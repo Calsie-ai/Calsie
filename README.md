@@ -1,2 +1,2 @@
 # applix
-Symbiotic Jon Applicator
+Symbiotic Job Applicator
