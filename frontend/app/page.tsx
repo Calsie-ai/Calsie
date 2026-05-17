@@ -1,370 +1,114 @@
 export default function HomePage() {
   return (
-    <main
-      style={{
-        padding: "40px",
-        fontFamily: "Arial, sans-serif",
-        background: "#f8f8fb",
-        minHeight: "100vh",
-      }}
-    >
-      {/* HEADER */}
-      <div style={{ marginBottom: "40px" }}>
-        <h1
-          style={{
-            fontSize: "42px",
-            fontWeight: 700,
-            marginBottom: "10px",
-          }}
-        >
-          Aplix – Job Match & Apply Workflow
-        </h1>
+    <main style={{ minHeight: "100vh", background: "#f7f6fb", padding: 24, fontFamily: "Arial" }}>
+      <h1>Aplix Job Swipe</h1>
+      <p>Swipe right for new matched jobs. Swipe left for old matched jobs. Scroll down to create resume and apply.</p>
 
-        <p
-          style={{
-            fontSize: "18px",
-            color: "#666",
-          }}
-        >
-          Swipe to explore new matches. Create a tailored resume, then apply
-          with one click.
-        </p>
-      </div>
+      <section style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 24, marginTop: 24 }}>
+        {/* LEFT JOB LIST */}
+        <aside>
+          <div style={{ background: "white", borderRadius: 18, padding: 18 }}>
+            <h3 style={{ color: "#6d35e8" }}>New Matched Jobs →</h3>
 
-      {/* MAIN GRID */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "320px 1fr 1fr",
-          gap: "30px",
-          alignItems: "start",
-        }}
-      >
-        {/* LEFT SIDEBAR */}
-        <div>
-          {/* NEW MATCHES */}
-          <div
-            style={{
-              background: "white",
-              borderRadius: "20px",
-              padding: "20px",
-              marginBottom: "30px",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-            }}
-          >
-            <h2 style={{ color: "#6c3df4" }}>✨ NEW MATCHED JOBS</h2>
-
-            {[
-              "NDIS Support Worker",
-              "Aged Care Support Worker",
-              "Disability Support Worker",
-            ].map((job, index) => (
-              <div
-                key={index}
-                style={{
-                  border: "1px solid #eee",
-                  borderRadius: "16px",
-                  padding: "15px",
-                  marginTop: "15px",
-                }}
-              >
-                <h3>{job}</h3>
-                <p style={{ color: "#777" }}>Sydney, NSW</p>
-                <div
-                  style={{
-                    background: "#dff7e3",
-                    color: "#2e8b57",
-                    display: "inline-block",
-                    padding: "4px 10px",
-                    borderRadius: "10px",
-                    fontSize: "12px",
-                  }}
-                >
-                  95% Match
-                </div>
+            {["NDIS Support Worker", "Aged Care Support Worker", "Disability Support Worker"].map((job) => (
+              <div key={job} style={{ border: "1px solid #eee", borderRadius: 14, padding: 14, marginTop: 12 }}>
+                <strong>{job}</strong>
+                <p>CareConnect Services</p>
+                <small>Sydney NSW • $35–$40/hr • 95% match</small>
               </div>
             ))}
           </div>
 
-          {/* OLD MATCHES */}
-          <div
-            style={{
-              background: "white",
-              borderRadius: "20px",
-              padding: "20px",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-            }}
-          >
-            <h2 style={{ color: "#6c3df4" }}>🕘 OLD MATCHED JOBS</h2>
+          <div style={{ background: "white", borderRadius: 18, padding: 18, marginTop: 20 }}>
+            <h3 style={{ color: "#6d35e8" }}>← Old Matched Jobs</h3>
 
-            {[
-              "Support Worker",
-              "Community Support Worker",
-              "Support Coordinator",
-            ].map((job, index) => (
-              <div
-                key={index}
-                style={{
-                  border: "1px solid #eee",
-                  borderRadius: "16px",
-                  padding: "15px",
-                  marginTop: "15px",
-                }}
-              >
-                <h3>{job}</h3>
-                <p style={{ color: "#777" }}>NSW</p>
+            {["Support Worker", "Community Support Worker", "Support Coordinator"].map((job) => (
+              <div key={job} style={{ border: "1px solid #eee", borderRadius: 14, padding: 14, marginTop: 12 }}>
+                <strong>{job}</strong>
+                <p>Older match</p>
+                <small>NSW • 80% match</small>
               </div>
             ))}
           </div>
-        </div>
+        </aside>
 
-        {/* JOB DETAILS */}
-        <div
-          style={{
-            background: "white",
-            borderRadius: "24px",
-            padding: "30px",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-          }}
-        >
-          <div
-            style={{
-              background: "#6c3df4",
-              color: "white",
-              display: "inline-block",
-              padding: "6px 14px",
-              borderRadius: "12px",
-              marginBottom: "20px",
-            }}
-          >
-            NEW MATCH
+        {/* MAIN SINGLE PAGE JOB CARD */}
+        <section style={{ background: "white", borderRadius: 24, padding: 28, maxHeight: "85vh", overflowY: "auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ width: 70, height: 70, borderRadius: 18, background: "#e8fff6", display: "grid", placeItems: "center", fontSize: 30 }}>
+              💜
+            </div>
+            <div>
+              <span style={{ background: "#6d35e8", color: "white", padding: "6px 10px", borderRadius: 10 }}>NEW MATCH</span>
+              <h2>NDIS Support Worker</h2>
+              <p>CareConnect Services</p>
+            </div>
           </div>
 
-          <h1 style={{ fontSize: "36px", marginBottom: "10px" }}>
-            NDIS Support Worker
-          </h1>
+          <p style={{ marginTop: 16 }}>📍 Sydney NSW • 💰 $35–$40/hr • ⏱ Part-time</p>
+          <p>Posted 2 hours ago • 2.3 km away</p>
 
-          <p style={{ color: "#777", marginBottom: "20px" }}>
-            Sydney, NSW • $35–40/hr • Part-time
-          </p>
+          <hr />
 
           <h3>About the role</h3>
-
-          <p
-            style={{
-              color: "#444",
-              lineHeight: 1.7,
-            }}
-          >
-            We are looking for a compassionate and reliable Support Worker to
-            join our team and support NDIS participants to achieve their goals
-            and live independently.
+          <p style={{ lineHeight: 1.7 }}>
+            We are looking for a compassionate and reliable Support Worker to support NDIS participants with daily living,
+            community access, appointments, and independence goals.
           </p>
 
-          {/* TAGS */}
-          <div
-            style={{
-              display: "flex",
-              gap: "10px",
-              marginTop: "20px",
-              flexWrap: "wrap",
-            }}
-          >
-            {["NDIS", "Community Support", "Disability Care"].map(
-              (tag, index) => (
-                <div
-                  key={index}
-                  style={{
-                    background: "#f2f2f7",
-                    padding: "8px 14px",
-                    borderRadius: "999px",
-                    fontSize: "14px",
-                  }}
-                >
-                  {tag}
-                </div>
-              )
-            )}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {["NDIS", "Community Support", "Disability Care"].map((tag) => (
+              <span key={tag} style={{ background: "#f1f1f5", padding: "8px 12px", borderRadius: 999 }}>{tag}</span>
+            ))}
           </div>
 
-          {/* CREATE RESUME */}
-          <div
-            style={{
-              marginTop: "40px",
-              border: "1px solid #ddd",
-              borderRadius: "20px",
-              padding: "20px",
-            }}
-          >
-            <h3>Create Your Resume</h3>
+          <div style={{ height: 180 }} />
 
-            <p style={{ color: "#666" }}>
-              AI will create a personalized resume tailored for this job.
-            </p>
-
-            <button
-              style={{
-                width: "100%",
-                background: "#6c3df4",
-                color: "white",
-                border: "none",
-                padding: "16px",
-                borderRadius: "14px",
-                marginTop: "20px",
-                fontSize: "16px",
-                cursor: "pointer",
-              }}
-            >
+          <h3>Create Your Resume</h3>
+          <div style={{ border: "1px solid #d8c9ff", background: "#fbf8ff", borderRadius: 18, padding: 18 }}>
+            <strong>Tailor a resume for this job</strong>
+            <p>AI will create a resume using your saved profile and this job description.</p>
+            <button style={{ width: "100%", background: "#6d35e8", color: "white", border: 0, borderRadius: 14, padding: 16 }}>
               Create Resume
             </button>
           </div>
 
-          {/* ACTIONS */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: "40px",
-            }}
-          >
-            <button
-              style={{
-                padding: "14px 20px",
-                borderRadius: "14px",
-                border: "1px solid #ddd",
-                background: "white",
-              }}
-            >
-              Skip
-            </button>
+          <div style={{ marginTop: 26 }}>
+            <h3>Your Tailored Resume</h3>
+            <div style={{ border: "1px solid #eee", borderRadius: 14, padding: 14 }}>
+              📄 NDIS_Support_Worker_Resume.pdf
+              <button style={{ float: "right" }}>Preview</button>
+            </div>
 
-            <button
-              style={{
-                padding: "14px 20px",
-                borderRadius: "14px",
-                border: "1px solid #ddd",
-                background: "white",
-              }}
-            >
-              Save
-            </button>
-
-            <button
-              style={{
-                padding: "14px 20px",
-                borderRadius: "14px",
-                border: "none",
-                background: "#20c997",
-                color: "white",
-              }}
-            >
-              Interested
-            </button>
+            <h3>Cover Letter</h3>
+            <div style={{ border: "1px solid #eee", borderRadius: 14, padding: 14 }}>
+              📄 Cover_Letter_NDIS_Support_Worker.pdf
+              <button style={{ float: "right" }}>Preview</button>
+            </div>
           </div>
 
-          {/* NEXT JOB */}
-          <button
-            style={{
-              width: "100%",
-              marginTop: "30px",
-              background: "#6c3df4",
-              color: "white",
-              border: "none",
-              padding: "18px",
-              borderRadius: "16px",
-              fontSize: "16px",
-            }}
-          >
-            Next Job →
-          </button>
-        </div>
-
-        {/* APPLY PANEL */}
-        <div
-          style={{
-            background: "white",
-            borderRadius: "24px",
-            padding: "30px",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-          }}
-        >
-          <h2>Your Tailored Resume</h2>
-
-          {/* RESUME FILE */}
-          <div
-            style={{
-              border: "1px solid #eee",
-              borderRadius: "16px",
-              padding: "16px",
-              marginTop: "20px",
-            }}
-          >
-            <strong>NDIS_Support_Worker_Resume.pdf</strong>
-            <p style={{ color: "#777" }}>Created just now</p>
-          </div>
-
-          {/* COVER LETTER */}
-          <div
-            style={{
-              border: "1px solid #eee",
-              borderRadius: "16px",
-              padding: "16px",
-              marginTop: "20px",
-            }}
-          >
-            <strong>Cover_Letter.pdf</strong>
-            <p style={{ color: "#777" }}>Created just now</p>
-          </div>
-
-          {/* APPLY */}
-          <div
-            style={{
-              marginTop: "30px",
-              background: "#f5fff8",
-              border: "1px solid #b7f0c7",
-              borderRadius: "20px",
-              padding: "20px",
-            }}
-          >
+          <div style={{ marginTop: 26, border: "1px solid #b9efc8", background: "#f3fff6", borderRadius: 18, padding: 18 }}>
             <h3>Apply To This Job</h3>
+            <p>Before resume creation, this button is grey. After resume creation, it turns green.</p>
 
-            <p style={{ color: "#666" }}>
-              Review your resume and approve the application.
-            </p>
+            <button style={{ width: "100%", background: "#22b96b", color: "white", border: 0, borderRadius: 14, padding: 16 }}>
+              Apply
+            </button>
+          </div>
 
-            <button
-              style={{
-                width: "100%",
-                marginTop: "20px",
-                background: "#20c997",
-                color: "white",
-                border: "none",
-                padding: "16px",
-                borderRadius: "14px",
-                fontSize: "16px",
-              }}
-            >
+          <div style={{ marginTop: 18, border: "1px solid #d8c9ff", background: "#fbf8ff", borderRadius: 18, padding: 18 }}>
+            <strong>Approve before applying</strong>
+            <p>Your application will be submitted only after your approval.</p>
+            <button style={{ width: "100%", background: "#6d35e8", color: "white", border: 0, borderRadius: 14, padding: 16 }}>
               Approve & Apply
             </button>
           </div>
 
-          {/* CONTINUE */}
-          <button
-            style={{
-              width: "100%",
-              marginTop: "30px",
-              background: "#6c3df4",
-              color: "white",
-              border: "none",
-              padding: "18px",
-              borderRadius: "16px",
-              fontSize: "16px",
-            }}
-          >
+          <button style={{ marginTop: 20, width: "100%", background: "#6d35e8", color: "white", border: 0, borderRadius: 14, padding: 18 }}>
             Next Job / Continue →
           </button>
-        </div>
-      </div>
+        </section>
+      </section>
     </main>
   );
 }
