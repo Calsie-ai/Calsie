@@ -1,12 +1,8 @@
-export default function Home() {
+export default function HomePage() {
   return (
-    <main style={{ padding: "40px", fontFamily: "Arial" }}>
-      <h1>Symbiote Applix</h1>
-      <p>Swipe jobs. Create tailored resumes. Approve applications.</p>
-
-      <button style={{ padding: "12px 20px", marginTop: "20px" }}>
-        Launch Symbiote
-      </button>
+    <main style={{ padding: "40px", fontFamily: "Arial, sans-serif" }}>
+      <h1>Applix is live</h1>
+      <p>Your Vercel deployment is working.</p>
     </main>
   );
 }
