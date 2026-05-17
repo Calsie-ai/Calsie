@@ -1,135 +1,370 @@
 export default function HomePage() {
   return (
-    <main style={styles.main}>
-      <section style={styles.hero}>
-        <p style={styles.badge}>Applix by ASSI</p>
-
-        <h1 style={styles.title}>
-          Your AI employment symbiote.
+    <main
+      style={{
+        padding: "40px",
+        fontFamily: "Arial, sans-serif",
+        background: "#f8f8fb",
+        minHeight: "100vh",
+      }}
+    >
+      {/* HEADER */}
+      <div style={{ marginBottom: "40px" }}>
+        <h1
+          style={{
+            fontSize: "42px",
+            fontWeight: 700,
+            marginBottom: "10px",
+          }}
+        >
+          Aplix – Job Match & Apply Workflow
         </h1>
 
-        <p style={styles.subtitle}>
-          Applix helps users understand jobs, applications, resumes,
-          interviews, and workplace tasks with guided AI support.
+        <p
+          style={{
+            fontSize: "18px",
+            color: "#666",
+          }}
+        >
+          Swipe to explore new matches. Create a tailored resume, then apply
+          with one click.
         </p>
+      </div>
 
-        <div style={styles.buttons}>
-          <a href="#start" style={styles.primaryButton}>
-            Start with Applix
-          </a>
-          <a href="#features" style={styles.secondaryButton}>
-            See features
-          </a>
+      {/* MAIN GRID */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "320px 1fr 1fr",
+          gap: "30px",
+          alignItems: "start",
+        }}
+      >
+        {/* LEFT SIDEBAR */}
+        <div>
+          {/* NEW MATCHES */}
+          <div
+            style={{
+              background: "white",
+              borderRadius: "20px",
+              padding: "20px",
+              marginBottom: "30px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+            }}
+          >
+            <h2 style={{ color: "#6c3df4" }}>✨ NEW MATCHED JOBS</h2>
+
+            {[
+              "NDIS Support Worker",
+              "Aged Care Support Worker",
+              "Disability Support Worker",
+            ].map((job, index) => (
+              <div
+                key={index}
+                style={{
+                  border: "1px solid #eee",
+                  borderRadius: "16px",
+                  padding: "15px",
+                  marginTop: "15px",
+                }}
+              >
+                <h3>{job}</h3>
+                <p style={{ color: "#777" }}>Sydney, NSW</p>
+                <div
+                  style={{
+                    background: "#dff7e3",
+                    color: "#2e8b57",
+                    display: "inline-block",
+                    padding: "4px 10px",
+                    borderRadius: "10px",
+                    fontSize: "12px",
+                  }}
+                >
+                  95% Match
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* OLD MATCHES */}
+          <div
+            style={{
+              background: "white",
+              borderRadius: "20px",
+              padding: "20px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+            }}
+          >
+            <h2 style={{ color: "#6c3df4" }}>🕘 OLD MATCHED JOBS</h2>
+
+            {[
+              "Support Worker",
+              "Community Support Worker",
+              "Support Coordinator",
+            ].map((job, index) => (
+              <div
+                key={index}
+                style={{
+                  border: "1px solid #eee",
+                  borderRadius: "16px",
+                  padding: "15px",
+                  marginTop: "15px",
+                }}
+              >
+                <h3>{job}</h3>
+                <p style={{ color: "#777" }}>NSW</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </section>
 
-      <section id="features" style={styles.section}>
-        <h2>What Applix will do</h2>
-
-        <div style={styles.grid}>
-          <div style={styles.card}>
-            <h3>Resume guidance</h3>
-            <p>Help users improve resumes, cover letters, and job applications.</p>
+        {/* JOB DETAILS */}
+        <div
+          style={{
+            background: "white",
+            borderRadius: "24px",
+            padding: "30px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+          }}
+        >
+          <div
+            style={{
+              background: "#6c3df4",
+              color: "white",
+              display: "inline-block",
+              padding: "6px 14px",
+              borderRadius: "12px",
+              marginBottom: "20px",
+            }}
+          >
+            NEW MATCH
           </div>
 
-          <div style={styles.card}>
-            <h3>Job search support</h3>
-            <p>Guide users through job listings, requirements, and next steps.</p>
+          <h1 style={{ fontSize: "36px", marginBottom: "10px" }}>
+            NDIS Support Worker
+          </h1>
+
+          <p style={{ color: "#777", marginBottom: "20px" }}>
+            Sydney, NSW • $35–40/hr • Part-time
+          </p>
+
+          <h3>About the role</h3>
+
+          <p
+            style={{
+              color: "#444",
+              lineHeight: 1.7,
+            }}
+          >
+            We are looking for a compassionate and reliable Support Worker to
+            join our team and support NDIS participants to achieve their goals
+            and live independently.
+          </p>
+
+          {/* TAGS */}
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              marginTop: "20px",
+              flexWrap: "wrap",
+            }}
+          >
+            {["NDIS", "Community Support", "Disability Care"].map(
+              (tag, index) => (
+                <div
+                  key={index}
+                  style={{
+                    background: "#f2f2f7",
+                    padding: "8px 14px",
+                    borderRadius: "999px",
+                    fontSize: "14px",
+                  }}
+                >
+                  {tag}
+                </div>
+              )
+            )}
           </div>
 
-          <div style={styles.card}>
-            <h3>Interview preparation</h3>
-            <p>Practice questions, answers, and confidence-building support.</p>
+          {/* CREATE RESUME */}
+          <div
+            style={{
+              marginTop: "40px",
+              border: "1px solid #ddd",
+              borderRadius: "20px",
+              padding: "20px",
+            }}
+          >
+            <h3>Create Your Resume</h3>
+
+            <p style={{ color: "#666" }}>
+              AI will create a personalized resume tailored for this job.
+            </p>
+
+            <button
+              style={{
+                width: "100%",
+                background: "#6c3df4",
+                color: "white",
+                border: "none",
+                padding: "16px",
+                borderRadius: "14px",
+                marginTop: "20px",
+                fontSize: "16px",
+                cursor: "pointer",
+              }}
+            >
+              Create Resume
+            </button>
           </div>
 
-          <div style={styles.card}>
-            <h3>Workplace assistant</h3>
-            <p>Help users understand tasks, emails, forms, and workplace systems.</p>
+          {/* ACTIONS */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: "40px",
+            }}
+          >
+            <button
+              style={{
+                padding: "14px 20px",
+                borderRadius: "14px",
+                border: "1px solid #ddd",
+                background: "white",
+              }}
+            >
+              Skip
+            </button>
+
+            <button
+              style={{
+                padding: "14px 20px",
+                borderRadius: "14px",
+                border: "1px solid #ddd",
+                background: "white",
+              }}
+            >
+              Save
+            </button>
+
+            <button
+              style={{
+                padding: "14px 20px",
+                borderRadius: "14px",
+                border: "none",
+                background: "#20c997",
+                color: "white",
+              }}
+            >
+              Interested
+            </button>
           </div>
+
+          {/* NEXT JOB */}
+          <button
+            style={{
+              width: "100%",
+              marginTop: "30px",
+              background: "#6c3df4",
+              color: "white",
+              border: "none",
+              padding: "18px",
+              borderRadius: "16px",
+              fontSize: "16px",
+            }}
+          >
+            Next Job →
+          </button>
         </div>
-      </section>
 
-      <section id="start" style={styles.section}>
-        <h2>Early access</h2>
-        <p>
-          Applix is currently being built. This page confirms the deployment
-          pipeline is working and ready for the next product features.
-        </p>
-      </section>
+        {/* APPLY PANEL */}
+        <div
+          style={{
+            background: "white",
+            borderRadius: "24px",
+            padding: "30px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+          }}
+        >
+          <h2>Your Tailored Resume</h2>
+
+          {/* RESUME FILE */}
+          <div
+            style={{
+              border: "1px solid #eee",
+              borderRadius: "16px",
+              padding: "16px",
+              marginTop: "20px",
+            }}
+          >
+            <strong>NDIS_Support_Worker_Resume.pdf</strong>
+            <p style={{ color: "#777" }}>Created just now</p>
+          </div>
+
+          {/* COVER LETTER */}
+          <div
+            style={{
+              border: "1px solid #eee",
+              borderRadius: "16px",
+              padding: "16px",
+              marginTop: "20px",
+            }}
+          >
+            <strong>Cover_Letter.pdf</strong>
+            <p style={{ color: "#777" }}>Created just now</p>
+          </div>
+
+          {/* APPLY */}
+          <div
+            style={{
+              marginTop: "30px",
+              background: "#f5fff8",
+              border: "1px solid #b7f0c7",
+              borderRadius: "20px",
+              padding: "20px",
+            }}
+          >
+            <h3>Apply To This Job</h3>
+
+            <p style={{ color: "#666" }}>
+              Review your resume and approve the application.
+            </p>
+
+            <button
+              style={{
+                width: "100%",
+                marginTop: "20px",
+                background: "#20c997",
+                color: "white",
+                border: "none",
+                padding: "16px",
+                borderRadius: "14px",
+                fontSize: "16px",
+              }}
+            >
+              Approve & Apply
+            </button>
+          </div>
+
+          {/* CONTINUE */}
+          <button
+            style={{
+              width: "100%",
+              marginTop: "30px",
+              background: "#6c3df4",
+              color: "white",
+              border: "none",
+              padding: "18px",
+              borderRadius: "16px",
+              fontSize: "16px",
+            }}
+          >
+            Next Job / Continue →
+          </button>
+        </div>
+      </div>
     </main>
   );
 }
-
-const styles = {
-  main: {
-    minHeight: "100vh",
-    background: "#0b0f19",
-    color: "#ffffff",
-    fontFamily: "Arial, Helvetica, sans-serif",
-  },
-  hero: {
-    padding: "90px 24px",
-    maxWidth: "1000px",
-    margin: "0 auto",
-  },
-  badge: {
-    display: "inline-block",
-    padding: "8px 14px",
-    border: "1px solid #334155",
-    borderRadius: "999px",
-    color: "#93c5fd",
-    marginBottom: "24px",
-  },
-  title: {
-    fontSize: "56px",
-    lineHeight: "1.05",
-    margin: "0 0 24px",
-    maxWidth: "760px",
-  },
-  subtitle: {
-    fontSize: "20px",
-    lineHeight: "1.6",
-    color: "#cbd5e1",
-    maxWidth: "720px",
-  },
-  buttons: {
-    display: "flex",
-    gap: "14px",
-    marginTop: "32px",
-    flexWrap: "wrap" as const,
-  },
-  primaryButton: {
-    background: "#3b82f6",
-    color: "#ffffff",
-    padding: "14px 20px",
-    borderRadius: "10px",
-    textDecoration: "none",
-    fontWeight: "bold",
-  },
-  secondaryButton: {
-    background: "transparent",
-    color: "#ffffff",
-    padding: "14px 20px",
-    borderRadius: "10px",
-    textDecoration: "none",
-    border: "1px solid #334155",
-    fontWeight: "bold",
-  },
-  section: {
-    maxWidth: "1000px",
-    margin: "0 auto",
-    padding: "40px 24px",
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: "18px",
-    marginTop: "24px",
-  },
-  card: {
-    background: "#111827",
-    border: "1px solid #1f2937",
-    borderRadius: "16px",
-    padding: "22px",
-  },
-};
