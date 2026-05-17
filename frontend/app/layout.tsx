@@ -1,3 +1,5 @@
+import "./globals.css";
+
 export const metadata = {
   title: "Symbiote Applix",
   description: "AI employment symbiote",
