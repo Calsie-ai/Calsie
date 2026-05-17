@@ -1,2 +1,0 @@
-# applix
-Symbiotic Job Applicator
