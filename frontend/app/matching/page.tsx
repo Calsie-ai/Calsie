@@ -1,8 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { jobs } from "../data/jobs";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../../lib/supabaseClient";
+import { jobs as demoJobs } from "../data/jobs";
+
+type FlowState = "empty" | "resume" | "edit" | "approved" | "email" | "sent";
+
+type MatchJob = {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  salary: string;
+  type: string;
+  description: string;
+  tags: string[];
+  logo: string;
+  match: number;
+  applyUrl?: string;
+  extractedEmail?: string | null;
+  source: "supabase" | "demo";
+};
 
 const mockUser = {
   fullName: "Demo Applicant",
@@ -13,37 +32,89 @@ const mockUser = {
   certificates: ["First Aid", "CPR", "NDIS Worker Screening Check"],
 };
 
-type FlowState = "empty" | "resume" | "edit" | "approved" | "email" | "sent";
-
 export default function MatchingPage() {
+  const [jobs, setJobs] = useState<MatchJob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [usingDemo, setUsingDemo] = useState(false);
   const [index, setIndex] = useState(0);
   const [flowState, setFlowState] = useState<FlowState>("empty");
   const [summary, setSummary] = useState("");
   const [skillsText, setSkillsText] = useState("");
   const [experienceText, setExperienceText] = useState("");
+
+  useEffect(() => {
+    loadJobs();
+  }, []);
+
+  async function loadJobs() {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("id,title,company,location,salary,job_type,description,match_score,category,required_certificates,work_mode,experience_level,apply_url,extracted_email,source")
+      .eq("status", "new")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (!error && data && data.length > 0) {
+      setJobs(data.map(mapSupabaseJob));
+      setUsingDemo(false);
+      setIndex(0);
+      resetResume();
+    } else {
+      setJobs(demoJobs.map((job, itemIndex) => ({ ...job, id: `demo-${itemIndex}`, source: "demo" })));
+      setUsingDemo(true);
+    }
+
+    setLoading(false);
+  }
+
   const job = jobs[index];
+  const skills = useMemo(() => skillsText.split("\n").map((item) => item.trim()).filter(Boolean), [skillsText]);
+  const bullets = useMemo(() => experienceText.split("\n").map((item) => item.trim()).filter(Boolean), [experienceText]);
+
+  function resetResume() {
+    setFlowState("empty");
+    setSummary("");
+    setSkillsText("");
+    setExperienceText("");
+  }
 
   function createResume() {
-    setSummary(`Reliable ${job.title} with practical experience supporting clients with daily routines, community access, appointments, transport, documentation, and safe person-centred support.`);
-    setSkillsText([...job.tags, "Client documentation", "Care plan support", "Communication"].join("\n"));
+    if (!job) return;
+
+    setSummary(`Reliable ${job.title} with practical experience supporting clients with daily routines, communication, documentation, and safe person-centred support. Strong interest in ${job.company} and the requirements of this role.`);
+    setSkillsText([...new Set([...job.tags, "Client documentation", "Communication", "Safe routines"])].join("\n"));
     setExperienceText([
       `Supported clients with daily living, appointments, transport, and community access relevant to ${job.title} duties.`,
       "Followed care plans and maintained clear communication with clients, families, and care teams.",
-      "Completed support notes and helped clients work toward independence and safety goals.",
+      "Completed support notes and helped clients work toward independence, safety, and personal goals.",
     ].join("\n"));
     setFlowState("resume");
   }
 
   function nextJob() {
-    setFlowState("empty");
-    setSummary("");
-    setSkillsText("");
-    setExperienceText("");
+    resetResume();
     setIndex((index + 1) % jobs.length);
   }
 
-  const skills = skillsText.split("\n").map((item) => item.trim()).filter(Boolean);
-  const bullets = experienceText.split("\n").map((item) => item.trim()).filter(Boolean);
+  if (loading) {
+    return <main style={styles.main}>Loading jobs...</main>;
+  }
+
+  if (!job) {
+    return (
+      <main style={styles.main}>
+        <section style={styles.shell}>
+          <article style={styles.card}>
+            <h1>No jobs yet.</h1>
+            <p style={styles.description}>Come back in 1 hour. Applix is preparing new job data for you.</p>
+            <Link href="/adzuna-test" style={styles.secondaryButton}>Fetch Adzuna jobs</Link>
+          </article>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main style={styles.main}>
@@ -54,6 +125,12 @@ export default function MatchingPage() {
           <span style={styles.count}>{index + 1}/{jobs.length}</span>
         </header>
 
+        {usingDemo && (
+          <div style={styles.warningBox}>
+            Showing demo cards because Supabase has no Adzuna jobs yet. Use <Link href="/adzuna-test">/adzuna-test</Link> to fetch real jobs.
+          </div>
+        )}
+
         <article style={styles.card}>
           <div style={styles.heroCard}>
             <div style={styles.logo}>{job.logo}</div>
@@ -63,7 +140,7 @@ export default function MatchingPage() {
           </div>
 
           <div style={styles.chips}>
-            {[job.location, job.salary, job.type].map((item) => <span key={item} style={styles.chip}>{item}</span>)}
+            {[job.location, job.salary, job.type].filter(Boolean).map((item) => <span key={item} style={styles.chip}>{item}</span>)}
           </div>
 
           <section style={styles.infoBox}>
@@ -74,7 +151,7 @@ export default function MatchingPage() {
 
           <section style={styles.kitBox}>
             <h2 style={styles.infoTitle}>Tailored resume</h2>
-            <p style={styles.description}>Create a resume under this card using the master resume template. This is the mock-data MVP before Adzuna, OpenAI, PDF storage, and email sending are connected.</p>
+            <p style={styles.description}>Create a resume under this card. Real Adzuna jobs are now supported when the jobs table has data.</p>
             <button onClick={createResume} style={styles.createButton}>Create Resume</button>
           </section>
 
@@ -118,9 +195,10 @@ export default function MatchingPage() {
               {(flowState === "email" || flowState === "sent") && (
                 <section style={styles.emailDraft}>
                   <h2 style={styles.infoTitle}>Email draft</h2>
-                  <p><strong>To:</strong> hiring email will come from Adzuna or the job ad.</p>
+                  <p><strong>To:</strong> {job.extractedEmail || "No email found. Use apply link."}</p>
                   <p><strong>Subject:</strong> Application for {job.title} - {mockUser.fullName}</p>
                   <div style={styles.emailBody}>Dear Hiring Manager,<br /><br />Please find attached my resume for the {job.title} position at {job.company}.<br /><br />Kind regards,<br />{mockUser.fullName}</div>
+                  {job.applyUrl && <p><strong>Apply URL:</strong> <a href={job.applyUrl} target="_blank">Open job application</a></p>}
                   <p style={styles.attachment}>Attachment: generated resume PDF</p>
                   <button onClick={() => setFlowState("sent")} style={styles.sendButton}>{flowState === "sent" ? "Application Sent" : "Send Application"}</button>
                 </section>
@@ -138,6 +216,26 @@ export default function MatchingPage() {
   );
 }
 
+function mapSupabaseJob(row: any): MatchJob {
+  const tags = [row.category, row.work_mode, row.experience_level, ...(row.required_certificates || [])].filter(Boolean);
+
+  return {
+    id: row.id,
+    title: row.title || "Untitled job",
+    company: row.company || "Unknown company",
+    location: row.location || "Location not listed",
+    salary: row.salary || "Salary not listed",
+    type: row.job_type || "Job type not listed",
+    description: row.description || "No description provided.",
+    tags: tags.length ? tags : ["Adzuna"],
+    logo: "💼",
+    match: row.match_score || 75,
+    applyUrl: row.apply_url || undefined,
+    extractedEmail: row.extracted_email || null,
+    source: "supabase",
+  };
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <section style={styles.paperSection}><h2 style={styles.paperSectionTitle}>{title}</h2>{children}</section>;
 }
@@ -148,6 +246,7 @@ const styles = {
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 4px 18px" },
   backLink: { color: "#111827", textDecoration: "none", fontWeight: 800 },
   count: { color: "#6b7280", fontWeight: 700 },
+  warningBox: { background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", borderRadius: 18, padding: 12, fontWeight: 800, marginBottom: 12, lineHeight: 1.5 },
   card: { flex: 1, background: "white", borderRadius: 34, padding: 16, boxShadow: "0 24px 70px rgba(15,23,42,0.18)" },
   heroCard: { minHeight: 280, borderRadius: 28, padding: 24, color: "white", background: "linear-gradient(135deg, #7c3aed 0%, #ec4899 60%, #fb923c 100%)", display: "flex", flexDirection: "column" as const, justifyContent: "flex-end" },
   logo: { width: 72, height: 72, borderRadius: 24, background: "rgba(255,255,255,0.22)", display: "grid", placeItems: "center", fontSize: 34, marginBottom: "auto" },
@@ -180,7 +279,8 @@ const styles = {
   paperMeta: { margin: "4px 0 8px", color: "#64748b", fontWeight: 800 },
   paperList: { color: "#334155", lineHeight: 1.6, paddingLeft: 18 },
   resumeActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 },
-  secondaryAction: { border: "1px solid #d1d5db", background: "white", color: "#111827", borderRadius: 999, padding: 13, fontWeight: 900, cursor: "pointer" },
+  secondaryAction: { border: "1px solid #d1d5db", background: "white", color: "#111827", borderRadius: 999, padding: 13, fontWeight: 900, cursor: "pointer", textDecoration: "none" },
+  secondaryButton: { display: "inline-block", border: "1px solid #d1d5db", background: "white", color: "#111827", borderRadius: 999, padding: 13, fontWeight: 900, cursor: "pointer", textDecoration: "none" },
   approveButton: { gridColumn: "1 / -1", border: 0, background: "#22c55e", color: "white", borderRadius: 999, padding: 13, fontWeight: 900, cursor: "pointer" },
   approvedBox: { marginTop: 14, borderRadius: 18, background: "#dcfce7", color: "#166534", padding: 14, fontWeight: 900, lineHeight: 1.5 },
   inlineButton: { marginTop: 10, display: "block", border: 0, borderRadius: 999, padding: "10px 14px", background: "#166534", color: "white", fontWeight: 900, cursor: "pointer" },
