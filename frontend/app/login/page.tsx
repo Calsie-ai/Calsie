@@ -20,17 +20,22 @@ export default function LoginPage() {
 
     try {
       if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            },
+          },
+        });
+
         if (error) throw error;
 
-        if (data.user) {
-          const { error: profileError } = await supabase.from("profiles").upsert({
-            id: data.user.id,
-            full_name: fullName,
-            email,
-          });
-
-          if (profileError) throw profileError;
+        if (!data.session) {
+          setMessage("Account created. Please check your email to confirm your account, then log in.");
+          setMode("login");
+          return;
         }
 
         router.push("/profile");
@@ -82,7 +87,7 @@ export default function LoginPage() {
             {loading ? "Please wait..." : mode === "login" ? "Login" : "Create account"}
           </button>
 
-          {message && <p style={styles.message}>{message}</p>}
+          {message && <p style={message.includes("created") ? styles.successMessage : styles.message}>{message}</p>}
         </div>
       </section>
     </main>
@@ -183,5 +188,13 @@ const styles = {
   message: {
     color: "#dc2626",
     lineHeight: 1.5,
+  },
+  successMessage: {
+    color: "#166534",
+    background: "#dcfce7",
+    padding: 12,
+    borderRadius: 14,
+    lineHeight: 1.5,
+    fontWeight: 800,
   },
 };
