@@ -84,7 +84,7 @@ export default function MatchingPage() {
     if (!job) return;
 
     setSummary(`Reliable ${job.title} with practical experience supporting clients with daily routines, communication, documentation, and safe person-centred support. Strong interest in ${job.company} and the requirements of this role.`);
-    setSkillsText([...new Set([...job.tags, "Client documentation", "Communication", "Safe routines"])].join("\n"));
+    setSkillsText(Array.from(new Set([...job.tags, "Client documentation", "Communication", "Safe routines"])).join("\n"));
     setExperienceText([
       `Supported clients with daily living, appointments, transport, and community access relevant to ${job.title} duties.`,
       "Followed care plans and maintained clear communication with clients, families, and care teams.",
