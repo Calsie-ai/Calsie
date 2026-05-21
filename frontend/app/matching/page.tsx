@@ -196,6 +196,10 @@ export default function MatchingPage() {
     }
   }
 
+  function updateProfileField(key: "full_name" | "phone" | "email" | "location" | "target_role", value: string) {
+    setProfile((current) => ({ ...current, [key]: value }));
+  }
+
   function updateResumeField(key: keyof ResumeDraft, value: string) {
     setResumeDraft((current) => {
       if (!current) return current;
@@ -299,6 +303,15 @@ export default function MatchingPage() {
                     <div><p style={styles.kitLabel}>Live resume editor</p><h2 style={styles.editorTitle}>Edit the draft below</h2></div>
                     <button onClick={() => setFlowState("draft")} style={styles.smallDarkButton}>Done editing</button>
                   </div>
+
+                  <div style={styles.contactGrid}>
+                    <label style={styles.editorLabel}>Full name<input style={styles.input} value={profile.full_name} onChange={(event) => updateProfileField("full_name", event.target.value)} /></label>
+                    <label style={styles.editorLabel}>Target role<input style={styles.input} value={profile.target_role} onChange={(event) => updateProfileField("target_role", event.target.value)} /></label>
+                    <label style={styles.editorLabel}>Phone<input style={styles.input} value={profile.phone} onChange={(event) => updateProfileField("phone", event.target.value)} /></label>
+                    <label style={styles.editorLabel}>Email<input style={styles.input} value={profile.email} onChange={(event) => updateProfileField("email", event.target.value)} /></label>
+                    <label style={styles.editorLabel}>Location<input style={styles.input} value={profile.location} onChange={(event) => updateProfileField("location", event.target.value)} /></label>
+                  </div>
+
                   <label style={styles.editorLabel}>Profile summary<textarea style={styles.textarea} value={resumeDraft.summary} onChange={(event) => updateResumeField("summary", event.target.value)} /></label>
                   <label style={styles.editorLabel}>Key skills - one per line<textarea style={styles.textarea} value={resumeDraft.skills.join("\n")} onChange={(event) => updateResumeField("skills", event.target.value)} /></label>
                   <label style={styles.editorLabel}>Experience bullets - one per line<textarea style={styles.textarea} value={resumeDraft.bullets.join("\n")} onChange={(event) => updateResumeField("bullets", event.target.value)} /></label>
@@ -307,7 +320,7 @@ export default function MatchingPage() {
               )}
 
               <article style={styles.resumePaper}>
-                <header style={styles.paperHeader}><h1>{profile.full_name}</h1><strong>{job.title}</strong><p>{profile.phone} | {profile.email} | {profile.location}</p></header>
+                <header style={styles.paperHeader}><h1>{profile.full_name}</h1><strong>{job.title || profile.target_role}</strong><p>{profile.phone} | {profile.email} | {profile.location}</p></header>
                 <PaperSection title="Profile"><p>{resumeDraft.summary}</p></PaperSection>
                 <PaperSection title="Key skills"><ul>{resumeDraft.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul></PaperSection>
                 <PaperSection title="Work experience">
@@ -421,6 +434,7 @@ const styles = {
   editorHeader: { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", marginBottom: 14 },
   editorTitle: { margin: "6px 0 0", color: "#111827" },
   editorLabel: { display: "grid", gap: 8, marginTop: 12, color: "#334155", fontWeight: 900 },
+  contactGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 },
   input: { border: "1px solid #d1d5db", borderRadius: 16, padding: 13, fontFamily: "Arial, Helvetica, sans-serif", fontSize: 15 },
   helperText: { color: "#166534", lineHeight: 1.6, fontWeight: 800 },
   textarea: { minHeight: 110, border: "1px solid #d1d5db", borderRadius: 16, padding: 13, fontFamily: "Arial, Helvetica, sans-serif", fontSize: 14, lineHeight: 1.5, resize: "vertical" as const },
