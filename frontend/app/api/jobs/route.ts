@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   url.searchParams.set("app_key", appKey);
   url.searchParams.set("what", role);
   url.searchParams.set("where", location);
-  url.searchParams.set("results_per_page", "20");
+  url.searchParams.set("results_per_page", "50");
   url.searchParams.set("content-type", "application/json");
 
   try {
@@ -55,30 +55,34 @@ export async function GET(request: Request) {
           source: "adzuna",
           error: `Adzuna request failed: ${response.status}`,
           details: text.slice(0, 500),
-          jobs: demoJobs,
+          jobs: [],
         },
         { status: 200 }
       );
     }
 
     const data = await response.json();
-    const jobs = (data.results || []).map(mapAdzunaJob);
+    const allJobs = (data.results || []).map(mapAdzunaJob);
+    const jobsWithEmail = allJobs.filter((job: any) => Boolean(job.contactEmail)).slice(0, 20);
 
     return NextResponse.json({
       ok: true,
       source: "adzuna",
       query: role,
       location,
-      count: jobs.length,
-      jobs: jobs.length ? jobs : demoJobs,
-      message: jobs.length ? "Fetched live jobs from Adzuna." : "No Adzuna jobs found. Showing demo jobs.",
+      count: jobsWithEmail.length,
+      total_checked: allJobs.length,
+      jobs: jobsWithEmail,
+      message: jobsWithEmail.length
+        ? `Fetched ${jobsWithEmail.length} Adzuna jobs with hiring emails.`
+        : "No Adzuna jobs with hiring email found. Try another role/location or use Visit jobsite.",
     });
   } catch (error: any) {
     return NextResponse.json({
       ok: false,
       source: "error",
       error: error?.message || "Unknown job fetch error",
-      jobs: demoJobs,
+      jobs: [],
     });
   }
 }
@@ -98,7 +102,7 @@ function mapAdzunaJob(job: AdzunaJob, index: number) {
     type: formatJobType(job.contract_time),
     match: Math.max(72, 96 - index * 2),
     description: cleanDescription,
-    tags: [job.category?.label, "Adzuna", "Live job"].filter(Boolean),
+    tags: [job.category?.label, "Adzuna", "Hiring email", "Live job"].filter(Boolean),
     applyUrl: job.redirect_url || null,
     contactEmail,
   };
