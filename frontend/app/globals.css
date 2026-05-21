@@ -26,3 +26,45 @@ textarea,
 select {
   font: inherit;
 }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  article article,
+  article article * {
+    visibility: visible !important;
+  }
+
+  article article {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+
+  article article section,
+  article article header,
+  article article div {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
