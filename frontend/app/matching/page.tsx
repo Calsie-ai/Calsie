@@ -16,6 +16,7 @@ type MatchJob = {
   logo: string;
   match: number;
   applyUrl?: string | null;
+  contactEmail?: string | null;
 };
 
 type ResumeProfile = {
@@ -69,6 +70,10 @@ export default function MatchingPage() {
   useEffect(() => {
     loadEverything();
   }, []);
+
+  useEffect(() => {
+    if (job?.contactEmail) setRecipientEmail(job.contactEmail);
+  }, [index, jobs]);
 
   async function loadEverything() {
     setLoading(true);
@@ -140,6 +145,7 @@ export default function MatchingPage() {
       setSource(data.source || "unknown");
       setMessage(data.message || "Jobs loaded.");
       setIndex(0);
+      if (data.jobs?.[0]?.contactEmail) setRecipientEmail(data.jobs[0].contactEmail);
     } catch (error: any) {
       setMessage(error?.message || "Could not load jobs.");
       setJobs([]);
@@ -151,14 +157,15 @@ export default function MatchingPage() {
   const isLongDescription = jobDescription.length > 460;
   const emailSubject = job ? `Application for ${job.title} - ${profile.full_name}` : "Application";
   const emailBody = resumeDraft ? buildEmailBody(resumeDraft, profile, job) : "";
-  const emailUrl = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+  const mailtoUrl = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
 
   function resetForNext(newIndex: number) {
     setResumeDraft(null);
     setFlowState("idle");
     setAiMessage("");
     setShowFullDescription(false);
-    setRecipientEmail("");
+    setRecipientEmail(jobs[newIndex]?.contactEmail || "");
     setIndex(newIndex);
   }
 
@@ -216,10 +223,10 @@ export default function MatchingPage() {
     });
   }
 
-  function openEmailDraft(event: React.MouseEvent<HTMLAnchorElement>) {
+  function validateEmailDraft(event: React.MouseEvent<HTMLAnchorElement>) {
     if (!recipientEmail.includes("@")) {
       event.preventDefault();
-      setAiMessage("Add the employer email first, then open the Gmail draft.");
+      setAiMessage("No hiring email found in this job ad. Add the employer email first, or use Visit jobsite.");
       return;
     }
     setFlowState("opened");
@@ -274,6 +281,7 @@ export default function MatchingPage() {
             <span>{job.type || "Job type not listed"}</span>
           </div>
 
+          {job.contactEmail && <div style={styles.contactFound}>Hiring email found: {job.contactEmail}</div>}
           {job.applyUrl && <a href={job.applyUrl} target="_blank" rel="noreferrer" style={styles.jobsiteButton}>Visit jobsite</a>}
 
           <section style={styles.sectionBox}>
@@ -346,11 +354,14 @@ export default function MatchingPage() {
               {(flowState === "email" || flowState === "opened") && (
                 <section style={styles.emailDraft}>
                   <h2>Gmail draft</h2>
-                  <p style={styles.helperText}>This opens the user's email app with the application already written. The user reviews it and taps send inside Gmail.</p>
+                  <p style={styles.helperText}>If Adzuna includes a hiring email in the job description, Applix fills it below. Gmail web opens reliably in Chrome; the app button uses your device default email app.</p>
                   <label style={styles.editorLabel}>Employer email<input style={styles.input} value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="employer email" /></label>
                   <p><strong>Subject:</strong> {emailSubject}</p>
                   <div style={styles.emailBody}>{emailBody}</div>
-                  <a href={emailUrl} onClick={openEmailDraft} style={styles.approveButton}>{flowState === "opened" ? "Draft opened" : "Open Gmail app"}</a>
+                  <div style={styles.emailButtons}>
+                    <a href={gmailUrl} target="_blank" rel="noreferrer" onClick={validateEmailDraft} style={styles.approveButton}>{flowState === "opened" ? "Gmail opened" : "Open Gmail web"}</a>
+                    <a href={mailtoUrl} onClick={validateEmailDraft} style={styles.secondaryButton}>Open email app</a>
+                  </div>
                 </section>
               )}
             </section>
@@ -441,6 +452,7 @@ const styles = {
   title: { margin: "8px 0 0", fontSize: "clamp(34px, 6vw, 54px)", lineHeight: 1, letterSpacing: -2 },
   match: { minWidth: 70, textAlign: "center" as const, borderRadius: 18, padding: "12px 10px", background: "#ecfdf5", color: "#047857", fontWeight: 900, fontSize: 20 },
   metaRow: { display: "flex", flexWrap: "wrap" as const, gap: 10, marginTop: 22 },
+  contactFound: { display: "inline-block", marginTop: 18, marginRight: 10, borderRadius: 999, background: "#dcfce7", color: "#166534", padding: "13px 18px", fontWeight: 900 },
   jobsiteButton: { display: "inline-block", marginTop: 18, borderRadius: 999, background: "#2563eb", color: "white", padding: "13px 18px", fontWeight: 900, textDecoration: "none" },
   sectionBox: { marginTop: 22, padding: 20, borderRadius: 22, background: "#f8fafc", color: "#334155", lineHeight: 1.7 },
   readMoreButton: { border: 0, background: "transparent", color: "#2563eb", fontWeight: 900, padding: "8px 0 0", cursor: "pointer" },
@@ -470,6 +482,7 @@ const styles = {
   smallButton: { display: "block", marginTop: 12, border: 0, borderRadius: 999, background: "#166534", color: "white", padding: "10px 14px", fontWeight: 900, cursor: "pointer" },
   emailDraft: { marginTop: 14, padding: 18, borderRadius: 22, background: "#ecfdf5", border: "1px solid #bbf7d0" },
   emailBody: { whiteSpace: "pre-line" as const, background: "white", border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, lineHeight: 1.7 },
+  emailButtons: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 },
   actions: { display: "grid", gridTemplateColumns: "1fr 1fr 1.3fr", gap: 12, marginTop: 20 },
   primaryButton: { display: "block", textAlign: "center" as const, border: 0, borderRadius: 999, background: "#111827", color: "white", padding: "15px 18px", fontWeight: 900, textDecoration: "none", cursor: "pointer" },
   secondaryButton: { display: "block", textAlign: "center" as const, border: "1px solid #e5e7eb", borderRadius: 999, background: "white", color: "#111827", padding: "15px 18px", fontWeight: 900, textDecoration: "none", cursor: "pointer" },
