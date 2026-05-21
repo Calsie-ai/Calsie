@@ -85,6 +85,8 @@ export async function GET(request: Request) {
 
 function mapAdzunaJob(job: AdzunaJob, index: number) {
   const salary = formatSalary(job.salary_min, job.salary_max);
+  const cleanDescription = stripHtml(job.description || "No description provided.");
+  const contactEmail = extractEmail(cleanDescription);
 
   return {
     id: job.id || `adzuna-${index}`,
@@ -95,9 +97,10 @@ function mapAdzunaJob(job: AdzunaJob, index: number) {
     salary,
     type: formatJobType(job.contract_time),
     match: Math.max(72, 96 - index * 2),
-    description: stripHtml(job.description || "No description provided."),
+    description: cleanDescription,
     tags: [job.category?.label, "Adzuna", "Live job"].filter(Boolean),
     applyUrl: job.redirect_url || null,
+    contactEmail,
   };
 }
 
@@ -115,4 +118,9 @@ function formatJobType(type?: string) {
 
 function stripHtml(value: string) {
   return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function extractEmail(value: string) {
+  const match = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return match ? match[0] : null;
 }
