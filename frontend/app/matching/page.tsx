@@ -85,6 +85,9 @@ export default function MatchingPage() {
       return;
     }
 
+    const userEmail = user.email || "";
+    const authName = getAuthUserName(user);
+
     const { data: resumeRow } = await supabase
       .from("resume_profiles")
       .select("full_name,target_role,phone,email,location,profile_summary,skills,work_experience,education_locked,certifications_locked")
@@ -95,10 +98,10 @@ export default function MatchingPage() {
 
     if (resumeRow) {
       setProfile({
-        full_name: resumeRow.full_name || "Your Name",
+        full_name: resumeRow.full_name || authName,
         target_role: resumeRow.target_role || "Applicant",
         phone: resumeRow.phone || "Add phone in profile",
-        email: resumeRow.email || user.email || "Add email in profile",
+        email: resumeRow.email || userEmail || "Add email in profile",
         location: resumeRow.location || "Add location in profile",
         profile_summary: resumeRow.profile_summary || "",
         skills: Array.isArray(resumeRow.skills) ? resumeRow.skills : [],
@@ -117,9 +120,9 @@ export default function MatchingPage() {
 
     setProfile({
       ...fallbackProfile,
-      full_name: profileRow?.full_name || "Your Name",
+      full_name: profileRow?.full_name || authName,
       phone: profileRow?.phone || "Add phone in profile",
-      email: profileRow?.email || user.email || "Add email in profile",
+      email: profileRow?.email || userEmail || "Add email in profile",
       location: profileRow?.location || "Add location in profile",
     });
   }
@@ -366,6 +369,25 @@ export default function MatchingPage() {
 
 function PaperSection({ title, children }: { title: string; children: React.ReactNode }) {
   return <section style={styles.paperSection}><h2>{title}</h2>{children}</section>;
+}
+
+function getAuthUserName(user: any) {
+  const metadata = user?.user_metadata || {};
+  const metadataName = metadata.full_name || metadata.name || metadata.display_name;
+  if (metadataName) return String(metadataName);
+
+  const email = String(user?.email || "");
+  const prefix = email.split("@")[0];
+  if (prefix) {
+    return prefix
+      .replace(/[._-]+/g, " ")
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+
+  return "Your Name";
 }
 
 function createFallbackDraft(job: MatchJob, profile: ResumeProfile): ResumeDraft {
