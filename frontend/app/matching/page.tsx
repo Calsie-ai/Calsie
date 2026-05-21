@@ -38,7 +38,7 @@ type ResumeDraft = {
   coverNote: string;
 };
 
-type FlowState = "idle" | "draft" | "approved" | "email" | "sent";
+type FlowState = "idle" | "generating" | "draft" | "approved" | "email" | "sent";
 
 const fallbackProfile: ResumeProfile = {
   full_name: "Your Name",
@@ -62,6 +62,7 @@ export default function MatchingPage() {
   const [profile, setProfile] = useState<ResumeProfile>(fallbackProfile);
   const [resumeDraft, setResumeDraft] = useState<ResumeDraft | null>(null);
   const [flowState, setFlowState] = useState<FlowState>("idle");
+  const [aiMessage, setAiMessage] = useState("");
 
   useEffect(() => {
     loadEverything();
@@ -124,6 +125,7 @@ export default function MatchingPage() {
   async function loadJobs() {
     setResumeDraft(null);
     setFlowState("idle");
+    setAiMessage("");
     try {
       const response = await fetch("/api/jobs?role=support%20worker&location=Sydney&country=au", { cache: "no-store" });
       const data = await response.json();
@@ -142,6 +144,7 @@ export default function MatchingPage() {
   function resetForNext(newIndex: number) {
     setResumeDraft(null);
     setFlowState("idle");
+    setAiMessage("");
     setIndex(newIndex);
   }
 
@@ -153,21 +156,33 @@ export default function MatchingPage() {
     if (jobs.length) resetForNext(index === 0 ? jobs.length - 1 : index - 1);
   }
 
-  function createResumeDraft() {
+  async function createResumeDraft() {
     if (!job) return;
 
-    const cleanTags = (job.tags || []).filter((tag) => tag !== "Adzuna" && tag !== "Live job");
-    const baseSkills = profile.skills.length ? profile.skills : ["Client communication", "Documentation", "Safe work practices"];
+    setFlowState("generating");
+    setAiMessage("Generating tailored resume with OpenAI...");
 
-    setResumeDraft({
-      summary:
-        profile.profile_summary ||
-        `Reliable ${job.title} candidate with practical experience, strong communication, and a client-focused approach. Interested in ${job.company} and ready to support the requirements of this role.`,
-      skills: Array.from(new Set([...cleanTags, ...baseSkills, "Reliable shift attendance"])).slice(0, 8),
-      bullets: buildExperienceBullets(job, profile),
-      coverNote: `Dear Hiring Manager,\n\nI am interested in the ${job.title} position at ${job.company}. My experience, skills, and reliability align with this opportunity.\n\nKind regards,\n${profile.full_name}`,
-    });
-    setFlowState("draft");
+    try {
+      const response = await fetch("/api/resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job, profile }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "OpenAI resume generation failed.");
+      }
+
+      setResumeDraft(data.draft);
+      setAiMessage(`Generated with ${data.model || "OpenAI"}.`);
+      setFlowState("draft");
+    } catch (error: any) {
+      setAiMessage(error?.message || "Could not generate with OpenAI. Using basic draft instead.");
+      setResumeDraft(createFallbackDraft(job, profile));
+      setFlowState("draft");
+    }
   }
 
   if (loading) return <main style={styles.loading}>Loading job matches...</main>;
@@ -234,9 +249,13 @@ export default function MatchingPage() {
           <section style={styles.kitBox}>
             <p style={styles.kitLabel}>Application kit</p>
             <h2>Create tailored resume</h2>
-            <p>Applix uses your saved profile and this job ad to create a targeted resume, cover note, and application steps.</p>
-            <button onClick={createResumeDraft} style={styles.primaryButton}>Create resume draft</button>
+            <p>Applix uses your saved profile, this job ad, and OpenAI to create a targeted resume, cover note, and application steps.</p>
+            <button onClick={createResumeDraft} disabled={flowState === "generating"} style={styles.primaryButton}>
+              {flowState === "generating" ? "Generating..." : "Create AI resume draft"}
+            </button>
           </section>
+
+          {aiMessage && <div style={styles.aiMessage}>{aiMessage}</div>}
 
           {resumeDraft && (
             <section style={styles.resumePanel}>
@@ -324,6 +343,20 @@ function PaperSection({ title, children }: { title: string; children: React.Reac
   return <section style={styles.paperSection}><h2>{title}</h2>{children}</section>;
 }
 
+function createFallbackDraft(job: MatchJob, profile: ResumeProfile): ResumeDraft {
+  const cleanTags = (job.tags || []).filter((tag) => tag !== "Adzuna" && tag !== "Live job");
+  const baseSkills = profile.skills.length ? profile.skills : ["Client communication", "Documentation", "Safe work practices"];
+
+  return {
+    summary:
+      profile.profile_summary ||
+      `Reliable ${job.title} candidate with practical experience, strong communication, and a client-focused approach. Interested in ${job.company} and ready to support the requirements of this role.`,
+    skills: Array.from(new Set([...cleanTags, ...baseSkills, "Reliable shift attendance"])).slice(0, 8),
+    bullets: buildExperienceBullets(job, profile),
+    coverNote: `Dear Hiring Manager,\n\nI am interested in the ${job.title} position at ${job.company}. My experience, skills, and reliability align with this opportunity.\n\nKind regards,\n${profile.full_name}`,
+  };
+}
+
 function buildExperienceBullets(job: MatchJob, profile: ResumeProfile) {
   const firstExperience = profile.work_experience[0];
   if (firstExperience?.description) {
@@ -365,6 +398,7 @@ const styles = {
   tag: { borderRadius: 999, background: "#f1f5f9", padding: "8px 12px", fontWeight: 800, color: "#475569" },
   kitBox: { marginTop: 16, padding: 22, borderRadius: 24, background: "#111827", color: "white", lineHeight: 1.6 },
   kitLabel: { margin: 0, textTransform: "uppercase" as const, letterSpacing: 1.5, fontSize: 12, fontWeight: 900, color: "#94a3b8" },
+  aiMessage: { marginTop: 14, padding: 14, borderRadius: 18, background: "#eef2ff", color: "#3730a3", fontWeight: 900 },
   resumePanel: { marginTop: 16, padding: 22, borderRadius: 24, border: "1px solid #d1fae5", background: "#f0fdf4" },
   greenTitle: { margin: "0 0 14px", color: "#047857" },
   resumePaper: { background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 22, color: "#111827" },
