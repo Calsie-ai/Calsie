@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabaseClient";
 
 type MatchJob = {
   id: string;
@@ -17,11 +18,39 @@ type MatchJob = {
   applyUrl?: string | null;
 };
 
+type ResumeProfile = {
+  full_name: string;
+  target_role: string;
+  phone: string;
+  email: string;
+  location: string;
+  profile_summary: string;
+  skills: string[];
+  work_experience: any[];
+  education_locked: any[];
+  certifications_locked: any[];
+};
+
 type ResumeDraft = {
   summary: string;
   skills: string[];
   bullets: string[];
   coverNote: string;
+};
+
+type FlowState = "idle" | "draft" | "approved" | "email" | "sent";
+
+const fallbackProfile: ResumeProfile = {
+  full_name: "Your Name",
+  target_role: "Applicant",
+  phone: "Add phone in profile",
+  email: "Add email in profile",
+  location: "Add location in profile",
+  profile_summary: "",
+  skills: [],
+  work_experience: [],
+  education_locked: [],
+  certifications_locked: [],
 };
 
 export default function MatchingPage() {
@@ -30,17 +59,71 @@ export default function MatchingPage() {
   const [source, setSource] = useState("");
   const [message, setMessage] = useState("");
   const [index, setIndex] = useState(0);
+  const [profile, setProfile] = useState<ResumeProfile>(fallbackProfile);
   const [resumeDraft, setResumeDraft] = useState<ResumeDraft | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [flowState, setFlowState] = useState<FlowState>("idle");
 
   useEffect(() => {
-    loadJobs();
+    loadEverything();
   }, []);
 
-  async function loadJobs() {
+  async function loadEverything() {
     setLoading(true);
+    await Promise.all([loadProfile(), loadJobs()]);
+    setLoading(false);
+  }
+
+  async function loadProfile() {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+
+    if (!user) {
+      setProfile(fallbackProfile);
+      return;
+    }
+
+    const { data: resumeRow } = await supabase
+      .from("resume_profiles")
+      .select("full_name,target_role,phone,email,location,profile_summary,skills,work_experience,education_locked,certifications_locked")
+      .eq("profile_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (resumeRow) {
+      setProfile({
+        full_name: resumeRow.full_name || "Your Name",
+        target_role: resumeRow.target_role || "Applicant",
+        phone: resumeRow.phone || "Add phone in profile",
+        email: resumeRow.email || user.email || "Add email in profile",
+        location: resumeRow.location || "Add location in profile",
+        profile_summary: resumeRow.profile_summary || "",
+        skills: Array.isArray(resumeRow.skills) ? resumeRow.skills : [],
+        work_experience: Array.isArray(resumeRow.work_experience) ? resumeRow.work_experience : [],
+        education_locked: Array.isArray(resumeRow.education_locked) ? resumeRow.education_locked : [],
+        certifications_locked: Array.isArray(resumeRow.certifications_locked) ? resumeRow.certifications_locked : [],
+      });
+      return;
+    }
+
+    const { data: profileRow } = await supabase
+      .from("profiles")
+      .select("full_name,email,phone,location")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    setProfile({
+      ...fallbackProfile,
+      full_name: profileRow?.full_name || "Your Name",
+      phone: profileRow?.phone || "Add phone in profile",
+      email: profileRow?.email || user.email || "Add email in profile",
+      location: profileRow?.location || "Add location in profile",
+    });
+  }
+
+  async function loadJobs() {
     setResumeDraft(null);
-    setSaved(false);
+    setFlowState("idle");
     try {
       const response = await fetch("/api/jobs?role=support%20worker&location=Sydney&country=au", { cache: "no-store" });
       const data = await response.json();
@@ -51,8 +134,6 @@ export default function MatchingPage() {
     } catch (error: any) {
       setMessage(error?.message || "Could not load jobs.");
       setJobs([]);
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -60,7 +141,7 @@ export default function MatchingPage() {
 
   function resetForNext(newIndex: number) {
     setResumeDraft(null);
-    setSaved(false);
+    setFlowState("idle");
     setIndex(newIndex);
   }
 
@@ -76,18 +157,17 @@ export default function MatchingPage() {
     if (!job) return;
 
     const cleanTags = (job.tags || []).filter((tag) => tag !== "Adzuna" && tag !== "Live job");
+    const baseSkills = profile.skills.length ? profile.skills : ["Client communication", "Documentation", "Safe work practices"];
 
     setResumeDraft({
-      summary: `Targeted resume draft for the ${job.title} role at ${job.company}. It highlights relevant support work, communication, reliability, documentation, and client-focused experience based on the job ad.`,
-      skills: Array.from(new Set([...cleanTags, "Client communication", "Documentation", "Safe work practices", "Reliable shift attendance"])).slice(0, 8),
-      bullets: [
-        `Supported clients with responsibilities relevant to the ${job.title} role.`,
-        "Communicated clearly with clients, families, coordinators, and care teams.",
-        "Followed care instructions, maintained safety, and completed clear support notes.",
-      ],
-      coverNote: `I am interested in the ${job.title} position at ${job.company}. My support work experience, reliability, and client-focused approach align with this opportunity.`,
+      summary:
+        profile.profile_summary ||
+        `Reliable ${job.title} candidate with practical experience, strong communication, and a client-focused approach. Interested in ${job.company} and ready to support the requirements of this role.`,
+      skills: Array.from(new Set([...cleanTags, ...baseSkills, "Reliable shift attendance"])).slice(0, 8),
+      bullets: buildExperienceBullets(job, profile),
+      coverNote: `Dear Hiring Manager,\n\nI am interested in the ${job.title} position at ${job.company}. My experience, skills, and reliability align with this opportunity.\n\nKind regards,\n${profile.full_name}`,
     });
-    setSaved(false);
+    setFlowState("draft");
   }
 
   if (loading) return <main style={styles.loading}>Loading job matches...</main>;
@@ -100,7 +180,7 @@ export default function MatchingPage() {
           <div style={styles.emptyCard}>
             <h1>No jobs loaded</h1>
             <p>{message}</p>
-            <button onClick={loadJobs} style={styles.primaryButton}>Try again</button>
+            <button onClick={loadEverything} style={styles.primaryButton}>Try again</button>
           </div>
         </section>
       </main>
@@ -116,7 +196,7 @@ export default function MatchingPage() {
             <strong>Applix Matching</strong>
             <span>{index + 1} of {jobs.length}</span>
           </div>
-          <button onClick={loadJobs} style={styles.refresh}>Refresh</button>
+          <button onClick={loadEverything} style={styles.refresh}>Refresh</button>
         </header>
 
         <div style={styles.statusBar}>
@@ -154,40 +234,78 @@ export default function MatchingPage() {
           <section style={styles.kitBox}>
             <p style={styles.kitLabel}>Application kit</p>
             <h2>Create tailored resume</h2>
-            <p>Applix will turn this job ad into a targeted resume summary, skills, experience bullets, and a cover note.</p>
+            <p>Applix uses your saved profile and this job ad to create a targeted resume, cover note, and application steps.</p>
             <button onClick={createResumeDraft} style={styles.primaryButton}>Create resume draft</button>
           </section>
 
           {resumeDraft && (
             <section style={styles.resumePanel}>
-              <div style={styles.resumeTop}>
-                <div>
-                  <p style={styles.kitLabel}>Resume draft</p>
-                  <h2 style={{ margin: "6px 0 0" }}>Tailored for {job.title}</h2>
-                </div>
-                <span style={styles.badge}>Draft</span>
-              </div>
+              <h2 style={styles.greenTitle}>Resume ready for {job.title}</h2>
 
-              <ResumeBlock title="Profile summary">{resumeDraft.summary}</ResumeBlock>
+              <article style={styles.resumePaper}>
+                <header style={styles.paperHeader}>
+                  <h1>{profile.full_name}</h1>
+                  <strong>{job.title}</strong>
+                  <p>{profile.phone} | {profile.email} | {profile.location}</p>
+                </header>
 
-              <div style={styles.resumeBlock}>
-                <h3>Key skills</h3>
-                <div style={styles.tags}>{resumeDraft.skills.map((skill) => <span key={skill} style={styles.tag}>{skill}</span>)}</div>
-              </div>
+                <PaperSection title="Profile">
+                  <p>{resumeDraft.summary}</p>
+                </PaperSection>
 
-              <div style={styles.resumeBlock}>
-                <h3>Experience bullets</h3>
-                <ul>{resumeDraft.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>
-              </div>
+                <PaperSection title="Key skills">
+                  <ul>{resumeDraft.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul>
+                </PaperSection>
 
-              <ResumeBlock title="Cover note">{resumeDraft.coverNote}</ResumeBlock>
+                <PaperSection title="Work experience">
+                  {profile.work_experience.length ? (
+                    profile.work_experience.slice(0, 2).map((item, itemIndex) => (
+                      <div key={itemIndex}>
+                        <h3>{item.job_title || job.title}</h3>
+                        <strong>{item.company || "Previous employer"}</strong>
+                        <ul>{resumeDraft.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>
+                      </div>
+                    ))
+                  ) : (
+                    <ul>{resumeDraft.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>
+                  )}
+                </PaperSection>
 
-              {saved && <div style={styles.savedBox}>Application kit saved for this job.</div>}
+                {!!profile.education_locked.length && (
+                  <PaperSection title="Education">
+                    {profile.education_locked.map((item, itemIndex) => <p key={itemIndex}>{item.qualification || item.institution || "Education item"} {item.institution ? `- ${item.institution}` : ""} {item.year || ""}</p>)}
+                  </PaperSection>
+                )}
+
+                {!!profile.certifications_locked.length && (
+                  <PaperSection title="Certifications">
+                    <ul>{profile.certifications_locked.map((item, itemIndex) => <li key={itemIndex}>{item.name || item.provider || "Certification"}</li>)}</ul>
+                  </PaperSection>
+                )}
+              </article>
 
               <div style={styles.resumeActions}>
-                <button onClick={() => setSaved(true)} style={styles.primaryButton}>Save kit</button>
-                {job.applyUrl ? <a href={job.applyUrl} target="_blank" style={styles.secondaryButton}>Open job</a> : <button style={styles.secondaryButton}>No apply link</button>}
+                <Link href="/profile" style={styles.secondaryButton}>Edit profile</Link>
+                <button onClick={() => window.print()} style={styles.secondaryButton}>Download PDF</button>
+                <button onClick={() => setFlowState("approved")} style={styles.approveButton}>Approve Resume</button>
               </div>
+
+              {flowState === "approved" && (
+                <div style={styles.approvedBox}>
+                  <strong>Resume approved. Next, prepare the email draft.</strong>
+                  <button onClick={() => setFlowState("email")} style={styles.smallButton}>Prepare Email</button>
+                </div>
+              )}
+
+              {(flowState === "email" || flowState === "sent") && (
+                <section style={styles.emailDraft}>
+                  <h2>Email draft</h2>
+                  <p><strong>Subject:</strong> Application for {job.title} - {profile.full_name}</p>
+                  <div style={styles.emailBody}>{resumeDraft.coverNote}</div>
+                  {job.applyUrl && <p><strong>Apply URL:</strong> <a href={job.applyUrl} target="_blank">Open job application</a></p>}
+                  <button onClick={() => setFlowState("sent")} style={styles.approveButton}>{flowState === "sent" ? "Application Sent" : "Send Application"}</button>
+                </section>
+              )}
             </section>
           )}
 
@@ -202,8 +320,21 @@ export default function MatchingPage() {
   );
 }
 
-function ResumeBlock({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div style={styles.resumeBlock}><h3>{title}</h3><p>{children}</p></div>;
+function PaperSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section style={styles.paperSection}><h2>{title}</h2>{children}</section>;
+}
+
+function buildExperienceBullets(job: MatchJob, profile: ResumeProfile) {
+  const firstExperience = profile.work_experience[0];
+  if (firstExperience?.description) {
+    return String(firstExperience.description).split("\n").map((item) => item.trim()).filter(Boolean).slice(0, 4);
+  }
+
+  return [
+    `Performed duties relevant to the ${job.title} role with reliability and care.`,
+    "Communicated clearly with clients, families, coordinators, and team members.",
+    "Followed instructions, maintained safety, and completed clear notes or documentation.",
+  ];
 }
 
 function trimText(value: string, limit: number) {
@@ -235,11 +366,16 @@ const styles = {
   kitBox: { marginTop: 16, padding: 22, borderRadius: 24, background: "#111827", color: "white", lineHeight: 1.6 },
   kitLabel: { margin: 0, textTransform: "uppercase" as const, letterSpacing: 1.5, fontSize: 12, fontWeight: 900, color: "#94a3b8" },
   resumePanel: { marginTop: 16, padding: 22, borderRadius: 24, border: "1px solid #d1fae5", background: "#f0fdf4" },
-  resumeTop: { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start" },
-  badge: { borderRadius: 999, background: "white", color: "#047857", padding: "8px 12px", fontWeight: 900 },
-  resumeBlock: { marginTop: 14, padding: 16, borderRadius: 18, background: "white", color: "#334155", lineHeight: 1.7 },
-  savedBox: { marginTop: 14, padding: 14, borderRadius: 16, background: "#dcfce7", color: "#166534", fontWeight: 900 },
+  greenTitle: { margin: "0 0 14px", color: "#047857" },
+  resumePaper: { background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 22, color: "#111827" },
+  paperHeader: { textAlign: "center" as const, borderBottom: "2px solid #111827", paddingBottom: 14, marginBottom: 18 },
+  paperSection: { borderBottom: "1px solid #e5e7eb", paddingBottom: 12, marginBottom: 14, lineHeight: 1.6 },
   resumeActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 },
+  approveButton: { gridColumn: "1 / -1", display: "block", textAlign: "center" as const, border: 0, borderRadius: 999, background: "#22c55e", color: "white", padding: "15px 18px", fontWeight: 900, cursor: "pointer" },
+  approvedBox: { marginTop: 14, padding: 16, borderRadius: 18, background: "#dcfce7", color: "#166534" },
+  smallButton: { display: "block", marginTop: 12, border: 0, borderRadius: 999, background: "#166534", color: "white", padding: "10px 14px", fontWeight: 900, cursor: "pointer" },
+  emailDraft: { marginTop: 14, padding: 18, borderRadius: 22, background: "#ecfdf5", border: "1px solid #bbf7d0" },
+  emailBody: { whiteSpace: "pre-line" as const, background: "white", border: "1px solid #e5e7eb", borderRadius: 16, padding: 16, lineHeight: 1.7 },
   actions: { display: "grid", gridTemplateColumns: "1fr 1fr 1.3fr", gap: 12, marginTop: 20 },
   primaryButton: { display: "block", textAlign: "center" as const, border: 0, borderRadius: 999, background: "#111827", color: "white", padding: "15px 18px", fontWeight: 900, textDecoration: "none", cursor: "pointer" },
   secondaryButton: { display: "block", textAlign: "center" as const, border: "1px solid #e5e7eb", borderRadius: 999, background: "white", color: "#111827", padding: "15px 18px", fontWeight: 900, textDecoration: "none", cursor: "pointer" },
