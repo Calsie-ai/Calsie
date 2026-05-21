@@ -63,6 +63,7 @@ export default function MatchingPage() {
   const [resumeDraft, setResumeDraft] = useState<ResumeDraft | null>(null);
   const [flowState, setFlowState] = useState<FlowState>("idle");
   const [aiMessage, setAiMessage] = useState("");
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   useEffect(() => {
     loadEverything();
@@ -126,6 +127,7 @@ export default function MatchingPage() {
     setResumeDraft(null);
     setFlowState("idle");
     setAiMessage("");
+    setShowFullDescription(false);
     try {
       const response = await fetch("/api/jobs?role=support%20worker&location=Sydney&country=au", { cache: "no-store" });
       const data = await response.json();
@@ -140,11 +142,14 @@ export default function MatchingPage() {
   }
 
   const job = jobs[index];
+  const jobDescription = job?.description || "No description provided.";
+  const isLongDescription = jobDescription.length > 460;
 
   function resetForNext(newIndex: number) {
     setResumeDraft(null);
     setFlowState("idle");
     setAiMessage("");
+    setShowFullDescription(false);
     setIndex(newIndex);
   }
 
@@ -250,9 +255,20 @@ export default function MatchingPage() {
             <span>{job.type || "Job type not listed"}</span>
           </div>
 
+          {job.applyUrl && (
+            <a href={job.applyUrl} target="_blank" rel="noreferrer" style={styles.jobsiteButton}>
+              Visit jobsite
+            </a>
+          )}
+
           <section style={styles.sectionBox}>
             <h2>Job summary</h2>
-            <p>{trimText(job.description || "No description provided.", 460)}</p>
+            <p>{showFullDescription ? jobDescription : trimText(jobDescription, 460)}</p>
+            {isLongDescription && (
+              <button onClick={() => setShowFullDescription(!showFullDescription)} style={styles.readMoreButton}>
+                {showFullDescription ? "Show less" : "Read more"}
+              </button>
+            )}
           </section>
 
           <section style={styles.sectionBoxLight}>
@@ -387,7 +403,7 @@ export default function MatchingPage() {
                   <h2>Email draft</h2>
                   <p><strong>Subject:</strong> Application for {job.title} - {profile.full_name}</p>
                   <div style={styles.emailBody}>{resumeDraft.coverNote}</div>
-                  {job.applyUrl && <p><strong>Apply URL:</strong> <a href={job.applyUrl} target="_blank">Open job application</a></p>}
+                  {job.applyUrl && <p><strong>Apply URL:</strong> <a href={job.applyUrl} target="_blank" rel="noreferrer">Open job application</a></p>}
                   <button onClick={() => setFlowState("sent")} style={styles.approveButton}>{flowState === "sent" ? "Application Sent" : "Send Application"}</button>
                 </section>
               )}
@@ -458,7 +474,9 @@ const styles = {
   title: { margin: "8px 0 0", fontSize: "clamp(34px, 6vw, 54px)", lineHeight: 1, letterSpacing: -2 },
   match: { minWidth: 70, textAlign: "center" as const, borderRadius: 18, padding: "12px 10px", background: "#ecfdf5", color: "#047857", fontWeight: 900, fontSize: 20 },
   metaRow: { display: "flex", flexWrap: "wrap" as const, gap: 10, marginTop: 22 },
+  jobsiteButton: { display: "inline-block", marginTop: 18, borderRadius: 999, background: "#2563eb", color: "white", padding: "13px 18px", fontWeight: 900, textDecoration: "none" },
   sectionBox: { marginTop: 22, padding: 20, borderRadius: 22, background: "#f8fafc", color: "#334155", lineHeight: 1.7 },
+  readMoreButton: { border: 0, background: "transparent", color: "#2563eb", fontWeight: 900, padding: "8px 0 0", cursor: "pointer" },
   sectionBoxLight: { marginTop: 14, padding: 20, borderRadius: 22, border: "1px solid #e5e7eb" },
   tags: { display: "flex", flexWrap: "wrap" as const, gap: 8 },
   tag: { borderRadius: 999, background: "#f1f5f9", padding: "8px 12px", fontWeight: 800, color: "#475569" },
