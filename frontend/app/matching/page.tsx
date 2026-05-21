@@ -38,7 +38,7 @@ type ResumeDraft = {
   coverNote: string;
 };
 
-type FlowState = "idle" | "generating" | "draft" | "approved" | "email" | "sent";
+type FlowState = "idle" | "generating" | "draft" | "editing" | "approved" | "email" | "sent";
 
 const fallbackProfile: ResumeProfile = {
   full_name: "Your Name",
@@ -185,6 +185,22 @@ export default function MatchingPage() {
     }
   }
 
+  function updateResumeField(key: keyof ResumeDraft, value: string) {
+    setResumeDraft((current) => {
+      if (!current) return current;
+      if (key === "skills" || key === "bullets") {
+        return {
+          ...current,
+          [key]: value
+            .split("\n")
+            .map((item) => item.trim())
+            .filter(Boolean),
+        };
+      }
+      return { ...current, [key]: value };
+    });
+  }
+
   if (loading) return <main style={styles.loading}>Loading job matches...</main>;
 
   if (!job) {
@@ -261,6 +277,54 @@ export default function MatchingPage() {
             <section style={styles.resumePanel}>
               <h2 style={styles.greenTitle}>Resume ready for {job.title}</h2>
 
+              {flowState === "editing" && (
+                <section style={styles.editorPanel}>
+                  <div style={styles.editorHeader}>
+                    <div>
+                      <p style={styles.kitLabel}>Live resume editor</p>
+                      <h2 style={styles.editorTitle}>Edit the draft below</h2>
+                    </div>
+                    <button onClick={() => setFlowState("draft")} style={styles.smallDarkButton}>Done editing</button>
+                  </div>
+
+                  <label style={styles.editorLabel}>
+                    Profile summary
+                    <textarea
+                      style={styles.textarea}
+                      value={resumeDraft.summary}
+                      onChange={(event) => updateResumeField("summary", event.target.value)}
+                    />
+                  </label>
+
+                  <label style={styles.editorLabel}>
+                    Key skills - one per line
+                    <textarea
+                      style={styles.textarea}
+                      value={resumeDraft.skills.join("\n")}
+                      onChange={(event) => updateResumeField("skills", event.target.value)}
+                    />
+                  </label>
+
+                  <label style={styles.editorLabel}>
+                    Experience bullets - one per line
+                    <textarea
+                      style={styles.textarea}
+                      value={resumeDraft.bullets.join("\n")}
+                      onChange={(event) => updateResumeField("bullets", event.target.value)}
+                    />
+                  </label>
+
+                  <label style={styles.editorLabel}>
+                    Email / cover note
+                    <textarea
+                      style={styles.textarea}
+                      value={resumeDraft.coverNote}
+                      onChange={(event) => updateResumeField("coverNote", event.target.value)}
+                    />
+                  </label>
+                </section>
+              )}
+
               <article style={styles.resumePaper}>
                 <header style={styles.paperHeader}>
                   <h1>{profile.full_name}</h1>
@@ -304,7 +368,9 @@ export default function MatchingPage() {
               </article>
 
               <div style={styles.resumeActions}>
-                <Link href="/profile" style={styles.secondaryButton}>Edit profile</Link>
+                <button onClick={() => setFlowState(flowState === "editing" ? "draft" : "editing")} style={styles.secondaryButton}>
+                  {flowState === "editing" ? "Save edits" : "Edit Resume"}
+                </button>
                 <button onClick={() => window.print()} style={styles.secondaryButton}>Download PDF</button>
                 <button onClick={() => setFlowState("approved")} style={styles.approveButton}>Approve Resume</button>
               </div>
@@ -401,6 +467,12 @@ const styles = {
   aiMessage: { marginTop: 14, padding: 14, borderRadius: 18, background: "#eef2ff", color: "#3730a3", fontWeight: 900 },
   resumePanel: { marginTop: 16, padding: 22, borderRadius: 24, border: "1px solid #d1fae5", background: "#f0fdf4" },
   greenTitle: { margin: "0 0 14px", color: "#047857" },
+  editorPanel: { marginBottom: 16, padding: 18, borderRadius: 22, background: "#ffffff", border: "1px solid #bbf7d0" },
+  editorHeader: { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", marginBottom: 14 },
+  editorTitle: { margin: "6px 0 0", color: "#111827" },
+  editorLabel: { display: "grid", gap: 8, marginTop: 12, color: "#334155", fontWeight: 900 },
+  textarea: { minHeight: 110, border: "1px solid #d1d5db", borderRadius: 16, padding: 13, fontFamily: "Arial, Helvetica, sans-serif", fontSize: 14, lineHeight: 1.5, resize: "vertical" as const },
+  smallDarkButton: { border: 0, borderRadius: 999, background: "#111827", color: "white", padding: "10px 14px", fontWeight: 900, cursor: "pointer" },
   resumePaper: { background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 22, color: "#111827" },
   paperHeader: { textAlign: "center" as const, borderBottom: "2px solid #111827", paddingBottom: 14, marginBottom: 18 },
   paperSection: { borderBottom: "1px solid #e5e7eb", paddingBottom: 12, marginBottom: 14, lineHeight: 1.6 },
