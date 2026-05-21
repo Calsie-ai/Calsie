@@ -38,7 +38,7 @@ type ResumeDraft = {
   coverNote: string;
 };
 
-type FlowState = "idle" | "generating" | "draft" | "editing" | "approved" | "email" | "sent";
+type FlowState = "idle" | "generating" | "draft" | "editing" | "approved" | "email" | "opened";
 
 const fallbackProfile: ResumeProfile = {
   full_name: "Your Name",
@@ -64,6 +64,7 @@ export default function MatchingPage() {
   const [flowState, setFlowState] = useState<FlowState>("idle");
   const [aiMessage, setAiMessage] = useState("");
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState("");
 
   useEffect(() => {
     loadEverything();
@@ -128,6 +129,7 @@ export default function MatchingPage() {
     setFlowState("idle");
     setAiMessage("");
     setShowFullDescription(false);
+    setRecipientEmail("");
     try {
       const response = await fetch("/api/jobs?role=support%20worker&location=Sydney&country=au", { cache: "no-store" });
       const data = await response.json();
@@ -144,12 +146,16 @@ export default function MatchingPage() {
   const job = jobs[index];
   const jobDescription = job?.description || "No description provided.";
   const isLongDescription = jobDescription.length > 460;
+  const emailSubject = job ? `Application for ${job.title} - ${profile.full_name}` : "Application";
+  const emailBody = resumeDraft ? buildEmailBody(resumeDraft, profile, job) : "";
+  const emailUrl = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
 
   function resetForNext(newIndex: number) {
     setResumeDraft(null);
     setFlowState("idle");
     setAiMessage("");
     setShowFullDescription(false);
+    setRecipientEmail("");
     setIndex(newIndex);
   }
 
@@ -196,14 +202,20 @@ export default function MatchingPage() {
       if (key === "skills" || key === "bullets") {
         return {
           ...current,
-          [key]: value
-            .split("\n")
-            .map((item) => item.trim())
-            .filter(Boolean),
+          [key]: value.split("\n").map((item) => item.trim()).filter(Boolean),
         };
       }
       return { ...current, [key]: value };
     });
+  }
+
+  function openEmailDraft(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (!recipientEmail.includes("@")) {
+      event.preventDefault();
+      setAiMessage("Add the employer email first, then open the Gmail draft.");
+      return;
+    }
+    setFlowState("opened");
   }
 
   if (loading) return <main style={styles.loading}>Loading job matches...</main>;
@@ -255,36 +267,24 @@ export default function MatchingPage() {
             <span>{job.type || "Job type not listed"}</span>
           </div>
 
-          {job.applyUrl && (
-            <a href={job.applyUrl} target="_blank" rel="noreferrer" style={styles.jobsiteButton}>
-              Visit jobsite
-            </a>
-          )}
+          {job.applyUrl && <a href={job.applyUrl} target="_blank" rel="noreferrer" style={styles.jobsiteButton}>Visit jobsite</a>}
 
           <section style={styles.sectionBox}>
             <h2>Job summary</h2>
             <p>{showFullDescription ? jobDescription : trimText(jobDescription, 460)}</p>
-            {isLongDescription && (
-              <button onClick={() => setShowFullDescription(!showFullDescription)} style={styles.readMoreButton}>
-                {showFullDescription ? "Show less" : "Read more"}
-              </button>
-            )}
+            {isLongDescription && <button onClick={() => setShowFullDescription(!showFullDescription)} style={styles.readMoreButton}>{showFullDescription ? "Show less" : "Read more"}</button>}
           </section>
 
           <section style={styles.sectionBoxLight}>
             <h2>Signals</h2>
-            <div style={styles.tags}>
-              {(job.tags || []).slice(0, 5).map((tag) => <span key={tag} style={styles.tag}>{tag}</span>)}
-            </div>
+            <div style={styles.tags}>{(job.tags || []).slice(0, 5).map((tag) => <span key={tag} style={styles.tag}>{tag}</span>)}</div>
           </section>
 
           <section style={styles.kitBox}>
             <p style={styles.kitLabel}>Application kit</p>
             <h2>Create tailored resume</h2>
             <p>Applix uses your saved profile, this job ad, and OpenAI to create a targeted resume, cover note, and application steps.</p>
-            <button onClick={createResumeDraft} disabled={flowState === "generating"} style={styles.primaryButton}>
-              {flowState === "generating" ? "Generating..." : "Create AI resume draft"}
-            </button>
+            <button onClick={createResumeDraft} disabled={flowState === "generating"} style={styles.primaryButton}>{flowState === "generating" ? "Generating..." : "Create AI resume draft"}</button>
           </section>
 
           {aiMessage && <div style={styles.aiMessage}>{aiMessage}</div>}
@@ -296,115 +296,45 @@ export default function MatchingPage() {
               {flowState === "editing" && (
                 <section style={styles.editorPanel}>
                   <div style={styles.editorHeader}>
-                    <div>
-                      <p style={styles.kitLabel}>Live resume editor</p>
-                      <h2 style={styles.editorTitle}>Edit the draft below</h2>
-                    </div>
+                    <div><p style={styles.kitLabel}>Live resume editor</p><h2 style={styles.editorTitle}>Edit the draft below</h2></div>
                     <button onClick={() => setFlowState("draft")} style={styles.smallDarkButton}>Done editing</button>
                   </div>
-
-                  <label style={styles.editorLabel}>
-                    Profile summary
-                    <textarea
-                      style={styles.textarea}
-                      value={resumeDraft.summary}
-                      onChange={(event) => updateResumeField("summary", event.target.value)}
-                    />
-                  </label>
-
-                  <label style={styles.editorLabel}>
-                    Key skills - one per line
-                    <textarea
-                      style={styles.textarea}
-                      value={resumeDraft.skills.join("\n")}
-                      onChange={(event) => updateResumeField("skills", event.target.value)}
-                    />
-                  </label>
-
-                  <label style={styles.editorLabel}>
-                    Experience bullets - one per line
-                    <textarea
-                      style={styles.textarea}
-                      value={resumeDraft.bullets.join("\n")}
-                      onChange={(event) => updateResumeField("bullets", event.target.value)}
-                    />
-                  </label>
-
-                  <label style={styles.editorLabel}>
-                    Email / cover note
-                    <textarea
-                      style={styles.textarea}
-                      value={resumeDraft.coverNote}
-                      onChange={(event) => updateResumeField("coverNote", event.target.value)}
-                    />
-                  </label>
+                  <label style={styles.editorLabel}>Profile summary<textarea style={styles.textarea} value={resumeDraft.summary} onChange={(event) => updateResumeField("summary", event.target.value)} /></label>
+                  <label style={styles.editorLabel}>Key skills - one per line<textarea style={styles.textarea} value={resumeDraft.skills.join("\n")} onChange={(event) => updateResumeField("skills", event.target.value)} /></label>
+                  <label style={styles.editorLabel}>Experience bullets - one per line<textarea style={styles.textarea} value={resumeDraft.bullets.join("\n")} onChange={(event) => updateResumeField("bullets", event.target.value)} /></label>
+                  <label style={styles.editorLabel}>Email / cover note<textarea style={styles.textarea} value={resumeDraft.coverNote} onChange={(event) => updateResumeField("coverNote", event.target.value)} /></label>
                 </section>
               )}
 
               <article style={styles.resumePaper}>
-                <header style={styles.paperHeader}>
-                  <h1>{profile.full_name}</h1>
-                  <strong>{job.title}</strong>
-                  <p>{profile.phone} | {profile.email} | {profile.location}</p>
-                </header>
-
-                <PaperSection title="Profile">
-                  <p>{resumeDraft.summary}</p>
-                </PaperSection>
-
-                <PaperSection title="Key skills">
-                  <ul>{resumeDraft.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul>
-                </PaperSection>
-
+                <header style={styles.paperHeader}><h1>{profile.full_name}</h1><strong>{job.title}</strong><p>{profile.phone} | {profile.email} | {profile.location}</p></header>
+                <PaperSection title="Profile"><p>{resumeDraft.summary}</p></PaperSection>
+                <PaperSection title="Key skills"><ul>{resumeDraft.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul></PaperSection>
                 <PaperSection title="Work experience">
-                  {profile.work_experience.length ? (
-                    profile.work_experience.slice(0, 2).map((item, itemIndex) => (
-                      <div key={itemIndex}>
-                        <h3>{item.job_title || job.title}</h3>
-                        <strong>{item.company || "Previous employer"}</strong>
-                        <ul>{resumeDraft.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>
-                      </div>
-                    ))
-                  ) : (
-                    <ul>{resumeDraft.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>
-                  )}
+                  {profile.work_experience.length ? profile.work_experience.slice(0, 2).map((item, itemIndex) => (
+                    <div key={itemIndex}><h3>{item.job_title || job.title}</h3><strong>{item.company || "Previous employer"}</strong><ul>{resumeDraft.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul></div>
+                  )) : <ul>{resumeDraft.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>}
                 </PaperSection>
-
-                {!!profile.education_locked.length && (
-                  <PaperSection title="Education">
-                    {profile.education_locked.map((item, itemIndex) => <p key={itemIndex}>{item.qualification || item.institution || "Education item"} {item.institution ? `- ${item.institution}` : ""} {item.year || ""}</p>)}
-                  </PaperSection>
-                )}
-
-                {!!profile.certifications_locked.length && (
-                  <PaperSection title="Certifications">
-                    <ul>{profile.certifications_locked.map((item, itemIndex) => <li key={itemIndex}>{item.name || item.provider || "Certification"}</li>)}</ul>
-                  </PaperSection>
-                )}
+                {!!profile.education_locked.length && <PaperSection title="Education">{profile.education_locked.map((item, itemIndex) => <p key={itemIndex}>{item.qualification || item.institution || "Education item"} {item.institution ? `- ${item.institution}` : ""} {item.year || ""}</p>)}</PaperSection>}
+                {!!profile.certifications_locked.length && <PaperSection title="Certifications"><ul>{profile.certifications_locked.map((item, itemIndex) => <li key={itemIndex}>{item.name || item.provider || "Certification"}</li>)}</ul></PaperSection>}
               </article>
 
               <div style={styles.resumeActions}>
-                <button onClick={() => setFlowState(flowState === "editing" ? "draft" : "editing")} style={styles.secondaryButton}>
-                  {flowState === "editing" ? "Save edits" : "Edit Resume"}
-                </button>
+                <button onClick={() => setFlowState(flowState === "editing" ? "draft" : "editing")} style={styles.secondaryButton}>{flowState === "editing" ? "Save edits" : "Edit Resume"}</button>
                 <button onClick={() => window.print()} style={styles.secondaryButton}>Download PDF</button>
                 <button onClick={() => setFlowState("approved")} style={styles.approveButton}>Approve Resume</button>
               </div>
 
-              {flowState === "approved" && (
-                <div style={styles.approvedBox}>
-                  <strong>Resume approved. Next, prepare the email draft.</strong>
-                  <button onClick={() => setFlowState("email")} style={styles.smallButton}>Prepare Email</button>
-                </div>
-              )}
+              {flowState === "approved" && <div style={styles.approvedBox}><strong>Resume approved. Next, prepare the Gmail draft.</strong><button onClick={() => setFlowState("email")} style={styles.smallButton}>Prepare Gmail draft</button></div>}
 
-              {(flowState === "email" || flowState === "sent") && (
+              {(flowState === "email" || flowState === "opened") && (
                 <section style={styles.emailDraft}>
-                  <h2>Email draft</h2>
-                  <p><strong>Subject:</strong> Application for {job.title} - {profile.full_name}</p>
-                  <div style={styles.emailBody}>{resumeDraft.coverNote}</div>
-                  {job.applyUrl && <p><strong>Apply URL:</strong> <a href={job.applyUrl} target="_blank" rel="noreferrer">Open job application</a></p>}
-                  <button onClick={() => setFlowState("sent")} style={styles.approveButton}>{flowState === "sent" ? "Application Sent" : "Send Application"}</button>
+                  <h2>Gmail draft</h2>
+                  <p style={styles.helperText}>This opens the user's email app with the application already written. The user reviews it and taps send inside Gmail.</p>
+                  <label style={styles.editorLabel}>Employer email<input style={styles.input} value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="employer email" /></label>
+                  <p><strong>Subject:</strong> {emailSubject}</p>
+                  <div style={styles.emailBody}>{emailBody}</div>
+                  <a href={emailUrl} onClick={openEmailDraft} style={styles.approveButton}>{flowState === "opened" ? "Draft opened" : "Open Gmail app"}</a>
                 </section>
               )}
             </section>
@@ -430,9 +360,7 @@ function createFallbackDraft(job: MatchJob, profile: ResumeProfile): ResumeDraft
   const baseSkills = profile.skills.length ? profile.skills : ["Client communication", "Documentation", "Safe work practices"];
 
   return {
-    summary:
-      profile.profile_summary ||
-      `Reliable ${job.title} candidate with practical experience, strong communication, and a client-focused approach. Interested in ${job.company} and ready to support the requirements of this role.`,
+    summary: profile.profile_summary || `Reliable ${job.title} candidate with practical experience, strong communication, and a client-focused approach. Interested in ${job.company} and ready to support the requirements of this role.`,
     skills: Array.from(new Set([...cleanTags, ...baseSkills, "Reliable shift attendance"])).slice(0, 8),
     bullets: buildExperienceBullets(job, profile),
     coverNote: `Dear Hiring Manager,\n\nI am interested in the ${job.title} position at ${job.company}. My experience, skills, and reliability align with this opportunity.\n\nKind regards,\n${profile.full_name}`,
@@ -450,6 +378,10 @@ function buildExperienceBullets(job: MatchJob, profile: ResumeProfile) {
     "Communicated clearly with clients, families, coordinators, and team members.",
     "Followed instructions, maintained safety, and completed clear notes or documentation.",
   ];
+}
+
+function buildEmailBody(resumeDraft: ResumeDraft, profile: ResumeProfile, job?: MatchJob) {
+  return `${resumeDraft.coverNote}\n\n---\nResume\n\n${profile.full_name}\n${job?.title || profile.target_role}\n${profile.phone} | ${profile.email} | ${profile.location}\n\nProfile\n${resumeDraft.summary}\n\nKey skills\n${resumeDraft.skills.map((skill) => `- ${skill}`).join("\n")}\n\nExperience\n${resumeDraft.bullets.map((bullet) => `- ${bullet}`).join("\n")}`;
 }
 
 function trimText(value: string, limit: number) {
@@ -489,13 +421,15 @@ const styles = {
   editorHeader: { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", marginBottom: 14 },
   editorTitle: { margin: "6px 0 0", color: "#111827" },
   editorLabel: { display: "grid", gap: 8, marginTop: 12, color: "#334155", fontWeight: 900 },
+  input: { border: "1px solid #d1d5db", borderRadius: 16, padding: 13, fontFamily: "Arial, Helvetica, sans-serif", fontSize: 15 },
+  helperText: { color: "#166534", lineHeight: 1.6, fontWeight: 800 },
   textarea: { minHeight: 110, border: "1px solid #d1d5db", borderRadius: 16, padding: 13, fontFamily: "Arial, Helvetica, sans-serif", fontSize: 14, lineHeight: 1.5, resize: "vertical" as const },
   smallDarkButton: { border: 0, borderRadius: 999, background: "#111827", color: "white", padding: "10px 14px", fontWeight: 900, cursor: "pointer" },
   resumePaper: { background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 22, color: "#111827" },
   paperHeader: { textAlign: "center" as const, borderBottom: "2px solid #111827", paddingBottom: 14, marginBottom: 18 },
   paperSection: { borderBottom: "1px solid #e5e7eb", paddingBottom: 12, marginBottom: 14, lineHeight: 1.6 },
   resumeActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 },
-  approveButton: { gridColumn: "1 / -1", display: "block", textAlign: "center" as const, border: 0, borderRadius: 999, background: "#22c55e", color: "white", padding: "15px 18px", fontWeight: 900, cursor: "pointer" },
+  approveButton: { gridColumn: "1 / -1", display: "block", textAlign: "center" as const, border: 0, borderRadius: 999, background: "#22c55e", color: "white", padding: "15px 18px", fontWeight: 900, cursor: "pointer", textDecoration: "none" },
   approvedBox: { marginTop: 14, padding: 16, borderRadius: 18, background: "#dcfce7", color: "#166534" },
   smallButton: { display: "block", marginTop: 12, border: 0, borderRadius: 999, background: "#166534", color: "white", padding: "10px 14px", fontWeight: 900, cursor: "pointer" },
   emailDraft: { marginTop: 14, padding: 18, borderRadius: 22, background: "#ecfdf5", border: "1px solid #bbf7d0" },
