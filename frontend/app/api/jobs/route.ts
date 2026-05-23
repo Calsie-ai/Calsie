@@ -106,13 +106,14 @@ export async function GET(request: Request) {
       }
 
       const enriched = await enrichJobsWithRender(jobs);
-      const jobsToShow = enriched.jobs.length ? enriched.jobs : jobs;
+      const emailReadyJobs = enriched.jobs.filter((job) => job.contactEmail || job.hiringEmail);
       const gatewayJobs = enriched.gatewayJobs || [];
-      const emailReadyCount = jobsToShow.filter((job) => job.contactEmail || job.hiringEmail).length;
+      const jobsToShow = enriched.usedRender ? emailReadyJobs : jobs;
+      const emailReadyCount = emailReadyJobs.length;
 
       return NextResponse.json({
         ok: true,
-        source: "adzuna",
+        source: emailReadyCount > 0 || !enriched.usedRender ? "adzuna" : "adzuna_no_email_ready",
         query: attempt.label === "profile query" ? searchQuery : simpleQuery,
         attemptedQuery: searchQuery,
         role,
@@ -220,7 +221,7 @@ async function enrichJobsWithRender(jobs: MatchJob[]) {
     clearTimeout(timeout);
 
     if (!response.ok) {
-      return { usedRender: true, checked: 0, jobs, gatewayJobs: [] as MatchJob[] };
+      return { usedRender: true, checked: 0, jobs: [] as MatchJob[], gatewayJobs: [] as MatchJob[] };
     }
 
     const data = await response.json();
@@ -230,11 +231,11 @@ async function enrichJobsWithRender(jobs: MatchJob[]) {
     return {
       usedRender: true,
       checked: Number(data.checked || 0),
-      jobs: emailReadyJobs.length ? emailReadyJobs : [...gatewayJobs, ...jobs.slice(data.checked || 8)],
+      jobs: emailReadyJobs,
       gatewayJobs,
     };
   } catch {
-    return { usedRender: true, checked: 0, jobs, gatewayJobs: [] as MatchJob[] };
+    return { usedRender: true, checked: 0, jobs: [] as MatchJob[], gatewayJobs: [] as MatchJob[] };
   }
 }
 
@@ -275,7 +276,7 @@ function buildSuccessMessage(total: number, returned: number, emailReady: number
     return `Fetched ${total} live jobs from Adzuna and found ${emailReady} with hiring emails.`;
   }
 
-  return `Fetched ${total} live jobs from Adzuna. No hiring emails found in the first checked jobs, showing application gateways.`;
+  return `Fetched ${total} live jobs from Adzuna, but no direct hiring emails were found in the first checked jobs. Applix is not showing gateway-only jobs by default.`;
 }
 
 function buildAdzunaUrl({
