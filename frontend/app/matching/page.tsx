@@ -155,6 +155,7 @@ export default function MatchingPage() {
   const job = jobs[index];
   const jobDescription = job?.description || "No description provided.";
   const isLongDescription = jobDescription.length > 460;
+  const isEditing = flowState === "editing";
   const emailSubject = job ? `Application for ${job.title} - ${profile.full_name}` : "Application";
   const emailBody = resumeDraft ? buildEmailBody(resumeDraft, profile, job) : "";
   const mailtoUrl = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
@@ -307,44 +308,53 @@ export default function MatchingPage() {
           {resumeDraft && (
             <section style={styles.resumePanel}>
               <h2 style={styles.greenTitle}>Resume ready for {job.title}</h2>
+              {isEditing && <div style={styles.editableHint}>Editing is on. Type directly inside the resume below, then press Save edits.</div>}
 
-              {flowState === "editing" && (
-                <section style={styles.editorPanel}>
-                  <div style={styles.editorHeader}>
-                    <div><p style={styles.kitLabel}>Live resume editor</p><h2 style={styles.editorTitle}>Edit the draft below</h2></div>
-                    <button onClick={() => setFlowState("draft")} style={styles.smallDarkButton}>Done editing</button>
-                  </div>
+              <article style={isEditing ? styles.resumePaperEditing : styles.resumePaper}>
+                <header style={styles.paperHeader}>
+                  {isEditing ? (
+                    <>
+                      <input aria-label="Full name" style={styles.paperNameInput} value={profile.full_name} onChange={(event) => updateProfileField("full_name", event.target.value)} />
+                      <input aria-label="Target role" style={styles.paperRoleInput} value={profile.target_role || job.title} onChange={(event) => updateProfileField("target_role", event.target.value)} />
+                      <div style={styles.contactGrid}>
+                        <input aria-label="Phone" style={styles.paperInput} value={profile.phone} onChange={(event) => updateProfileField("phone", event.target.value)} />
+                        <input aria-label="Email" style={styles.paperInput} value={profile.email} onChange={(event) => updateProfileField("email", event.target.value)} />
+                        <input aria-label="Location" style={styles.paperInput} value={profile.location} onChange={(event) => updateProfileField("location", event.target.value)} />
+                      </div>
+                    </>
+                  ) : (
+                    <><h1>{profile.full_name}</h1><strong>{job.title || profile.target_role}</strong><p>{profile.phone} | {profile.email} | {profile.location}</p></>
+                  )}
+                </header>
 
-                  <div style={styles.contactGrid}>
-                    <label style={styles.editorLabel}>Full name<input style={styles.input} value={profile.full_name} onChange={(event) => updateProfileField("full_name", event.target.value)} /></label>
-                    <label style={styles.editorLabel}>Target role<input style={styles.input} value={profile.target_role} onChange={(event) => updateProfileField("target_role", event.target.value)} /></label>
-                    <label style={styles.editorLabel}>Phone<input style={styles.input} value={profile.phone} onChange={(event) => updateProfileField("phone", event.target.value)} /></label>
-                    <label style={styles.editorLabel}>Email<input style={styles.input} value={profile.email} onChange={(event) => updateProfileField("email", event.target.value)} /></label>
-                    <label style={styles.editorLabel}>Location<input style={styles.input} value={profile.location} onChange={(event) => updateProfileField("location", event.target.value)} /></label>
-                  </div>
+                <PaperSection title="Profile">
+                  {isEditing ? <textarea aria-label="Profile summary" style={styles.paperTextarea} value={resumeDraft.summary} onChange={(event) => updateResumeField("summary", event.target.value)} /> : <p>{resumeDraft.summary}</p>}
+                </PaperSection>
 
-                  <label style={styles.editorLabel}>Profile summary<textarea style={styles.textarea} value={resumeDraft.summary} onChange={(event) => updateResumeField("summary", event.target.value)} /></label>
-                  <label style={styles.editorLabel}>Key skills - one per line<textarea style={styles.textarea} value={resumeDraft.skills.join("\n")} onChange={(event) => updateResumeField("skills", event.target.value)} /></label>
-                  <label style={styles.editorLabel}>Experience bullets - one per line<textarea style={styles.textarea} value={resumeDraft.bullets.join("\n")} onChange={(event) => updateResumeField("bullets", event.target.value)} /></label>
-                  <label style={styles.editorLabel}>Email / cover note<textarea style={styles.textarea} value={resumeDraft.coverNote} onChange={(event) => updateResumeField("coverNote", event.target.value)} /></label>
-                </section>
-              )}
+                <PaperSection title="Key skills">
+                  {isEditing ? <textarea aria-label="Key skills" style={styles.paperTextarea} value={resumeDraft.skills.join("\n")} onChange={(event) => updateResumeField("skills", event.target.value)} /> : <ul>{resumeDraft.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul>}
+                </PaperSection>
 
-              <article style={styles.resumePaper}>
-                <header style={styles.paperHeader}><h1>{profile.full_name}</h1><strong>{job.title || profile.target_role}</strong><p>{profile.phone} | {profile.email} | {profile.location}</p></header>
-                <PaperSection title="Profile"><p>{resumeDraft.summary}</p></PaperSection>
-                <PaperSection title="Key skills"><ul>{resumeDraft.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul></PaperSection>
                 <PaperSection title="Work experience">
-                  {profile.work_experience.length ? profile.work_experience.slice(0, 2).map((item, itemIndex) => (
+                  {isEditing ? (
+                    <textarea aria-label="Experience bullets" style={styles.paperTextarea} value={resumeDraft.bullets.join("\n")} onChange={(event) => updateResumeField("bullets", event.target.value)} />
+                  ) : profile.work_experience.length ? profile.work_experience.slice(0, 2).map((item, itemIndex) => (
                     <div key={itemIndex}><h3>{item.job_title || job.title}</h3><strong>{item.company || "Previous employer"}</strong><ul>{resumeDraft.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul></div>
                   )) : <ul>{resumeDraft.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>}
                 </PaperSection>
+
                 {!!profile.education_locked.length && <PaperSection title="Education">{profile.education_locked.map((item, itemIndex) => <p key={itemIndex}>{item.qualification || item.institution || "Education item"} {item.institution ? `- ${item.institution}` : ""} {item.year || ""}</p>)}</PaperSection>}
                 {!!profile.certifications_locked.length && <PaperSection title="Certifications"><ul>{profile.certifications_locked.map((item, itemIndex) => <li key={itemIndex}>{item.name || item.provider || "Certification"}</li>)}</ul></PaperSection>}
               </article>
 
+              {isEditing && (
+                <section style={styles.editorPanel}>
+                  <label style={styles.editorLabel}>Email / cover note<textarea style={styles.textarea} value={resumeDraft.coverNote} onChange={(event) => updateResumeField("coverNote", event.target.value)} /></label>
+                </section>
+              )}
+
               <div style={styles.resumeActions}>
-                <button onClick={() => setFlowState(flowState === "editing" ? "draft" : "editing")} style={styles.secondaryButton}>{flowState === "editing" ? "Save edits" : "Edit Resume"}</button>
+                <button onClick={() => setFlowState(isEditing ? "draft" : "editing")} style={styles.secondaryButton}>{isEditing ? "Save edits" : "Edit Resume"}</button>
                 <button onClick={() => window.print()} style={styles.secondaryButton}>Download PDF</button>
                 <button onClick={() => setFlowState("approved")} style={styles.approveButton}>Approve Resume</button>
               </div>
@@ -464,7 +474,8 @@ const styles = {
   aiMessage: { marginTop: 14, padding: 14, borderRadius: 18, background: "#eef2ff", color: "#3730a3", fontWeight: 900 },
   resumePanel: { marginTop: 16, padding: 22, borderRadius: 24, border: "1px solid #d1fae5", background: "#f0fdf4" },
   greenTitle: { margin: "0 0 14px", color: "#047857" },
-  editorPanel: { marginBottom: 16, padding: 18, borderRadius: 22, background: "#ffffff", border: "1px solid #bbf7d0" },
+  editableHint: { marginBottom: 12, padding: 12, borderRadius: 16, background: "#dcfce7", color: "#166534", fontWeight: 900 },
+  editorPanel: { marginTop: 16, padding: 18, borderRadius: 22, background: "#ffffff", border: "1px solid #bbf7d0" },
   editorHeader: { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", marginBottom: 14 },
   editorTitle: { margin: "6px 0 0", color: "#111827" },
   editorLabel: { display: "grid", gap: 8, marginTop: 12, color: "#334155", fontWeight: 900 },
@@ -474,8 +485,13 @@ const styles = {
   textarea: { minHeight: 110, border: "1px solid #d1d5db", borderRadius: 16, padding: 13, fontFamily: "Arial, Helvetica, sans-serif", fontSize: 14, lineHeight: 1.5, resize: "vertical" as const },
   smallDarkButton: { border: 0, borderRadius: 999, background: "#111827", color: "white", padding: "10px 14px", fontWeight: 900, cursor: "pointer" },
   resumePaper: { background: "white", border: "1px solid #e5e7eb", borderRadius: 14, padding: 22, color: "#111827" },
+  resumePaperEditing: { background: "white", border: "2px solid #22c55e", borderRadius: 14, padding: 22, color: "#111827" },
   paperHeader: { textAlign: "center" as const, borderBottom: "2px solid #111827", paddingBottom: 14, marginBottom: 18 },
   paperSection: { borderBottom: "1px solid #e5e7eb", paddingBottom: 12, marginBottom: 14, lineHeight: 1.6 },
+  paperNameInput: { width: "100%", border: "1px solid #bbf7d0", borderRadius: 12, padding: 10, textAlign: "center" as const, fontSize: 28, fontWeight: 900, marginBottom: 8 },
+  paperRoleInput: { width: "100%", border: "1px solid #bbf7d0", borderRadius: 12, padding: 10, textAlign: "center" as const, fontSize: 16, fontWeight: 900, marginBottom: 8 },
+  paperInput: { width: "100%", border: "1px solid #bbf7d0", borderRadius: 12, padding: 10, fontFamily: "Arial, Helvetica, sans-serif", fontSize: 14 },
+  paperTextarea: { width: "100%", minHeight: 120, border: "1px solid #bbf7d0", borderRadius: 12, padding: 12, fontFamily: "Arial, Helvetica, sans-serif", fontSize: 14, lineHeight: 1.5, resize: "vertical" as const },
   resumeActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 },
   approveButton: { gridColumn: "1 / -1", display: "block", textAlign: "center" as const, border: 0, borderRadius: 999, background: "#22c55e", color: "white", padding: "15px 18px", fontWeight: 900, cursor: "pointer", textDecoration: "none" },
   approvedBox: { marginTop: 14, padding: 16, borderRadius: 18, background: "#dcfce7", color: "#166534" },
