@@ -22,6 +22,9 @@ type MatchJob = {
 type ResumeProfile = {
   full_name: string;
   target_role: string;
+  industry: string;
+  industry_specialisation: string;
+  target_keywords: string[];
   phone: string;
   email: string;
   location: string;
@@ -45,9 +48,12 @@ type JobInteractionAction = "viewed" | "skipped" | "saved" | "resume_created" | 
 const fallbackProfile: ResumeProfile = {
   full_name: "Your Name",
   target_role: "Applicant",
+  industry: "",
+  industry_specialisation: "",
+  target_keywords: [],
   phone: "Add phone in profile",
   email: "Add email in profile",
-  location: "Add location in profile",
+  location: "Sydney",
   profile_summary: "",
   skills: [],
   work_experience: [],
@@ -80,7 +86,8 @@ export default function MatchingPage() {
 
   async function loadEverything() {
     setLoading(true);
-    await Promise.all([loadProfile(), loadJobs()]);
+    const loadedProfile = await loadProfile();
+    await loadJobs(loadedProfile);
     setLoading(false);
   }
 
@@ -90,7 +97,7 @@ export default function MatchingPage() {
 
     if (!user) {
       setProfile(fallbackProfile);
-      return;
+      return fallbackProfile;
     }
 
     const userEmail = user.email || "";
@@ -98,26 +105,30 @@ export default function MatchingPage() {
 
     const { data: resumeRow } = await supabase
       .from("resume_profiles")
-      .select("full_name,target_role,phone,email,location,profile_summary,skills,work_experience,education_locked,certifications_locked")
+      .select("full_name,target_role,industry,industry_specialisation,target_keywords,phone,email,location,profile_summary,skills,work_experience,education_locked,certifications_locked")
       .eq("profile_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (resumeRow) {
-      setProfile({
+      const loadedProfile = {
         full_name: resumeRow.full_name || authName,
         target_role: resumeRow.target_role || "Applicant",
+        industry: resumeRow.industry || "",
+        industry_specialisation: resumeRow.industry_specialisation || "",
+        target_keywords: Array.isArray(resumeRow.target_keywords) ? resumeRow.target_keywords : [],
         phone: resumeRow.phone || "Add phone in profile",
         email: resumeRow.email || userEmail || "Add email in profile",
-        location: resumeRow.location || "Add location in profile",
+        location: resumeRow.location || "Sydney",
         profile_summary: resumeRow.profile_summary || "",
         skills: Array.isArray(resumeRow.skills) ? resumeRow.skills : [],
         work_experience: Array.isArray(resumeRow.work_experience) ? resumeRow.work_experience : [],
         education_locked: Array.isArray(resumeRow.education_locked) ? resumeRow.education_locked : [],
         certifications_locked: Array.isArray(resumeRow.certifications_locked) ? resumeRow.certifications_locked : [],
-      });
-      return;
+      };
+      setProfile(loadedProfile);
+      return loadedProfile;
     }
 
     const { data: profileRow } = await supabase
@@ -126,27 +137,42 @@ export default function MatchingPage() {
       .eq("id", user.id)
       .maybeSingle();
 
-    setProfile({
+    const loadedProfile = {
       ...fallbackProfile,
       full_name: profileRow?.full_name || authName,
       phone: profileRow?.phone || "Add phone in profile",
       email: profileRow?.email || userEmail || "Add email in profile",
-      location: profileRow?.location || "Add location in profile",
-    });
+      location: profileRow?.location || "Sydney",
+    };
+
+    setProfile(loadedProfile);
+    return loadedProfile;
   }
 
-  async function loadJobs() {
+  async function loadJobs(profileForSearch = profile) {
     setResumeDraft(null);
     setFlowState("idle");
     setAiMessage("");
     setShowFullDescription(false);
     setRecipientEmail("");
+
+    const params = new URLSearchParams({
+      role: profileForSearch.target_role || "support worker",
+      location: profileForSearch.location || "Sydney",
+      country: "au",
+      max_days: "30",
+    });
+
+    if (profileForSearch.industry) params.set("industry", profileForSearch.industry);
+    if (profileForSearch.industry_specialisation) params.set("specialisation", profileForSearch.industry_specialisation);
+    if (profileForSearch.target_keywords.length) params.set("keywords", profileForSearch.target_keywords.join(" "));
+
     try {
-      const response = await fetch("/api/jobs?role=support%20worker&location=Sydney&country=au", { cache: "no-store" });
+      const response = await fetch(`/api/jobs?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
       setJobs(data.jobs || []);
       setSource(data.source || "unknown");
-      setMessage(data.message || "Jobs loaded.");
+      setMessage(data.message || `Jobs loaded for ${data.query || profileForSearch.target_role}.`);
       setIndex(0);
       if (data.jobs?.[0]?.contactEmail) setRecipientEmail(data.jobs[0].contactEmail);
     } catch (error: any) {
@@ -307,7 +333,7 @@ export default function MatchingPage() {
 
         <div style={styles.statusBar}>
           <span style={source === "adzuna" ? styles.liveDot : styles.demoDot} />
-          <span>{source === "adzuna" ? "Live Adzuna jobs" : message}</span>
+          <span>{source === "adzuna" ? `Live Adzuna jobs for ${profile.target_role}` : message}</span>
         </div>
 
         <article style={styles.jobCard}>
@@ -467,7 +493,7 @@ function createFallbackDraft(job: MatchJob, profile: ResumeProfile): ResumeDraft
 
   return {
     summary: profile.profile_summary || `Reliable ${job.title} candidate with practical experience, strong communication, and a client-focused approach. Interested in ${job.company} and ready to support the requirements of this role.`,
-    skills: Array.from(new Set([...cleanTags, ...baseSkills, "Reliable shift attendance"])).slice(0, 8),
+    skills: Array.from(new Set([...cleanTags, ...baseSkills, ...profile.target_keywords, "Reliable shift attendance"])).slice(0, 8),
     bullets: buildExperienceBullets(job, profile),
     coverNote: `Dear Hiring Manager,\n\nI am interested in the ${job.title} position at ${job.company}. My experience, skills, and reliability align with this opportunity.\n\nKind regards,\n${profile.full_name}`,
   };
