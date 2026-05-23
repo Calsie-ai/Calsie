@@ -72,6 +72,9 @@ export default function ProfilePage() {
 
   const [fullName, setFullName] = useState("");
   const [targetRole, setTargetRole] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [industrySpecialisation, setIndustrySpecialisation] = useState("");
+  const [targetKeywordsText, setTargetKeywordsText] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [location, setLocation] = useState("");
@@ -122,6 +125,9 @@ export default function ProfilePage() {
         setResumeProfileId(resumeRow.id);
         setFullName(resumeRow.full_name || profileRow?.full_name || "");
         setTargetRole(resumeRow.target_role || "");
+        setIndustry(resumeRow.industry || "");
+        setIndustrySpecialisation(resumeRow.industry_specialisation || "");
+        setTargetKeywordsText(Array.isArray(resumeRow.target_keywords) ? resumeRow.target_keywords.join("\n") : "");
         setPhone(resumeRow.phone || profileRow?.phone || "");
         setEmail(resumeRow.email || profileRow?.email || data.user.email || "");
         setLocation(resumeRow.location || profileRow?.location || "");
@@ -167,12 +173,10 @@ export default function ProfilePage() {
     setSaving(true);
     setMessage("");
 
-    const skills = skillsText
-      .split("\n")
-      .map((skill) => skill.trim())
-      .filter(Boolean);
+    const skills = splitLines(skillsText);
+    const targetKeywords = splitLines(targetKeywordsText);
 
-    const payload = {
+    const basePayload = {
       profile_id: userId,
       full_name: fullName,
       target_role: targetRole,
@@ -192,6 +196,13 @@ export default function ProfilePage() {
       updated_at: new Date().toISOString(),
     };
 
+    const enhancedPayload = {
+      ...basePayload,
+      industry,
+      industry_specialisation: industrySpecialisation,
+      target_keywords: targetKeywords,
+    };
+
     try {
       const { error: profileError } = await supabase.from("profiles").upsert({
         id: userId,
@@ -203,6 +214,21 @@ export default function ProfilePage() {
 
       if (profileError) throw profileError;
 
+      const savedEnhanced = await saveResumeRow(enhancedPayload, basePayload);
+
+      setMessage(savedEnhanced
+        ? "Resume profile saved with career target fields. You can now match jobs and generate application kits."
+        : "Resume profile saved. Run the Supabase career target SQL migration to save industry and specialisation permanently."
+      );
+    } catch (error: any) {
+      setMessage(error.message || "Could not save resume profile.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveResumeRow(enhancedPayload: any, basePayload: any) {
+    async function save(payload: any) {
       if (resumeProfileId) {
         const { error } = await supabase
           .from("resume_profiles")
@@ -210,22 +236,28 @@ export default function ProfilePage() {
           .eq("id", resumeProfileId);
 
         if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from("resume_profiles")
-          .insert(payload)
-          .select("id")
-          .single();
-
-        if (error) throw error;
-        setResumeProfileId(data.id);
+        return;
       }
 
-      setMessage("Resume profile saved. You can now match jobs and generate application kits.");
+      const { data, error } = await supabase
+        .from("resume_profiles")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (error) throw error;
+      setResumeProfileId(data.id);
+    }
+
+    try {
+      await save(enhancedPayload);
+      return true;
     } catch (error: any) {
-      setMessage(error.message || "Could not save resume profile.");
-    } finally {
-      setSaving(false);
+      const text = String(error?.message || "").toLowerCase();
+      const missingCareerColumn = text.includes("industry") || text.includes("target_keywords") || text.includes("schema cache") || text.includes("column");
+      if (!missingCareerColumn) throw error;
+      await save(basePayload);
+      return false;
     }
   }
 
@@ -251,13 +283,26 @@ export default function ProfilePage() {
           <h2 style={styles.sectionTitle}>Personal details</h2>
           <div style={styles.formGrid}>
             <Field label="Full name" value={fullName} onChange={setFullName} placeholder="Your full name" />
-            <Field label="Target role" value={targetRole} onChange={setTargetRole} placeholder="Support Worker, Admin Assistant..." />
-            <Field label="Phone" value={phone} onChange={setPhone} placeholder="0430..." />
+            <Field label="Target role" value={targetRole} onChange={setTargetRole} placeholder="Administrator, Accountant, Support Worker" />
+            <Field label="Phone" value={phone} onChange={setPhone} placeholder="Phone number" />
             <Field label="Email" value={email} onChange={setEmail} placeholder="you@example.com" />
             <Field label="Location" value={location} onChange={setLocation} placeholder="Sydney NSW" />
             <Field label="LinkedIn" value={linkedin} onChange={setLinkedin} placeholder="https://linkedin.com/in/..." />
             <Field label="Portfolio / website" value={website} onChange={setWebsite} placeholder="https://..." />
           </div>
+        </section>
+
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>Career target</h2>
+          <p style={styles.helperText}>Keep Target role simple. Use Industry, Specialisation, and Keywords to tell Applix which market to search.</p>
+          <div style={styles.formGrid}>
+            <Field label="Industry" value={industry} onChange={setIndustry} placeholder="Construction, Finance, Education, Healthcare, NDIS" />
+            <Field label="Industry specialisation" value={industrySpecialisation} onChange={setIndustrySpecialisation} placeholder="Site admin, payroll, school admin, NDIS support" />
+          </div>
+          <label style={styles.fieldWide}>
+            Target keywords - one per line
+            <textarea style={styles.textarea} value={targetKeywordsText} onChange={(event) => setTargetKeywordsText(event.target.value)} placeholder={"project coordination\naccounts payable\nstudent records\ncontractor onboarding"} />
+          </label>
         </section>
 
         <section style={styles.section}>
@@ -304,8 +349,8 @@ export default function ProfilePage() {
           </div>
           {education.map((item, index) => (
             <div key={index} style={styles.formGrid}>
-              <Field label="Institution" value={item.institution} onChange={(value) => updateEducation(index, "institution", value)} placeholder="TAFE NSW" />
-              <Field label="Qualification" value={item.qualification} onChange={(value) => updateEducation(index, "qualification", value)} placeholder="Certificate III in Individual Support" />
+              <Field label="Institution" value={item.institution} onChange={(value) => updateEducation(index, "institution", value)} placeholder="Institution name" />
+              <Field label="Qualification" value={item.qualification} onChange={(value) => updateEducation(index, "qualification", value)} placeholder="Qualification" />
               <Field label="Year" value={item.year} onChange={(value) => updateEducation(index, "year", value)} placeholder="2023" />
             </div>
           ))}
@@ -324,7 +369,7 @@ export default function ProfilePage() {
 
           <label style={styles.fieldWide}>
             Work rights
-            <input style={styles.input} value={workRights} onChange={(event) => setWorkRights(event.target.value)} placeholder="Australian citizen, permanent resident, valid work visa..." />
+            <input style={styles.input} value={workRights} onChange={(event) => setWorkRights(event.target.value)} placeholder="Work rights or availability notes" />
           </label>
 
           <div style={styles.sectionHeader}>
@@ -362,182 +407,36 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
   );
 }
 
+function splitLines(value: string) {
+  return value.split("\n").map((item) => item.trim()).filter(Boolean);
+}
+
 const styles = {
-  main: {
-    minHeight: "100vh",
-    background: "#f8fafc",
-    fontFamily: "Arial, Helvetica, sans-serif",
-    padding: 24,
-    color: "#111827",
-  },
-  card: {
-    maxWidth: 980,
-    margin: "0 auto",
-    background: "white",
-    borderRadius: 30,
-    padding: 28,
-    boxShadow: "0 20px 60px rgba(15,23,42,0.08)",
-  },
-  topBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  backLink: {
-    color: "#111827",
-    textDecoration: "none",
-    fontWeight: 900,
-  },
-  logoutButton: {
-    border: "1px solid #e5e7eb",
-    background: "white",
-    borderRadius: 999,
-    padding: "10px 14px",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  badge: {
-    display: "inline-block",
-    marginTop: 40,
-    padding: "8px 12px",
-    borderRadius: 999,
-    background: "#eef2ff",
-    color: "#4338ca",
-    fontWeight: 900,
-  },
-  title: {
-    maxWidth: 720,
-    margin: "18px 0 12px",
-    fontSize: "clamp(36px, 7vw, 64px)",
-    lineHeight: 0.98,
-    letterSpacing: -2,
-  },
-  subtitle: {
-    maxWidth: 760,
-    color: "#64748b",
-    lineHeight: 1.7,
-    fontSize: 18,
-  },
-  section: {
-    marginTop: 30,
-    paddingTop: 24,
-    borderTop: "1px solid #e5e7eb",
-  },
-  lockedSection: {
-    marginTop: 30,
-    padding: 20,
-    borderRadius: 24,
-    background: "#f8fafc",
-    border: "1px solid #e5e7eb",
-  },
-  sectionHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 20,
-  },
-  sectionTitle: {
-    margin: "0 0 14px",
-    fontSize: 24,
-  },
-  subTitle: {
-    margin: "0 0 12px",
-    fontSize: 18,
-  },
-  lockedText: {
-    color: "#64748b",
-    lineHeight: 1.6,
-  },
-  formGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
-    gap: 14,
-    marginTop: 14,
-  },
-  field: {
-    display: "grid",
-    gap: 8,
-    color: "#334155",
-    fontWeight: 900,
-  },
-  fieldWide: {
-    display: "grid",
-    gap: 8,
-    color: "#334155",
-    fontWeight: 900,
-    marginTop: 14,
-  },
-  input: {
-    border: "1px solid #e5e7eb",
-    borderRadius: 16,
-    padding: 14,
-    fontSize: 16,
-  },
-  textarea: {
-    border: "1px solid #e5e7eb",
-    borderRadius: 16,
-    padding: 14,
-    fontSize: 16,
-    minHeight: 120,
-    resize: "vertical" as const,
-  },
-  repeatCard: {
-    marginTop: 14,
-    padding: 16,
-    border: "1px solid #e5e7eb",
-    borderRadius: 22,
-    background: "white",
-  },
-  smallButton: {
-    border: 0,
-    borderRadius: 999,
-    background: "#111827",
-    color: "white",
-    padding: "10px 14px",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  actions: {
-    display: "flex",
-    flexWrap: "wrap" as const,
-    gap: 12,
-    marginTop: 26,
-  },
-  primaryButton: {
-    border: 0,
-    borderRadius: 999,
-    background: "#111827",
-    color: "white",
-    padding: "15px 20px",
-    fontWeight: 900,
-    fontSize: 16,
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    borderRadius: 999,
-    background: "white",
-    color: "#111827",
-    border: "1px solid #e5e7eb",
-    padding: "15px 20px",
-    fontWeight: 900,
-    textDecoration: "none",
-  },
-  successMessage: {
-    marginTop: 18,
-    color: "#166534",
-    background: "#dcfce7",
-    padding: 14,
-    borderRadius: 16,
-    fontWeight: 800,
-  },
-  errorMessage: {
-    marginTop: 18,
-    color: "#991b1b",
-    background: "#fee2e2",
-    padding: 14,
-    borderRadius: 16,
-    fontWeight: 800,
-  },
+  main: { minHeight: "100vh", background: "#f8fafc", fontFamily: "Arial, Helvetica, sans-serif", padding: 24, color: "#111827" },
+  card: { maxWidth: 980, margin: "0 auto", background: "white", borderRadius: 30, padding: 28, boxShadow: "0 20px 60px rgba(15,23,42,0.08)" },
+  topBar: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  backLink: { color: "#111827", textDecoration: "none", fontWeight: 900 },
+  logoutButton: { border: "1px solid #e5e7eb", background: "white", borderRadius: 999, padding: "10px 14px", fontWeight: 900, cursor: "pointer" },
+  badge: { display: "inline-block", marginTop: 40, padding: "8px 12px", borderRadius: 999, background: "#eef2ff", color: "#4338ca", fontWeight: 900 },
+  title: { maxWidth: 720, margin: "18px 0 12px", fontSize: "clamp(36px, 7vw, 64px)", lineHeight: 0.98, letterSpacing: -2 },
+  subtitle: { maxWidth: 760, color: "#64748b", lineHeight: 1.7, fontSize: 18 },
+  helperText: { maxWidth: 820, color: "#64748b", lineHeight: 1.6, fontWeight: 800 },
+  section: { marginTop: 30, paddingTop: 24, borderTop: "1px solid #e5e7eb" },
+  lockedSection: { marginTop: 30, padding: 20, borderRadius: 24, background: "#f8fafc", border: "1px solid #e5e7eb" },
+  sectionHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 20 },
+  sectionTitle: { margin: "0 0 14px", fontSize: 24 },
+  subTitle: { margin: "0 0 12px", fontSize: 18 },
+  lockedText: { color: "#64748b", lineHeight: 1.6 },
+  formGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14, marginTop: 14 },
+  field: { display: "grid", gap: 8, color: "#334155", fontWeight: 900 },
+  fieldWide: { display: "grid", gap: 8, color: "#334155", fontWeight: 900, marginTop: 14 },
+  input: { border: "1px solid #e5e7eb", borderRadius: 16, padding: 14, fontSize: 16 },
+  textarea: { border: "1px solid #e5e7eb", borderRadius: 16, padding: 14, fontSize: 16, minHeight: 120, resize: "vertical" as const },
+  repeatCard: { marginTop: 14, padding: 16, border: "1px solid #e5e7eb", borderRadius: 22, background: "white" },
+  smallButton: { border: 0, borderRadius: 999, background: "#111827", color: "white", padding: "10px 14px", fontWeight: 900, cursor: "pointer" },
+  actions: { display: "flex", flexWrap: "wrap" as const, gap: 12, marginTop: 26 },
+  primaryButton: { border: 0, borderRadius: 999, background: "#111827", color: "white", padding: "15px 20px", fontWeight: 900, fontSize: 16, cursor: "pointer" },
+  secondaryButton: { borderRadius: 999, background: "white", color: "#111827", border: "1px solid #e5e7eb", padding: "15px 20px", fontWeight: 900, textDecoration: "none" },
+  successMessage: { marginTop: 18, color: "#166534", background: "#dcfce7", padding: 14, borderRadius: 16, fontWeight: 800 },
+  errorMessage: { marginTop: 18, color: "#991b1b", background: "#fee2e2", padding: 14, borderRadius: 16, fontWeight: 800 },
 };
