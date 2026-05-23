@@ -15,6 +15,28 @@ type AdzunaJob = {
   created?: string;
 };
 
+type MatchJob = {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  salary: string;
+  type: string;
+  postedAt?: string | null;
+  postedAgo?: string;
+  match: number;
+  description: string;
+  tags: string[];
+  logo: string;
+  applyUrl?: string | null;
+  contactEmail?: string | null;
+  hiringEmail?: string | null;
+  contactConfidence?: string;
+  applicationMethod?: string;
+  sourceUrl?: string | null;
+  contactNotes?: string[];
+};
+
 type FetchAttempt = {
   url: URL;
   label: string;
@@ -76,12 +98,17 @@ export async function GET(request: Request) {
         continue;
       }
 
-      const jobs = (result.data.results || []).map(mapAdzunaJob);
+      const jobs: MatchJob[] = (result.data.results || []).map(mapAdzunaJob);
 
       if (!jobs.length) {
         errors.push(`${attempt.label}: no jobs returned`);
         continue;
       }
+
+      const enriched = await enrichJobsWithRender(jobs);
+      const jobsToShow = enriched.jobs.length ? enriched.jobs : jobs;
+      const gatewayJobs = enriched.gatewayJobs || [];
+      const emailReadyCount = jobsToShow.filter((job) => job.contactEmail || job.hiringEmail).length;
 
       return NextResponse.json({
         ok: true,
@@ -95,9 +122,13 @@ export async function GET(request: Request) {
         location,
         page: attempt.url.pathname.split("/").pop() || page,
         maxDays,
-        count: jobs.length,
-        jobs,
-        message: `Fetched ${jobs.length} live jobs from Adzuna using ${attempt.label}.`,
+        count: jobsToShow.length,
+        emailReadyCount,
+        gatewayCount: gatewayJobs.length,
+        jobs: jobsToShow,
+        gatewayJobs,
+        renderChecked: enriched.checked,
+        message: buildSuccessMessage(jobs.length, jobsToShow.length, emailReadyCount, enriched.usedRender, attempt.label),
       });
     }
 
@@ -168,6 +199,85 @@ async function fetchAdzunaAttempt(attempt: FetchAttempt) {
   };
 }
 
+async function enrichJobsWithRender(jobs: MatchJob[]) {
+  const scraperUrl = process.env.RENDER_SCRAPER_URL;
+
+  if (!scraperUrl) {
+    return { usedRender: false, checked: 0, jobs, gatewayJobs: [] as MatchJob[] };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 115000);
+
+    const response = await fetch(`${scraperUrl.replace(/\/$/, "")}/email-ready-jobs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobs, limit: 8 }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return { usedRender: true, checked: 0, jobs, gatewayJobs: [] as MatchJob[] };
+    }
+
+    const data = await response.json();
+    const emailReadyJobs = Array.isArray(data.jobs) ? data.jobs.map(normaliseRenderJob) : [];
+    const gatewayJobs = Array.isArray(data.gatewayJobs) ? data.gatewayJobs.map(normaliseRenderJob) : [];
+
+    return {
+      usedRender: true,
+      checked: Number(data.checked || 0),
+      jobs: emailReadyJobs.length ? emailReadyJobs : [...gatewayJobs, ...jobs.slice(data.checked || 8)],
+      gatewayJobs,
+    };
+  } catch {
+    return { usedRender: true, checked: 0, jobs, gatewayJobs: [] as MatchJob[] };
+  }
+}
+
+function normaliseRenderJob(job: any): MatchJob {
+  const contactEmail = job.contactEmail || job.hiringEmail || null;
+  const contactNotes = Array.isArray(job.contactNotes) ? job.contactNotes : [];
+  const tags = Array.isArray(job.tags) ? job.tags : [];
+
+  return {
+    id: String(job.id || `${job.company}-${job.title}-${job.location}`),
+    title: job.title || "Untitled role",
+    company: job.company || "Company not listed",
+    location: job.location || "Location not listed",
+    salary: job.salary || "Salary not listed",
+    type: job.type || "Job type not listed",
+    postedAt: job.postedAt || null,
+    postedAgo: job.postedAgo || "",
+    match: Number(job.match || 75),
+    description: job.description || "No description provided.",
+    tags: [contactEmail ? "Hiring email found" : "Application gateway", ...tags].filter(Boolean),
+    logo: job.logo || "💼",
+    applyUrl: job.applyUrl || job.sourceUrl || null,
+    contactEmail,
+    hiringEmail: contactEmail,
+    contactConfidence: job.contactConfidence || (contactEmail ? "medium" : "none"),
+    applicationMethod: job.applicationMethod || (contactEmail ? "email" : "apply_link"),
+    sourceUrl: job.sourceUrl || job.applyUrl || null,
+    contactNotes,
+  };
+}
+
+function buildSuccessMessage(total: number, returned: number, emailReady: number, usedRender: boolean, attemptLabel: string) {
+  if (!usedRender) {
+    return `Fetched ${total} live jobs from Adzuna using ${attemptLabel}. Add RENDER_SCRAPER_URL to check hiring emails.`;
+  }
+
+  if (emailReady > 0) {
+    return `Fetched ${total} live jobs from Adzuna and found ${emailReady} with hiring emails.`;
+  }
+
+  return `Fetched ${total} live jobs from Adzuna. No hiring emails found in the first checked jobs, showing application gateways.`;
+}
+
 function buildAdzunaUrl({
   country,
   page,
@@ -207,7 +317,7 @@ function buildSearchQuery(role: string, industry: string, specialisation: string
   return Array.from(new Set(parts)).join(" ").replace(/\s+/g, " ").trim() || "support worker";
 }
 
-function mapAdzunaJob(job: AdzunaJob, index: number) {
+function mapAdzunaJob(job: AdzunaJob, index: number): MatchJob {
   const salary = formatSalary(job.salary_min, job.salary_max);
   const postedAgo = formatPostedAgo(job.created);
   const jobType = formatJobType(job.contract_time);
@@ -224,8 +334,10 @@ function mapAdzunaJob(job: AdzunaJob, index: number) {
     postedAgo,
     match: Math.max(72, 96 - index * 2),
     description: stripHtml(job.description || "No description provided."),
-    tags: [job.category?.label, postedAgo, "Adzuna", "Live job"].filter(Boolean),
+    tags: [job.category?.label, postedAgo, "Adzuna", "Live job"].filter(Boolean) as string[],
     applyUrl: job.redirect_url || null,
+    contactEmail: null,
+    applicationMethod: job.redirect_url ? "apply_link" : "unknown",
   };
 }
 
