@@ -193,7 +193,7 @@ def extract_emails(text: str) -> List[str]:
     emails = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text or "")
     cleaned = []
     for email in emails:
-        email = email.lower().strip(".,;:)"])
+        email = email.lower().strip(".,;:)")
         if is_useful_email(email):
             cleaned.append(email)
     return list(dict.fromkeys(cleaned))
