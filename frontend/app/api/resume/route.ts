@@ -28,6 +28,13 @@ export async function POST(request: Request) {
   const job = payload.job || {};
   const profile = payload.profile || {};
 
+  const careerTarget = {
+    target_role: profile.target_role || "",
+    industry: profile.industry || "",
+    industry_specialisation: profile.industry_specialisation || "",
+    target_keywords: Array.isArray(profile.target_keywords) ? profile.target_keywords : [],
+  };
+
   const prompt = `Create a tailored Australian job application kit.
 
 Return ONLY valid JSON with this exact shape:
@@ -40,10 +47,17 @@ Return ONLY valid JSON with this exact shape:
 
 Rules:
 - Use the candidate profile as source truth.
+- Use the career target fields to guide wording and relevance.
+- Target role is the job type the user wants.
+- Industry is the market context, for example Construction, Finance, Education, Healthcare, NDIS, Accounting, or Administration.
+- Industry specialisation and target keywords should guide ATS wording when relevant to the job ad.
 - Tailor wording to the job ad.
 - Do not invent licences, certificates, degrees, employers, dates, or names.
 - Keep it concise and ATS-friendly.
 - Australian English.
+
+Career target:
+${JSON.stringify(careerTarget, null, 2)}
 
 Candidate profile:
 ${JSON.stringify(profile, null, 2)}
