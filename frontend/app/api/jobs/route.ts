@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       source: "demo",
-      message: "Adzuna keys are not set in Vercel. Showing demo jobs only.",
+      message: "Adzuna keys are not set in Vercel. Add ADZUNA_APP_ID and ADZUNA_APP_KEY, then redeploy.",
       query: searchQuery,
       location,
       page,
@@ -62,13 +62,14 @@ export async function GET(request: Request) {
 
     if (!response.ok) {
       const text = await response.text();
+      const safeDetails = cleanDetails(text);
       return NextResponse.json(
         {
           ok: false,
           source: "adzuna_error_demo_fallback",
           error: `Adzuna request failed: ${response.status}`,
-          details: text.slice(0, 500),
-          message: "Adzuna request failed. Showing demo jobs only.",
+          details: safeDetails,
+          message: `Adzuna request failed with status ${response.status}. ${safeDetails || "Check ADZUNA_APP_ID, ADZUNA_APP_KEY, country, and quota."} Showing demo jobs only.`,
           query: searchQuery,
           location,
           page,
@@ -120,7 +121,7 @@ export async function GET(request: Request) {
       ok: false,
       source: "fetch_error_demo_fallback",
       error: error?.message || "Unknown job fetch error",
-      message: "Job fetch failed. Showing demo jobs only.",
+      message: `Job fetch failed: ${error?.message || "Unknown error"}. Showing demo jobs only.`,
       query: searchQuery,
       location,
       page,
@@ -194,4 +195,12 @@ function formatPostedAgo(created?: string) {
 
 function stripHtml(value: string) {
   return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function cleanDetails(value: string) {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 220);
 }
