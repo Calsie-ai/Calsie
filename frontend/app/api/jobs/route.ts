@@ -12,6 +12,7 @@ type AdzunaJob = {
   description?: string;
   category?: { label?: string };
   redirect_url?: string;
+  created?: string;
 };
 
 export async function GET(request: Request) {
@@ -19,6 +20,13 @@ export async function GET(request: Request) {
   const role = searchParams.get("role") || "support worker";
   const location = searchParams.get("location") || "Sydney";
   const country = searchParams.get("country") || "au";
+  const industry = searchParams.get("industry") || "";
+  const specialisation = searchParams.get("specialisation") || searchParams.get("industry_specialisation") || "";
+  const keywords = searchParams.get("keywords") || "";
+  const maxDays = searchParams.get("max_days") || "30";
+  const requestedPage = searchParams.get("page");
+  const page = requestedPage || String(Math.floor(Math.random() * 4) + 1);
+  const searchQuery = buildSearchQuery(role, industry, specialisation, keywords);
 
   const appId = process.env.ADZUNA_APP_ID;
   const appKey = process.env.ADZUNA_APP_KEY;
@@ -29,16 +37,21 @@ export async function GET(request: Request) {
       source: "demo",
       message:
         "Adzuna keys are not set in Vercel yet. Returning demo jobs so the fetch flow still runs.",
+      query: searchQuery,
+      location,
+      page,
       jobs: demoJobs,
     });
   }
 
-  const url = new URL(`https://api.adzuna.com/v1/api/jobs/${country}/search/1`);
+  const url = new URL(`https://api.adzuna.com/v1/api/jobs/${country}/search/${page}`);
   url.searchParams.set("app_id", appId);
   url.searchParams.set("app_key", appKey);
-  url.searchParams.set("what", role);
+  url.searchParams.set("what", searchQuery);
   url.searchParams.set("where", location);
   url.searchParams.set("results_per_page", "20");
+  url.searchParams.set("sort_by", "date");
+  url.searchParams.set("max_days", maxDays);
   url.searchParams.set("content-type", "application/json");
 
   try {
@@ -55,6 +68,9 @@ export async function GET(request: Request) {
           source: "adzuna",
           error: `Adzuna request failed: ${response.status}`,
           details: text.slice(0, 500),
+          query: searchQuery,
+          location,
+          page,
           jobs: demoJobs,
         },
         { status: 200 }
@@ -67,24 +83,45 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       source: "adzuna",
-      query: role,
+      query: searchQuery,
+      role,
+      industry,
+      specialisation,
+      keywords,
       location,
+      page,
+      maxDays,
       count: jobs.length,
       jobs: jobs.length ? jobs : demoJobs,
-      message: jobs.length ? "Fetched live jobs from Adzuna." : "No Adzuna jobs found. Showing demo jobs.",
+      message: jobs.length
+        ? `Fetched live jobs from Adzuna. Showing page ${page}, sorted by newest first.`
+        : "No Adzuna jobs found. Showing demo jobs.",
     });
   } catch (error: any) {
     return NextResponse.json({
       ok: false,
       source: "error",
       error: error?.message || "Unknown job fetch error",
+      query: searchQuery,
+      location,
+      page,
       jobs: demoJobs,
     });
   }
 }
 
+function buildSearchQuery(role: string, industry: string, specialisation: string, keywords: string) {
+  const parts = [role, industry, specialisation, keywords]
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(parts)).join(" ").replace(/\s+/g, " ").trim() || "support worker";
+}
+
 function mapAdzunaJob(job: AdzunaJob, index: number) {
   const salary = formatSalary(job.salary_min, job.salary_max);
+  const postedAgo = formatPostedAgo(job.created);
+  const jobType = formatJobType(job.contract_time);
 
   return {
     id: job.id || `adzuna-${index}`,
@@ -93,10 +130,12 @@ function mapAdzunaJob(job: AdzunaJob, index: number) {
     logo: "💼",
     location: job.location?.display_name || "Location not listed",
     salary,
-    type: formatJobType(job.contract_time),
+    type: postedAgo ? `${jobType} • ${postedAgo}` : jobType,
+    postedAt: job.created || null,
+    postedAgo,
     match: Math.max(72, 96 - index * 2),
     description: stripHtml(job.description || "No description provided."),
-    tags: [job.category?.label, "Adzuna", "Live job"].filter(Boolean),
+    tags: [job.category?.label, postedAgo, "Adzuna", "Live job"].filter(Boolean),
     applyUrl: job.redirect_url || null,
   };
 }
@@ -111,6 +150,26 @@ function formatSalary(min?: number, max?: number) {
 function formatJobType(type?: string) {
   if (!type) return "Job type not listed";
   return type.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatPostedAgo(created?: string) {
+  if (!created) return "";
+
+  const createdDate = new Date(created);
+  if (Number.isNaN(createdDate.getTime())) return "";
+
+  const diffMs = Date.now() - createdDate.getTime();
+  const diffHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffHours < 1) return "posted just now";
+  if (diffHours < 24) return `posted ${diffHours}h ago`;
+  if (diffDays === 1) return "posted 1 day ago";
+  if (diffDays < 30) return `posted ${diffDays} days ago`;
+
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths === 1) return "posted 1 month ago";
+  return `posted ${diffMonths} months ago`;
 }
 
 function stripHtml(value: string) {
