@@ -35,11 +35,11 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       source: "demo",
-      message:
-        "Adzuna keys are not set in Vercel yet. Returning demo jobs so the fetch flow still runs.",
+      message: "Adzuna keys are not set in Vercel. Showing demo jobs only.",
       query: searchQuery,
       location,
       page,
+      count: 0,
       jobs: demoJobs,
     });
   }
@@ -65,12 +65,14 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          source: "adzuna",
+          source: "adzuna_error_demo_fallback",
           error: `Adzuna request failed: ${response.status}`,
           details: text.slice(0, 500),
+          message: "Adzuna request failed. Showing demo jobs only.",
           query: searchQuery,
           location,
           page,
+          count: 0,
           jobs: demoJobs,
         },
         { status: 200 }
@@ -79,6 +81,24 @@ export async function GET(request: Request) {
 
     const data = await response.json();
     const jobs = (data.results || []).map(mapAdzunaJob);
+
+    if (!jobs.length) {
+      return NextResponse.json({
+        ok: true,
+        source: "adzuna_empty_demo_fallback",
+        query: searchQuery,
+        role,
+        industry,
+        specialisation,
+        keywords,
+        location,
+        page,
+        maxDays,
+        count: 0,
+        jobs: demoJobs,
+        message: `Adzuna returned no live jobs for ${searchQuery} near ${location}. Showing demo jobs only.`,
+      });
+    }
 
     return NextResponse.json({
       ok: true,
@@ -92,19 +112,19 @@ export async function GET(request: Request) {
       page,
       maxDays,
       count: jobs.length,
-      jobs: jobs.length ? jobs : demoJobs,
-      message: jobs.length
-        ? `Fetched live jobs from Adzuna. Showing page ${page}, sorted by newest first.`
-        : "No Adzuna jobs found. Showing demo jobs.",
+      jobs,
+      message: `Fetched ${jobs.length} live jobs from Adzuna. Showing page ${page}, sorted by newest first.`,
     });
   } catch (error: any) {
     return NextResponse.json({
       ok: false,
-      source: "error",
+      source: "fetch_error_demo_fallback",
       error: error?.message || "Unknown job fetch error",
+      message: "Job fetch failed. Showing demo jobs only.",
       query: searchQuery,
       location,
       page,
+      count: 0,
       jobs: demoJobs,
     });
   }
