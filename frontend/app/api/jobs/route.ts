@@ -15,6 +15,11 @@ type AdzunaJob = {
   created?: string;
 };
 
+type FetchAttempt = {
+  url: URL;
+  label: string;
+};
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const role = searchParams.get("role") || "support worker";
@@ -27,6 +32,7 @@ export async function GET(request: Request) {
   const requestedPage = searchParams.get("page");
   const page = requestedPage || String(Math.floor(Math.random() * 4) + 1);
   const searchQuery = buildSearchQuery(role, industry, specialisation, keywords);
+  const simpleQuery = buildSearchQuery(role, "", "", "");
 
   const appId = process.env.ADZUNA_APP_ID;
   const appKey = process.env.ADZUNA_APP_KEY;
@@ -44,66 +50,60 @@ export async function GET(request: Request) {
     });
   }
 
-  const url = new URL(`https://api.adzuna.com/v1/api/jobs/${country}/search/${page}`);
-  url.searchParams.set("app_id", appId);
-  url.searchParams.set("app_key", appKey);
-  url.searchParams.set("what", searchQuery);
-  url.searchParams.set("where", location);
-  url.searchParams.set("results_per_page", "20");
-  url.searchParams.set("sort_by", "date");
-  url.searchParams.set("max_days", maxDays);
-  url.searchParams.set("content-type", "application/json");
+  const attempts: FetchAttempt[] = [
+    {
+      label: "profile query",
+      url: buildAdzunaUrl({ country, page, appId, appKey, what: searchQuery, where: location, sortByDate: true, maxDays }),
+    },
+    {
+      label: "simple role query",
+      url: buildAdzunaUrl({ country, page: "1", appId, appKey, what: simpleQuery, where: location, sortByDate: false }),
+    },
+    {
+      label: "role only query",
+      url: buildAdzunaUrl({ country, page: "1", appId, appKey, what: simpleQuery, where: "", sortByDate: false }),
+    },
+  ];
+
+  const errors: string[] = [];
 
   try {
-    const response = await fetch(url.toString(), {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    });
+    for (const attempt of attempts) {
+      const result = await fetchAdzunaAttempt(attempt);
 
-    if (!response.ok) {
-      const text = await response.text();
-      const safeDetails = cleanDetails(text);
-      return NextResponse.json(
-        {
-          ok: false,
-          source: "adzuna_error_demo_fallback",
-          error: `Adzuna request failed: ${response.status}`,
-          details: safeDetails,
-          message: `Adzuna request failed with status ${response.status}. ${safeDetails || "Check ADZUNA_APP_ID, ADZUNA_APP_KEY, country, and quota."} Showing demo jobs only.`,
-          query: searchQuery,
-          location,
-          page,
-          count: 0,
-          jobs: demoJobs,
-        },
-        { status: 200 }
-      );
-    }
+      if (!result.ok) {
+        errors.push(`${attempt.label}: ${result.status} ${result.details}`.trim());
+        continue;
+      }
 
-    const data = await response.json();
-    const jobs = (data.results || []).map(mapAdzunaJob);
+      const jobs = (result.data.results || []).map(mapAdzunaJob);
 
-    if (!jobs.length) {
+      if (!jobs.length) {
+        errors.push(`${attempt.label}: no jobs returned`);
+        continue;
+      }
+
       return NextResponse.json({
         ok: true,
-        source: "adzuna_empty_demo_fallback",
-        query: searchQuery,
+        source: "adzuna",
+        query: attempt.label === "profile query" ? searchQuery : simpleQuery,
+        attemptedQuery: searchQuery,
         role,
         industry,
         specialisation,
         keywords,
         location,
-        page,
+        page: attempt.url.pathname.split("/").pop() || page,
         maxDays,
-        count: 0,
-        jobs: demoJobs,
-        message: `Adzuna returned no live jobs for ${searchQuery} near ${location}. Showing demo jobs only.`,
+        count: jobs.length,
+        jobs,
+        message: `Fetched ${jobs.length} live jobs from Adzuna using ${attempt.label}.`,
       });
     }
 
     return NextResponse.json({
       ok: true,
-      source: "adzuna",
+      source: "adzuna_empty_demo_fallback",
       query: searchQuery,
       role,
       industry,
@@ -112,9 +112,10 @@ export async function GET(request: Request) {
       location,
       page,
       maxDays,
-      count: jobs.length,
-      jobs,
-      message: `Fetched ${jobs.length} live jobs from Adzuna. Showing page ${page}, sorted by newest first.`,
+      count: 0,
+      jobs: demoJobs,
+      message: `Adzuna could not return live jobs for this search. Tried profile and simple role queries. Showing demo jobs only.`,
+      debug: errors.slice(0, 3),
     });
   } catch (error: any) {
     return NextResponse.json({
@@ -129,6 +130,73 @@ export async function GET(request: Request) {
       jobs: demoJobs,
     });
   }
+}
+
+async function fetchAdzunaAttempt(attempt: FetchAttempt) {
+  const response = await fetch(attempt.url.toString(), {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+
+  if (!response.ok) {
+    const text = await response.text();
+    return {
+      ok: false,
+      status: response.status,
+      details: cleanDetails(text),
+      data: null as any,
+    };
+  }
+
+  if (!contentType.includes("application/json")) {
+    const text = await response.text();
+    return {
+      ok: false,
+      status: response.status,
+      details: `Expected JSON but received ${contentType}. ${cleanDetails(text)}`,
+      data: null as any,
+    };
+  }
+
+  return {
+    ok: true,
+    status: response.status,
+    details: "",
+    data: await response.json(),
+  };
+}
+
+function buildAdzunaUrl({
+  country,
+  page,
+  appId,
+  appKey,
+  what,
+  where,
+  sortByDate,
+  maxDays,
+}: {
+  country: string;
+  page: string;
+  appId: string;
+  appKey: string;
+  what: string;
+  where: string;
+  sortByDate: boolean;
+  maxDays?: string;
+}) {
+  const url = new URL(`https://api.adzuna.com/v1/api/jobs/${country}/search/${page}`);
+  url.searchParams.set("app_id", appId);
+  url.searchParams.set("app_key", appKey);
+  url.searchParams.set("what", what);
+  if (where) url.searchParams.set("where", where);
+  url.searchParams.set("results_per_page", "20");
+  url.searchParams.set("content-type", "application/json");
+  if (sortByDate) url.searchParams.set("sort_by", "date");
+  if (sortByDate && maxDays) url.searchParams.set("max_days", maxDays);
+  return url;
 }
 
 function buildSearchQuery(role: string, industry: string, specialisation: string, keywords: string) {
@@ -198,9 +266,17 @@ function stripHtml(value: string) {
 }
 
 function cleanDetails(value: string) {
-  return value
+  const stripped = value
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<[^>]*>/g, " ")
+    .replace(/\{[^}]*\}/g, " ")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 220);
+    .trim();
+
+  if (!stripped || stripped.toLowerCase().includes("uh oh")) {
+    return "Adzuna returned a bad request page. Retrying with a simpler query.";
+  }
+
+  return stripped.slice(0, 220);
 }
