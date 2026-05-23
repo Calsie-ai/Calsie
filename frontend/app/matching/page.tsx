@@ -42,6 +42,15 @@ type ResumeDraft = {
   coverNote: string;
 };
 
+type ApplicationContact = {
+  status: string;
+  applicationMethod: string;
+  hiringEmail: string | null;
+  contactConfidence: string;
+  sourceUrl: string | null;
+  notes: string[];
+};
+
 type FlowState = "idle" | "generating" | "draft" | "editing" | "approved" | "email" | "opened";
 type JobInteractionAction = "viewed" | "skipped" | "saved" | "resume_created" | "application_prepared" | "sent" | "failed";
 
@@ -74,6 +83,8 @@ export default function MatchingPage() {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState("");
   const [savedJobIds, setSavedJobIds] = useState<string[]>([]);
+  const [contactDiscovery, setContactDiscovery] = useState<ApplicationContact | null>(null);
+  const [preparingApplication, setPreparingApplication] = useState(false);
 
   useEffect(() => {
     loadEverything();
@@ -155,6 +166,7 @@ export default function MatchingPage() {
     setAiMessage("");
     setShowFullDescription(false);
     setRecipientEmail("");
+    setContactDiscovery(null);
 
     const params = new URLSearchParams({
       role: profileForSearch.target_role || "support worker",
@@ -198,6 +210,7 @@ export default function MatchingPage() {
     setAiMessage("");
     setShowFullDescription(false);
     setRecipientEmail(jobs[newIndex]?.contactEmail || "");
+    setContactDiscovery(null);
     setIndex(newIndex);
   }
 
@@ -275,6 +288,40 @@ export default function MatchingPage() {
     }
   }
 
+  async function approveResumeAndPrepareApplication() {
+    if (!job || !resumeDraft) return;
+
+    setPreparingApplication(true);
+    setFlowState("approved");
+    setAiMessage("Resume approved. Applix is checking the employer hiring pathway...");
+
+    try {
+      const response = await fetch("/api/contact-discovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job, profile, resumeDraft }),
+      });
+
+      const data = await response.json();
+      setContactDiscovery(data);
+
+      if (data.hiringEmail) {
+        setRecipientEmail(data.hiringEmail);
+        setFlowState("email");
+        setAiMessage(`Application ready. Hiring email found: ${data.hiringEmail}`);
+        await recordJobInteraction("application_prepared", job, false);
+      } else if (data.sourceUrl || job.applyUrl) {
+        setAiMessage("Application ready. No hiring email found yet, so use the job application gateway.");
+      } else {
+        setAiMessage("Application ready. No public hiring email or application gateway found yet.");
+      }
+    } catch (error: any) {
+      setAiMessage(error?.message || "Could not run contact discovery. You can still use Visit jobsite or copy the email draft.");
+    } finally {
+      setPreparingApplication(false);
+    }
+  }
+
   function updateProfileField(key: "full_name" | "phone" | "email" | "location" | "target_role", value: string) {
     setProfile((current) => ({ ...current, [key]: value }));
   }
@@ -295,7 +342,7 @@ export default function MatchingPage() {
   function validateEmailDraft(event: React.MouseEvent<HTMLAnchorElement>) {
     if (!recipientEmail.includes("@")) {
       event.preventDefault();
-      setAiMessage("No hiring email found in this job ad. Add the employer email first, or use Visit jobsite.");
+      setAiMessage("No hiring email found. Use Visit jobsite, or connect the Render scraper later for deeper contact discovery.");
       return;
     }
     setFlowState("opened");
@@ -426,15 +473,17 @@ export default function MatchingPage() {
               <div style={styles.resumeActions}>
                 <button onClick={() => setFlowState(isEditing ? "draft" : "editing")} style={styles.secondaryButton}>{isEditing ? "Save edits" : "Edit Resume"}</button>
                 <button onClick={() => window.print()} style={styles.secondaryButton}>Download PDF</button>
-                <button onClick={() => setFlowState("approved")} style={styles.approveButton}>Approve Resume</button>
+                <button onClick={approveResumeAndPrepareApplication} disabled={preparingApplication} style={styles.approveButton}>{preparingApplication ? "Preparing application..." : "Approve Resume"}</button>
               </div>
 
-              {flowState === "approved" && <div style={styles.approvedBox}><strong>Resume approved. Next, prepare the Gmail draft.</strong><button onClick={() => setFlowState("email")} style={styles.smallButton}>Prepare Gmail draft</button></div>}
+              {contactDiscovery && <div style={styles.approvedBox}><strong>{contactDiscovery.hiringEmail ? `Hiring email found: ${contactDiscovery.hiringEmail}` : "No hiring email found yet."}</strong><p>{contactDiscovery.notes?.join(" ")}</p>{contactDiscovery.sourceUrl && <a href={contactDiscovery.sourceUrl} target="_blank" rel="noreferrer" style={styles.jobsiteButton}>Open application gateway</a>}</div>}
+
+              {flowState === "approved" && !contactDiscovery && <div style={styles.approvedBox}><strong>Resume approved. Applix is preparing the application pathway.</strong></div>}
 
               {(flowState === "email" || flowState === "opened") && (
                 <section style={styles.emailDraft}>
                   <h2>Gmail draft</h2>
-                  <p style={styles.helperText}>If Adzuna includes a hiring email in the job description, Applix fills it below. Gmail web opens reliably in Chrome; the app button uses your device default email app.</p>
+                  <p style={styles.helperText}>Applix fills this when a hiring email is discovered. If no email is found, use the jobsite/application gateway.</p>
                   <label style={styles.editorLabel}>Employer email<input style={styles.input} value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="employer email" /></label>
                   <p><strong>Subject:</strong> {emailSubject}</p>
                   <div style={styles.emailBody}>{emailBody}</div>
