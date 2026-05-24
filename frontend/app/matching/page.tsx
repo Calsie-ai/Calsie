@@ -99,7 +99,7 @@ export default function MatchingPage() {
   async function loadEverything() {
     setLoading(true);
     const loadedProfile = await loadProfile();
-    await loadJobs(loadedProfile);
+    await loadJobsFromSupabase(loadedProfile);
     setLoading(false);
   }
 
@@ -161,7 +161,7 @@ export default function MatchingPage() {
     return loadedProfile;
   }
 
-  async function loadJobs(profileForSearch = profile) {
+  async function loadJobsFromSupabase(profileForSearch = profile) {
     setResumeDraft(null);
     setFlowState("idle");
     setAiMessage("");
@@ -170,27 +170,39 @@ export default function MatchingPage() {
     setContactDiscovery(null);
     setEndReached(false);
 
-    const params = new URLSearchParams({
-      role: profileForSearch.target_role || "support worker",
-      location: profileForSearch.location || "Sydney",
-      country: "au",
-      max_days: "30",
-    });
-
-    if (profileForSearch.industry) params.set("industry", profileForSearch.industry);
-    if (profileForSearch.industry_specialisation) params.set("specialisation", profileForSearch.industry_specialisation);
-    if (profileForSearch.target_keywords.length) params.set("keywords", profileForSearch.target_keywords.join(" "));
-
     try {
-      const response = await fetch(`/api/jobs?${params.toString()}`, { cache: "no-store" });
-      const data = await response.json();
-      setJobs(data.jobs || []);
-      setSource(data.source || "unknown");
-      setMessage(data.message || `Jobs loaded for ${data.query || profileForSearch.target_role}.`);
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
+
+      if (!user) {
+        setJobs([]);
+        setSource("supabase_empty");
+        setMessage("Login first so Applix can load your saved email-ready jobs.");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("jobs_gateway")
+        .select("id,external_job_id,title,company,location,salary,job_type,description,apply_url,hiring_email,contact_confidence,source_url,contact_notes,tags,posted_at,posted_ago,match_score,refreshed_at")
+        .eq("user_id", user.id)
+        .not("hiring_email", "is", null)
+        .order("refreshed_at", { ascending: false })
+        .limit(30);
+
+      if (error) throw error;
+
+      const mappedJobs = (data || []).map(mapGatewayJob);
+      setJobs(mappedJobs);
+      setSource(mappedJobs.length ? "supabase" : "supabase_empty");
+      setMessage(mappedJobs.length
+        ? `Loaded ${mappedJobs.length} email-ready jobs from Supabase.`
+        : `No email-ready jobs saved yet for ${profileForSearch.target_role}. Applix is hunting in the background.`
+      );
       setIndex(0);
-      if (data.jobs?.[0]?.contactEmail) setRecipientEmail(data.jobs[0].contactEmail);
+      if (mappedJobs[0]?.contactEmail) setRecipientEmail(mappedJobs[0].contactEmail);
     } catch (error: any) {
-      setMessage(error?.message || "Could not load jobs.");
+      setMessage(error?.message || "Could not load saved jobs from Supabase.");
+      setSource("supabase_error");
       setJobs([]);
     }
   }
@@ -368,7 +380,7 @@ export default function MatchingPage() {
     recordJobInteraction("application_prepared", job, false);
   }
 
-  if (loading) return <main style={styles.loading}>Loading job matches...</main>;
+  if (loading) return <main style={styles.loading}>Loading saved job matches...</main>;
 
   if (!job) {
     return (
@@ -378,7 +390,7 @@ export default function MatchingPage() {
           <div style={styles.emptyCard}>
             <p style={styles.kitLabel}>Applix job hunt</p>
             <h1>{endReached ? "Applix is hunting jobs." : "No email-ready jobs loaded yet."}</h1>
-            <p>{endReached ? "You have reached the end of the current jobs. Applix will keep hunting in the background and new jobs can appear after the next hourly update." : message || "Applix is preparing job data in the background."}</p>
+            <p>{endReached ? "You have reached the end of the current saved jobs. Applix will keep hunting in the background and new jobs can appear after the next hourly update." : message || "Applix is preparing job data in the background."}</p>
             <p style={styles.helperText}>Come back in about 1 hour. The background job will refresh Supabase with new Adzuna + Render results.</p>
             {!!jobs.length && <button onClick={previousJob} style={styles.secondaryButton}>Back to last job</button>}
           </div>
@@ -400,8 +412,8 @@ export default function MatchingPage() {
         </header>
 
         <div style={styles.statusBar}>
-          <span style={source === "adzuna" ? styles.liveDot : styles.demoDot} />
-          <span>{source === "adzuna" ? `Email-ready jobs for ${profile.target_role}` : message}</span>
+          <span style={source === "supabase" ? styles.liveDot : styles.demoDot} />
+          <span>{source === "supabase" ? `Saved email-ready jobs for ${profile.target_role}` : message}</span>
         </div>
 
         <article style={styles.jobCard}>
@@ -527,6 +539,23 @@ export default function MatchingPage() {
       </section>
     </main>
   );
+}
+
+function mapGatewayJob(row: any): MatchJob {
+  return {
+    id: String(row.external_job_id || row.id),
+    title: row.title || "Untitled role",
+    company: row.company || "Company not listed",
+    location: row.location || "Location not listed",
+    salary: row.salary || "Salary not listed",
+    type: row.job_type || row.posted_ago || "Job type not listed",
+    description: row.description || "No description provided.",
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    logo: "💼",
+    match: Number(row.match_score || 75),
+    applyUrl: row.apply_url || row.source_url || null,
+    contactEmail: row.hiring_email || null,
+  };
 }
 
 function PaperSection({ title, children }: { title: string; children: React.ReactNode }) {
