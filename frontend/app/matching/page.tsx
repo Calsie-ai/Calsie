@@ -85,6 +85,7 @@ export default function MatchingPage() {
   const [savedJobIds, setSavedJobIds] = useState<string[]>([]);
   const [contactDiscovery, setContactDiscovery] = useState<ApplicationContact | null>(null);
   const [preparingApplication, setPreparingApplication] = useState(false);
+  const [endReached, setEndReached] = useState(false);
 
   useEffect(() => {
     loadEverything();
@@ -93,7 +94,7 @@ export default function MatchingPage() {
   useEffect(() => {
     if (job?.contactEmail) setRecipientEmail(job.contactEmail);
     if (job) recordJobInteraction("viewed", job, false);
-  }, [index, jobs]);
+  }, [index, jobs, endReached]);
 
   async function loadEverything() {
     setLoading(true);
@@ -167,6 +168,7 @@ export default function MatchingPage() {
     setShowFullDescription(false);
     setRecipientEmail("");
     setContactDiscovery(null);
+    setEndReached(false);
 
     const params = new URLSearchParams({
       role: profileForSearch.target_role || "support worker",
@@ -193,7 +195,7 @@ export default function MatchingPage() {
     }
   }
 
-  const job = jobs[index];
+  const job = endReached ? undefined : jobs[index];
   const jobDescription = job?.description || "No description provided.";
   const isLongDescription = jobDescription.length > 460;
   const isEditing = flowState === "editing";
@@ -211,15 +213,32 @@ export default function MatchingPage() {
     setShowFullDescription(false);
     setRecipientEmail(jobs[newIndex]?.contactEmail || "");
     setContactDiscovery(null);
+    setEndReached(false);
     setIndex(newIndex);
   }
 
   function nextJob() {
-    if (jobs.length) resetForNext((index + 1) % jobs.length);
+    if (!jobs.length) return;
+    if (index >= jobs.length - 1) {
+      setResumeDraft(null);
+      setFlowState("idle");
+      setAiMessage("");
+      setShowFullDescription(false);
+      setRecipientEmail("");
+      setContactDiscovery(null);
+      setEndReached(true);
+      return;
+    }
+    resetForNext(index + 1);
   }
 
   function previousJob() {
-    if (jobs.length) resetForNext(index === 0 ? jobs.length - 1 : index - 1);
+    if (!jobs.length) return;
+    if (endReached) {
+      resetForNext(jobs.length - 1);
+      return;
+    }
+    resetForNext(index === 0 ? 0 : index - 1);
   }
 
   async function recordJobInteraction(action: JobInteractionAction, targetJob = job, showMessage = true) {
@@ -357,9 +376,11 @@ export default function MatchingPage() {
         <section style={styles.shell}>
           <Link href="/" style={styles.back}>Back home</Link>
           <div style={styles.emptyCard}>
-            <h1>No jobs loaded</h1>
-            <p>{message}</p>
-            <button onClick={loadEverything} style={styles.primaryButton}>Try again</button>
+            <p style={styles.kitLabel}>Applix job hunt</p>
+            <h1>{endReached ? "Applix is hunting jobs." : "No email-ready jobs loaded yet."}</h1>
+            <p>{endReached ? "You have reached the end of the current jobs. Applix will keep hunting in the background and new jobs can appear after the next hourly update." : message || "Applix is preparing job data in the background."}</p>
+            <p style={styles.helperText}>Come back in about 1 hour. The background job will refresh Supabase with new Adzuna + Render results.</p>
+            {!!jobs.length && <button onClick={previousJob} style={styles.secondaryButton}>Back to last job</button>}
           </div>
         </section>
       </main>
@@ -375,12 +396,12 @@ export default function MatchingPage() {
             <strong>Applix Matching</strong>
             <span>{index + 1} of {jobs.length}</span>
           </div>
-          <button onClick={loadEverything} style={styles.refresh}>Refresh</button>
+          <span />
         </header>
 
         <div style={styles.statusBar}>
           <span style={source === "adzuna" ? styles.liveDot : styles.demoDot} />
-          <span>{source === "adzuna" ? `Live Adzuna jobs for ${profile.target_role}` : message}</span>
+          <span>{source === "adzuna" ? `Email-ready jobs for ${profile.target_role}` : message}</span>
         </div>
 
         <article style={styles.jobCard}>
