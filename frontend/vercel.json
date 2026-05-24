@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/hourly-job-hunt",
-      "schedule": "0 * * * *"
-    }
-  ]
-}
+{}
