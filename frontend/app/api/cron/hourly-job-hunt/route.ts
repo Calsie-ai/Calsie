@@ -79,17 +79,43 @@ export async function GET(request: Request) {
 }
 
 async function runHuntForProfile({ profile, appId, appKey, scraperUrl, supabase }: any) {
-  const role = profile.target_role || "support worker";
-  const location = profile.location || "Sydney";
+  const role = cleanRole(profile.target_role || "support worker");
+  const location = cleanLocation(profile.location || "Sydney");
   const industry = profile.industry || "";
   const specialisation = profile.industry_specialisation || "";
   const keywords = Array.isArray(profile.target_keywords) ? profile.target_keywords.join(" ") : "";
-  const query = buildSearchQuery(role, industry, specialisation, keywords);
+  const profileQuery = buildSearchQuery(role, industry, specialisation, keywords);
+  const searchAttempts = buildSearchAttempts(role, profileQuery, location);
 
-  const adzunaJobs = await fetchAdzunaPages({ appId, appKey, query, location, country: "au", pages: 3 });
-  const uniqueJobs = dedupeJobs(adzunaJobs).slice(0, 60);
-  const enriched = await enrichJobsWithRender(uniqueJobs, scraperUrl, 20);
-  const emailReadyJobs = enriched.jobs.filter((job: MatchJob) => job.contactEmail || job.hiringEmail);
+  let uniqueJobs: MatchJob[] = [];
+  let usedAttempt = searchAttempts[0];
+
+  for (const attempt of searchAttempts) {
+    const adzunaJobs = await fetchAdzunaPages({
+      appId,
+      appKey,
+      query: attempt.query,
+      location: attempt.location,
+      country: "au",
+      pages: attempt.pages,
+      useDateSort: attempt.useDateSort,
+    });
+
+    uniqueJobs = dedupeJobs(adzunaJobs).slice(0, 1000);
+    usedAttempt = attempt;
+
+    if (uniqueJobs.length > 0) break;
+  }
+
+  const jobsForRender = uniqueJobs.slice(0, 20);
+  const standard = await enrichJobsWithRender(jobsForRender, scraperUrl, jobsForRender.length, false);
+  let emailReadyJobs = standard.jobs.filter((job: MatchJob) => job.contactEmail || job.hiringEmail);
+  let deep = { checked: 0, jobs: [] as MatchJob[] };
+
+  if (!emailReadyJobs.length && jobsForRender.length) {
+    deep = await enrichJobsWithRender(jobsForRender, scraperUrl, jobsForRender.length, true);
+    emailReadyJobs = deep.jobs.filter((job: MatchJob) => job.contactEmail || job.hiringEmail);
+  }
 
   if (emailReadyJobs.length) {
     const rows = emailReadyJobs.map((job: MatchJob) => ({
@@ -124,22 +150,75 @@ async function runHuntForProfile({ profile, appId, appKey, scraperUrl, supabase 
       .upsert(rows, { onConflict: "user_id,external_job_id" });
 
     if (error) {
-      return { userId: profile.profile_id, fetched: uniqueJobs.length, checked: enriched.checked, saved: 0, error: error.message };
+      return { userId: profile.profile_id, query: usedAttempt.query, location: usedAttempt.location, fetched: uniqueJobs.length, checked: standard.checked, deepChecked: deep.checked, saved: 0, error: error.message };
     }
   }
 
   return {
     userId: profile.profile_id,
-    query,
-    location,
+    query: usedAttempt.query,
+    location: usedAttempt.location || "Australia-wide",
     fetched: uniqueJobs.length,
-    checked: enriched.checked,
+    checked: standard.checked,
+    deepChecked: deep.checked,
     emailReady: emailReadyJobs.length,
     saved: emailReadyJobs.length,
+    attemptsTried: searchAttempts.indexOf(usedAttempt) + 1,
+    note: uniqueJobs.length > 20 ? `Fetched ${uniqueJobs.length} leads. Checked first 20 with Render to avoid timeout.` : undefined,
   };
 }
 
-async function fetchAdzunaPages({ appId, appKey, query, location, country, pages }: any) {
+function buildSearchAttempts(role: string, profileQuery: string, location: string) {
+  const broadRoles = expandRole(role);
+  const queries = [profileQuery, role, ...broadRoles];
+  const attempts: Array<{ query: string; location: string; pages: number; useDateSort: boolean }> = [];
+
+  for (const query of queries) {
+    attempts.push({ query, location, pages: 5, useDateSort: false });
+  }
+
+  for (const query of queries) {
+    attempts.push({ query, location: "", pages: 5, useDateSort: false });
+  }
+
+  const seen = new Set<string>();
+  return attempts.filter((attempt) => {
+    const key = `${attempt.query}|${attempt.location}`.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return Boolean(attempt.query.trim());
+  });
+}
+
+function expandRole(role: string) {
+  const value = role.toLowerCase();
+  if (value.includes("market")) return ["market research", "market researcher", "marketing", "research assistant", "insights analyst", "data analyst"];
+  if (value === "admin" || value.includes("admin")) return ["administrator", "office administrator", "administration assistant", "office support"];
+  if (value.includes("support worker")) return ["support worker", "disability support worker", "care worker"];
+  if (value.includes("account")) return ["accounts", "bookkeeper", "accounts officer"];
+  return [role];
+}
+
+function cleanRole(value: string) {
+  return value.replace(/,+/g, " ").replace(/\s+/g, " ").trim() || "support worker";
+}
+
+function cleanLocation(value: string) {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "Sydney";
+  const upper = cleaned.toUpperCase();
+  if (upper === "NSW") return "New South Wales";
+  if (upper === "NT") return "Northern Territory";
+  if (upper === "VIC") return "Victoria";
+  if (upper === "QLD") return "Queensland";
+  if (upper === "SA") return "South Australia";
+  if (upper === "WA") return "Western Australia";
+  if (upper === "TAS") return "Tasmania";
+  if (upper === "ACT") return "Australian Capital Territory";
+  return cleaned;
+}
+
+async function fetchAdzunaPages({ appId, appKey, query, location, country, pages, useDateSort }: any) {
   const allJobs: MatchJob[] = [];
 
   for (let page = 1; page <= pages; page += 1) {
@@ -147,11 +226,13 @@ async function fetchAdzunaPages({ appId, appKey, query, location, country, pages
     url.searchParams.set("app_id", appId);
     url.searchParams.set("app_key", appKey);
     url.searchParams.set("what", query);
-    url.searchParams.set("where", location);
-    url.searchParams.set("results_per_page", "20");
-    url.searchParams.set("sort_by", "date");
-    url.searchParams.set("max_days", "30");
+    if (location) url.searchParams.set("where", location);
+    url.searchParams.set("results_per_page", "50");
     url.searchParams.set("content-type", "application/json");
+    if (useDateSort) {
+      url.searchParams.set("sort_by", "date");
+      url.searchParams.set("max_days", "30");
+    }
 
     const response = await fetch(url.toString(), { headers: { Accept: "application/json" }, cache: "no-store" });
     if (!response.ok) continue;
@@ -163,7 +244,9 @@ async function fetchAdzunaPages({ appId, appKey, query, location, country, pages
   return allJobs;
 }
 
-async function enrichJobsWithRender(jobs: MatchJob[], scraperUrl: string, limit: number) {
+async function enrichJobsWithRender(jobs: MatchJob[], scraperUrl: string, limit: number, deep: boolean) {
+  if (!jobs.length || !limit) return { checked: 0, jobs: [] as MatchJob[] };
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 115000);
@@ -171,7 +254,7 @@ async function enrichJobsWithRender(jobs: MatchJob[], scraperUrl: string, limit:
     const response = await fetch(`${scraperUrl.replace(/\/$/, "")}/email-ready-jobs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobs, limit }),
+      body: JSON.stringify({ jobs, limit, deep }),
       signal: controller.signal,
     });
 
