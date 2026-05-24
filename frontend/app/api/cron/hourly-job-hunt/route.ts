@@ -107,6 +107,8 @@ async function runHuntForProfile({ profile, appId, appKey, scraperUrl, supabase 
     if (uniqueJobs.length > 0) break;
   }
 
+  const savedLeadCount = await saveJobLeads({ supabase, profile, jobs: uniqueJobs, role, industry, specialisation, location });
+
   const jobsForRender = uniqueJobs.slice(0, 20);
   const standard = await enrichJobsWithRender(jobsForRender, scraperUrl, jobsForRender.length, false);
   let emailReadyJobs = standard.jobs.filter((job: MatchJob) => job.contactEmail || job.hiringEmail);
@@ -117,41 +119,14 @@ async function runHuntForProfile({ profile, appId, appKey, scraperUrl, supabase 
     emailReadyJobs = deep.jobs.filter((job: MatchJob) => job.contactEmail || job.hiringEmail);
   }
 
+  const savedCandidateCount = await saveEmailCandidates({ supabase, profile, jobs: emailReadyJobs });
+  const savedDomainCount = await saveCompanyDomains({ supabase, profile, jobs: emailReadyJobs });
+  const savedGatewayCount = await saveGatewayJobs({ supabase, profile, jobs: emailReadyJobs, role, industry, specialisation, location });
+
   if (emailReadyJobs.length) {
-    const rows = emailReadyJobs.map((job: MatchJob) => ({
-      user_id: profile.profile_id,
-      external_job_id: job.id,
-      title: job.title,
-      company: job.company,
-      location: job.location,
-      salary: job.salary,
-      job_type: job.type,
-      description: job.description,
-      source_website: "adzuna",
-      apply_url: job.applyUrl || null,
-      hiring_email: job.contactEmail || job.hiringEmail || null,
-      application_method: "email",
-      contact_confidence: job.contactConfidence || "medium",
-      source_url: job.sourceUrl || job.applyUrl || null,
-      contact_notes: job.contactNotes || [],
-      tags: job.tags || [],
-      posted_at: job.postedAt || null,
-      posted_ago: job.postedAgo || null,
-      match_score: job.match || 75,
-      requested_role: role,
-      requested_industry: industry,
-      requested_specialisation: specialisation,
-      requested_location: location,
-      refreshed_at: new Date().toISOString(),
-    }));
-
-    const { error } = await supabase
-      .from("jobs_gateway")
-      .upsert(rows, { onConflict: "user_id,external_job_id" });
-
-    if (error) {
-      return { userId: profile.profile_id, query: usedAttempt.query, location: usedAttempt.location, fetched: uniqueJobs.length, checked: standard.checked, deepChecked: deep.checked, saved: 0, error: error.message };
-    }
+    await markLeadsStatus({ supabase, profile, jobs: emailReadyJobs, status: "email_found" });
+  } else if (uniqueJobs.length) {
+    await markLeadsStatus({ supabase, profile, jobs: jobsForRender, status: "no_email_checked" });
   }
 
   return {
@@ -159,13 +134,143 @@ async function runHuntForProfile({ profile, appId, appKey, scraperUrl, supabase 
     query: usedAttempt.query,
     location: usedAttempt.location || "Australia-wide",
     fetched: uniqueJobs.length,
+    rawLeadsSaved: savedLeadCount,
     checked: standard.checked,
     deepChecked: deep.checked,
     emailReady: emailReadyJobs.length,
-    saved: emailReadyJobs.length,
+    candidatesSaved: savedCandidateCount,
+    domainsSaved: savedDomainCount,
+    saved: savedGatewayCount,
     attemptsTried: searchAttempts.indexOf(usedAttempt) + 1,
     note: uniqueJobs.length > 20 ? `Fetched ${uniqueJobs.length} leads. Checked first 20 with Render to avoid timeout.` : undefined,
   };
+}
+
+async function saveJobLeads({ supabase, profile, jobs, role, industry, specialisation, location }: any) {
+  if (!jobs.length) return 0;
+
+  const rows = jobs.map((job: MatchJob) => ({
+    user_id: profile.profile_id,
+    external_job_id: job.id,
+    title: job.title,
+    company: job.company,
+    location: job.location,
+    salary: job.salary,
+    job_type: job.type,
+    description: job.description,
+    source_website: "adzuna",
+    apply_url: job.applyUrl || null,
+    posted_at: job.postedAt || null,
+    posted_ago: job.postedAgo || null,
+    tags: job.tags || [],
+    requested_role: role,
+    requested_industry: industry,
+    requested_specialisation: specialisation,
+    requested_location: location,
+    status: "pending_enrichment",
+    refreshed_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase.from("job_leads").upsert(rows, { onConflict: "user_id,external_job_id" });
+  if (error) return 0;
+  return rows.length;
+}
+
+async function saveGatewayJobs({ supabase, profile, jobs, role, industry, specialisation, location }: any) {
+  const emailReadyJobs = jobs.filter((job: MatchJob) => job.contactEmail || job.hiringEmail);
+  if (!emailReadyJobs.length) return 0;
+
+  const rows = emailReadyJobs.map((job: MatchJob) => ({
+    user_id: profile.profile_id,
+    external_job_id: job.id,
+    title: job.title,
+    company: job.company,
+    location: job.location,
+    salary: job.salary,
+    job_type: job.type,
+    description: job.description,
+    source_website: "adzuna",
+    apply_url: job.applyUrl || null,
+    hiring_email: job.contactEmail || job.hiringEmail || null,
+    application_method: "email",
+    contact_confidence: job.contactConfidence || "medium",
+    source_url: job.sourceUrl || job.applyUrl || null,
+    contact_notes: job.contactNotes || [],
+    tags: job.tags || [],
+    posted_at: job.postedAt || null,
+    posted_ago: job.postedAgo || null,
+    match_score: job.match || 75,
+    requested_role: role,
+    requested_industry: industry,
+    requested_specialisation: specialisation,
+    requested_location: location,
+    refreshed_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase.from("jobs_gateway").upsert(rows, { onConflict: "user_id,external_job_id" });
+  if (error) return 0;
+  return rows.length;
+}
+
+async function saveEmailCandidates({ supabase, profile, jobs }: any) {
+  const rows = jobs
+    .filter((job: MatchJob) => job.contactEmail || job.hiringEmail)
+    .map((job: MatchJob) => {
+      const email = String(job.contactEmail || job.hiringEmail || "").toLowerCase();
+      const domain = email.includes("@") ? email.split("@")[1] : domainFromUrl(job.sourceUrl || job.applyUrl || "");
+      return {
+        user_id: profile.profile_id,
+        external_job_id: job.id,
+        company: job.company,
+        domain,
+        email,
+        email_type: classifyEmail(email),
+        confidence: job.contactConfidence || "medium",
+        source_url: job.sourceUrl || job.applyUrl || null,
+        source_method: email.includes("careers@") || email.includes("recruitment@") || email.includes("jobs@") ? "scrape_high_signal" : "scrape",
+        verified_status: "unverified",
+        notes: job.contactNotes || [],
+        refreshed_at: new Date().toISOString(),
+      };
+    });
+
+  if (!rows.length) return 0;
+  const { error } = await supabase.from("email_candidates").upsert(rows, { onConflict: "user_id,external_job_id,email" });
+  if (error) return 0;
+  return rows.length;
+}
+
+async function saveCompanyDomains({ supabase, profile, jobs }: any) {
+  const rows = jobs
+    .map((job: MatchJob) => {
+      const email = String(job.contactEmail || job.hiringEmail || "").toLowerCase();
+      const domain = email.includes("@") ? email.split("@")[1] : domainFromUrl(job.sourceUrl || job.applyUrl || "");
+      if (!domain) return null;
+      return {
+        user_id: profile.profile_id,
+        company: job.company,
+        domain,
+        confidence: job.contactConfidence || "medium",
+        source_url: job.sourceUrl || job.applyUrl || null,
+        refreshed_at: new Date().toISOString(),
+      };
+    })
+    .filter(Boolean);
+
+  if (!rows.length) return 0;
+  const { error } = await supabase.from("company_domains").upsert(rows, { onConflict: "user_id,company,domain" });
+  if (error) return 0;
+  return rows.length;
+}
+
+async function markLeadsStatus({ supabase, profile, jobs, status }: any) {
+  for (const job of jobs) {
+    await supabase
+      .from("job_leads")
+      .update({ status, refreshed_at: new Date().toISOString() })
+      .eq("user_id", profile.profile_id)
+      .eq("external_job_id", job.id);
+  }
 }
 
 function buildSearchAttempts(role: string, profileQuery: string, location: string) {
@@ -173,13 +278,8 @@ function buildSearchAttempts(role: string, profileQuery: string, location: strin
   const queries = [profileQuery, role, ...broadRoles];
   const attempts: Array<{ query: string; location: string; pages: number; useDateSort: boolean }> = [];
 
-  for (const query of queries) {
-    attempts.push({ query, location, pages: 5, useDateSort: false });
-  }
-
-  for (const query of queries) {
-    attempts.push({ query, location: "", pages: 5, useDateSort: false });
-  }
+  for (const query of queries) attempts.push({ query, location, pages: 5, useDateSort: false });
+  for (const query of queries) attempts.push({ query, location: "", pages: 5, useDateSort: false });
 
   const seen = new Set<string>();
   return attempts.filter((attempt) => {
@@ -259,7 +359,6 @@ async function enrichJobsWithRender(jobs: MatchJob[], scraperUrl: string, limit:
     });
 
     clearTimeout(timeout);
-
     if (!response.ok) return { checked: 0, jobs: [] as MatchJob[] };
 
     const data = await response.json();
@@ -362,4 +461,20 @@ function formatPostedAgo(created?: string) {
 
 function stripHtml(value: string) {
   return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function domainFromUrl(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function classifyEmail(email: string) {
+  const prefix = email.split("@")[0] || "";
+  if (["careers", "career", "recruitment", "jobs"].some((item) => prefix.includes(item))) return "hiring";
+  if (["hr", "people", "talent"].some((item) => prefix.includes(item))) return "people";
+  if (["info", "admin", "contact", "hello"].some((item) => prefix.includes(item))) return "general";
+  return "unknown";
 }
