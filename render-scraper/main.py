@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin, quote_plus
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -16,6 +16,10 @@ HEADERS = {
 PREFERRED_PREFIXES = ["careers", "recruitment", "jobs", "hr", "talent", "people"]
 FALLBACK_PREFIXES = ["info", "admin", "contact", "hello"]
 PATHS_TO_CHECK = ["/careers", "/career", "/jobs", "/join-us", "/work-with-us", "/contact", "/about"]
+DEEP_PATHS_TO_CHECK = [
+    "/careers", "/career", "/jobs", "/join-us", "/work-with-us", "/contact", "/about", "/team",
+    "/people", "/recruitment", "/vacancies", "/employment", "/opportunities", "/contact-us"
+]
 
 class JobPayload(BaseModel):
     id: Optional[str] = None
@@ -32,6 +36,7 @@ class JobPayload(BaseModel):
 class EmailReadyJobsPayload(BaseModel):
     jobs: List[JobPayload]
     limit: Optional[int] = 8
+    deep: Optional[bool] = False
 
 class ContactDiscoveryPayload(BaseModel):
     jobTitle: Optional[str] = None
@@ -48,7 +53,8 @@ def health():
 
 @app.post("/email-ready-jobs")
 def email_ready_jobs(payload: EmailReadyJobsPayload):
-    limit = max(1, min(payload.limit or 8, 12))
+    max_limit = 20 if payload.deep else 12
+    limit = max(1, min(payload.limit or 8, max_limit))
     checked_jobs = payload.jobs[:limit]
     email_ready = []
     gateway_jobs = []
@@ -60,6 +66,7 @@ def email_ready_jobs(payload: EmailReadyJobsPayload):
             company=job.company,
             job_title=job.title,
             location=job.location,
+            deep=bool(payload.deep),
         )
 
         enriched = job.model_dump()
@@ -80,6 +87,7 @@ def email_ready_jobs(payload: EmailReadyJobsPayload):
     return {
         "ok": True,
         "checked": len(checked_jobs),
+        "deep": bool(payload.deep),
         "emailReadyCount": len(email_ready),
         "gatewayCount": len(gateway_jobs),
         "jobs": email_ready,
@@ -95,6 +103,7 @@ def contact_discovery(payload: ContactDiscoveryPayload):
         company=payload.company,
         job_title=payload.jobTitle,
         location=payload.location,
+        deep=True,
     )
 
 def discover_for_job(
@@ -103,14 +112,16 @@ def discover_for_job(
     company: Optional[str],
     job_title: Optional[str],
     location: Optional[str],
+    deep: bool = False,
 ) -> Dict[str, Any]:
     description_email = best_email(description or "")
     if description_email:
         return result_email(description_email, apply_url, ["Found public email in job description."])
 
-    urls = candidate_urls(apply_url)
+    urls = candidate_urls(apply_url, company, job_title, location, deep)
     pages_checked = []
     emails_found = []
+    linked_limit = 10 if deep else 4
 
     for url in urls:
         text = fetch_page_text(url)
@@ -119,7 +130,7 @@ def discover_for_job(
         pages_checked.append(url)
         emails_found.extend(extract_emails(text))
         linked_pages = extract_candidate_links(text, url)
-        for linked_url in linked_pages[:4]:
+        for linked_url in linked_pages[:linked_limit]:
             linked_text = fetch_page_text(linked_url)
             if linked_text:
                 pages_checked.append(linked_url)
@@ -130,6 +141,7 @@ def discover_for_job(
         return result_email(selected_email, pages_checked[0] if pages_checked else apply_url, [
             "Found public hiring/contact email while checking employer pages.",
             f"Checked {len(pages_checked)} page(s).",
+            "Deep search was used." if deep else "Standard search was used.",
         ])
 
     if apply_url:
@@ -153,18 +165,39 @@ def discover_for_job(
         "notes": ["No public hiring email or application gateway found."]
     }
 
-def candidate_urls(apply_url: Optional[str]) -> List[str]:
-    if not apply_url:
-        return []
+def candidate_urls(apply_url: Optional[str], company: Optional[str], job_title: Optional[str], location: Optional[str], deep: bool) -> List[str]:
+    urls = []
+    if apply_url:
+        urls.append(apply_url)
+        parsed = urlparse(apply_url)
+        if parsed.scheme and parsed.netloc:
+            base = f"{parsed.scheme}://{parsed.netloc}"
+            paths = DEEP_PATHS_TO_CHECK if deep else PATHS_TO_CHECK
+            for path in paths:
+                urls.append(urljoin(base, path))
 
-    urls = [apply_url]
-    parsed = urlparse(apply_url)
-    if parsed.scheme and parsed.netloc:
-        base = f"{parsed.scheme}://{parsed.netloc}"
-        for path in PATHS_TO_CHECK:
-            urls.append(urljoin(base, path))
+    if deep and company:
+        urls.extend(search_engine_candidate_urls(company, job_title, location))
 
     return list(dict.fromkeys(urls))
+
+def search_engine_candidate_urls(company: str, job_title: Optional[str], location: Optional[str]) -> List[str]:
+    query_parts = [company, job_title or "", location or "", "careers contact recruitment email"]
+    query = quote_plus(" ".join(part for part in query_parts if part).strip())
+    # DuckDuckGo HTML is less JavaScript-heavy than major search pages. If blocked, this simply returns no links.
+    search_url = f"https://duckduckgo.com/html/?q={query}"
+    text = fetch_page_text(search_url)
+    links = re.findall(r"https?://[^\s'\"<>]+", text)
+    useful = []
+    company_token = re.sub(r"[^a-z0-9]", "", company.lower())[:12]
+    for link in links:
+        lower = link.lower()
+        normalised = re.sub(r"[^a-z0-9]", "", lower)
+        if any(word in lower for word in ["career", "job", "contact", "recruit", "work-with-us", "join", "about"]):
+            useful.append(link)
+        elif company_token and company_token in normalised:
+            useful.append(link)
+    return list(dict.fromkeys(useful))[:8]
 
 def fetch_page_text(url: str) -> str:
     try:
@@ -185,7 +218,7 @@ def extract_candidate_links(text: str, base_url: str) -> List[str]:
     for link in raw_links:
         full_url = urljoin(base_url, link)
         lower = full_url.lower()
-        if any(word in lower for word in ["career", "job", "contact", "recruit", "work-with-us", "join"]):
+        if any(word in lower for word in ["career", "job", "contact", "recruit", "work-with-us", "join", "vacanc", "employment", "people", "team"]):
             links.append(full_url)
     return list(dict.fromkeys(links))
 
@@ -199,7 +232,7 @@ def extract_emails(text: str) -> List[str]:
     return list(dict.fromkeys(cleaned))
 
 def is_useful_email(email: str) -> bool:
-    bad_terms = ["example.com", "sentry", "wixpress", "wordpress", "schema", "noreply", "no-reply"]
+    bad_terms = ["example.com", "sentry", "wixpress", "wordpress", "schema", "noreply", "no-reply", "donotreply", "privacy@", "support@adzuna"]
     return "@" in email and not any(term in email for term in bad_terms)
 
 def best_email(text: str) -> Optional[str]:
