@@ -27,6 +27,9 @@ export default function HomePage() {
           <Link href="/apply" style={styles.secondaryButton}>
             Application Kit
           </Link>
+          <Link href="/api/google/connect" style={styles.gmailButton}>
+            Connect Gmail
+          </Link>
         </div>
       </section>
 
@@ -102,6 +105,15 @@ const styles = {
     border: "1px solid rgba(255,255,255,0.14)",
     textDecoration: "none",
     fontWeight: 800,
+  },
+  gmailButton: {
+    padding: "15px 22px",
+    borderRadius: 999,
+    background: "#22c55e",
+    color: "#052e16",
+    border: "1px solid rgba(255,255,255,0.14)",
+    textDecoration: "none",
+    fontWeight: 900,
   },
   panel: {
     maxWidth: 960,
