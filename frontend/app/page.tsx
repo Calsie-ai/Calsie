@@ -18,17 +18,17 @@ export default function HomePage() {
         </p>
 
         <div style={styles.actions}>
-          <Link href="/matching" style={styles.primaryButton}>
-            Start Matching
+          <Link href="/login" style={styles.redButton}>
+            Sign up
           </Link>
           <Link href="/profile" style={styles.secondaryButton}>
             Create Profile
           </Link>
-          <Link href="/apply" style={styles.secondaryButton}>
-            Application Kit
-          </Link>
           <Link href="/api/google/connect" style={styles.gmailButton}>
             Connect Gmail
+          </Link>
+          <Link href="/matching" style={styles.primaryButton}>
+            Start Matching
           </Link>
         </div>
       </section>
@@ -51,46 +51,60 @@ export default function HomePage() {
 const styles = {
   main: {
     minHeight: "100vh",
-    background: "linear-gradient(135deg, #0f172a 0%, #111827 55%, #312e81 100%)",
+    background: "#eef0f4",
     color: "white",
     fontFamily: "Arial, Helvetica, sans-serif",
-    padding: "48px 24px",
+    padding: "80px 28px",
   },
   hero: {
-    maxWidth: 960,
+    maxWidth: 1180,
     margin: "0 auto",
-    padding: "72px 0 40px",
+    padding: "86px 70px 40px",
+    background: "linear-gradient(135deg, #0b1220 0%, #101a30 55%, #171944 100%)",
+    borderTop: "10px solid #8065b7",
+    boxShadow: "0 30px 80px rgba(15, 23, 42, 0.18)",
   },
   badge: {
     display: "inline-block",
-    padding: "9px 14px",
+    padding: "10px 18px",
     borderRadius: 999,
-    background: "rgba(255,255,255,0.08)",
-    border: "1px solid rgba(255,255,255,0.14)",
-    color: "#bfdbfe",
-    fontWeight: 700,
+    background: "rgba(255,255,255,0.09)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    color: "#cfe0ff",
+    fontWeight: 900,
   },
   title: {
     maxWidth: 760,
-    margin: "24px 0 18px",
-    fontSize: "clamp(44px, 8vw, 82px)",
-    lineHeight: 0.95,
-    letterSpacing: -3,
+    margin: "48px 0 22px",
+    fontSize: "clamp(54px, 8vw, 92px)",
+    lineHeight: 0.98,
+    letterSpacing: -4,
   },
   subtitle: {
-    maxWidth: 680,
-    color: "#cbd5e1",
-    fontSize: 20,
-    lineHeight: 1.7,
+    maxWidth: 720,
+    color: "#d6def0",
+    fontSize: 21,
+    lineHeight: 1.65,
   },
   actions: {
     display: "flex",
     flexWrap: "wrap" as const,
-    gap: 14,
+    gap: 26,
+    alignItems: "center",
     marginTop: 34,
   },
+  redButton: {
+    padding: "17px 32px",
+    borderRadius: 999,
+    background: "#ff1717",
+    color: "#050505",
+    textDecoration: "none",
+    fontWeight: 900,
+    fontSize: 20,
+    textTransform: "uppercase" as const,
+  },
   primaryButton: {
-    padding: "15px 22px",
+    padding: "17px 32px",
     borderRadius: 999,
     background: "#ffffff",
     color: "#111827",
@@ -98,30 +112,27 @@ const styles = {
     fontWeight: 900,
   },
   secondaryButton: {
-    padding: "15px 22px",
+    padding: "19px 36px",
     borderRadius: 999,
     background: "rgba(255,255,255,0.08)",
     color: "white",
     border: "1px solid rgba(255,255,255,0.14)",
     textDecoration: "none",
-    fontWeight: 800,
+    fontWeight: 900,
   },
   gmailButton: {
-    padding: "15px 22px",
+    padding: "17px 32px",
     borderRadius: 999,
-    background: "#22c55e",
-    color: "#052e16",
-    border: "1px solid rgba(255,255,255,0.14)",
+    background: "#21c86a",
+    color: "#06160c",
     textDecoration: "none",
     fontWeight: 900,
   },
   panel: {
-    maxWidth: 960,
+    maxWidth: 1180,
     margin: "0 auto",
     padding: 24,
-    borderRadius: 28,
-    background: "rgba(255,255,255,0.08)",
-    border: "1px solid rgba(255,255,255,0.12)",
+    background: "#101a30",
   },
   panelTitle: {
     margin: "0 0 18px",
