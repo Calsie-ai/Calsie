@@ -3,7 +3,7 @@ import Link from "next/link";
 const steps = [
   "Create your work profile",
   "Swipe through job matches",
-  "Generate an AI application kit",
+  "Open the live apply dashboard",
 ];
 
 export default function HomePage() {
@@ -29,6 +29,9 @@ export default function HomePage() {
           </Link>
           <Link href="/matching" style={styles.primaryButton}>
             Start Matching
+          </Link>
+          <Link href="/applying/live" style={styles.applyButton}>
+            Apply Jobs
           </Link>
         </div>
       </section>
@@ -127,6 +130,15 @@ const styles = {
     color: "#06160c",
     textDecoration: "none",
     fontWeight: 900,
+  },
+  applyButton: {
+    padding: "17px 32px",
+    borderRadius: 999,
+    background: "linear-gradient(135deg, #00d4ff, #7c3aed)",
+    color: "white",
+    textDecoration: "none",
+    fontWeight: 900,
+    boxShadow: "0 0 30px rgba(0, 212, 255, 0.28)",
   },
   panel: {
     maxWidth: 1180,
