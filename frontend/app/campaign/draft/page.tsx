@@ -8,6 +8,7 @@ type CampaignDraft = {
   industry: string;
   radius: string;
   resumeName: string;
+  resumeSource?: "applix_profile" | "uploaded_file" | "not_ready";
   dailyLimit: number;
   campaignDays: number;
   createdAt: string;
@@ -18,6 +19,7 @@ const emptyDraft: CampaignDraft = {
   industry: "",
   radius: "20",
   resumeName: "Resume not attached yet",
+  resumeSource: "not_ready",
   dailyLimit: 25,
   campaignDays: 30,
   createdAt: "",
@@ -25,7 +27,7 @@ const emptyDraft: CampaignDraft = {
 
 export default function CampaignDraftPage() {
   const [draft, setDraft] = useState<CampaignDraft>(emptyDraft);
-  const [status, setStatus] = useState("Draft ready for review");
+  const [status, setStatus] = useState("Campaign draft ready for review");
 
   useEffect(() => {
     const savedDraft = sessionStorage.getItem("applixCampaignDraft");
@@ -38,8 +40,8 @@ export default function CampaignDraftPage() {
     }
   }, []);
 
-  function approveDraft() {
-    setStatus("Campaign approved. Next step: save this draft to Supabase and queue the Python scraper.");
+  function launchCampaign() {
+    setStatus("Campaign launch queued. Next: save to Supabase, trigger Python scraper, then start n8n enrichment and outreach.");
   }
 
   const totalOpportunities = draft.dailyLimit * draft.campaignDays;
@@ -52,8 +54,8 @@ export default function CampaignDraftPage() {
           <p style={styles.badge}>Campaign draft</p>
           <h1 style={styles.title}>Review your Applix job hunt before launch.</h1>
           <p style={styles.subtitle}>
-            This is the working draft Applix will later save into Supabase, queue for scraping,
-            enrich through n8n, and show inside your dashboard.
+            This draft will be saved into Supabase, queued for Python scraping,
+            enriched through n8n, and tracked inside your Applix dashboard.
           </p>
         </header>
 
@@ -67,13 +69,13 @@ export default function CampaignDraftPage() {
           <article style={styles.card}>
             <p style={styles.cardLabel}>Search area</p>
             <h2 style={styles.cardTitle}>{draft.radius} km radius</h2>
-            <p style={styles.muted}>Google Maps selector will provide the exact pin/location soon.</p>
+            <p style={styles.muted}>Google Maps will store a selected address, latitude, longitude, and radius for scraping.</p>
           </article>
 
           <article style={styles.card}>
             <p style={styles.cardLabel}>Resume</p>
             <h2 style={styles.cardTitle}>{draft.resumeName}</h2>
-            <p style={styles.muted}>File upload storage will connect to Supabase Storage next.</p>
+            <p style={styles.muted}>{draft.resumeSource === "applix_profile" ? "Applix will use the saved resume builder profile." : "File upload storage will connect to Supabase Storage next."}</p>
           </article>
         </div>
 
@@ -102,7 +104,7 @@ export default function CampaignDraftPage() {
 
         <section style={styles.actionsCard}>
           <p style={styles.status}>{status}</p>
-          <button style={styles.primaryButton} onClick={approveDraft}>Approve draft</button>
+          <button style={styles.primaryButton} onClick={launchCampaign}>Launch campaign</button>
           <Link href="/" style={styles.secondaryButton}>Edit setup</Link>
         </section>
       </section>
