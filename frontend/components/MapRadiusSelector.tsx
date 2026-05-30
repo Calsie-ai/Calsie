@@ -26,6 +26,13 @@ export default function MapRadiusSelector({ value, onChange }: Props) {
     return `https://www.google.com/maps?q=${query}&z=11&output=embed`;
   }, [value.latitude, value.longitude]);
 
+  const circleSize = useMemo(() => {
+    const min = 72;
+    const max = 240;
+    const size = Math.round(min + (value.radiusKm / 50) * (max - min));
+    return Math.min(max, Math.max(min, size));
+  }, [value.radiusKm]);
+
   async function findLocation() {
     const address = addressInput.trim();
     if (!address) {
@@ -94,6 +101,12 @@ export default function MapRadiusSelector({ value, onChange }: Props) {
 
       <div style={styles.mapFrame}>
         {mapUrl ? <iframe title="Selected campaign area" src={mapUrl} style={styles.iframe} loading="lazy" /> : <p style={styles.mapMessage}>Map preview appears after location is found.</p>}
+        {mapUrl && (
+          <div style={{ ...styles.radiusCircle, width: circleSize, height: circleSize }}>
+            <span style={styles.pin}>●</span>
+            <span style={styles.radiusLabel}>{value.radiusKm} km</span>
+          </div>
+        )}
       </div>
 
       <div style={styles.summaryBox}>
@@ -115,8 +128,11 @@ const styles = {
   searchButton: { border: 0, borderRadius: 18, padding: "0 18px", background: "#111827", color: "white", fontWeight: 900, cursor: "pointer" },
   label: { display: "grid", gap: 8, marginTop: 14, color: "#374151", fontWeight: 900 },
   select: { width: "100%", border: "1px solid #d1d5db", borderRadius: 18, padding: "16px 18px", outline: "none", color: "#111827", background: "#ffffff", fontWeight: 700 },
-  mapFrame: { minHeight: 260, marginTop: 16, borderRadius: 22, overflow: "hidden", background: "linear-gradient(135deg, #dbeafe 0%, #ecfeff 48%, #dcfce7 100%)", display: "grid", placeItems: "center" },
+  mapFrame: { position: "relative" as const, minHeight: 260, marginTop: 16, borderRadius: 22, overflow: "hidden", background: "linear-gradient(135deg, #dbeafe 0%, #ecfeff 48%, #dcfce7 100%)", display: "grid", placeItems: "center" },
   iframe: { width: "100%", height: 260, border: 0 },
+  radiusCircle: { position: "absolute" as const, left: "50%", top: "50%", transform: "translate(-50%, -50%)", borderRadius: 9999, border: "3px solid rgba(124, 58, 237, 0.9)", background: "rgba(124, 58, 237, 0.16)", display: "grid", placeItems: "center", pointerEvents: "none" as const, boxShadow: "0 0 40px rgba(124, 58, 237, 0.35)" },
+  pin: { width: 26, height: 26, borderRadius: 999, background: "#111827", color: "white", display: "grid", placeItems: "center", fontSize: 10, lineHeight: 1 },
+  radiusLabel: { position: "absolute" as const, bottom: 12, padding: "6px 10px", borderRadius: 999, background: "white", color: "#111827", fontWeight: 900, fontSize: 12, boxShadow: "0 8px 20px rgba(15, 23, 42, 0.18)" },
   mapMessage: { padding: 18, color: "#374151", fontWeight: 900, textAlign: "center" as const },
   summaryBox: { marginTop: 14, padding: 14, borderRadius: 18, background: "#ffffff", color: "#374151", display: "grid", gap: 6, fontWeight: 800 },
 };
