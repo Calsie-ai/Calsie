@@ -1,4 +1,54 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+type CampaignDraft = {
+  targetRole: string;
+  industry: string;
+  radius: string;
+  resumeName: string;
+  dailyLimit: number;
+  campaignDays: number;
+  createdAt: string;
+};
+
 export default function HomePage() {
+  const router = useRouter();
+  const [targetRole, setTargetRole] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [radius, setRadius] = useState("20");
+  const [resumeName, setResumeName] = useState("");
+  const [error, setError] = useState("");
+
+  function createDraft() {
+    const cleanRole = targetRole.trim();
+    const cleanIndustry = industry.trim();
+
+    if (!cleanRole) {
+      setError("Add the target job or role first.");
+      return;
+    }
+
+    if (!cleanIndustry) {
+      setError("Add the desired industry or company type first.");
+      return;
+    }
+
+    const draft: CampaignDraft = {
+      targetRole: cleanRole,
+      industry: cleanIndustry,
+      radius,
+      resumeName: resumeName || "Resume not attached yet",
+      dailyLimit: 25,
+      campaignDays: 30,
+      createdAt: new Date().toISOString(),
+    };
+
+    sessionStorage.setItem("applixCampaignDraft", JSON.stringify(draft));
+    router.push("/campaign/draft");
+  }
+
   return (
     <main style={styles.main}>
       <section style={styles.hero}>
@@ -26,7 +76,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <form style={styles.launchCard}>
+        <form style={styles.launchCard} onSubmit={(event) => event.preventDefault()}>
           <div style={styles.formHeader}>
             <p style={styles.formEyebrow}>Campaign setup</p>
             <h2 style={styles.formTitle}>Tell Applix what to hunt for</h2>
@@ -38,6 +88,8 @@ export default function HomePage() {
               style={styles.input}
               type="text"
               name="targetRole"
+              value={targetRole}
+              onChange={(event) => setTargetRole(event.target.value)}
               placeholder="Example: Support Worker, Admin Assistant, Junior Developer"
             />
           </label>
@@ -48,13 +100,21 @@ export default function HomePage() {
               style={styles.input}
               type="text"
               name="industry"
+              value={industry}
+              onChange={(event) => setIndustry(event.target.value)}
               placeholder="Example: NDIS providers, healthcare, local agencies"
             />
           </label>
 
           <label style={styles.label}>
             Upload resume
-            <input style={styles.fileInput} type="file" name="resume" accept=".pdf,.doc,.docx" />
+            <input
+              style={styles.fileInput}
+              type="file"
+              name="resume"
+              accept=".pdf,.doc,.docx"
+              onChange={(event) => setResumeName(event.target.files?.[0]?.name || "")}
+            />
           </label>
 
           <div style={styles.mapBlock}>
@@ -72,7 +132,7 @@ export default function HomePage() {
 
           <label style={styles.label}>
             Search radius
-            <select style={styles.input} name="radius">
+            <select style={styles.input} name="radius" value={radius} onChange={(event) => setRadius(event.target.value)}>
               <option value="5">5 km</option>
               <option value="10">10 km</option>
               <option value="20">20 km</option>
@@ -81,7 +141,9 @@ export default function HomePage() {
             </select>
           </label>
 
-          <button style={styles.launchButton} type="button">
+          {error && <p style={styles.errorText}>{error}</p>}
+
+          <button style={styles.launchButton} type="button" onClick={createDraft}>
             Launch Applix
           </button>
 
@@ -270,6 +332,11 @@ const styles = {
     borderRadius: 999,
     border: "3px solid rgba(124, 58, 237, 0.38)",
     background: "rgba(124, 58, 237, 0.08)",
+  },
+  errorText: {
+    margin: "14px 0 0",
+    color: "#dc2626",
+    fontWeight: 900,
   },
   launchButton: {
     width: "100%",
