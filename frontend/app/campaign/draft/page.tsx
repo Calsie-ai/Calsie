@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type CampaignDraft = {
   targetRole: string;
   industry: string;
-  radius: string;
+  selectedAddress: string;
+  placeId: string;
+  latitude: number | null;
+  longitude: number | null;
+  radiusKm: number;
   resumeName: string;
   resumeSource?: "applix_profile" | "uploaded_file" | "not_ready";
   dailyLimit: number;
@@ -17,7 +22,11 @@ type CampaignDraft = {
 const emptyDraft: CampaignDraft = {
   targetRole: "",
   industry: "",
-  radius: "20",
+  selectedAddress: "No location selected yet",
+  placeId: "",
+  latitude: null,
+  longitude: null,
+  radiusKm: 20,
   resumeName: "Resume not attached yet",
   resumeSource: "not_ready",
   dailyLimit: 25,
@@ -26,22 +35,49 @@ const emptyDraft: CampaignDraft = {
 };
 
 export default function CampaignDraftPage() {
+  const router = useRouter();
   const [draft, setDraft] = useState<CampaignDraft>(emptyDraft);
   const [status, setStatus] = useState("Campaign draft ready for review");
+  const [launching, setLaunching] = useState(false);
 
   useEffect(() => {
     const savedDraft = sessionStorage.getItem("applixCampaignDraft");
     if (!savedDraft) return;
 
     try {
-      setDraft(JSON.parse(savedDraft));
+      setDraft({ ...emptyDraft, ...JSON.parse(savedDraft) });
     } catch {
       setStatus("Could not load campaign draft. Please create it again.");
     }
   }, []);
 
-  function launchCampaign() {
-    setStatus("Campaign launch queued. Next: save to Supabase, trigger Python scraper, then start n8n enrichment and outreach.");
+  async function launchCampaign() {
+    if (!draft.latitude || !draft.longitude) {
+      setStatus("Missing map coordinates. Go back and select a campaign area first.");
+      return;
+    }
+
+    setLaunching(true);
+    setStatus("Saving campaign to Supabase...");
+
+    try {
+      const response = await fetch("/api/campaigns/launch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not launch campaign.");
+
+      sessionStorage.setItem("applixLastCampaignId", data.campaign.id);
+      setStatus("Campaign launched. Python scraper queue is ready.");
+      router.push(`/dashboard?campaign=${data.campaign.id}`);
+    } catch (error: any) {
+      setStatus(error?.message || "Campaign launch failed.");
+    } finally {
+      setLaunching(false);
+    }
   }
 
   const totalOpportunities = draft.dailyLimit * draft.campaignDays;
@@ -68,8 +104,9 @@ export default function CampaignDraftPage() {
 
           <article style={styles.card}>
             <p style={styles.cardLabel}>Search area</p>
-            <h2 style={styles.cardTitle}>{draft.radius} km radius</h2>
-            <p style={styles.muted}>Google Maps will store a selected address, latitude, longitude, and radius for scraping.</p>
+            <h2 style={styles.cardTitle}>{draft.radiusKm} km radius</h2>
+            <p style={styles.muted}>{draft.selectedAddress}</p>
+            <p style={styles.muted}>{draft.latitude && draft.longitude ? `${draft.latitude.toFixed(5)}, ${draft.longitude.toFixed(5)}` : "Coordinates missing"}</p>
           </article>
 
           <article style={styles.card}>
@@ -104,7 +141,7 @@ export default function CampaignDraftPage() {
 
         <section style={styles.actionsCard}>
           <p style={styles.status}>{status}</p>
-          <button style={styles.primaryButton} onClick={launchCampaign}>Launch campaign</button>
+          <button style={styles.primaryButton} onClick={launchCampaign} disabled={launching}>{launching ? "Launching..." : "Launch campaign"}</button>
           <Link href="/" style={styles.secondaryButton}>Edit setup</Link>
         </section>
       </section>
@@ -121,133 +158,22 @@ const styles = {
     fontFamily: "Arial, Helvetica, sans-serif",
     padding: "46px 24px",
   },
-  shell: {
-    maxWidth: 1180,
-    margin: "0 auto",
-  },
-  header: {
-    padding: 38,
-    borderRadius: 34,
-    background: "linear-gradient(135deg, #090d18 0%, #101a30 55%, #1f1550 100%)",
-    color: "white",
-    boxShadow: "0 24px 70px rgba(15, 23, 42, 0.18)",
-  },
-  backLink: {
-    color: "#cfe0ff",
-    textDecoration: "none",
-    fontWeight: 900,
-  },
-  badge: {
-    width: "fit-content",
-    margin: "28px 0 16px",
-    padding: "10px 18px",
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.09)",
-    border: "1px solid rgba(255,255,255,0.14)",
-    color: "#cfe0ff",
-    fontWeight: 900,
-  },
-  title: {
-    maxWidth: 760,
-    margin: "0 0 16px",
-    fontSize: "clamp(40px, 6vw, 76px)",
-    lineHeight: 0.98,
-    letterSpacing: -3,
-  },
-  subtitle: {
-    maxWidth: 740,
-    color: "#d6def0",
-    fontSize: 20,
-    lineHeight: 1.6,
-    margin: 0,
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: 18,
-    marginTop: 22,
-  },
-  card: {
-    padding: 26,
-    borderRadius: 28,
-    background: "#ffffff",
-    boxShadow: "0 20px 50px rgba(15, 23, 42, 0.1)",
-    border: "1px solid rgba(15, 23, 42, 0.08)",
-  },
-  cardLabel: {
-    margin: "0 0 10px",
-    color: "#7c3aed",
-    fontSize: 12,
-    textTransform: "uppercase" as const,
-    letterSpacing: 1.2,
-    fontWeight: 900,
-  },
-  cardTitle: {
-    margin: 0,
-    fontSize: 24,
-    letterSpacing: -0.8,
-  },
-  muted: {
-    margin: "12px 0 0",
-    color: "#6b7280",
-    fontWeight: 700,
-    lineHeight: 1.55,
-  },
-  planCard: {
-    marginTop: 22,
-    padding: 30,
-    borderRadius: 30,
-    background: "#ffffff",
-    boxShadow: "0 20px 50px rgba(15, 23, 42, 0.1)",
-    border: "1px solid rgba(15, 23, 42, 0.08)",
-  },
-  planTitle: {
-    margin: 0,
-    fontSize: 34,
-    letterSpacing: -1.3,
-  },
-  flowBox: {
-    marginTop: 22,
-    padding: 18,
-    borderRadius: 22,
-    background: "#f3f4f6",
-    display: "flex",
-    flexWrap: "wrap" as const,
-    gap: 12,
-    color: "#111827",
-    fontWeight: 900,
-  },
-  actionsCard: {
-    marginTop: 22,
-    padding: 24,
-    borderRadius: 30,
-    background: "#ffffff",
-    display: "flex",
-    gap: 14,
-    alignItems: "center",
-    justifyContent: "space-between",
-    boxShadow: "0 20px 50px rgba(15, 23, 42, 0.1)",
-  },
-  status: {
-    margin: 0,
-    color: "#374151",
-    fontWeight: 900,
-  },
-  primaryButton: {
-    padding: "16px 24px",
-    border: 0,
-    borderRadius: 999,
-    background: "linear-gradient(135deg, #00d4ff, #7c3aed)",
-    color: "white",
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    padding: "16px 24px",
-    borderRadius: 999,
-    background: "#f3f4f6",
-    color: "#111827",
-    textDecoration: "none",
-    fontWeight: 900,
-  },
+  shell: { maxWidth: 1180, margin: "0 auto" },
+  header: { padding: 38, borderRadius: 34, background: "linear-gradient(135deg, #090d18 0%, #101a30 55%, #1f1550 100%)", color: "white", boxShadow: "0 24px 70px rgba(15, 23, 42, 0.18)" },
+  backLink: { color: "#cfe0ff", textDecoration: "none", fontWeight: 900 },
+  badge: { width: "fit-content", margin: "28px 0 16px", padding: "10px 18px", borderRadius: 999, background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.14)", color: "#cfe0ff", fontWeight: 900 },
+  title: { maxWidth: 760, margin: "0 0 16px", fontSize: "clamp(40px, 6vw, 76px)", lineHeight: 0.98, letterSpacing: -3 },
+  subtitle: { maxWidth: 740, color: "#d6def0", fontSize: 20, lineHeight: 1.6, margin: 0 },
+  grid: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 18, marginTop: 22 },
+  card: { padding: 26, borderRadius: 28, background: "#ffffff", boxShadow: "0 20px 50px rgba(15, 23, 42, 0.1)", border: "1px solid rgba(15, 23, 42, 0.08)" },
+  cardLabel: { margin: "0 0 10px", color: "#7c3aed", fontSize: 12, textTransform: "uppercase" as const, letterSpacing: 1.2, fontWeight: 900 },
+  cardTitle: { margin: 0, fontSize: 24, letterSpacing: -0.8 },
+  muted: { margin: "12px 0 0", color: "#6b7280", fontWeight: 700, lineHeight: 1.55 },
+  planCard: { marginTop: 22, padding: 30, borderRadius: 30, background: "#ffffff", boxShadow: "0 20px 50px rgba(15, 23, 42, 0.1)", border: "1px solid rgba(15, 23, 42, 0.08)" },
+  planTitle: { margin: 0, fontSize: 34, letterSpacing: -1.3 },
+  flowBox: { marginTop: 22, padding: 18, borderRadius: 22, background: "#f3f4f6", display: "flex", flexWrap: "wrap" as const, gap: 12, color: "#111827", fontWeight: 900 },
+  actionsCard: { marginTop: 22, padding: 24, borderRadius: 30, background: "#ffffff", display: "flex", gap: 14, alignItems: "center", justifyContent: "space-between", boxShadow: "0 20px 50px rgba(15, 23, 42, 0.1)" },
+  status: { margin: 0, color: "#374151", fontWeight: 900 },
+  primaryButton: { padding: "16px 24px", border: 0, borderRadius: 999, background: "linear-gradient(135deg, #00d4ff, #7c3aed)", color: "white", fontWeight: 900, cursor: "pointer" },
+  secondaryButton: { padding: "16px 24px", borderRadius: 999, background: "#f3f4f6", color: "#111827", textDecoration: "none", fontWeight: 900 },
 };
