@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import MapRadiusSelector, { type MapSelection } from "../components/MapRadiusSelector";
 
 type CampaignDraft = {
   targetRole: string;
   industry: string;
-  radius: string;
+  selectedAddress: string;
+  placeId: string;
+  latitude: number | null;
+  longitude: number | null;
+  radiusKm: number;
   resumeName: string;
   resumeSource: "applix_profile" | "uploaded_file" | "not_ready";
   dailyLimit: number;
@@ -19,7 +24,13 @@ export default function HomePage() {
   const router = useRouter();
   const [targetRole, setTargetRole] = useState("");
   const [industry, setIndustry] = useState("");
-  const [radius, setRadius] = useState("20");
+  const [mapSelection, setMapSelection] = useState<MapSelection>({
+    selectedAddress: "",
+    placeId: "",
+    latitude: null,
+    longitude: null,
+    radiusKm: 20,
+  });
   const [resumeName, setResumeName] = useState("");
   const [useApplixResume, setUseApplixResume] = useState(true);
   const [error, setError] = useState("");
@@ -38,10 +49,19 @@ export default function HomePage() {
       return;
     }
 
+    if (!mapSelection.latitude || !mapSelection.longitude || !mapSelection.selectedAddress) {
+      setError("Select a real campaign area with the map before launching.");
+      return;
+    }
+
     const draft: CampaignDraft = {
       targetRole: cleanRole,
       industry: cleanIndustry,
-      radius,
+      selectedAddress: mapSelection.selectedAddress,
+      placeId: mapSelection.placeId,
+      latitude: mapSelection.latitude,
+      longitude: mapSelection.longitude,
+      radiusKm: mapSelection.radiusKm,
       resumeName: useApplixResume ? "Applix resume profile" : resumeName || "Resume not attached yet",
       resumeSource: useApplixResume ? "applix_profile" : resumeName ? "uploaded_file" : "not_ready",
       dailyLimit: 25,
@@ -60,7 +80,7 @@ export default function HomePage() {
           <p style={styles.badge}>Applix by ASSI</p>
           <h1 style={styles.title}>Launch your 30-day AI job hunt.</h1>
           <p style={styles.subtitle}>
-            Fill your resume inside Applix, choose your target role, select your search radius,
+            Fill your resume inside Applix, choose your target role, select your real map radius,
             and Applix will prepare a focused outreach campaign to relevant local companies.
           </p>
 
@@ -143,29 +163,7 @@ export default function HomePage() {
             )}
           </section>
 
-          <div style={styles.mapBlock}>
-            <div>
-              <p style={styles.mapTitle}>Select search area</p>
-              <p style={styles.mapText}>
-                Google Maps radius selector will connect here. For now, choose the radius below.
-              </p>
-            </div>
-            <div style={styles.mapPreview}>
-              <span style={styles.mapPin}>⌖</span>
-              <span style={styles.radiusRing} />
-            </div>
-          </div>
-
-          <label style={styles.label}>
-            Search radius
-            <select style={styles.input} name="radius" value={radius} onChange={(event) => setRadius(event.target.value)}>
-              <option value="5">5 km</option>
-              <option value="10">10 km</option>
-              <option value="20">20 km</option>
-              <option value="30">30 km</option>
-              <option value="50">50 km</option>
-            </select>
-          </label>
+          <MapRadiusSelector value={mapSelection} onChange={setMapSelection} />
 
           {error && <p style={styles.errorText}>{error}</p>}
 
@@ -312,49 +310,8 @@ const styles = {
     background: "#f9fafb",
     fontWeight: 700,
   },
-  mapBlock: {
-    marginTop: 20,
-    display: "grid",
-    gridTemplateColumns: "1fr 170px",
-    gap: 18,
-    alignItems: "center",
-    padding: 18,
-    borderRadius: 24,
-    background: "#f3f4f6",
-    border: "1px solid #e5e7eb",
-  },
   mapTitle: { margin: "0 0 8px", fontSize: 18, fontWeight: 900 },
   mapText: { margin: 0, color: "#6b7280", lineHeight: 1.5, fontWeight: 700 },
-  mapPreview: {
-    position: "relative" as const,
-    minHeight: 140,
-    borderRadius: 22,
-    background: "linear-gradient(135deg, #dbeafe 0%, #ecfeff 48%, #dcfce7 100%)",
-    overflow: "hidden",
-    display: "grid",
-    placeItems: "center",
-  },
-  mapPin: {
-    position: "relative" as const,
-    zIndex: 2,
-    width: 42,
-    height: 42,
-    borderRadius: 999,
-    background: "#111827",
-    color: "white",
-    display: "grid",
-    placeItems: "center",
-    fontSize: 24,
-    fontWeight: 900,
-  },
-  radiusRing: {
-    position: "absolute" as const,
-    width: 112,
-    height: 112,
-    borderRadius: 999,
-    border: "3px solid rgba(124, 58, 237, 0.38)",
-    background: "rgba(124, 58, 237, 0.08)",
-  },
   errorText: { margin: "14px 0 0", color: "#dc2626", fontWeight: 900 },
   launchButton: {
     width: "100%",
