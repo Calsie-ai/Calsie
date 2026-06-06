@@ -5,6 +5,23 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
+function withTimeout<T>(promise: Promise<T>, milliseconds = 12000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error("Login is taking too long. Check your internet connection and Supabase settings, then try again."));
+    }, milliseconds);
+
+    promise
+      .then((value) => resolve(value))
+      .catch((error) => reject(error))
+      .finally(() => window.clearTimeout(timer));
+  });
+}
+
+function cleanEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -15,6 +32,26 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   async function handleAuth() {
+    if (loading) return;
+
+    const authEmail = cleanEmail(email);
+    const authPassword = password.trim();
+
+    if (!authEmail || !authEmail.includes("@")) {
+      setMessage("Enter your full email address, for example name@gmail.com.");
+      return;
+    }
+
+    if (authPassword.length < 6) {
+      setMessage("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (mode === "signup" && !fullName.trim()) {
+      setMessage("Enter your full name before creating an account.");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
@@ -22,16 +59,18 @@ export default function LoginPage() {
       if (mode === "signup") {
         const redirectTo = `${window.location.origin}/login`;
 
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: redirectTo,
-            data: {
-              full_name: fullName,
+        const { data, error } = await withTimeout(
+          supabase.auth.signUp({
+            email: authEmail,
+            password: authPassword,
+            options: {
+              emailRedirectTo: redirectTo,
+              data: {
+                full_name: fullName.trim(),
+              },
             },
-          },
-        });
+          })
+        );
 
         if (error) throw error;
 
@@ -41,16 +80,20 @@ export default function LoginPage() {
           return;
         }
 
+        setMessage("Account ready. Opening your profile...");
         router.push("/profile");
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email: authEmail, password: authPassword })
+      );
+
       if (error) throw error;
+      setMessage("Login successful. Opening your profile...");
       router.push("/profile");
     } catch (error: any) {
-      setMessage(error.message || "Something went wrong. Please try again.");
-    } finally {
+      setMessage(error?.message || "Something went wrong. Please try again.");
       setLoading(false);
     }
   }
@@ -64,8 +107,8 @@ export default function LoginPage() {
         <p style={styles.subtitle}>Log in to save your resume profile, job matches, and application kits.</p>
 
         <div style={styles.tabs}>
-          <button onClick={() => setMode("login")} style={mode === "login" ? styles.activeTab : styles.tab}>Login</button>
-          <button onClick={() => setMode("signup")} style={mode === "signup" ? styles.activeTab : styles.tab}>Sign up</button>
+          <button disabled={loading} onClick={() => setMode("login")} style={mode === "login" ? styles.activeTab : styles.tab}>Login</button>
+          <button disabled={loading} onClick={() => setMode("signup")} style={mode === "signup" ? styles.activeTab : styles.tab}>Sign up</button>
         </div>
 
         <div style={styles.form}>
@@ -78,19 +121,20 @@ export default function LoginPage() {
 
           <label style={styles.field}>
             Email
-            <input style={styles.input} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" type="email" />
+            <input style={styles.input} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" type="email" autoComplete="email" />
           </label>
 
           <label style={styles.field}>
             Password
-            <input style={styles.input} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 6 characters" type="password" />
+            <input style={styles.input} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 6 characters" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} />
           </label>
 
-          <button disabled={loading} onClick={handleAuth} style={styles.primaryButton}>
-            {loading ? "Please wait..." : mode === "login" ? "Login" : "Create account"}
+          <button disabled={loading} onClick={handleAuth} style={loading ? styles.loadingButton : styles.primaryButton}>
+            {loading ? "Checking account..." : mode === "login" ? "Login" : "Create account"}
           </button>
 
-          {message && <p style={message.includes("created") ? styles.successMessage : styles.message}>{message}</p>}
+          {loading && <p style={styles.helpText}>This should only take a few seconds.</p>}
+          {message && <p style={message.includes("created") || message.includes("successful") || message.includes("Opening") ? styles.successMessage : styles.message}>{message}</p>}
         </div>
       </section>
     </main>
@@ -188,9 +232,27 @@ const styles = {
     fontSize: 16,
     cursor: "pointer",
   },
+  loadingButton: {
+    border: 0,
+    borderRadius: 999,
+    background: "#334155",
+    color: "white",
+    padding: 15,
+    fontWeight: 900,
+    fontSize: 16,
+    cursor: "wait",
+  },
+  helpText: {
+    color: "#64748b",
+    lineHeight: 1.5,
+    margin: 0,
+    fontWeight: 700,
+  },
   message: {
     color: "#dc2626",
     lineHeight: 1.5,
+    margin: 0,
+    fontWeight: 800,
   },
   successMessage: {
     color: "#166534",
