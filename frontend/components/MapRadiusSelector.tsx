@@ -15,16 +15,23 @@ type Props = {
   onChange: (value: MapSelection) => void;
 };
 
+const DEFAULT_MAP_QUERY = "Sydney NSW Australia";
+
 export default function MapRadiusSelector({ value, onChange }: Props) {
   const [addressInput, setAddressInput] = useState(value.selectedAddress || "");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("Search a suburb or address so Applix knows where to look.");
+  const [usingLocation, setUsingLocation] = useState(false);
+  const [message, setMessage] = useState("Search an area or use your location so Applix knows where to look.");
+
+  const hasLockedLocation = Boolean(value.latitude && value.longitude);
 
   const mapUrl = useMemo(() => {
-    if (!value.latitude || !value.longitude) return "";
-    const query = encodeURIComponent(`${value.latitude},${value.longitude}`);
-    return `https://www.google.com/maps?q=${query}&z=11&output=embed`;
-  }, [value.latitude, value.longitude]);
+    const query = hasLockedLocation
+      ? encodeURIComponent(`${value.latitude},${value.longitude}`)
+      : encodeURIComponent(DEFAULT_MAP_QUERY);
+    const zoom = hasLockedLocation ? 11 : 10;
+    return `https://www.google.com/maps?q=${query}&z=${zoom}&output=embed`;
+  }, [hasLockedLocation, value.latitude, value.longitude]);
 
   const circleSize = useMemo(() => {
     const min = 72;
@@ -67,6 +74,38 @@ export default function MapRadiusSelector({ value, onChange }: Props) {
     }
   }
 
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setMessage("Your browser does not support location access. Search your suburb instead.");
+      return;
+    }
+
+    setUsingLocation(true);
+    setMessage("Asking your browser for your location...");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        onChange({
+          ...value,
+          selectedAddress: "My current location",
+          placeId: "browser-geolocation",
+          latitude,
+          longitude,
+        });
+        setAddressInput("My current location");
+        setMessage("Location locked from your browser. You can still search another area if you want.");
+        setUsingLocation(false);
+      },
+      () => {
+        setMessage("Location permission was not allowed. Search your suburb or address instead.");
+        setUsingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }
+
   function updateRadius(radiusKm: number) {
     onChange({ ...value, radiusKm });
   }
@@ -74,13 +113,26 @@ export default function MapRadiusSelector({ value, onChange }: Props) {
   return (
     <section style={styles.wrapper}>
       <p style={styles.title}>Target location</p>
-      <p style={styles.helper}>Pick the suburb or address where Applix should start looking.</p>
+      <p style={styles.helper}>Use your current location or search the suburb where Applix should start looking.</p>
+
+      <div style={styles.quickRow}>
+        <button type="button" style={styles.locationButton} onClick={useMyLocation} disabled={usingLocation}>
+          {usingLocation ? "Finding you..." : "Use my location"}
+        </button>
+        <span style={styles.orText}>or search manually</span>
+      </div>
 
       <div style={styles.searchRow}>
         <input
           style={styles.input}
           value={addressInput}
           onChange={(event) => setAddressInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              findLocation();
+            }
+          }}
           placeholder="Burwood NSW, Parramatta, Melbourne CBD"
         />
         <button type="button" style={styles.searchButton} onClick={findLocation} disabled={loading}>
@@ -100,15 +152,14 @@ export default function MapRadiusSelector({ value, onChange }: Props) {
       </label>
 
       <div style={styles.mapFrame}>
-        {mapUrl ? (
-          <iframe title="Selected Applix target area" src={mapUrl} style={styles.iframe} loading="lazy" />
-        ) : (
-          <div style={styles.mapPlaceholder}>
-            <span style={styles.mapGlow}>◎</span>
-            <p style={styles.mapMessage}>Google map appears here after you find an area.</p>
+        <iframe title="Applix target map" src={mapUrl} style={styles.iframe} loading="lazy" />
+        {!hasLockedLocation && (
+          <div style={styles.mapOverlay}>
+            <strong>Map is ready</strong>
+            <span>Use your location or search a suburb to lock Applix there.</span>
           </div>
         )}
-        {mapUrl && (
+        {hasLockedLocation && (
           <div style={{ ...styles.radiusCircle, width: circleSize, height: circleSize }}>
             <span style={styles.pin}>●</span>
             <span style={styles.radiusLabel}>{value.radiusKm} km</span>
@@ -117,8 +168,8 @@ export default function MapRadiusSelector({ value, onChange }: Props) {
       </div>
 
       <div style={styles.summaryBox}>
-        <strong>{value.selectedAddress || "No target area selected yet"}</strong>
-        <span>{value.latitude && value.longitude ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)}` : "Coordinates will appear after the map is found."}</span>
+        <strong>{value.selectedAddress || "Previewing Sydney map"}</strong>
+        <span>{value.latitude && value.longitude ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)}` : "Use your location or search your real target area to lock coordinates."}</span>
         <span>Radius: {value.radiusKm} km</span>
         <span>{message}</span>
       </div>
@@ -136,7 +187,18 @@ const styles = {
   },
   title: { margin: "0 0 8px", color: "#ffffff", fontSize: 18, fontWeight: 900 },
   helper: { margin: 0, color: "#9ca3af", lineHeight: 1.5, fontWeight: 700 },
-  searchRow: { display: "grid", gridTemplateColumns: "1fr auto", gap: 10, marginTop: 14 },
+  quickRow: { display: "flex", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap" as const },
+  locationButton: {
+    border: "1px solid rgba(94, 231, 255, 0.35)",
+    borderRadius: 999,
+    padding: "11px 14px",
+    background: "rgba(94, 231, 255, 0.12)",
+    color: "#dffbff",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  orText: { color: "#9ca3af", fontWeight: 800, fontSize: 12 },
+  searchRow: { display: "grid", gridTemplateColumns: "1fr auto", gap: 10, marginTop: 12 },
   input: {
     width: "100%",
     border: "1px solid rgba(255, 138, 61, 0.28)",
@@ -173,14 +235,27 @@ const styles = {
     marginTop: 16,
     borderRadius: 18,
     overflow: "hidden",
-    background: "radial-gradient(circle at center, rgba(94,231,255,0.22), rgba(8,12,20,0.92) 54%)",
+    background: "#07101a",
     display: "grid",
     placeItems: "center",
     border: "1px solid rgba(255, 138, 61, 0.25)",
   },
-  iframe: { width: "100%", height: 260, border: 0, filter: "saturate(0.9) contrast(0.95)" },
-  mapPlaceholder: { display: "grid", placeItems: "center", gap: 8, padding: 18, textAlign: "center" as const },
-  mapGlow: { color: "#5ee7ff", fontSize: 42, textShadow: "0 0 28px rgba(94,231,255,0.8)" },
+  iframe: { width: "100%", height: 260, border: 0, filter: "saturate(0.86) contrast(0.98) brightness(0.82)" },
+  mapOverlay: {
+    position: "absolute" as const,
+    left: 14,
+    right: 14,
+    bottom: 14,
+    display: "grid",
+    gap: 4,
+    padding: "12px 14px",
+    borderRadius: 14,
+    background: "rgba(2, 6, 23, 0.82)",
+    border: "1px solid rgba(94, 231, 255, 0.22)",
+    color: "#ffffff",
+    fontWeight: 900,
+    pointerEvents: "none" as const,
+  },
   radiusCircle: {
     position: "absolute" as const,
     left: "50%",
@@ -196,6 +271,5 @@ const styles = {
   },
   pin: { width: 26, height: 26, borderRadius: 999, background: "#0b0f19", color: "#5ee7ff", display: "grid", placeItems: "center", fontSize: 10, lineHeight: 1 },
   radiusLabel: { position: "absolute" as const, bottom: 12, padding: "6px 10px", borderRadius: 999, background: "#0b0f19", color: "#ffd08a", fontWeight: 900, fontSize: 12, boxShadow: "0 8px 20px rgba(0, 0, 0, 0.25)" },
-  mapMessage: { margin: 0, color: "#cbd5e1", fontWeight: 900, lineHeight: 1.4 },
   summaryBox: { marginTop: 14, padding: 14, borderRadius: 16, background: "rgba(15, 23, 42, 0.9)", color: "#cbd5e1", display: "grid", gap: 6, fontWeight: 800, border: "1px solid rgba(94, 231, 255, 0.16)" },
 };
