@@ -73,26 +73,48 @@ export default function HomePage() {
 
   return (
     <main style={styles.main}>
+      <header style={styles.header}>
+        <Link href="/" style={styles.logoMark}>
+          A
+        </Link>
+        <div style={styles.headerText}>ARTIFICIAL SYMBIOTIC SUPER INTELLIGENCE</div>
+        <nav style={styles.navLinks}>
+          <Link href="/" style={styles.navLink}>Symbiotes</Link>
+          <Link href="/profile" style={styles.navLink}>Resume Memory</Link>
+          <Link href="/login" style={styles.navLink}>Applix Account</Link>
+        </nav>
+      </header>
+
       <section style={styles.hero}>
         <div style={styles.copyPanel}>
-          <div>
-            <div style={styles.brandRow}>
-              <p style={styles.badge}>ASSI Symbiote</p>
-              <span style={styles.statusDot}>Live memory</span>
+          <p style={styles.eyebrow}>ASSI ECOSYSTEM / APPLIX SYMBIOTE</p>
+          <h1 style={styles.title}>Tell Applix what work you want.</h1>
+          <p style={styles.leadLine}>
+            It finds the companies, writes the approach, and helps you reach them every day.
+          </p>
+          <p style={styles.symbioteLine}>
+            Applix is the job-hunt symbiote from ASSI — a small worker beside you that searches,
+            writes, remembers, and prepares your next move while you stay in control.
+          </p>
+
+          <div style={styles.actionRow}>
+            <a href="#launch" style={styles.primaryPill}>Open Applix</a>
+            <span style={styles.secondaryPill}>You approve before sending</span>
+          </div>
+
+          <div style={styles.productCard}>
+            <div style={styles.windowDots}>
+              <span style={{ ...styles.dot, background: "#ff8a3d" }} />
+              <span style={{ ...styles.dot, background: "#5ee7ff" }} />
+              <span style={{ ...styles.dot, background: "#8b5cf6" }} />
             </div>
-
-            <h1 style={styles.title}>Tell Applix what work you want.</h1>
-
-            <p style={styles.leadLine}>
-              It finds the companies, writes the approach, and helps you reach them every day.
-            </p>
-
-            <p style={styles.symbioteLine}>
-              Applix is the job-hunt symbiote from ASSI — a small worker beside you that searches,
-              writes, remembers, and prepares your next move while you stay in control.
-            </p>
-
-            <p style={styles.controlLine}>You approve everything before anything is sent.</p>
+            <div style={styles.productCardBody}>
+              <p style={styles.productKicker}>ASSI VISUAL</p>
+              <h2 style={styles.productName}>Applix</h2>
+              <p style={styles.productCopy}>
+                Symbiotic job hunter. Searches, remembers, prepares messages, and keeps you in command.
+              </p>
+            </div>
           </div>
 
           <div style={styles.statsGrid}>
@@ -111,9 +133,15 @@ export default function HomePage() {
           </div>
         </div>
 
-        <form style={styles.launchCard} onSubmit={(event) => event.preventDefault()}>
+        <form id="launch" style={styles.launchCard} onSubmit={(event) => event.preventDefault()}>
+          <div style={styles.windowDots}>
+            <span style={{ ...styles.dot, background: "#ff8a3d" }} />
+            <span style={{ ...styles.dot, background: "#5ee7ff" }} />
+            <span style={{ ...styles.dot, background: "#8b5cf6" }} />
+          </div>
+
           <div style={styles.formHeader}>
-            <p style={styles.formEyebrow}>Launch Applix</p>
+            <p style={styles.formEyebrow}>LAUNCH APPLIX</p>
             <h2 style={styles.formTitle}>Tell Applix where to hunt</h2>
             <p style={styles.formIntro}>
               Choose the work, the company type, and the area. Applix prepares the reach-outs first.
@@ -146,18 +174,17 @@ export default function HomePage() {
 
           <section style={styles.resumePanel}>
             <div>
-              <p style={styles.mapTitle}>Your resume memory</p>
-              <p style={styles.mapText}>
-                Applix uses the details you save in your profile. It can shape the wording, but your
-                facts stay locked.
+              <p style={styles.panelTitle}>Resume memory</p>
+              <p style={styles.panelText}>
+                Applix works from details you save in your profile. It can shape the wording, but your facts stay locked.
               </p>
             </div>
 
             <div style={styles.resumeMemoryCard}>
-              <span style={styles.memoryIcon}>ASSI</span>
+              <span style={styles.memoryIcon}>A</span>
               <div>
                 <strong style={styles.memoryTitle}>Use my Applix resume profile</strong>
-                <p style={styles.memoryText}>No PDF scraping. Edit your details once and let Applix work from that.</p>
+                <p style={styles.memoryText}>No PDF scraping. Edit your details once and let Applix remember them.</p>
               </div>
             </div>
 
@@ -166,7 +193,9 @@ export default function HomePage() {
             </Link>
           </section>
 
-          <MapRadiusSelector value={mapSelection} onChange={setMapSelection} />
+          <div style={styles.mapShell}>
+            <MapRadiusSelector value={mapSelection} onChange={setMapSelection} />
+          </div>
 
           {error && <p style={styles.errorText}>{error}</p>}
 
@@ -187,189 +216,268 @@ const styles = {
   main: {
     minHeight: "100vh",
     background:
-      "radial-gradient(circle at top left, rgba(99, 102, 241, 0.18), transparent 32%), radial-gradient(circle at bottom right, rgba(20, 184, 166, 0.16), transparent 28%), #eef0f4",
-    color: "#111827",
+      "radial-gradient(circle at 18% 14%, rgba(255, 138, 61, 0.18), transparent 24%), radial-gradient(circle at 72% 24%, rgba(94, 231, 255, 0.1), transparent 26%), linear-gradient(135deg, #080403 0%, #050914 42%, #07070b 100%)",
+    color: "#f8fafc",
     fontFamily: "Arial, Helvetica, sans-serif",
-    padding: "54px 24px",
+    padding: "34px 24px 64px",
   },
-  hero: {
-    maxWidth: 1240,
-    minHeight: "calc(100vh - 108px)",
-    margin: "0 auto",
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1.08fr) minmax(360px, 470px)",
-    gap: 28,
-    alignItems: "stretch",
-  },
-  copyPanel: {
-    position: "relative" as const,
-    overflow: "hidden",
-    borderRadius: 38,
-    padding: "64px 58px",
-    background:
-      "linear-gradient(145deg, #05070d 0%, #0b1221 48%, #111c36 73%, #281250 100%)",
-    color: "white",
-    boxShadow: "0 30px 90px rgba(15, 23, 42, 0.28)",
-    display: "flex",
-    flexDirection: "column" as const,
-    justifyContent: "space-between",
-  },
-  brandRow: {
+  header: {
+    maxWidth: 1180,
+    margin: "0 auto 44px",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: 14,
+    color: "#f8fafc",
   },
-  badge: {
-    width: "fit-content",
-    padding: "10px 18px",
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.09)",
-    border: "1px solid rgba(255,255,255,0.14)",
-    color: "#dbeafe",
+  logoMark: {
+    display: "grid",
+    placeItems: "center",
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    background: "#17100b",
+    border: "1px solid rgba(255, 154, 76, 0.7)",
+    color: "#ffc27a",
+    textDecoration: "none",
     fontWeight: 900,
-    margin: 0,
   },
-  statusDot: {
-    padding: "9px 14px",
-    borderRadius: 999,
-    color: "#a7f3d0",
-    background: "rgba(16, 185, 129, 0.12)",
-    border: "1px solid rgba(167, 243, 208, 0.2)",
+  headerText: {
+    fontSize: 10,
+    letterSpacing: 2,
     fontWeight: 900,
-    fontSize: 13,
+    color: "#cbd5e1",
+  },
+  navLinks: {
+    marginLeft: "auto",
+    display: "flex",
+    gap: 24,
+    alignItems: "center",
+  },
+  navLink: {
+    color: "#cbd5e1",
+    textDecoration: "none",
+    fontSize: 12,
+    fontWeight: 900,
+  },
+  hero: {
+    maxWidth: 1180,
+    margin: "0 auto",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(380px, 450px)",
+    gap: 28,
+    alignItems: "start",
+  },
+  copyPanel: {
+    minHeight: 760,
+    padding: "24px 0 0",
+  },
+  eyebrow: {
+    margin: "0 0 18px",
+    color: "#7dd3fc",
+    fontSize: 11,
+    fontWeight: 900,
+    letterSpacing: 2.2,
   },
   title: {
     maxWidth: 760,
-    margin: "70px 0 24px",
-    fontSize: "clamp(46px, 6.6vw, 88px)",
-    lineHeight: 0.96,
+    margin: 0,
+    fontSize: "clamp(58px, 8vw, 104px)",
+    lineHeight: 0.86,
     letterSpacing: -4,
+    textTransform: "uppercase" as const,
+    textShadow: "4px 4px 0 rgba(255, 138, 61, 0.25), -3px -2px 0 rgba(94, 231, 255, 0.18)",
   },
   leadLine: {
-    maxWidth: 680,
-    color: "#f8fafc",
-    fontSize: 24,
-    lineHeight: 1.42,
-    margin: 0,
-    fontWeight: 800,
-  },
-  symbioteLine: {
-    maxWidth: 700,
-    color: "#cbd5e1",
-    fontSize: 19,
-    lineHeight: 1.7,
-    margin: "22px 0 0",
-  },
-  controlLine: {
-    width: "fit-content",
+    maxWidth: 640,
     margin: "28px 0 0",
-    padding: "12px 16px",
-    borderRadius: 999,
-    color: "#ecfeff",
-    background: "rgba(34, 211, 238, 0.12)",
-    border: "1px solid rgba(103, 232, 249, 0.22)",
+    color: "#f8fafc",
+    fontSize: 22,
+    lineHeight: 1.48,
     fontWeight: 900,
   },
+  symbioteLine: {
+    maxWidth: 650,
+    margin: "18px 0 0",
+    color: "#b6c2d5",
+    fontSize: 16,
+    lineHeight: 1.75,
+    fontWeight: 700,
+  },
+  actionRow: {
+    display: "flex",
+    gap: 12,
+    flexWrap: "wrap" as const,
+    alignItems: "center",
+    marginTop: 28,
+  },
+  primaryPill: {
+    padding: "12px 18px",
+    borderRadius: 999,
+    background: "linear-gradient(135deg, #ff8a3d, #ffd08a)",
+    color: "#120804",
+    textDecoration: "none",
+    fontWeight: 900,
+    boxShadow: "0 14px 30px rgba(255, 138, 61, 0.24)",
+  },
+  secondaryPill: {
+    padding: "11px 17px",
+    borderRadius: 999,
+    border: "1px solid rgba(255, 138, 61, 0.55)",
+    color: "#ffe1bd",
+    fontWeight: 900,
+  },
+  productCard: {
+    maxWidth: 430,
+    marginTop: 62,
+    borderRadius: 18,
+    border: "1px solid rgba(255, 138, 61, 0.55)",
+    background: "linear-gradient(160deg, rgba(255,138,61,0.12), rgba(7,12,22,0.92) 38%, rgba(8,14,18,0.98))",
+    overflow: "hidden",
+    boxShadow: "0 28px 80px rgba(0,0,0,0.34)",
+  },
+  windowDots: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "12px 14px",
+    borderBottom: "1px solid rgba(255, 138, 61, 0.28)",
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    display: "block",
+  },
+  productCardBody: {
+    padding: "86px 22px 22px",
+    minHeight: 210,
+    background: "radial-gradient(circle at 18% 18%, rgba(255,138,61,0.22), transparent 24%), radial-gradient(circle at 84% 24%, rgba(94,231,255,0.12), transparent 26%)",
+  },
+  productKicker: {
+    margin: 0,
+    color: "#cbd5e1",
+    fontSize: 10,
+    letterSpacing: 2,
+    fontWeight: 900,
+  },
+  productName: {
+    margin: "18px 0 8px",
+    color: "#ffffff",
+    fontSize: 24,
+    letterSpacing: -0.8,
+  },
+  productCopy: {
+    maxWidth: 330,
+    margin: 0,
+    color: "#9ca3af",
+    lineHeight: 1.6,
+    fontWeight: 700,
+    fontSize: 13,
+  },
   statsGrid: {
+    maxWidth: 620,
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: 14,
-    marginTop: 58,
+    marginTop: 28,
   },
   statCard: {
-    padding: 20,
-    borderRadius: 24,
-    background: "rgba(255,255,255,0.08)",
-    border: "1px solid rgba(255,255,255,0.12)",
+    padding: 18,
+    borderRadius: 18,
+    background: "rgba(15, 23, 42, 0.72)",
+    border: "1px solid rgba(255, 138, 61, 0.35)",
   },
-  statNumber: { display: "block", fontSize: 34, lineHeight: 1 },
-  statText: { display: "block", marginTop: 10, color: "#d6def0", fontWeight: 800 },
+  statNumber: { display: "block", fontSize: 32, lineHeight: 1, color: "#ffffff" },
+  statText: { display: "block", marginTop: 8, color: "#cbd5e1", fontWeight: 900, fontSize: 12 },
   launchCard: {
-    borderRadius: 38,
-    padding: 34,
-    background: "#ffffff",
-    boxShadow: "0 30px 90px rgba(15, 23, 42, 0.16)",
-    border: "1px solid rgba(15, 23, 42, 0.08)",
+    borderRadius: 22,
+    padding: 0,
+    background: "linear-gradient(180deg, rgba(13, 18, 31, 0.98), rgba(8, 12, 20, 0.98))",
+    boxShadow: "0 30px 90px rgba(0, 0, 0, 0.38)",
+    border: "1px solid rgba(255, 138, 61, 0.45)",
+    overflow: "hidden",
   },
-  formHeader: { marginBottom: 26 },
+  formHeader: { padding: "24px 24px 6px" },
   formEyebrow: {
     margin: "0 0 8px",
-    color: "#7c3aed",
+    color: "#5ee7ff",
     fontWeight: 900,
     textTransform: "uppercase" as const,
-    letterSpacing: 1.4,
-    fontSize: 12,
+    letterSpacing: 1.8,
+    fontSize: 11,
   },
-  formTitle: { margin: 0, fontSize: 32, letterSpacing: -1.2 },
-  formIntro: { margin: "10px 0 0", color: "#6b7280", lineHeight: 1.55, fontWeight: 700 },
-  label: { display: "grid", gap: 9, marginTop: 18, color: "#374151", fontWeight: 900 },
+  formTitle: { margin: 0, color: "#ffffff", fontSize: 32, letterSpacing: -1.2, lineHeight: 1.05 },
+  formIntro: { margin: "12px 0 0", color: "#9ca3af", lineHeight: 1.55, fontWeight: 700 },
+  label: { display: "grid", gap: 9, margin: "18px 24px 0", color: "#e5e7eb", fontWeight: 900 },
   input: {
     width: "100%",
-    border: "1px solid #d1d5db",
-    borderRadius: 18,
-    padding: "16px 18px",
+    border: "1px solid rgba(255, 138, 61, 0.26)",
+    borderRadius: 14,
+    padding: "15px 16px",
     outline: "none",
-    color: "#111827",
-    background: "#f9fafb",
-    fontWeight: 700,
+    color: "#ffffff",
+    background: "rgba(2, 6, 23, 0.75)",
+    fontWeight: 800,
   },
   resumePanel: {
-    marginTop: 20,
-    padding: 18,
-    borderRadius: 24,
-    background: "#f8fafc",
-    border: "1px solid #e5e7eb",
+    margin: "20px 24px 0",
+    padding: 16,
+    borderRadius: 18,
+    background: "rgba(2, 6, 23, 0.55)",
+    border: "1px solid rgba(94, 231, 255, 0.18)",
   },
   resumeMemoryCard: {
     display: "flex",
     alignItems: "center",
     gap: 12,
     marginTop: 16,
-    padding: 14,
-    borderRadius: 20,
-    background: "white",
-    border: "1px solid #e5e7eb",
+    padding: 13,
+    borderRadius: 16,
+    background: "rgba(15, 23, 42, 0.9)",
+    border: "1px solid rgba(255, 138, 61, 0.24)",
   },
   memoryIcon: {
     display: "grid",
     placeItems: "center",
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    background: "linear-gradient(135deg, #111827, #7c3aed)",
-    color: "white",
-    fontSize: 11,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    background: "linear-gradient(135deg, #ff8a3d, #7dd3fc)",
+    color: "#0b0f19",
+    fontSize: 15,
     fontWeight: 900,
   },
-  memoryTitle: { display: "block", color: "#111827" },
-  memoryText: { margin: "4px 0 0", color: "#6b7280", lineHeight: 1.45, fontSize: 13, fontWeight: 700 },
+  memoryTitle: { display: "block", color: "#ffffff" },
+  memoryText: { margin: "4px 0 0", color: "#9ca3af", lineHeight: 1.45, fontSize: 13, fontWeight: 700 },
   resumeButton: {
     display: "block",
     textAlign: "center" as const,
     marginTop: 14,
-    padding: "14px 18px",
+    padding: "13px 18px",
     borderRadius: 999,
-    background: "#111827",
-    color: "white",
+    background: "#ffffff",
+    color: "#090d18",
     textDecoration: "none",
     fontWeight: 900,
   },
-  mapTitle: { margin: "0 0 8px", fontSize: 18, fontWeight: 900 },
-  mapText: { margin: 0, color: "#6b7280", lineHeight: 1.5, fontWeight: 700 },
-  errorText: { margin: "14px 0 0", color: "#dc2626", fontWeight: 900 },
+  panelTitle: { margin: "0 0 8px", color: "#ffffff", fontSize: 18, fontWeight: 900 },
+  panelText: { margin: 0, color: "#9ca3af", lineHeight: 1.5, fontWeight: 700 },
+  mapShell: {
+    margin: "20px 24px 0",
+  },
+  errorText: { margin: "14px 24px 0", color: "#fecaca", fontWeight: 900, lineHeight: 1.45 },
   launchButton: {
-    width: "100%",
-    marginTop: 24,
-    padding: "19px 24px",
+    width: "calc(100% - 48px)",
+    margin: "24px 24px 0",
+    padding: "17px 24px",
     border: 0,
     borderRadius: 999,
-    background: "linear-gradient(135deg, #00d4ff, #7c3aed)",
-    color: "white",
+    background: "linear-gradient(135deg, #ff8a3d, #5ee7ff)",
+    color: "#090d18",
     fontWeight: 900,
     fontSize: 18,
     cursor: "pointer",
-    boxShadow: "0 20px 40px rgba(124, 58, 237, 0.26)",
+    boxShadow: "0 20px 40px rgba(255, 138, 61, 0.22)",
   },
-  disclaimer: { margin: "16px 0 0", color: "#6b7280", fontSize: 13, lineHeight: 1.5, fontWeight: 700 },
+  disclaimer: { margin: "14px 24px 24px", color: "#9ca3af", fontSize: 13, lineHeight: 1.5, fontWeight: 800 },
 };
