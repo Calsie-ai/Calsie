@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type MapSelection = {
   selectedAddress: string;
@@ -15,30 +15,163 @@ type Props = {
   onChange: (value: MapSelection) => void;
 };
 
+declare global {
+  interface Window {
+    google?: any;
+    applixGoogleMapsReady?: Promise<void>;
+  }
+}
+
+const DEFAULT_CENTER = { lat: -33.8688, lng: 151.2093 };
 const DEFAULT_MAP_QUERY = "Sydney NSW Australia";
+const PUBLIC_MAP_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+
+function loadGoogleMaps() {
+  if (typeof window === "undefined") return Promise.reject(new Error("Window is not available"));
+  if (window.google?.maps) return Promise.resolve();
+  if (window.applixGoogleMapsReady) return window.applixGoogleMapsReady;
+
+  if (!PUBLIC_MAP_KEY) return Promise.reject(new Error("Missing NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"));
+
+  window.applixGoogleMapsReady = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${PUBLIC_MAP_KEY}`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Could not load Google Maps"));
+    document.head.appendChild(script);
+  });
+
+  return window.applixGoogleMapsReady;
+}
 
 export default function MapRadiusSelector({ value, onChange }: Props) {
   const [addressInput, setAddressInput] = useState(value.selectedAddress || "");
   const [loading, setLoading] = useState(false);
   const [usingLocation, setUsingLocation] = useState(false);
-  const [message, setMessage] = useState("Search an area or use your location so Applix knows where to look.");
+  const [message, setMessage] = useState("Tap the map, use your location, or search an area so Applix knows where to look.");
+  const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState("");
+  const mapElementRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const circleRef = useRef<any>(null);
 
   const hasLockedLocation = Boolean(value.latitude && value.longitude);
 
-  const mapUrl = useMemo(() => {
+  const fallbackMapUrl = useMemo(() => {
     const query = hasLockedLocation
       ? encodeURIComponent(`${value.latitude},${value.longitude}`)
       : encodeURIComponent(DEFAULT_MAP_QUERY);
-    const zoom = hasLockedLocation ? 11 : 10;
+    const zoom = hasLockedLocation ? 12 : 10;
     return `https://www.google.com/maps?q=${query}&z=${zoom}&output=embed`;
   }, [hasLockedLocation, value.latitude, value.longitude]);
 
-  const circleSize = useMemo(() => {
-    const min = 72;
-    const max = 240;
-    const size = Math.round(min + (value.radiusKm / 50) * (max - min));
-    return Math.min(max, Math.max(min, size));
-  }, [value.radiusKm]);
+  useEffect(() => {
+    let cancelled = false;
+
+    loadGoogleMaps()
+      .then(() => {
+        if (cancelled || !mapElementRef.current || !window.google?.maps) return;
+
+        const center = hasLockedLocation
+          ? { lat: value.latitude, lng: value.longitude }
+          : DEFAULT_CENTER;
+
+        const map = new window.google.maps.Map(mapElementRef.current, {
+          center,
+          zoom: hasLockedLocation ? 12 : 10,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          clickableIcons: false,
+          gestureHandling: "greedy",
+        });
+
+        mapRef.current = map;
+        setMapReady(true);
+        setMapError("");
+
+        const marker = new window.google.maps.Marker({
+          position: center,
+          map,
+          draggable: true,
+          visible: hasLockedLocation,
+          title: "Applix target area",
+        });
+        markerRef.current = marker;
+
+        const circle = new window.google.maps.Circle({
+          map,
+          center,
+          radius: value.radiusKm * 1000,
+          strokeColor: "#ff8a3d",
+          strokeOpacity: 0.9,
+          strokeWeight: 2,
+          fillColor: "#ff8a3d",
+          fillOpacity: 0.16,
+          visible: hasLockedLocation,
+        });
+        circleRef.current = circle;
+
+        function lockPin(position: any, label = "Pinned on map") {
+          const latitude = position.lat();
+          const longitude = position.lng();
+          marker.setPosition(position);
+          marker.setVisible(true);
+          circle.setCenter(position);
+          circle.setVisible(true);
+          map.panTo(position);
+          onChange({
+            ...value,
+            selectedAddress: label,
+            placeId: "map-pin",
+            latitude,
+            longitude,
+          });
+          setAddressInput(label);
+          setMessage("Pin locked. You can drag it or tap another spot on the map.");
+        }
+
+        map.addListener("click", (event: any) => {
+          if (event.latLng) lockPin(event.latLng);
+        });
+
+        marker.addListener("dragend", (event: any) => {
+          if (event.latLng) lockPin(event.latLng, "Pinned from dragged map marker");
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setMapError(error?.message || "Interactive map unavailable");
+          setMessage("Interactive pin map is unavailable. Search an area or use your location instead.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mapRef.current || !markerRef.current || !circleRef.current) return;
+
+    const center = hasLockedLocation
+      ? { lat: value.latitude, lng: value.longitude }
+      : DEFAULT_CENTER;
+
+    markerRef.current.setPosition(center);
+    markerRef.current.setVisible(hasLockedLocation);
+    circleRef.current.setCenter(center);
+    circleRef.current.setRadius(value.radiusKm * 1000);
+    circleRef.current.setVisible(hasLockedLocation);
+
+    if (hasLockedLocation) {
+      mapRef.current.panTo(center);
+      mapRef.current.setZoom(12);
+    }
+  }, [hasLockedLocation, value.latitude, value.longitude, value.radiusKm]);
 
   async function findLocation() {
     const address = addressInput.trim();
@@ -95,7 +228,7 @@ export default function MapRadiusSelector({ value, onChange }: Props) {
           longitude,
         });
         setAddressInput("My current location");
-        setMessage("Location locked from your browser. You can still search another area if you want.");
+        setMessage("Location locked from your browser. You can drag the pin or search another area.");
         setUsingLocation(false);
       },
       () => {
@@ -113,7 +246,7 @@ export default function MapRadiusSelector({ value, onChange }: Props) {
   return (
     <section style={styles.wrapper}>
       <p style={styles.title}>Target location</p>
-      <p style={styles.helper}>Use your current location or search the suburb where Applix should start looking.</p>
+      <p style={styles.helper}>Tap the map to drop a pin, drag the pin, use your location, or search a suburb.</p>
 
       <div style={styles.quickRow}>
         <button type="button" style={styles.locationButton} onClick={useMyLocation} disabled={usingLocation}>
@@ -136,7 +269,7 @@ export default function MapRadiusSelector({ value, onChange }: Props) {
           placeholder="Burwood NSW, Parramatta, Melbourne CBD"
         />
         <button type="button" style={styles.searchButton} onClick={findLocation} disabled={loading}>
-          {loading ? "Finding..." : "Find on map"}
+          {loading ? "Finding..." : "Find"}
         </button>
       </div>
 
@@ -152,24 +285,23 @@ export default function MapRadiusSelector({ value, onChange }: Props) {
       </label>
 
       <div style={styles.mapFrame}>
-        <iframe title="Applix target map" src={mapUrl} style={styles.iframe} loading="lazy" />
+        {mapError ? (
+          <iframe title="Applix target map preview" src={fallbackMapUrl} style={styles.iframe} loading="lazy" />
+        ) : (
+          <div ref={mapElementRef} style={styles.interactiveMap} />
+        )}
+
         {!hasLockedLocation && (
           <div style={styles.mapOverlay}>
-            <strong>Map is ready</strong>
-            <span>Use your location or search a suburb to lock Applix there.</span>
-          </div>
-        )}
-        {hasLockedLocation && (
-          <div style={{ ...styles.radiusCircle, width: circleSize, height: circleSize }}>
-            <span style={styles.pin}>●</span>
-            <span style={styles.radiusLabel}>{value.radiusKm} km</span>
+            <strong>{mapReady ? "Tap the map to place your pin" : "Loading map..."}</strong>
+            <span>{mapError ? "Fallback preview active. Search or use location to lock coordinates." : "Use your finger on phone. Drag the pin after placing it."}</span>
           </div>
         )}
       </div>
 
       <div style={styles.summaryBox}>
-        <strong>{value.selectedAddress || "Previewing Sydney map"}</strong>
-        <span>{value.latitude && value.longitude ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)}` : "Use your location or search your real target area to lock coordinates."}</span>
+        <strong>{value.selectedAddress || "No target area selected yet"}</strong>
+        <span>{value.latitude && value.longitude ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)}` : "Tap the map, search, or use your location to lock coordinates."}</span>
         <span>Radius: {value.radiusKm} km</span>
         <span>{message}</span>
       </div>
@@ -201,6 +333,7 @@ const styles = {
   searchRow: { display: "grid", gridTemplateColumns: "1fr auto", gap: 10, marginTop: 12 },
   input: {
     width: "100%",
+    minWidth: 0,
     border: "1px solid rgba(255, 138, 61, 0.28)",
     borderRadius: 14,
     padding: "15px 16px",
@@ -231,16 +364,17 @@ const styles = {
   },
   mapFrame: {
     position: "relative" as const,
-    minHeight: 260,
+    height: "min(62vw, 340px)",
+    minHeight: 280,
     marginTop: 16,
     borderRadius: 18,
     overflow: "hidden",
     background: "#07101a",
-    display: "grid",
-    placeItems: "center",
     border: "1px solid rgba(255, 138, 61, 0.25)",
+    touchAction: "pan-x pan-y",
   },
-  iframe: { width: "100%", height: 260, border: 0, filter: "saturate(0.86) contrast(0.98) brightness(0.82)" },
+  interactiveMap: { width: "100%", height: "100%" },
+  iframe: { width: "100%", height: "100%", border: 0, filter: "saturate(0.86) contrast(0.98) brightness(0.82)" },
   mapOverlay: {
     position: "absolute" as const,
     left: 14,
@@ -256,20 +390,5 @@ const styles = {
     fontWeight: 900,
     pointerEvents: "none" as const,
   },
-  radiusCircle: {
-    position: "absolute" as const,
-    left: "50%",
-    top: "50%",
-    transform: "translate(-50%, -50%)",
-    borderRadius: 9999,
-    border: "3px solid rgba(255, 138, 61, 0.95)",
-    background: "rgba(255, 138, 61, 0.16)",
-    display: "grid",
-    placeItems: "center",
-    pointerEvents: "none" as const,
-    boxShadow: "0 0 42px rgba(255, 138, 61, 0.36)",
-  },
-  pin: { width: 26, height: 26, borderRadius: 999, background: "#0b0f19", color: "#5ee7ff", display: "grid", placeItems: "center", fontSize: 10, lineHeight: 1 },
-  radiusLabel: { position: "absolute" as const, bottom: 12, padding: "6px 10px", borderRadius: 999, background: "#0b0f19", color: "#ffd08a", fontWeight: 900, fontSize: 12, boxShadow: "0 8px 20px rgba(0, 0, 0, 0.25)" },
   summaryBox: { marginTop: 14, padding: 14, borderRadius: 16, background: "rgba(15, 23, 42, 0.9)", color: "#cbd5e1", display: "grid", gap: 6, fontWeight: 800, border: "1px solid rgba(94, 231, 255, 0.16)" },
 };
