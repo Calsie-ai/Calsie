@@ -9,7 +9,9 @@
   "dependencies": {
     "@supabase/supabase-js": "latest",
     "googleapis": "^144.0.0",
+    "mammoth": "latest",
     "next": "latest",
+    "pdf-parse": "latest",
     "react": "latest",
     "react-dom": "latest"
   },
