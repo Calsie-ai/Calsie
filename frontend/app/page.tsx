@@ -45,7 +45,7 @@ const questions = [
 ];
 
 const defaultMessages: Message[] = [
-  { role: "applix", text: "I am Applix, the job-hunt symbiote from ASSI. I will ask everything step by step." },
+  { role: "applix", text: "I am Applix, the job-hunt symbiote from ASSI. Tell me what you want and I will build the campaign with you." },
   { role: "applix", text: questions[0] },
 ];
 
@@ -106,6 +106,11 @@ function yes(text: string) {
   return ["yes", "y", "ok", "okay", "agree", "allow", "consent", "sure"].some((word) => clean === word || clean.includes(word));
 }
 
+function nextFallbackQuestion(step: number) {
+  const nextStep = Math.min(step + 1, questions.length);
+  return nextStep >= questions.length ? "All set. Review the summary, then launch Applix and create your account." : questions[nextStep];
+}
+
 export default function HomePage() {
   const router = useRouter();
   const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -113,6 +118,7 @@ export default function HomePage() {
   const [input, setInput] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [status, setStatus] = useState("Chat autosaves in this browser.");
+  const [aiThinking, setAiThinking] = useState(false);
 
   const isComplete = state.step >= questions.length;
   const dailyLimit = state.plan === "gentle" ? 10 : 100;
@@ -130,12 +136,12 @@ export default function HomePage() {
   useEffect(() => {
     if (!loaded || typeof window === "undefined") return;
     window.localStorage.setItem(CACHE_KEY, JSON.stringify(state));
-    setStatus("Saved in this browser.");
-  }, [loaded, state]);
+    setStatus(aiThinking ? "Applix is thinking..." : "Saved in this browser.");
+  }, [loaded, state, aiThinking]);
 
   useEffect(() => {
     messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth" });
-  }, [state.messages.length]);
+  }, [state.messages.length, aiThinking]);
 
   const summary = useMemo(
     () => [
@@ -171,46 +177,93 @@ export default function HomePage() {
     return next;
   }
 
-  function answer(text: string) {
-    const value = text.trim();
-    if (!value || isComplete) return;
+  function applyOpenAiUpdates(base: ChatState, updates: any) {
+    const next = { ...base };
+    if (!updates || typeof updates !== "object") return next;
+    if (typeof updates.targetRole === "string" && updates.targetRole.trim()) next.targetRole = updates.targetRole.trim();
+    if (typeof updates.companyType === "string" && updates.companyType.trim()) next.companyType = updates.companyType.trim();
+    if (typeof updates.targetArea === "string" && updates.targetArea.trim()) next.targetArea = updates.targetArea.trim();
+    if (typeof updates.radiusKm === "number" && updates.radiusKm > 0) next.radiusKm = parseRadius(String(updates.radiusKm));
+    if (typeof updates.fullName === "string" && updates.fullName.trim()) next.fullName = updates.fullName.trim();
+    if (typeof updates.email === "string" && updates.email.includes("@")) next.email = updates.email.trim().toLowerCase();
+    if (typeof updates.phone === "string" && updates.phone.trim()) next.phone = updates.phone.trim();
+    if (typeof updates.resumeSummary === "string" && updates.resumeSummary.trim()) next.resumeSummary = updates.resumeSummary.trim();
+    if (typeof updates.skills === "string" && updates.skills.trim()) next.skills = updates.skills.trim();
+    if (typeof updates.experience === "string" && updates.experience.trim()) next.experience = updates.experience.trim();
+    if (typeof updates.certificates === "string" && updates.certificates.trim()) next.certificates = updates.certificates.trim();
+    if (updates.plan === "full" || updates.plan === "gentle") next.plan = updates.plan;
+    if (updates.aiConsent === true) next.aiConsent = true;
+    if (updates.emailConsent === true) next.emailConsent = true;
+    return next;
+  }
 
+  function validateLocal(value: string) {
     if (state.step === 5 && !/^\S+@\S+\.\S+$/.test(value)) {
-      setState((current) => ({
-        ...current,
-        messages: [...current.messages, { role: "user", text: value }, { role: "applix", text: "That does not look like a full email. Please type it like name@gmail.com." }],
-      }));
-      setInput("");
-      return;
+      return "That does not look like a full email. Please type it like name@gmail.com.";
     }
-
     if ((state.step === 12 || state.step === 13) && !yes(value)) {
-      const consentText = state.step === 12
+      return state.step === 12
         ? "I need a clear yes before using AI to write drafts or tailor editable wording. Reply yes when ready."
         : "I need a clear yes before asking for Gmail access later. Nothing sends without your approval. Reply yes when ready.";
+    }
+    return "";
+  }
+
+  async function answer(text: string) {
+    const value = text.trim();
+    if (!value || isComplete || aiThinking) return;
+
+    const validation = validateLocal(value);
+    if (validation) {
       setState((current) => ({
         ...current,
-        messages: [...current.messages, { role: "user", text: value }, { role: "applix", text: consentText }],
+        messages: [...current.messages, { role: "user", text: value }, { role: "applix", text: validation }],
       }));
       setInput("");
       return;
     }
 
-    setState((current) => {
-      const updated = updateByStep(current, value);
-      const nextStep = Math.min(current.step + 1, questions.length);
-      const applixText = nextStep >= questions.length ? "All set. Review the summary, then launch Applix and create your account." : questions[nextStep];
-      return {
-        ...updated,
-        step: nextStep,
-        messages: [...current.messages, { role: "user", text: value }, { role: "applix", text: applixText }],
-      };
-    });
+    const baseUpdated = updateByStep(state, value);
+    const nextStep = Math.min(state.step + 1, questions.length);
+    setState((current) => ({ ...baseUpdated, messages: [...current.messages, { role: "user", text: value }] }));
     setInput("");
+    setAiThinking(true);
+
+    try {
+      const response = await fetch("/api/applix/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: state.step,
+          userMessage: value,
+          currentQuestion,
+          setup: baseUpdated,
+        }),
+      });
+      const data = await response.json();
+      const aiMessage = data?.assistantMessage || nextFallbackQuestion(state.step);
+      const openAiUpdated = applyOpenAiUpdates(baseUpdated, data?.updates);
+
+      setState((current) => ({
+        ...openAiUpdated,
+        step: nextStep,
+        messages: [...current.messages, { role: "applix", text: aiMessage }],
+      }));
+      setStatus(data?.source === "openai" ? "Applix used OpenAI to understand this answer." : "Saved in this browser. OpenAI fallback used.");
+    } catch {
+      setState((current) => ({
+        ...baseUpdated,
+        step: nextStep,
+        messages: [...current.messages, { role: "applix", text: nextFallbackQuestion(state.step) }],
+      }));
+      setStatus("Saved in this browser. OpenAI route was unavailable, fallback used.");
+    } finally {
+      setAiThinking(false);
+    }
   }
 
   function goBackOne() {
-    if (state.step <= 0) return;
+    if (state.step <= 0 || aiThinking) return;
     setState((current) => {
       const nextStep = Math.max(current.step - 1, 0);
       return {
@@ -281,6 +334,7 @@ export default function HomePage() {
           <div style={styles.progress}>QUESTION {Math.min(state.step + 1, questions.length)} / {questions.length}</div>
           <div ref={messagesRef} style={styles.messages}>
             {state.messages.map((message, index) => <div key={`${message.role}-${index}`} style={message.role === "applix" ? styles.applixBubble : styles.userBubble}>{message.text}</div>)}
+            {aiThinking && <div style={styles.applixBubble}>Applix is reading that...</div>}
           </div>
 
           {!isComplete && state.step === 3 && <div style={styles.quickGrid}><button type="button" style={styles.quickButton} onClick={() => answer("5km")}>5km</button><button type="button" style={styles.quickButton} onClick={() => answer("10km")}>10km</button><button type="button" style={styles.quickButton} onClick={() => answer("20km")}>20km</button><button type="button" style={styles.quickButton} onClick={() => answer("50km")}>50km</button></div>}
@@ -300,10 +354,11 @@ export default function HomePage() {
                 }}
                 placeholder={currentQuestion}
                 style={styles.textInput}
+                disabled={aiThinking}
               />
               <div style={styles.sendStack}>
-                <button type="submit" style={styles.sendButton}>Send</button>
-                <button type="button" style={styles.backButton} onClick={goBackOne}>Back</button>
+                <button type="submit" style={styles.sendButton} disabled={aiThinking}>{aiThinking ? "Wait" : "Send"}</button>
+                <button type="button" style={styles.backButton} onClick={goBackOne} disabled={aiThinking}>Back</button>
               </div>
             </form>
           ) : (
