@@ -30,19 +30,73 @@ function safeNextPath(value: string | null) {
   return value;
 }
 
+function friendlyAuthError(error: any) {
+  const raw = String(error?.message || "").toLowerCase();
+
+  if (raw.includes("invalid login credentials")) {
+    return "Wrong email or password. If you forgot it, use Reset password below.";
+  }
+
+  if (raw.includes("email not confirmed") || raw.includes("confirm")) {
+    return "Your email is not confirmed yet. Check your inbox for the confirmation email before logging in.";
+  }
+
+  if (raw.includes("invalid path specified")) {
+    return "The login redirect path was invalid. Refresh this page and try again.";
+  }
+
+  if (raw.includes("fetch") || raw.includes("network") || raw.includes("timeout")) {
+    return "Applix could not reach the login server. Check internet connection or Supabase environment settings.";
+  }
+
+  return error?.message || "Login failed. Please check your details and try again.";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = safeNextPath(searchParams.get("next"));
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  async function handlePasswordReset() {
+    if (loading) return;
+
+    const authEmail = cleanEmail(email);
+    if (!authEmail || !authEmail.includes("@")) {
+      setMessage("Enter your full email address first, then Applix can send a reset link.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const redirectTo = `${window.location.origin}/reset-password?next=${encodeURIComponent(nextPath)}`;
+      const { error } = await withTimeout(
+        supabase.auth.resetPasswordForEmail(authEmail, { redirectTo })
+      );
+
+      if (error) throw error;
+      setMessage("Password reset link sent. Check your email, then open the link to choose a new password.");
+    } catch (error: any) {
+      setMessage(friendlyAuthError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleAuth() {
     if (loading) return;
+
+    if (mode === "reset") {
+      await handlePasswordReset();
+      return;
+    }
 
     const authEmail = cleanEmail(email);
     const authPassword = password.trim();
@@ -53,7 +107,7 @@ export default function LoginPage() {
     }
 
     if (authPassword.length < 6) {
-      setMessage("Password must be at least 6 characters.");
+      setMessage("Password must be at least 6 characters. If you forgot it, press Reset password.");
       return;
     }
 
@@ -104,7 +158,7 @@ export default function LoginPage() {
       setMessage("Login successful. Opening Applix...");
       router.push(nextPath);
     } catch (error: any) {
-      setMessage(error?.message || "Something went wrong. Please try again.");
+      setMessage(friendlyAuthError(error));
       setLoading(false);
     }
   }
@@ -114,12 +168,12 @@ export default function LoginPage() {
       <section style={styles.card}>
         <Link href="/" style={styles.backLink}>← Home</Link>
         <p style={styles.badge}>Applix account</p>
-        <h1 style={styles.title}>{mode === "login" ? "Welcome back." : "Create your account."}</h1>
-        <p style={styles.subtitle}>Log in to save your resume profile, job matches, and application kits.</p>
+        <h1 style={styles.title}>{mode === "signup" ? "Create your account." : mode === "reset" ? "Reset password." : "Welcome back."}</h1>
+        <p style={styles.subtitle}>{mode === "reset" ? "Enter your email and Applix will send a password reset link." : "Log in to save your resume profile, job matches, and application kits."}</p>
 
         <div style={styles.tabs}>
-          <button disabled={loading} onClick={() => setMode("login")} style={mode === "login" ? styles.activeTab : styles.tab}>Login</button>
-          <button disabled={loading} onClick={() => setMode("signup")} style={mode === "signup" ? styles.activeTab : styles.tab}>Sign up</button>
+          <button disabled={loading} onClick={() => { setMode("login"); setMessage(""); }} style={mode === "login" ? styles.activeTab : styles.tab}>Login</button>
+          <button disabled={loading} onClick={() => { setMode("signup"); setMessage(""); }} style={mode === "signup" ? styles.activeTab : styles.tab}>Sign up</button>
         </div>
 
         <div style={styles.form}>
@@ -135,17 +189,31 @@ export default function LoginPage() {
             <input style={styles.input} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" type="email" autoComplete="email" />
           </label>
 
-          <label style={styles.field}>
-            Password
-            <input style={styles.input} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 6 characters" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} />
-          </label>
+          {mode !== "reset" && (
+            <label style={styles.field}>
+              Password
+              <input style={styles.input} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minimum 6 characters" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} />
+            </label>
+          )}
 
           <button disabled={loading} onClick={handleAuth} style={loading ? styles.loadingButton : styles.primaryButton}>
-            {loading ? "Checking account..." : mode === "login" ? "Login" : "Create account"}
+            {loading ? "Please wait..." : mode === "login" ? "Login" : mode === "signup" ? "Create account" : "Send reset link"}
           </button>
 
+          {mode === "login" && (
+            <button type="button" disabled={loading} onClick={() => { setMode("reset"); setMessage(""); }} style={styles.textButton}>
+              Forgot password? Reset it
+            </button>
+          )}
+
+          {mode === "reset" && (
+            <button type="button" disabled={loading} onClick={() => { setMode("login"); setMessage(""); }} style={styles.textButton}>
+              Back to login
+            </button>
+          )}
+
           {loading && <p style={styles.helpText}>This should only take a few seconds.</p>}
-          {message && <p style={message.includes("created") || message.includes("successful") || message.includes("Opening") || message.includes("ready") ? styles.successMessage : styles.message}>{message}</p>}
+          {message && <p style={message.includes("created") || message.includes("successful") || message.includes("Opening") || message.includes("ready") || message.includes("reset link sent") ? styles.successMessage : styles.message}>{message}</p>}
         </div>
       </section>
     </main>
@@ -252,6 +320,15 @@ const styles = {
     fontWeight: 900,
     fontSize: 16,
     cursor: "wait",
+  },
+  textButton: {
+    border: 0,
+    background: "transparent",
+    color: "#4338ca",
+    fontWeight: 900,
+    cursor: "pointer",
+    padding: 4,
+    textAlign: "center" as const,
   },
   helpText: {
     color: "#64748b",
