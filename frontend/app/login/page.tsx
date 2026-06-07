@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
 function withTimeout<T>(promise: Promise<T>, milliseconds = 12000): Promise<T> {
@@ -52,7 +52,7 @@ function friendlyAuthError(error: any) {
   return error?.message || "Login failed. Please check your details and try again.";
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = safeNextPath(searchParams.get("next"));
@@ -217,6 +217,14 @@ export default function LoginPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<main style={styles.main}><section style={styles.card}><p style={styles.subtitle}>Loading Applix account...</p></section></main>}>
+      <LoginContent />
+    </Suspense>
   );
 }
 
