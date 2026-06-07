@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -22,8 +22,18 @@ function cleanEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
+function safeNextPath(value: string | null) {
+  if (!value) return "/dashboard";
+  if (!value.startsWith("/")) return "/dashboard";
+  if (value.startsWith("//")) return "/dashboard";
+  if (value.includes("http://") || value.includes("https://")) return "/dashboard";
+  return value;
+}
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = safeNextPath(searchParams.get("next"));
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -57,7 +67,7 @@ export default function LoginPage() {
 
     try {
       if (mode === "signup") {
-        const redirectTo = `${window.location.origin}/login`;
+        const redirectTo = `${window.location.origin}/login?next=${encodeURIComponent(nextPath)}`;
 
         const { data, error } = await withTimeout(
           supabase.auth.signUp({
@@ -77,11 +87,12 @@ export default function LoginPage() {
         if (!data.session) {
           setMessage("Account created. Please check your email to confirm your account, then log in.");
           setMode("login");
+          setLoading(false);
           return;
         }
 
-        setMessage("Account ready. Opening your profile...");
-        router.push("/profile");
+        setMessage("Account ready. Opening Applix...");
+        router.push(nextPath);
         return;
       }
 
@@ -90,8 +101,8 @@ export default function LoginPage() {
       );
 
       if (error) throw error;
-      setMessage("Login successful. Opening your profile...");
-      router.push("/profile");
+      setMessage("Login successful. Opening Applix...");
+      router.push(nextPath);
     } catch (error: any) {
       setMessage(error?.message || "Something went wrong. Please try again.");
       setLoading(false);
@@ -134,7 +145,7 @@ export default function LoginPage() {
           </button>
 
           {loading && <p style={styles.helpText}>This should only take a few seconds.</p>}
-          {message && <p style={message.includes("created") || message.includes("successful") || message.includes("Opening") ? styles.successMessage : styles.message}>{message}</p>}
+          {message && <p style={message.includes("created") || message.includes("successful") || message.includes("Opening") || message.includes("ready") ? styles.successMessage : styles.message}>{message}</p>}
         </div>
       </section>
     </main>
