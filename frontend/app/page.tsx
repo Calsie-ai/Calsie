@@ -31,7 +31,7 @@ const questions = [
   "What work do you want? Example: Support Worker, Admin Assistant, Social Worker.",
   "What kind of companies should I look for? Example: NDIS providers, aged care, healthcare, offices.",
   "Where should I hunt? Type a city, suburb, or area. Example: Burwood NSW, Parramatta, Melbourne CBD.",
-  "How far should I look? Type 5km, 10km, 20km, 30km, or 50km.",
+  "How far should I look? Choose 5km, 10km, 20km, 30km, or 50km.",
   "Tell me your full name.",
   "What email should companies reply to?",
   "What phone number should appear on your resume/contact details?",
@@ -45,7 +45,7 @@ const questions = [
 ];
 
 const defaultMessages: Message[] = [
-  { role: "applix", text: "I am Applix, the job-hunt symbiote from ASSI. Tell me what you want and I will build the campaign with you." },
+  { role: "applix", text: "I am Applix, the job-hunt symbiote from ASSI. Tell me what work you want and I will build the campaign with you." },
   { role: "applix", text: questions[0] },
 ];
 
@@ -70,7 +70,13 @@ const defaultState: ChatState = {
 
 function normalizeCache(value: any): ChatState {
   const step = typeof value?.step === "number" ? Math.min(Math.max(value.step, 0), questions.length) : 0;
-  const messages = Array.isArray(value?.messages) && value.messages.length ? value.messages : defaultMessages;
+  let messages = Array.isArray(value?.messages) && value.messages.length ? value.messages : defaultMessages;
+  const editSpamCount = messages.filter((message: Message) => message?.text?.startsWith("Let's edit that")).length;
+
+  if (editSpamCount > 2 || messages.length > 80) {
+    messages = defaultMessages;
+  }
+
   return {
     ...defaultState,
     ...value,
@@ -106,7 +112,12 @@ function yes(text: string) {
   return ["yes", "y", "ok", "okay", "agree", "allow", "consent", "sure"].some((word) => clean === word || clean.includes(word));
 }
 
-function nextFallbackQuestion(step: number) {
+function isOnlyGreeting(text: string) {
+  const clean = text.toLowerCase().trim();
+  return ["hi", "hello", "hey", "hi ai", "hello ai", "hey ai"].includes(clean);
+}
+
+function nextQuestion(step: number) {
   const nextStep = Math.min(step + 1, questions.length);
   return nextStep >= questions.length ? "All set. Review the summary, then launch Applix and create your account." : questions[nextStep];
 }
@@ -136,7 +147,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!loaded || typeof window === "undefined") return;
     window.localStorage.setItem(CACHE_KEY, JSON.stringify(state));
-    setStatus(aiThinking ? "Applix is thinking..." : "Saved in this browser.");
+    setStatus(aiThinking ? "Applix is reading your answer..." : "Saved in this browser.");
   }, [loaded, state, aiThinking]);
 
   useEffect(() => {
@@ -185,7 +196,7 @@ export default function HomePage() {
     if (typeof updates.targetArea === "string" && updates.targetArea.trim()) next.targetArea = updates.targetArea.trim();
     if (typeof updates.radiusKm === "number" && updates.radiusKm > 0) next.radiusKm = parseRadius(String(updates.radiusKm));
     if (typeof updates.fullName === "string" && updates.fullName.trim()) next.fullName = updates.fullName.trim();
-    if (typeof updates.email === "string" && updates.email.includes("@")) next.email = updates.email.trim().toLowerCase();
+    if (typeof updates.email === "string" && /^\S+@\S+\.\S+$/.test(updates.email)) next.email = updates.email.trim().toLowerCase();
     if (typeof updates.phone === "string" && updates.phone.trim()) next.phone = updates.phone.trim();
     if (typeof updates.resumeSummary === "string" && updates.resumeSummary.trim()) next.resumeSummary = updates.resumeSummary.trim();
     if (typeof updates.skills === "string" && updates.skills.trim()) next.skills = updates.skills.trim();
@@ -198,6 +209,12 @@ export default function HomePage() {
   }
 
   function validateLocal(value: string) {
+    if (state.step === 0 && isOnlyGreeting(value)) {
+      return "Tell me the job or work you want, for example: Support Worker, Admin Assistant, or Social Worker.";
+    }
+    if (state.step === 3 && !/\d+/.test(value)) {
+      return "Choose a radius like 5km, 10km, 20km, 30km, or 50km.";
+    }
     if (state.step === 5 && !/^\S+@\S+\.\S+$/.test(value)) {
       return "That does not look like a full email. Please type it like name@gmail.com.";
     }
@@ -225,6 +242,8 @@ export default function HomePage() {
 
     const baseUpdated = updateByStep(state, value);
     const nextStep = Math.min(state.step + 1, questions.length);
+    const controlledNextMessage = nextQuestion(state.step);
+
     setState((current) => ({ ...baseUpdated, messages: [...current.messages, { role: "user", text: value }] }));
     setInput("");
     setAiThinking(true);
@@ -241,20 +260,19 @@ export default function HomePage() {
         }),
       });
       const data = await response.json();
-      const aiMessage = data?.assistantMessage || nextFallbackQuestion(state.step);
       const openAiUpdated = applyOpenAiUpdates(baseUpdated, data?.updates);
 
       setState((current) => ({
         ...openAiUpdated,
         step: nextStep,
-        messages: [...current.messages, { role: "applix", text: aiMessage }],
+        messages: [...current.messages, { role: "applix", text: controlledNextMessage }],
       }));
-      setStatus(data?.source === "openai" ? "Applix used OpenAI to understand this answer." : "Saved in this browser. OpenAI fallback used.");
+      setStatus(data?.source === "openai" ? "Applix used OpenAI to understand the answer, then followed the setup flow." : "Saved in this browser. OpenAI fallback used.");
     } catch {
       setState((current) => ({
         ...baseUpdated,
         step: nextStep,
-        messages: [...current.messages, { role: "applix", text: nextFallbackQuestion(state.step) }],
+        messages: [...current.messages, { role: "applix", text: controlledNextMessage }],
       }));
       setStatus("Saved in this browser. OpenAI route was unavailable, fallback used.");
     } finally {
@@ -266,10 +284,11 @@ export default function HomePage() {
     if (state.step <= 0 || aiThinking) return;
     setState((current) => {
       const nextStep = Math.max(current.step - 1, 0);
+      const cleanedMessages = current.messages.slice(0, Math.max(2, current.messages.length - 2));
       return {
         ...current,
         step: nextStep,
-        messages: [...current.messages, { role: "applix", text: `Let's edit that. ${questions[nextStep]}` }],
+        messages: [...cleanedMessages, { role: "applix", text: questions[nextStep] }],
       };
     });
   }
@@ -337,7 +356,7 @@ export default function HomePage() {
             {aiThinking && <div style={styles.applixBubble}>Applix is reading that...</div>}
           </div>
 
-          {!isComplete && state.step === 3 && <div style={styles.quickGrid}><button type="button" style={styles.quickButton} onClick={() => answer("5km")}>5km</button><button type="button" style={styles.quickButton} onClick={() => answer("10km")}>10km</button><button type="button" style={styles.quickButton} onClick={() => answer("20km")}>20km</button><button type="button" style={styles.quickButton} onClick={() => answer("50km")}>50km</button></div>}
+          {!isComplete && state.step === 3 && <div style={styles.quickGrid}><button type="button" style={styles.quickButton} onClick={() => answer("5km")}>5km</button><button type="button" style={styles.quickButton} onClick={() => answer("10km")}>10km</button><button type="button" style={styles.quickButton} onClick={() => answer("20km")}>20km</button><button type="button" style={styles.quickButton} onClick={() => answer("30km")}>30km</button><button type="button" style={styles.quickButton} onClick={() => answer("50km")}>50km</button></div>}
           {!isComplete && state.step === 11 && <div style={styles.quickGrid}><button type="button" style={styles.quickButton} onClick={() => answer("10 applications per day")}>10/day for 10 days</button><button type="button" style={styles.quickButton} onClick={() => answer("100 applications per day")}>100/day for 10 days</button></div>}
           {!isComplete && state.step >= 12 && <div style={styles.quickGrid}><button type="button" style={styles.quickButton} onClick={() => answer("yes")}>Yes, I consent</button><button type="button" style={styles.quickButtonGhost} onClick={() => answer("not yet")}>Not yet</button></div>}
 
