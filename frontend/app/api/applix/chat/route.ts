@@ -1,35 +1,26 @@
 import { NextResponse } from "next/server";
 
 type ChatPayload = {
-  step: number;
   userMessage: string;
-  currentQuestion: string;
   setup: Record<string, unknown>;
+  history?: Array<{ role: "applix" | "user"; text: string }>;
 };
 
-const fallbackQuestions = [
-  "What work do you want? Example: Support Worker, Admin Assistant, Social Worker.",
-  "What kind of companies should I look for? Example: NDIS providers, aged care, healthcare, offices.",
-  "Where should I hunt? Type a city, suburb, or area. Example: Burwood NSW, Parramatta, Melbourne CBD.",
-  "How far should I look? Type 5km, 10km, 20km, 30km, or 50km.",
-  "Tell me your full name.",
-  "What email should companies reply to?",
-  "What phone number should appear on your resume/contact details?",
-  "Write a short resume summary. Tell me who you are and what kind of work you can do.",
-  "List your main skills. Example: personal care, NDIS support, documentation, communication, teamwork.",
-  "Tell me your experience. Include where you worked, what you did, and anything important.",
-  "Add your certificates or checks. Example: First Aid, CPR, Police Check, WWCC, NDIS module. Type none if not applicable.",
-  "Choose your Applix level: type 10 for 10 applications/day, or 100 for 100 applications/day. Both run for 10 days.",
-  "Do I have permission to use AI to prepare email drafts and tailor editable resume wording while keeping your facts locked? Reply yes.",
-  "Later, Applix will ask Gmail permission to send only emails you approve. Do you consent to that email access request later? Reply yes.",
+const requiredFields = [
+  "targetRole",
+  "companyType",
+  "targetArea",
+  "fullName",
+  "email",
+  "phone",
+  "resumeSummary",
+  "skills",
+  "experience",
+  "certificates",
+  "plan",
+  "aiConsent",
+  "emailConsent",
 ];
-
-function fallbackReply(step: number) {
-  const nextStep = Math.min(step + 1, fallbackQuestions.length);
-  return nextStep >= fallbackQuestions.length
-    ? "All set. Review the summary, then launch Applix and create your account."
-    : fallbackQuestions[nextStep];
-}
 
 function extractJson(text: string) {
   try {
@@ -45,32 +36,89 @@ function extractJson(text: string) {
   }
 }
 
+function fallbackMissing(setup: Record<string, unknown>) {
+  return requiredFields.filter((field) => {
+    const value = setup[field];
+    if (typeof value === "boolean") return value !== true;
+    return !value;
+  });
+}
+
+function fallbackAssistantMessage(setup: Record<string, unknown>) {
+  const missing = fallbackMissing(setup);
+  const first = missing[0];
+  if (!first) return "I have enough to prepare your Applix setup. Review the summary, then launch when you are ready.";
+
+  const questions: Record<string, string> = {
+    targetRole: "What work do you want Applix to hunt for?",
+    companyType: "What kind of companies should Applix look for?",
+    targetArea: "Which city, suburb, or area should Applix focus on?",
+    fullName: "What is your full name for the resume/profile?",
+    email: "What email should companies reply to?",
+    phone: "What phone number should appear on your contact details?",
+    resumeSummary: "Give me a short resume summary. What kind of worker are you?",
+    skills: "List your main skills.",
+    experience: "Tell me your work experience.",
+    certificates: "Any certificates or checks, like First Aid, CPR, Police Check, WWCC, or NDIS module?",
+    plan: "Choose your level: 10 applications per day or 100 applications per day?",
+    aiConsent: "Do I have permission to use AI to prepare drafts and tailor editable wording while keeping your facts locked?",
+    emailConsent: "Do you consent to Applix asking for Gmail access later, only to send emails you approve?",
+  };
+
+  return questions[first] || "Tell me the next detail for your Applix setup.";
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as ChatPayload;
     const apiKey = process.env.OPENAI_API_KEY;
     const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+    const setup = body.setup || {};
 
     if (!apiKey) {
       return NextResponse.json({
         ok: true,
         source: "fallback",
-        assistantMessage: fallbackReply(body.step),
+        assistantMessage: fallbackAssistantMessage(setup),
         updates: {},
-        confidence: 0,
-        warning: "OPENAI_API_KEY is missing. Using local fallback question flow.",
+        missingFields: fallbackMissing(setup),
+        readyToLaunch: fallbackMissing(setup).length === 0,
+        warning: "OPENAI_API_KEY is missing. Using local fallback.",
       });
     }
 
-    const systemPrompt = `You are Applix, the job-hunt symbiote from ASSI.
-Your job is to guide a normal person through launching a job outreach campaign.
-Keep replies short, warm, direct, and non-technical.
-You must keep the source of truth factual. Do not invent resume facts.
-You may interpret the user's answer into structured fields for the campaign.
-Do not say emails will be sent automatically. Always say user approval is required.
-Return JSON only with this shape:
+    const systemPrompt = `You are Applix, a job-hunt symbiote from ASSI.
+Talk naturally like ChatGPT, but stay focused on building a job outreach campaign.
+The user can answer in any order, ask questions, or provide multiple details at once.
+Your job:
+1. Reply conversationally and briefly.
+2. Extract any campaign details from the latest message.
+3. Keep asking only for the most important missing detail.
+4. Do not force a numbered form.
+5. Never invent resume facts.
+6. Never promise automatic sending. Always approval first.
+7. If the user asks what is happening, explain simply.
+8. If enough details are collected, say they can launch and review in dashboard.
+
+Required setup fields:
+- targetRole
+- companyType
+- targetArea
+- radiusKm
+- fullName
+- email
+- phone
+- resumeSummary
+- skills
+- experience
+- certificates
+- plan: gentle means 10/day, full means 100/day
+- aiConsent
+- emailConsent
+
+Return JSON only:
 {
-  "assistantMessage": "short next message to show in chat",
+  "assistantMessage": "natural chat reply",
   "updates": {
     "targetRole": "",
     "companyType": "",
@@ -87,9 +135,16 @@ Return JSON only with this shape:
     "aiConsent": null,
     "emailConsent": null
   },
+  "missingFields": ["field names still missing"],
+  "readyToLaunch": false,
   "confidence": 0.0
 }
-Only include update values when the user's latest message clearly provides that information.`;
+Only include updates that are clearly supported by the user message or existing setup.`;
+
+    const recentHistory = (body.history || []).slice(-12).map((message) => ({
+      role: message.role === "user" ? "user" : "assistant",
+      content: message.text,
+    }));
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -99,17 +154,15 @@ Only include update values when the user's latest message clearly provides that 
       },
       body: JSON.stringify({
         model,
-        temperature: 0.2,
+        temperature: 0.4,
         messages: [
           { role: "system", content: systemPrompt },
+          ...recentHistory,
           {
             role: "user",
             content: JSON.stringify({
-              currentStep: body.step,
-              currentQuestion: body.currentQuestion,
               latestUserMessage: body.userMessage,
-              existingSetup: body.setup,
-              nextFallbackQuestion: fallbackReply(body.step),
+              currentSetup: setup,
             }),
           },
         ],
@@ -121,9 +174,10 @@ Only include update values when the user's latest message clearly provides that 
       return NextResponse.json({
         ok: true,
         source: "fallback",
-        assistantMessage: fallbackReply(body.step),
+        assistantMessage: fallbackAssistantMessage(setup),
         updates: {},
-        confidence: 0,
+        missingFields: fallbackMissing(setup),
+        readyToLaunch: fallbackMissing(setup).length === 0,
         warning: `OpenAI request failed: ${text.slice(0, 220)}`,
       });
     }
@@ -136,9 +190,10 @@ Only include update values when the user's latest message clearly provides that 
       return NextResponse.json({
         ok: true,
         source: "fallback",
-        assistantMessage: fallbackReply(body.step),
+        assistantMessage: fallbackAssistantMessage(setup),
         updates: {},
-        confidence: 0,
+        missingFields: fallbackMissing(setup),
+        readyToLaunch: fallbackMissing(setup).length === 0,
         warning: "OpenAI returned non-JSON content. Used fallback.",
       });
     }
@@ -146,8 +201,10 @@ Only include update values when the user's latest message clearly provides that 
     return NextResponse.json({
       ok: true,
       source: "openai",
-      assistantMessage: parsed.assistantMessage || fallbackReply(body.step),
+      assistantMessage: parsed.assistantMessage || fallbackAssistantMessage(setup),
       updates: parsed.updates || {},
+      missingFields: Array.isArray(parsed.missingFields) ? parsed.missingFields : fallbackMissing(setup),
+      readyToLaunch: Boolean(parsed.readyToLaunch),
       confidence: Number(parsed.confidence || 0),
     });
   } catch (error: any) {
