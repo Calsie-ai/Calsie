@@ -28,7 +28,7 @@ type ChatState = {
 };
 
 const defaultMessages: Message[] = [
-  { role: "applix", text: "I am Applix, the job-hunt symbiote from ASSI. Talk to me normally. Tell me what work you want, where you want to apply, and what resume details I should remember." },
+  { role: "applix", text: "I am Applix. Tell me what job you want, where you want to work, and what resume details I should remember. You can say it all in one message." },
 ];
 
 const defaultState: ChatState = {
@@ -118,13 +118,28 @@ function localReady(state: ChatState) {
   );
 }
 
+function fallbackQuestion(state: ChatState) {
+  if (!state.targetRole) return "What job should I hunt for? Example: Support Worker, Admin Assistant, Social Worker.";
+  if (!state.companyType) return "What kind of companies should I look for? Example: NDIS providers, aged care, healthcare, local offices.";
+  if (!state.targetArea) return "Where should I look? Give me a suburb, city, or area.";
+  if (!state.fullName) return "What is your full name for the resume/profile?";
+  if (!state.email) return "What email should companies reply to?";
+  if (!state.phone) return "What phone number should appear on your contact details?";
+  if (!state.resumeSummary) return "Tell me a short resume summary. What kind of worker are you?";
+  if (!state.skills) return "List your main skills.";
+  if (!state.experience) return "Tell me your work experience.";
+  if (!state.certificates) return "Any certificates or checks? Type them, or say none.";
+  if (!state.aiConsent || !state.emailConsent) return "Do you consent to AI draft support and later Gmail access request, with you approving before anything sends?";
+  return "I have enough to prepare your Applix setup. Review the memory panel, then launch when ready.";
+}
+
 export default function HomePage() {
   const router = useRouter();
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<ChatState>(defaultState);
   const [input, setInput] = useState("");
   const [loaded, setLoaded] = useState(false);
-  const [status, setStatus] = useState("Chat autosaves in this browser.");
+  const [status, setStatus] = useState("Saved locally");
   const [thinking, setThinking] = useState(false);
 
   const dailyLimit = state.plan === "gentle" ? 10 : 100;
@@ -134,7 +149,7 @@ export default function HomePage() {
     const saved = readCache();
     if (saved) {
       setState(saved);
-      setStatus("Restored your saved Applix chat.");
+      setStatus("Restored saved chat");
     }
     setLoaded(true);
   }, []);
@@ -168,7 +183,7 @@ export default function HomePage() {
 
     setInput("");
     setThinking(true);
-    setStatus("Applix is thinking...");
+    setStatus("Thinking...");
 
     const userMessage: Message = { role: "user", text: value };
     const withUser = { ...state, messages: [...state.messages, userMessage] };
@@ -187,20 +202,22 @@ export default function HomePage() {
       const data = await response.json();
       const updated = applyUpdates(withUser, data?.updates);
       const ready = Boolean(data?.readyToLaunch) || localReady(updated);
-      const assistantText = data?.assistantMessage || "I saved that. Tell me the next detail for your Applix setup.";
+      const assistantText = data?.source === "openai"
+        ? data?.assistantMessage || fallbackQuestion(updated)
+        : fallbackQuestion(updated);
 
       setState({
         ...updated,
         readyToLaunch: ready,
         messages: [...withUser.messages, { role: "applix", text: assistantText }],
       });
-      setStatus(data?.source === "openai" ? "Applix used OpenAI and saved campaign memory." : "Saved in this browser. Fallback used.");
+      setStatus(data?.source === "openai" ? "OpenAI connected" : "Fallback: add OPENAI_API_KEY in Vercel");
     } catch {
       setState({
         ...withUser,
-        messages: [...withUser.messages, { role: "applix", text: "I had trouble thinking for a second. Tell me the target role, area, or resume details and I will keep building the campaign." }],
+        messages: [...withUser.messages, { role: "applix", text: fallbackQuestion(withUser) }],
       });
-      setStatus("OpenAI route unavailable. Chat saved locally.");
+      setStatus("Fallback: OpenAI route unavailable");
     } finally {
       setThinking(false);
     }
@@ -241,35 +258,37 @@ export default function HomePage() {
     sessionStorage.removeItem("applixCampaignDraft");
     setState(defaultState);
     setInput("");
-    setStatus("Chat cleared.");
+    setStatus("Chat cleared");
   }
 
   return (
     <main style={styles.main}>
-      <header style={styles.header}>
+      <header style={styles.topbar}>
         <Link href="/" style={styles.logo}>A</Link>
-        <span style={styles.headerText}>ARTIFICIAL SYMBIOTIC SUPER INTELLIGENCE</span>
-        <Link href="/login" style={styles.navLink}>Applix Account</Link>
+        <div>
+          <strong style={styles.product}>Applix</strong>
+          <span style={styles.subProduct}>ASSI job-hunt symbiote</span>
+        </div>
+        <div style={styles.topActions}>
+          <span style={styles.statusPill}>{status}</span>
+          <Link href="/login" style={styles.accountLink}>Account</Link>
+        </div>
       </header>
 
-      <section style={styles.shell}>
-        <aside style={styles.side}>
-          <p style={styles.eyebrow}>ASSI ECOSYSTEM / APPLIX SYMBIOTE</p>
-          <h1 style={styles.title}>Talk to Applix.</h1>
-          <p style={styles.copy}>Chat naturally. Applix listens, remembers the campaign details, asks for what is missing, and prepares the job hunt under your control.</p>
-          <div style={styles.statusBox}><span>{status}</span><button type="button" style={styles.clearButton} onClick={clearChat}>Clear chat</button></div>
-          <div style={styles.summaryBox}>{summary.map(([label, value]) => <div key={label} style={styles.summaryRow}><strong>{label}</strong><span>{value}</span></div>)}</div>
-        </aside>
+      <section style={styles.appShell}>
+        <section style={styles.chatPanel}>
+          <div style={styles.chatHeader}>
+            <div style={styles.dots}><span style={{ ...styles.dot, background: "#ff8a3d" }} /><span style={{ ...styles.dot, background: "#5ee7ff" }} /><span style={{ ...styles.dot, background: "#8b5cf6" }} /></div>
+            <strong>{canLaunch ? "Ready to launch" : "Chat with Applix"}</strong>
+          </div>
 
-        <section style={styles.chatCard}>
-          <div style={styles.dots}><span style={{ ...styles.dot, background: "#ff8a3d" }} /><span style={{ ...styles.dot, background: "#5ee7ff" }} /><span style={{ ...styles.dot, background: "#8b5cf6" }} /></div>
-          <div style={styles.progress}>{canLaunch ? "READY TO LAUNCH" : "APPLIX CHAT"}</div>
           <div ref={messagesRef} style={styles.messages}>
             {state.messages.map((message, index) => <div key={`${message.role}-${index}`} style={message.role === "applix" ? styles.applixBubble : styles.userBubble}>{message.text}</div>)}
-            {thinking && <div style={styles.applixBubble}>Applix is thinking...</div>}
+            {thinking && <div style={styles.applixBubble}>Thinking...</div>}
           </div>
 
           <div style={styles.quickGrid}>
+            <button type="button" style={styles.quickButton} onClick={() => send("I want support worker jobs around Burwood NSW with NDIS providers")}>Example</button>
             <button type="button" style={styles.quickButton} onClick={() => send("I want a 10 applications per day plan")}>10/day</button>
             <button type="button" style={styles.quickButton} onClick={() => send("I want a 100 applications per day plan")}>100/day</button>
             <button type="button" style={styles.quickButtonGhost} onClick={() => send("yes, I consent to AI writing support and Gmail access request later, with my approval before sending")}>Consent</button>
@@ -285,50 +304,62 @@ export default function HomePage() {
                   send(input);
                 }
               }}
-              placeholder="Talk to Applix like ChatGPT..."
+              placeholder="Message Applix..."
               style={styles.textInput}
               disabled={thinking}
             />
-            <div style={styles.sendStack}>
-              <button type="submit" style={styles.sendButton} disabled={thinking}>{thinking ? "Wait" : "Send"}</button>
-              <button type="button" style={canLaunch ? styles.launchSmallButton : styles.disabledButton} onClick={launch} disabled={!canLaunch}>Launch</button>
-            </div>
+            <button type="submit" style={styles.sendButton} disabled={thinking}>{thinking ? "..." : "Send"}</button>
           </form>
         </section>
+
+        <aside style={styles.memoryPanel}>
+          <div style={styles.memoryHeader}>
+            <div>
+              <p style={styles.eyebrow}>Campaign memory</p>
+              <h1 style={styles.memoryTitle}>Applix remembers</h1>
+            </div>
+            <button type="button" style={styles.clearButton} onClick={clearChat}>Clear</button>
+          </div>
+          <div style={styles.summaryBox}>{summary.map(([label, value]) => <div key={label} style={styles.summaryRow}><strong>{label}</strong><span>{value}</span></div>)}</div>
+          <button type="button" style={canLaunch ? styles.launchButton : styles.disabledLaunchButton} onClick={launch} disabled={!canLaunch}>Launch Applix</button>
+          <p style={styles.helpText}>{canLaunch ? "You can launch and review in the dashboard." : "Keep chatting until the required details and consent are ready."}</p>
+        </aside>
       </section>
     </main>
   );
 }
 
 const styles = {
-  main: { minHeight: "100vh", background: "radial-gradient(circle at 18% 14%, rgba(255,138,61,.18), transparent 24%), radial-gradient(circle at 72% 24%, rgba(94,231,255,.1), transparent 26%), linear-gradient(135deg,#080403,#050914 42%,#07070b)", color: "#f8fafc", fontFamily: "Arial, Helvetica, sans-serif", padding: "clamp(18px, 4vw, 34px)" },
-  header: { maxWidth: 1180, margin: "0 auto 34px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" as const },
-  logo: { display: "grid", placeItems: "center", width: 30, height: 30, borderRadius: 9, background: "#17100b", border: "1px solid rgba(255,154,76,.7)", color: "#ffc27a", textDecoration: "none", fontWeight: 900 },
-  headerText: { fontSize: 10, letterSpacing: 2, fontWeight: 900, color: "#cbd5e1" },
-  navLink: { marginLeft: "auto", color: "#cbd5e1", textDecoration: "none", fontSize: 12, fontWeight: 900 },
-  shell: { maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))", gap: 28, alignItems: "start" },
-  side: { position: "sticky" as const, top: 24 },
-  eyebrow: { margin: "0 0 18px", color: "#7dd3fc", fontSize: 11, fontWeight: 900, letterSpacing: 2.2 },
-  title: { maxWidth: 620, margin: 0, fontSize: "clamp(48px, 8vw, 86px)", lineHeight: .9, letterSpacing: -3, textTransform: "uppercase" as const, textShadow: "4px 4px 0 rgba(255,138,61,.25),-3px -2px 0 rgba(94,231,255,.18)" },
-  copy: { maxWidth: 560, margin: "22px 0", color: "#cbd5e1", fontSize: 17, lineHeight: 1.6, fontWeight: 700 },
-  statusBox: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: 14, borderRadius: 18, background: "rgba(15,23,42,.72)", border: "1px solid rgba(94,231,255,.18)", color: "#cbd5e1", fontWeight: 800, fontSize: 12 },
-  clearButton: { border: "1px solid rgba(255,255,255,.14)", background: "transparent", color: "#ffd08a", borderRadius: 999, padding: "7px 10px", fontWeight: 900, cursor: "pointer" },
-  summaryBox: { marginTop: 16, display: "grid", gap: 8, padding: 16, borderRadius: 18, background: "rgba(15,23,42,.72)", border: "1px solid rgba(255,138,61,.28)" },
-  summaryRow: { display: "grid", gridTemplateColumns: "92px 1fr", gap: 12, color: "#cbd5e1", fontSize: 13, lineHeight: 1.4, wordBreak: "break-word" as const },
-  chatCard: { borderRadius: 22, background: "linear-gradient(180deg,rgba(13,18,31,.98),rgba(8,12,20,.98))", boxShadow: "0 30px 90px rgba(0,0,0,.38)", border: "1px solid rgba(255,138,61,.45)", overflow: "hidden", minWidth: 0 },
-  dots: { display: "flex", gap: 6, padding: "12px 14px", borderBottom: "1px solid rgba(255,138,61,.28)" },
+  main: { minHeight: "100vh", background: "radial-gradient(circle at 18% 14%, rgba(255,138,61,.18), transparent 24%), radial-gradient(circle at 72% 24%, rgba(94,231,255,.1), transparent 26%), linear-gradient(135deg,#080403,#050914 42%,#07070b)", color: "#f8fafc", fontFamily: "Arial, Helvetica, sans-serif", padding: "18px" },
+  topbar: { maxWidth: 1220, margin: "0 auto 18px", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 18, background: "rgba(15,23,42,.62)", border: "1px solid rgba(255,138,61,.2)" },
+  logo: { display: "grid", placeItems: "center", width: 34, height: 34, borderRadius: 10, background: "#17100b", border: "1px solid rgba(255,154,76,.7)", color: "#ffc27a", textDecoration: "none", fontWeight: 900 },
+  product: { display: "block", fontSize: 18, letterSpacing: .3 },
+  subProduct: { display: "block", color: "#94a3b8", fontSize: 12, fontWeight: 800 },
+  topActions: { marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 },
+  statusPill: { padding: "7px 10px", borderRadius: 999, background: "rgba(94,231,255,.1)", color: "#cbd5e1", fontSize: 12, fontWeight: 900 },
+  accountLink: { color: "#ffd08a", textDecoration: "none", fontSize: 13, fontWeight: 900 },
+  appShell: { maxWidth: 1220, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 340px", gap: 18, alignItems: "stretch" },
+  chatPanel: { minWidth: 0, height: "calc(100vh - 104px)", borderRadius: 22, background: "linear-gradient(180deg,rgba(13,18,31,.98),rgba(8,12,20,.98))", border: "1px solid rgba(255,138,61,.38)", overflow: "hidden", display: "flex", flexDirection: "column" as const, boxShadow: "0 30px 90px rgba(0,0,0,.28)" },
+  chatHeader: { display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: "1px solid rgba(255,138,61,.2)", color: "#5ee7ff", letterSpacing: 1.1, textTransform: "uppercase" as const, fontSize: 12 },
+  dots: { display: "flex", gap: 6 },
   dot: { display: "block", width: 8, height: 8, borderRadius: 999 },
-  progress: { padding: "12px 18px", color: "#5ee7ff", fontSize: 11, letterSpacing: 1.8, fontWeight: 900, borderBottom: "1px solid rgba(94,231,255,.14)" },
-  messages: { height: "min(58vh, 560px)", minHeight: 360, overflowY: "auto" as const, padding: 20, display: "flex", flexDirection: "column" as const, gap: 12, scrollBehavior: "smooth" as const },
-  applixBubble: { maxWidth: "88%", alignSelf: "flex-start", padding: "14px 16px", borderRadius: "18px 18px 18px 4px", background: "rgba(255,138,61,.12)", border: "1px solid rgba(255,138,61,.28)", color: "#fff", lineHeight: 1.5, fontWeight: 800, whiteSpace: "pre-wrap" as const },
-  userBubble: { maxWidth: "88%", alignSelf: "flex-end", padding: "14px 16px", borderRadius: "18px 18px 4px 18px", background: "rgba(94,231,255,.12)", border: "1px solid rgba(94,231,255,.28)", color: "#e0fbff", lineHeight: 1.5, fontWeight: 800, whiteSpace: "pre-wrap" as const },
-  inputRow: { display: "grid", gridTemplateColumns: "1fr auto", gap: 10, padding: 18, borderTop: "1px solid rgba(255,138,61,.18)" },
-  textInput: { minHeight: 78, resize: "vertical" as const, border: "1px solid rgba(255,138,61,.26)", borderRadius: 16, padding: 14, color: "#fff", background: "rgba(2,6,23,.75)", fontWeight: 800, fontFamily: "Arial, Helvetica, sans-serif", minWidth: 0 },
-  sendStack: { display: "grid", gap: 8 },
-  sendButton: { border: 0, borderRadius: 16, padding: "0 20px", background: "linear-gradient(135deg,#ff8a3d,#5ee7ff)", color: "#090d18", fontWeight: 900, cursor: "pointer" },
-  launchSmallButton: { border: 0, borderRadius: 16, padding: "10px 16px", background: "linear-gradient(135deg,#ff8a3d,#ffd08a)", color: "#090d18", fontWeight: 900, cursor: "pointer" },
-  disabledButton: { border: "1px solid rgba(255,255,255,.12)", borderRadius: 16, padding: "10px 16px", background: "rgba(255,255,255,.04)", color: "#64748b", fontWeight: 900, cursor: "not-allowed" },
-  quickGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, padding: "0 18px 18px" },
-  quickButton: { border: 0, borderRadius: 999, padding: "13px 14px", background: "linear-gradient(135deg,#ff8a3d,#ffd08a)", color: "#090d18", fontWeight: 900, cursor: "pointer" },
-  quickButtonGhost: { border: "1px solid rgba(255,255,255,.16)", borderRadius: 999, padding: "13px 14px", background: "rgba(255,255,255,.04)", color: "#cbd5e1", fontWeight: 900, cursor: "pointer" },
+  messages: { flex: 1, overflowY: "auto" as const, padding: "22px", display: "flex", flexDirection: "column" as const, gap: 14, scrollBehavior: "smooth" as const },
+  applixBubble: { maxWidth: "78%", alignSelf: "flex-start", padding: "14px 16px", borderRadius: "18px 18px 18px 4px", background: "rgba(255,138,61,.12)", border: "1px solid rgba(255,138,61,.28)", color: "#fff", lineHeight: 1.5, fontWeight: 800, whiteSpace: "pre-wrap" as const },
+  userBubble: { maxWidth: "78%", alignSelf: "flex-end", padding: "14px 16px", borderRadius: "18px 18px 4px 18px", background: "rgba(94,231,255,.12)", border: "1px solid rgba(94,231,255,.28)", color: "#e0fbff", lineHeight: 1.5, fontWeight: 800, whiteSpace: "pre-wrap" as const },
+  quickGrid: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, padding: "0 16px 14px" },
+  quickButton: { border: 0, borderRadius: 999, padding: "12px 10px", background: "linear-gradient(135deg,#ff8a3d,#ffd08a)", color: "#090d18", fontWeight: 900, cursor: "pointer" },
+  quickButtonGhost: { border: "1px solid rgba(255,255,255,.16)", borderRadius: 999, padding: "12px 10px", background: "rgba(255,255,255,.04)", color: "#cbd5e1", fontWeight: 900, cursor: "pointer" },
+  inputRow: { display: "grid", gridTemplateColumns: "1fr auto", gap: 10, padding: 16, borderTop: "1px solid rgba(255,138,61,.18)" },
+  textInput: { minHeight: 58, maxHeight: 160, resize: "vertical" as const, border: "1px solid rgba(255,138,61,.26)", borderRadius: 16, padding: 14, color: "#fff", background: "rgba(2,6,23,.75)", fontWeight: 800, fontFamily: "Arial, Helvetica, sans-serif", minWidth: 0 },
+  sendButton: { border: 0, borderRadius: 16, padding: "0 22px", background: "linear-gradient(135deg,#ff8a3d,#5ee7ff)", color: "#090d18", fontWeight: 900, cursor: "pointer" },
+  memoryPanel: { height: "calc(100vh - 104px)", overflowY: "auto" as const, borderRadius: 22, background: "rgba(15,23,42,.72)", border: "1px solid rgba(94,231,255,.18)", padding: 18, boxShadow: "0 30px 90px rgba(0,0,0,.2)" },
+  memoryHeader: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" },
+  eyebrow: { margin: 0, color: "#7dd3fc", fontSize: 11, fontWeight: 900, letterSpacing: 1.8, textTransform: "uppercase" as const },
+  memoryTitle: { margin: "6px 0 0", fontSize: 28, lineHeight: 1, letterSpacing: -1, color: "#fff" },
+  clearButton: { border: "1px solid rgba(255,255,255,.14)", background: "transparent", color: "#ffd08a", borderRadius: 999, padding: "9px 12px", fontWeight: 900, cursor: "pointer" },
+  summaryBox: { marginTop: 18, display: "grid", gap: 10 },
+  summaryRow: { display: "grid", gap: 5, padding: "12px", borderRadius: 14, background: "rgba(2,6,23,.46)", border: "1px solid rgba(255,255,255,.08)", color: "#cbd5e1", fontSize: 13, lineHeight: 1.35, wordBreak: "break-word" as const },
+  launchButton: { width: "100%", marginTop: 18, border: 0, borderRadius: 999, padding: "15px 18px", background: "linear-gradient(135deg,#ff8a3d,#5ee7ff)", color: "#090d18", fontWeight: 900, cursor: "pointer" },
+  disabledLaunchButton: { width: "100%", marginTop: 18, border: "1px solid rgba(255,255,255,.12)", borderRadius: 999, padding: "15px 18px", background: "rgba(255,255,255,.04)", color: "#64748b", fontWeight: 900, cursor: "not-allowed" },
+  helpText: { color: "#94a3b8", lineHeight: 1.5, fontSize: 13, fontWeight: 800 },
 };
