@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const CACHE_KEY = "applixChatLaunchCache";
@@ -65,7 +65,8 @@ export default function ResumeCanvasPage() {
   const router = useRouter();
   const [resume, setResume] = useState<ResumeState>(emptyResume);
   const [campaign, setCampaign] = useState<CampaignState>({});
-  const [status, setStatus] = useState("Resume canvas autosaves in this browser.");
+  const [status, setStatus] = useState("Upload a resume or edit the canvas directly.");
+  const [parsing, setParsing] = useState(false);
 
   const dailyLimit = campaign.plan === "full" ? 100 : 10;
 
@@ -94,11 +95,52 @@ export default function ResumeCanvasPage() {
       experience: resume.experience,
       certificates: resume.certificates,
     });
-    setStatus("Saved in this browser.");
-  }, [resume]);
+    if (!parsing) setStatus("Saved in this browser.");
+  }, [resume, parsing]);
 
   function update(field: keyof ResumeState, value: string) {
     setResume((current) => ({ ...current, [field]: value }));
+  }
+
+  async function uploadResume(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || parsing) return;
+
+    setParsing(true);
+    setStatus(`Parsing ${file.name}...`);
+
+    try {
+      const formData = new FormData();
+      formData.append("resume", file);
+
+      const response = await fetch("/api/applix/parse-resume", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.error || "Could not parse resume.");
+      }
+
+      const parsed = data.parsed || {};
+      setResume((current) => ({
+        fullName: parsed.fullName || current.fullName,
+        email: parsed.email || current.email,
+        phone: parsed.phone || current.phone,
+        location: parsed.location || current.location || campaign.targetArea || "",
+        resumeSummary: parsed.resumeSummary || current.resumeSummary,
+        skills: parsed.skills || current.skills,
+        experience: parsed.experience || current.experience,
+        certificates: parsed.certificates || current.certificates,
+      }));
+      setStatus("Resume parsed and filled into the canvas. Review and edit anything you want.");
+    } catch (error: any) {
+      setStatus(error?.message || "Resume parsing failed. Try DOCX, TXT, or a text-based PDF.");
+    } finally {
+      setParsing(false);
+      event.target.value = "";
+    }
   }
 
   function launch() {
@@ -129,6 +171,15 @@ export default function ResumeCanvasPage() {
     };
 
     sessionStorage.setItem("applixCampaignDraft", JSON.stringify(draft));
+    saveCampaign({
+      fullName: resume.fullName,
+      email: resume.email,
+      phone: resume.phone,
+      resumeSummary: resume.resumeSummary,
+      skills: resume.skills,
+      experience: resume.experience,
+      certificates: resume.certificates,
+    });
     router.push("/login?next=/dashboard");
   }
 
@@ -137,21 +188,34 @@ export default function ResumeCanvasPage() {
       <header style={styles.topbar}>
         <Link href="/" style={styles.backLink}>← Back to Applix chat</Link>
         <div style={styles.status}>{status}</div>
-        <button style={styles.launchTop} onClick={launch}>Save & continue</button>
+        <button style={styles.launchTop} onClick={launch}>Save master & continue</button>
       </header>
 
       <section style={styles.shell}>
         <aside style={styles.sidePanel}>
           <p style={styles.eyebrow}>Campaign</p>
           <h1 style={styles.sideTitle}>Resume Canvas</h1>
-          <p style={styles.sideCopy}>This white document is your reusable master resume. Applix can tailor copies later, but this version is your source of truth.</p>
+          <p style={styles.sideCopy}>Upload your existing resume to autofill this white document, then edit anything. This becomes your master source of truth.</p>
+
+          <label style={styles.uploadBox}>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              onChange={uploadResume}
+              style={styles.fileInput}
+              disabled={parsing}
+            />
+            <strong>{parsing ? "Parsing resume..." : "Upload PDF / DOCX / TXT"}</strong>
+            <span>Applix will fill the canvas automatically.</span>
+          </label>
+
           <div style={styles.memoryBox}>
             <strong>Target role</strong><span>{campaign.targetRole || "Not set"}</span>
             <strong>Company type</strong><span>{campaign.companyType || "Not set"}</span>
             <strong>Area</strong><span>{campaign.targetArea ? `${campaign.targetArea} (${campaign.radiusKm || 20}km)` : "Not set"}</span>
             <strong>Pace</strong><span>{dailyLimit}/day for 10 days</span>
           </div>
-          <p style={styles.note}>Certificates can be typed as names for now. Later we can add file uploads or verification.</p>
+          <p style={styles.note}>Certificates can be uploaded later. For now, type certificate names or let Applix extract them from the resume.</p>
         </aside>
 
         <section style={styles.paperWrap}>
@@ -191,7 +255,7 @@ export default function ResumeCanvasPage() {
               style={styles.experienceInput}
               value={resume.experience}
               onChange={(event) => update("experience", event.target.value)}
-              placeholder="Add your experience like a resume. Example:\nCompany Name — Role\nDates\n- Responsibility or achievement\n- Responsibility or achievement"
+              placeholder={"Add your experience like a resume. Example:\nCompany Name — Role\nDates\n- Responsibility or achievement\n- Responsibility or achievement"}
             />
 
             <SectionTitle title="Certificates / Checks" />
@@ -216,13 +280,15 @@ const styles = {
   main: { minHeight: "100vh", background: "#e7e9ef", color: "#111827", fontFamily: "Arial, Helvetica, sans-serif", padding: 18 },
   topbar: { maxWidth: 1220, margin: "0 auto 18px", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 18, background: "#ffffff", border: "1px solid #d8dee9", boxShadow: "0 10px 30px rgba(15,23,42,.08)" },
   backLink: { color: "#111827", textDecoration: "none", fontWeight: 900 },
-  status: { marginLeft: "auto", color: "#64748b", fontSize: 13, fontWeight: 800 },
+  status: { marginLeft: "auto", color: "#64748b", fontSize: 13, fontWeight: 800, maxWidth: 460, textAlign: "right" as const },
   launchTop: { border: 0, borderRadius: 999, padding: "12px 18px", background: "#111827", color: "white", fontWeight: 900, cursor: "pointer" },
   shell: { maxWidth: 1220, margin: "0 auto", display: "grid", gridTemplateColumns: "320px minmax(0, 1fr)", gap: 22, alignItems: "start" },
   sidePanel: { position: "sticky" as const, top: 18, background: "#111827", color: "white", borderRadius: 24, padding: 22, boxShadow: "0 20px 50px rgba(15,23,42,.18)" },
   eyebrow: { margin: 0, color: "#5ee7ff", fontSize: 11, letterSpacing: 2, fontWeight: 900, textTransform: "uppercase" as const },
   sideTitle: { margin: "12px 0", fontSize: 34, lineHeight: 1, letterSpacing: -1.2 },
   sideCopy: { color: "#cbd5e1", lineHeight: 1.5, fontWeight: 700 },
+  uploadBox: { display: "grid", gap: 7, marginTop: 18, padding: 16, borderRadius: 18, background: "rgba(94,231,255,.1)", border: "1px dashed rgba(94,231,255,.55)", cursor: "pointer" },
+  fileInput: { display: "none" },
   memoryBox: { display: "grid", gridTemplateColumns: "110px 1fr", gap: 9, marginTop: 18, padding: 14, borderRadius: 16, background: "rgba(255,255,255,.07)", color: "#dbeafe", fontSize: 13, lineHeight: 1.4 },
   note: { marginTop: 18, color: "#ffd08a", lineHeight: 1.5, fontWeight: 800, fontSize: 13 },
   paperWrap: { display: "flex", justifyContent: "center" },
