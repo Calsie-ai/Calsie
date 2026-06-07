@@ -90,6 +90,7 @@ export async function POST(req: Request) {
     const systemPrompt = `You are Applix, a job-hunt symbiote from ASSI.
 Talk naturally like ChatGPT, but stay focused on building a job outreach campaign.
 The user can answer in any order, ask questions, or provide multiple details at once.
+
 Your job:
 1. Reply conversationally and briefly.
 2. Extract any campaign details from the latest message.
@@ -116,7 +117,7 @@ Required setup fields:
 - aiConsent
 - emailConsent
 
-Return JSON only:
+You must respond with valid JSON only. The JSON object must have this shape:
 {
   "assistantMessage": "natural chat reply",
   "updates": {
@@ -141,7 +142,7 @@ Return JSON only:
 }
 Only include updates that are clearly supported by the user message or existing setup.`;
 
-    const recentHistory = (body.history || []).slice(-12).map((message) => ({
+    const recentHistory = (body.history || []).slice(-10).map((message) => ({
       role: message.role === "user" ? "user" : "assistant",
       content: message.text,
     }));
@@ -154,7 +155,8 @@ Only include updates that are clearly supported by the user message or existing 
       },
       body: JSON.stringify({
         model,
-        temperature: 0.4,
+        temperature: 0.3,
+        response_format: { type: "json_object" },
         messages: [
           { role: "system", content: systemPrompt },
           ...recentHistory,
@@ -195,6 +197,7 @@ Only include updates that are clearly supported by the user message or existing 
         missingFields: fallbackMissing(setup),
         readyToLaunch: fallbackMissing(setup).length === 0,
         warning: "OpenAI returned non-JSON content. Used fallback.",
+        openaiPreview: content.slice(0, 300),
       });
     }
 
