@@ -50,6 +50,13 @@ function cleanJson(text: string) {
   }
 }
 
+async function extractPdfText(buffer: Buffer) {
+  const pdfModule: any = await import("pdf-parse");
+  const pdfParse = pdfModule.default || pdfModule;
+  const data = await pdfParse(buffer);
+  return data.text || "";
+}
+
 async function extractText(file: File) {
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
@@ -57,9 +64,7 @@ async function extractText(file: File) {
   const type = file.type.toLowerCase();
 
   if (type.includes("pdf") || name.endsWith(".pdf")) {
-    const pdfParse = (await import("pdf-parse")).default;
-    const data = await pdfParse(buffer);
-    return data.text || "";
+    return extractPdfText(buffer);
   }
 
   if (name.endsWith(".docx") || type.includes("wordprocessingml")) {
