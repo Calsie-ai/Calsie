@@ -6,17 +6,10 @@ type ChatPayload = {
   history?: Array<{ role: "applix" | "user"; text: string }>;
 };
 
-const requiredFields = [
+const requiredCampaignFields = [
   "targetRole",
   "companyType",
   "targetArea",
-  "fullName",
-  "email",
-  "phone",
-  "resumeSummary",
-  "skills",
-  "experience",
-  "certificates",
   "plan",
   "aiConsent",
   "emailConsent",
@@ -37,7 +30,7 @@ function extractJson(text: string) {
 }
 
 function fallbackMissing(setup: Record<string, unknown>) {
-  return requiredFields.filter((field) => {
+  return requiredCampaignFields.filter((field) => {
     const value = setup[field];
     if (typeof value === "boolean") return value !== true;
     return !value;
@@ -47,25 +40,21 @@ function fallbackMissing(setup: Record<string, unknown>) {
 function fallbackAssistantMessage(setup: Record<string, unknown>) {
   const missing = fallbackMissing(setup);
   const first = missing[0];
-  if (!first) return "I have enough to prepare your Applix setup. Review the summary, then launch when you are ready.";
+
+  if (!first) {
+    return "Your campaign target is ready. Now complete the Master Resume Canvas on the right, then launch Applix when you are ready.";
+  }
 
   const questions: Record<string, string> = {
     targetRole: "What work do you want Applix to hunt for?",
     companyType: "What kind of companies should Applix look for?",
     targetArea: "Which city, suburb, or area should Applix focus on?",
-    fullName: "What is your full name for the resume/profile?",
-    email: "What email should companies reply to?",
-    phone: "What phone number should appear on your contact details?",
-    resumeSummary: "Give me a short resume summary. What kind of worker are you?",
-    skills: "List your main skills.",
-    experience: "Tell me your work experience.",
-    certificates: "Any certificates or checks, like First Aid, CPR, Police Check, WWCC, or NDIS module?",
-    plan: "Choose your level: 10 applications per day or 100 applications per day?",
-    aiConsent: "Do I have permission to use AI to prepare drafts and tailor editable wording while keeping your facts locked?",
+    plan: "Choose your pace: 10 applications per day or 100 applications per day?",
+    aiConsent: "Do you consent to AI draft support while your Master Resume facts stay locked?",
     emailConsent: "Do you consent to Applix asking for Gmail access later, only to send emails you approve?",
   };
 
-  return questions[first] || "Tell me the next detail for your Applix setup.";
+  return questions[first] || "Tell me the next campaign detail for your Applix setup.";
 }
 
 export async function POST(req: Request) {
@@ -89,23 +78,32 @@ export async function POST(req: Request) {
 
     const systemPrompt = `You are Applix, a job-hunt symbiote from ASSI.
 Talk naturally like ChatGPT, but stay focused on building a job outreach campaign.
-The user can answer in any order, ask questions, or provide multiple details at once.
+The user can answer in any order, ask questions, or provide multiple campaign details at once.
 
-Your job:
-1. Reply conversationally and briefly.
-2. Extract any campaign details from the latest message.
-3. Keep asking only for the most important missing detail.
-4. Do not force a numbered form.
+Important product rule:
+The user fills their resume in the Master Resume Canvas on the page.
+Do NOT ask for phone number, resume summary, skills, experience, certificates, or other resume fields in chat.
+If resume details are missing, tell the user to complete the Master Resume Canvas on the right.
+
+Your chat job:
+1. Extract campaign details from the latest message.
+2. Ask only for missing campaign details: target role, company type, area, pace, and consent.
+3. Keep replies brief and conversational.
+4. Never force a numbered form.
 5. Never invent resume facts.
 6. Never promise automatic sending. Always approval first.
-7. If the user asks what is happening, explain simply.
-8. If enough details are collected, say they can launch and review in dashboard.
+7. If campaign target is ready, say: complete the Master Resume Canvas on the right, then launch Applix.
 
-Required setup fields:
+Campaign fields:
 - targetRole
 - companyType
 - targetArea
 - radiusKm
+- plan: gentle means 10/day, full means 100/day
+- aiConsent
+- emailConsent
+
+Resume canvas fields may be present in currentSetup, but you should not ask for them in chat:
 - fullName
 - email
 - phone
@@ -113,9 +111,6 @@ Required setup fields:
 - skills
 - experience
 - certificates
-- plan: gentle means 10/day, full means 100/day
-- aiConsent
-- emailConsent
 
 You must respond with valid JSON only. The JSON object must have this shape:
 {
@@ -125,18 +120,11 @@ You must respond with valid JSON only. The JSON object must have this shape:
     "companyType": "",
     "targetArea": "",
     "radiusKm": null,
-    "fullName": "",
-    "email": "",
-    "phone": "",
-    "resumeSummary": "",
-    "skills": "",
-    "experience": "",
-    "certificates": "",
     "plan": "gentle or full",
     "aiConsent": null,
     "emailConsent": null
   },
-  "missingFields": ["field names still missing"],
+  "missingFields": ["campaign field names still missing"],
   "readyToLaunch": false,
   "confidence": 0.0
 }
