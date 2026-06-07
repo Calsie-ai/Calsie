@@ -28,7 +28,7 @@ type ChatState = {
 };
 
 const defaultMessages: Message[] = [
-  { role: "applix", text: "I am Applix. Tell me what job you want, where you want to work, and what resume details I should remember. You can say it all in one message." },
+  { role: "applix", text: "I am Applix. Tell me the job hunt you want: role, company type, area, and pace. Your Master Resume canvas is on the right — edit it directly and I will reuse it." },
 ];
 
 const defaultState: ChatState = {
@@ -122,15 +122,8 @@ function fallbackQuestion(state: ChatState) {
   if (!state.targetRole) return "What job should I hunt for? Example: Support Worker, Admin Assistant, Social Worker.";
   if (!state.companyType) return "What kind of companies should I look for? Example: NDIS providers, aged care, healthcare, local offices.";
   if (!state.targetArea) return "Where should I look? Give me a suburb, city, or area.";
-  if (!state.fullName) return "What is your full name for the resume/profile?";
-  if (!state.email) return "What email should companies reply to?";
-  if (!state.phone) return "What phone number should appear on your contact details?";
-  if (!state.resumeSummary) return "Tell me a short resume summary. What kind of worker are you?";
-  if (!state.skills) return "List your main skills.";
-  if (!state.experience) return "Tell me your work experience.";
-  if (!state.certificates) return "Any certificates or checks? Type them, or say none.";
   if (!state.aiConsent || !state.emailConsent) return "Do you consent to AI draft support and later Gmail access request, with you approving before anything sends?";
-  return "I have enough to prepare your Applix setup. Review the memory panel, then launch when ready.";
+  return "Campaign memory is ready. Now make sure your Master Resume canvas is complete, then launch when ready.";
 }
 
 export default function HomePage() {
@@ -168,9 +161,6 @@ export default function HomePage() {
       ["Work", state.targetRole || "—"],
       ["Companies", state.companyType || "—"],
       ["Area", state.targetArea ? `${state.targetArea} (${state.radiusKm}km)` : "—"],
-      ["Name", state.fullName || "—"],
-      ["Email", state.email || "—"],
-      ["Phone", state.phone || "—"],
       ["Level", `${dailyLimit}/day for 10 days`],
       ["Consent", state.aiConsent && state.emailConsent ? "Ready" : "Waiting"],
     ],
@@ -223,6 +213,10 @@ export default function HomePage() {
     }
   }
 
+  function updateResume(field: keyof ChatState, value: string) {
+    setState((current) => ({ ...current, [field]: value }));
+  }
+
   function launch() {
     const draft = {
       targetRole: state.targetRole,
@@ -233,7 +227,7 @@ export default function HomePage() {
       longitude: null,
       radiusKm: state.radiusKm,
       resumeName: state.fullName || "Applix resume",
-      resumeSource: "chat_form",
+      resumeSource: "master_resume_canvas",
       resumeSnapshot: {
         fullName: state.fullName,
         email: state.email,
@@ -287,13 +281,6 @@ export default function HomePage() {
             {thinking && <div style={styles.applixBubble}>Thinking...</div>}
           </div>
 
-          <div style={styles.quickGrid}>
-            <button type="button" style={styles.quickButton} onClick={() => send("I want support worker jobs around Burwood NSW with NDIS providers")}>Example</button>
-            <button type="button" style={styles.quickButton} onClick={() => send("I want a 10 applications per day plan")}>10/day</button>
-            <button type="button" style={styles.quickButton} onClick={() => send("I want a 100 applications per day plan")}>100/day</button>
-            <button type="button" style={styles.quickButtonGhost} onClick={() => send("yes, I consent to AI writing support and Gmail access request later, with my approval before sending")}>Consent</button>
-          </div>
-
           <form style={styles.inputRow} onSubmit={(event) => { event.preventDefault(); send(input); }}>
             <textarea
               value={input}
@@ -304,7 +291,7 @@ export default function HomePage() {
                   send(input);
                 }
               }}
-              placeholder="Message Applix..."
+              placeholder="Message Applix about target role, company type, area, or sending pace..."
               style={styles.textInput}
               disabled={thinking}
             />
@@ -322,7 +309,21 @@ export default function HomePage() {
           </div>
           <div style={styles.summaryBox}>{summary.map(([label, value]) => <div key={label} style={styles.summaryRow}><strong>{label}</strong><span>{value}</span></div>)}</div>
           <button type="button" style={canLaunch ? styles.launchButton : styles.disabledLaunchButton} onClick={launch} disabled={!canLaunch}>Launch Applix</button>
-          <p style={styles.helpText}>{canLaunch ? "You can launch and review in the dashboard." : "Keep chatting until the required details and consent are ready."}</p>
+          <p style={styles.helpText}>{canLaunch ? "You can launch and review in the dashboard." : "Chat about the job target and complete the Master Resume canvas."}</p>
+
+          <section style={styles.resumeCanvas}>
+            <p style={styles.eyebrow}>Master Resume Canvas</p>
+            <h2 style={styles.resumeTitle}>Source of truth</h2>
+            <p style={styles.resumeNote}>Edit this directly. Applix can tailor copies later, but this master resume stays reusable.</p>
+
+            <label style={styles.canvasLabel}>Full name<input style={styles.canvasInput} value={state.fullName} onChange={(event) => updateResume("fullName", event.target.value)} placeholder="Your full name" /></label>
+            <label style={styles.canvasLabel}>Email<input style={styles.canvasInput} value={state.email} onChange={(event) => updateResume("email", event.target.value)} placeholder="you@email.com" /></label>
+            <label style={styles.canvasLabel}>Phone<input style={styles.canvasInput} value={state.phone} onChange={(event) => updateResume("phone", event.target.value)} placeholder="04xx xxx xxx" /></label>
+            <label style={styles.canvasLabel}>Profile summary<textarea style={styles.canvasTextarea} value={state.resumeSummary} onChange={(event) => updateResume("resumeSummary", event.target.value)} placeholder="Short professional summary..." /></label>
+            <label style={styles.canvasLabel}>Skills<textarea style={styles.canvasTextarea} value={state.skills} onChange={(event) => updateResume("skills", event.target.value)} placeholder="Skills separated by commas or lines..." /></label>
+            <label style={styles.canvasLabel}>Experience<textarea style={styles.canvasTextareaLarge} value={state.experience} onChange={(event) => updateResume("experience", event.target.value)} placeholder="Work history, projects, responsibilities, achievements..." /></label>
+            <label style={styles.canvasLabel}>Certificates / checks<textarea style={styles.canvasTextarea} value={state.certificates} onChange={(event) => updateResume("certificates", event.target.value)} placeholder="First Aid, CPR, Police Check, WWCC, licences, or none..." /></label>
+          </section>
         </aside>
       </section>
     </main>
@@ -331,14 +332,14 @@ export default function HomePage() {
 
 const styles = {
   main: { minHeight: "100vh", background: "radial-gradient(circle at 18% 14%, rgba(255,138,61,.18), transparent 24%), radial-gradient(circle at 72% 24%, rgba(94,231,255,.1), transparent 26%), linear-gradient(135deg,#080403,#050914 42%,#07070b)", color: "#f8fafc", fontFamily: "Arial, Helvetica, sans-serif", padding: "18px" },
-  topbar: { maxWidth: 1220, margin: "0 auto 18px", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 18, background: "rgba(15,23,42,.62)", border: "1px solid rgba(255,138,61,.2)" },
+  topbar: { maxWidth: 1320, margin: "0 auto 18px", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 18, background: "rgba(15,23,42,.62)", border: "1px solid rgba(255,138,61,.2)" },
   logo: { display: "grid", placeItems: "center", width: 34, height: 34, borderRadius: 10, background: "#17100b", border: "1px solid rgba(255,154,76,.7)", color: "#ffc27a", textDecoration: "none", fontWeight: 900 },
   product: { display: "block", fontSize: 18, letterSpacing: .3 },
   subProduct: { display: "block", color: "#94a3b8", fontSize: 12, fontWeight: 800 },
   topActions: { marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 },
   statusPill: { padding: "7px 10px", borderRadius: 999, background: "rgba(94,231,255,.1)", color: "#cbd5e1", fontSize: 12, fontWeight: 900 },
   accountLink: { color: "#ffd08a", textDecoration: "none", fontSize: 13, fontWeight: 900 },
-  appShell: { maxWidth: 1220, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 340px", gap: 18, alignItems: "stretch" },
+  appShell: { maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 430px", gap: 18, alignItems: "stretch" },
   chatPanel: { minWidth: 0, height: "calc(100vh - 104px)", borderRadius: 22, background: "linear-gradient(180deg,rgba(13,18,31,.98),rgba(8,12,20,.98))", border: "1px solid rgba(255,138,61,.38)", overflow: "hidden", display: "flex", flexDirection: "column" as const, boxShadow: "0 30px 90px rgba(0,0,0,.28)" },
   chatHeader: { display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: "1px solid rgba(255,138,61,.2)", color: "#5ee7ff", letterSpacing: 1.1, textTransform: "uppercase" as const, fontSize: 12 },
   dots: { display: "flex", gap: 6 },
@@ -346,9 +347,6 @@ const styles = {
   messages: { flex: 1, overflowY: "auto" as const, padding: "22px", display: "flex", flexDirection: "column" as const, gap: 14, scrollBehavior: "smooth" as const },
   applixBubble: { maxWidth: "78%", alignSelf: "flex-start", padding: "14px 16px", borderRadius: "18px 18px 18px 4px", background: "rgba(255,138,61,.12)", border: "1px solid rgba(255,138,61,.28)", color: "#fff", lineHeight: 1.5, fontWeight: 800, whiteSpace: "pre-wrap" as const },
   userBubble: { maxWidth: "78%", alignSelf: "flex-end", padding: "14px 16px", borderRadius: "18px 18px 4px 18px", background: "rgba(94,231,255,.12)", border: "1px solid rgba(94,231,255,.28)", color: "#e0fbff", lineHeight: 1.5, fontWeight: 800, whiteSpace: "pre-wrap" as const },
-  quickGrid: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, padding: "0 16px 14px" },
-  quickButton: { border: 0, borderRadius: 999, padding: "12px 10px", background: "linear-gradient(135deg,#ff8a3d,#ffd08a)", color: "#090d18", fontWeight: 900, cursor: "pointer" },
-  quickButtonGhost: { border: "1px solid rgba(255,255,255,.16)", borderRadius: 999, padding: "12px 10px", background: "rgba(255,255,255,.04)", color: "#cbd5e1", fontWeight: 900, cursor: "pointer" },
   inputRow: { display: "grid", gridTemplateColumns: "1fr auto", gap: 10, padding: 16, borderTop: "1px solid rgba(255,138,61,.18)" },
   textInput: { minHeight: 58, maxHeight: 160, resize: "vertical" as const, border: "1px solid rgba(255,138,61,.26)", borderRadius: 16, padding: 14, color: "#fff", background: "rgba(2,6,23,.75)", fontWeight: 800, fontFamily: "Arial, Helvetica, sans-serif", minWidth: 0 },
   sendButton: { border: 0, borderRadius: 16, padding: "0 22px", background: "linear-gradient(135deg,#ff8a3d,#5ee7ff)", color: "#090d18", fontWeight: 900, cursor: "pointer" },
@@ -362,4 +360,11 @@ const styles = {
   launchButton: { width: "100%", marginTop: 18, border: 0, borderRadius: 999, padding: "15px 18px", background: "linear-gradient(135deg,#ff8a3d,#5ee7ff)", color: "#090d18", fontWeight: 900, cursor: "pointer" },
   disabledLaunchButton: { width: "100%", marginTop: 18, border: "1px solid rgba(255,255,255,.12)", borderRadius: 999, padding: "15px 18px", background: "rgba(255,255,255,.04)", color: "#64748b", fontWeight: 900, cursor: "not-allowed" },
   helpText: { color: "#94a3b8", lineHeight: 1.5, fontSize: 13, fontWeight: 800 },
+  resumeCanvas: { marginTop: 22, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,.1)" },
+  resumeTitle: { margin: "6px 0 6px", fontSize: 24, letterSpacing: -0.8, color: "#ffffff" },
+  resumeNote: { margin: "0 0 14px", color: "#94a3b8", lineHeight: 1.45, fontSize: 13, fontWeight: 800 },
+  canvasLabel: { display: "grid", gap: 7, marginTop: 12, color: "#dbeafe", fontSize: 13, fontWeight: 900 },
+  canvasInput: { width: "100%", border: "1px solid rgba(255,138,61,.26)", borderRadius: 14, padding: "12px 13px", color: "#ffffff", background: "rgba(2,6,23,.72)", fontWeight: 800, outline: "none" },
+  canvasTextarea: { width: "100%", minHeight: 78, resize: "vertical" as const, border: "1px solid rgba(255,138,61,.26)", borderRadius: 14, padding: "12px 13px", color: "#ffffff", background: "rgba(2,6,23,.72)", fontWeight: 800, fontFamily: "Arial, Helvetica, sans-serif", outline: "none" },
+  canvasTextareaLarge: { width: "100%", minHeight: 120, resize: "vertical" as const, border: "1px solid rgba(255,138,61,.26)", borderRadius: 14, padding: "12px 13px", color: "#ffffff", background: "rgba(2,6,23,.72)", fontWeight: 800, fontFamily: "Arial, Helvetica, sans-serif", outline: "none" },
 };
