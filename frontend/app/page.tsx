@@ -28,7 +28,7 @@ type ChatState = {
 };
 
 const defaultMessages: Message[] = [
-  { role: "applix", text: "I am Applix. Tell me the job hunt you want: role, company type, area, and pace. Your Master Resume canvas is on the right — edit it directly and I will reuse it." },
+  { role: "applix", text: "I am Applix. Tell me the campaign you want: target job, company type, area, and sending pace. After that, I will send you to the resume canvas." },
 ];
 
 const defaultState: ChatState = {
@@ -88,42 +88,22 @@ function applyUpdates(base: ChatState, updates: any) {
   if (typeof updates.companyType === "string" && updates.companyType.trim()) next.companyType = updates.companyType.trim();
   if (typeof updates.targetArea === "string" && updates.targetArea.trim()) next.targetArea = updates.targetArea.trim();
   if (updates.radiusKm !== null && updates.radiusKm !== undefined) next.radiusKm = parseRadius(updates.radiusKm);
-  if (typeof updates.fullName === "string" && updates.fullName.trim()) next.fullName = updates.fullName.trim();
-  if (typeof updates.email === "string" && /^\S+@\S+\.\S+$/.test(updates.email)) next.email = updates.email.trim().toLowerCase();
-  if (typeof updates.phone === "string" && updates.phone.trim()) next.phone = updates.phone.trim();
-  if (typeof updates.resumeSummary === "string" && updates.resumeSummary.trim()) next.resumeSummary = updates.resumeSummary.trim();
-  if (typeof updates.skills === "string" && updates.skills.trim()) next.skills = updates.skills.trim();
-  if (typeof updates.experience === "string" && updates.experience.trim()) next.experience = updates.experience.trim();
-  if (typeof updates.certificates === "string" && updates.certificates.trim()) next.certificates = updates.certificates.trim();
   if (updates.plan === "full" || updates.plan === "gentle") next.plan = updates.plan;
   if (updates.aiConsent === true) next.aiConsent = true;
   if (updates.emailConsent === true) next.emailConsent = true;
   return next;
 }
 
-function localReady(state: ChatState) {
-  return Boolean(
-    state.targetRole &&
-    state.companyType &&
-    state.targetArea &&
-    state.fullName &&
-    state.email &&
-    state.phone &&
-    state.resumeSummary &&
-    state.skills &&
-    state.experience &&
-    state.certificates &&
-    state.aiConsent &&
-    state.emailConsent
-  );
+function campaignReady(state: ChatState) {
+  return Boolean(state.targetRole && state.companyType && state.targetArea && state.aiConsent && state.emailConsent);
 }
 
 function fallbackQuestion(state: ChatState) {
-  if (!state.targetRole) return "What job should I hunt for? Example: Support Worker, Admin Assistant, Social Worker.";
-  if (!state.companyType) return "What kind of companies should I look for? Example: NDIS providers, aged care, healthcare, local offices.";
+  if (!state.targetRole) return "What job should I hunt for? Example: Support Worker, Admin Assistant, Cyber Security Analyst.";
+  if (!state.companyType) return "What kind of companies should I look for? Example: NDIS providers, startups, aged care, local offices.";
   if (!state.targetArea) return "Where should I look? Give me a suburb, city, or area.";
   if (!state.aiConsent || !state.emailConsent) return "Do you consent to AI draft support and later Gmail access request, with you approving before anything sends?";
-  return "Campaign memory is ready. Now make sure your Master Resume canvas is complete, then launch when ready.";
+  return "Campaign target is ready. Continue to the resume canvas and fill your master resume like a document.";
 }
 
 export default function HomePage() {
@@ -136,7 +116,7 @@ export default function HomePage() {
   const [thinking, setThinking] = useState(false);
 
   const dailyLimit = state.plan === "gentle" ? 10 : 100;
-  const canLaunch = state.readyToLaunch || localReady(state);
+  const canContinue = state.readyToLaunch || campaignReady(state);
 
   useEffect(() => {
     const saved = readCache();
@@ -191,7 +171,7 @@ export default function HomePage() {
       });
       const data = await response.json();
       const updated = applyUpdates(withUser, data?.updates);
-      const ready = Boolean(data?.readyToLaunch) || localReady(updated);
+      const ready = Boolean(data?.readyToLaunch) || campaignReady(updated);
       const assistantText = data?.source === "openai"
         ? data?.assistantMessage || fallbackQuestion(updated)
         : fallbackQuestion(updated);
@@ -201,7 +181,7 @@ export default function HomePage() {
         readyToLaunch: ready,
         messages: [...withUser.messages, { role: "applix", text: assistantText }],
       });
-      setStatus(data?.source === "openai" ? "OpenAI connected" : "Fallback: add OPENAI_API_KEY in Vercel");
+      setStatus(data?.source === "openai" ? "OpenAI connected" : "Fallback: campaign saved locally");
     } catch {
       setState({
         ...withUser,
@@ -213,11 +193,7 @@ export default function HomePage() {
     }
   }
 
-  function updateResume(field: keyof ChatState, value: string) {
-    setState((current) => ({ ...current, [field]: value }));
-  }
-
-  function launch() {
+  function continueToResume() {
     const draft = {
       targetRole: state.targetRole,
       industry: state.companyType,
@@ -227,7 +203,7 @@ export default function HomePage() {
       longitude: null,
       radiusKm: state.radiusKm,
       resumeName: state.fullName || "Applix resume",
-      resumeSource: "master_resume_canvas",
+      resumeSource: "resume_canvas",
       resumeSnapshot: {
         fullName: state.fullName,
         email: state.email,
@@ -244,7 +220,8 @@ export default function HomePage() {
       createdAt: new Date().toISOString(),
     };
     sessionStorage.setItem("applixCampaignDraft", JSON.stringify(draft));
-    router.push("/login?next=/dashboard");
+    localStorage.setItem(CACHE_KEY, JSON.stringify(state));
+    router.push("/resume-canvas");
   }
 
   function clearChat() {
@@ -273,7 +250,7 @@ export default function HomePage() {
         <section style={styles.chatPanel}>
           <div style={styles.chatHeader}>
             <div style={styles.dots}><span style={{ ...styles.dot, background: "#ff8a3d" }} /><span style={{ ...styles.dot, background: "#5ee7ff" }} /><span style={{ ...styles.dot, background: "#8b5cf6" }} /></div>
-            <strong>{canLaunch ? "Ready to launch" : "Chat with Applix"}</strong>
+            <strong>{canContinue ? "Campaign ready" : "Chat with Applix"}</strong>
           </div>
 
           <div ref={messagesRef} style={styles.messages}>
@@ -291,7 +268,7 @@ export default function HomePage() {
                   send(input);
                 }
               }}
-              placeholder="Message Applix about target role, company type, area, or sending pace..."
+              placeholder="Tell Applix the role, company type, area, pace, or consent..."
               style={styles.textInput}
               disabled={thinking}
             />
@@ -308,22 +285,8 @@ export default function HomePage() {
             <button type="button" style={styles.clearButton} onClick={clearChat}>Clear</button>
           </div>
           <div style={styles.summaryBox}>{summary.map(([label, value]) => <div key={label} style={styles.summaryRow}><strong>{label}</strong><span>{value}</span></div>)}</div>
-          <button type="button" style={canLaunch ? styles.launchButton : styles.disabledLaunchButton} onClick={launch} disabled={!canLaunch}>Launch Applix</button>
-          <p style={styles.helpText}>{canLaunch ? "You can launch and review in the dashboard." : "Chat about the job target and complete the Master Resume canvas."}</p>
-
-          <section style={styles.resumeCanvas}>
-            <p style={styles.eyebrow}>Master Resume Canvas</p>
-            <h2 style={styles.resumeTitle}>Source of truth</h2>
-            <p style={styles.resumeNote}>Edit this directly. Applix can tailor copies later, but this master resume stays reusable.</p>
-
-            <label style={styles.canvasLabel}>Full name<input style={styles.canvasInput} value={state.fullName} onChange={(event) => updateResume("fullName", event.target.value)} placeholder="Your full name" /></label>
-            <label style={styles.canvasLabel}>Email<input style={styles.canvasInput} value={state.email} onChange={(event) => updateResume("email", event.target.value)} placeholder="you@email.com" /></label>
-            <label style={styles.canvasLabel}>Phone<input style={styles.canvasInput} value={state.phone} onChange={(event) => updateResume("phone", event.target.value)} placeholder="04xx xxx xxx" /></label>
-            <label style={styles.canvasLabel}>Profile summary<textarea style={styles.canvasTextarea} value={state.resumeSummary} onChange={(event) => updateResume("resumeSummary", event.target.value)} placeholder="Short professional summary..." /></label>
-            <label style={styles.canvasLabel}>Skills<textarea style={styles.canvasTextarea} value={state.skills} onChange={(event) => updateResume("skills", event.target.value)} placeholder="Skills separated by commas or lines..." /></label>
-            <label style={styles.canvasLabel}>Experience<textarea style={styles.canvasTextareaLarge} value={state.experience} onChange={(event) => updateResume("experience", event.target.value)} placeholder="Work history, projects, responsibilities, achievements..." /></label>
-            <label style={styles.canvasLabel}>Certificates / checks<textarea style={styles.canvasTextarea} value={state.certificates} onChange={(event) => updateResume("certificates", event.target.value)} placeholder="First Aid, CPR, Police Check, WWCC, licences, or none..." /></label>
-          </section>
+          <button type="button" style={canContinue ? styles.launchButton : styles.disabledLaunchButton} onClick={continueToResume} disabled={!canContinue}>Continue to Resume Canvas</button>
+          <p style={styles.helpText}>{canContinue ? "Next: fill your master resume on a white document canvas." : "Tell Applix the campaign target first. Resume comes next."}</p>
         </aside>
       </section>
     </main>
@@ -332,14 +295,14 @@ export default function HomePage() {
 
 const styles = {
   main: { minHeight: "100vh", background: "radial-gradient(circle at 18% 14%, rgba(255,138,61,.18), transparent 24%), radial-gradient(circle at 72% 24%, rgba(94,231,255,.1), transparent 26%), linear-gradient(135deg,#080403,#050914 42%,#07070b)", color: "#f8fafc", fontFamily: "Arial, Helvetica, sans-serif", padding: "18px" },
-  topbar: { maxWidth: 1320, margin: "0 auto 18px", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 18, background: "rgba(15,23,42,.62)", border: "1px solid rgba(255,138,61,.2)" },
+  topbar: { maxWidth: 1220, margin: "0 auto 18px", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 18, background: "rgba(15,23,42,.62)", border: "1px solid rgba(255,138,61,.2)" },
   logo: { display: "grid", placeItems: "center", width: 34, height: 34, borderRadius: 10, background: "#17100b", border: "1px solid rgba(255,154,76,.7)", color: "#ffc27a", textDecoration: "none", fontWeight: 900 },
   product: { display: "block", fontSize: 18, letterSpacing: .3 },
   subProduct: { display: "block", color: "#94a3b8", fontSize: 12, fontWeight: 800 },
   topActions: { marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 },
   statusPill: { padding: "7px 10px", borderRadius: 999, background: "rgba(94,231,255,.1)", color: "#cbd5e1", fontSize: 12, fontWeight: 900 },
   accountLink: { color: "#ffd08a", textDecoration: "none", fontSize: 13, fontWeight: 900 },
-  appShell: { maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 430px", gap: 18, alignItems: "stretch" },
+  appShell: { maxWidth: 1220, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 340px", gap: 18, alignItems: "stretch" },
   chatPanel: { minWidth: 0, height: "calc(100vh - 104px)", borderRadius: 22, background: "linear-gradient(180deg,rgba(13,18,31,.98),rgba(8,12,20,.98))", border: "1px solid rgba(255,138,61,.38)", overflow: "hidden", display: "flex", flexDirection: "column" as const, boxShadow: "0 30px 90px rgba(0,0,0,.28)" },
   chatHeader: { display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: "1px solid rgba(255,138,61,.2)", color: "#5ee7ff", letterSpacing: 1.1, textTransform: "uppercase" as const, fontSize: 12 },
   dots: { display: "flex", gap: 6 },
@@ -360,11 +323,4 @@ const styles = {
   launchButton: { width: "100%", marginTop: 18, border: 0, borderRadius: 999, padding: "15px 18px", background: "linear-gradient(135deg,#ff8a3d,#5ee7ff)", color: "#090d18", fontWeight: 900, cursor: "pointer" },
   disabledLaunchButton: { width: "100%", marginTop: 18, border: "1px solid rgba(255,255,255,.12)", borderRadius: 999, padding: "15px 18px", background: "rgba(255,255,255,.04)", color: "#64748b", fontWeight: 900, cursor: "not-allowed" },
   helpText: { color: "#94a3b8", lineHeight: 1.5, fontSize: 13, fontWeight: 800 },
-  resumeCanvas: { marginTop: 22, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,.1)" },
-  resumeTitle: { margin: "6px 0 6px", fontSize: 24, letterSpacing: -0.8, color: "#ffffff" },
-  resumeNote: { margin: "0 0 14px", color: "#94a3b8", lineHeight: 1.45, fontSize: 13, fontWeight: 800 },
-  canvasLabel: { display: "grid", gap: 7, marginTop: 12, color: "#dbeafe", fontSize: 13, fontWeight: 900 },
-  canvasInput: { width: "100%", border: "1px solid rgba(255,138,61,.26)", borderRadius: 14, padding: "12px 13px", color: "#ffffff", background: "rgba(2,6,23,.72)", fontWeight: 800, outline: "none" },
-  canvasTextarea: { width: "100%", minHeight: 78, resize: "vertical" as const, border: "1px solid rgba(255,138,61,.26)", borderRadius: 14, padding: "12px 13px", color: "#ffffff", background: "rgba(2,6,23,.72)", fontWeight: 800, fontFamily: "Arial, Helvetica, sans-serif", outline: "none" },
-  canvasTextareaLarge: { width: "100%", minHeight: 120, resize: "vertical" as const, border: "1px solid rgba(255,138,61,.26)", borderRadius: 14, padding: "12px 13px", color: "#ffffff", background: "rgba(2,6,23,.72)", fontWeight: 800, fontFamily: "Arial, Helvetica, sans-serif", outline: "none" },
 };
