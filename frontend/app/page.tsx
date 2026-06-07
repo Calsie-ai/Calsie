@@ -1,9 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import MapRadiusSelector, { type MapSelection } from "../components/MapRadiusSelector";
+
+const APPLIX_DRAFT_CACHE_KEY = "applixLaunchFormCache";
+
+type ResumeSnapshot = {
+  fullName: string;
+  email: string;
+  phone: string;
+  location: string;
+  summary: string;
+  skills: string;
+  experience: string;
+  certificates: string;
+};
 
 type CampaignDraft = {
   targetRole: string;
@@ -15,20 +28,42 @@ type CampaignDraft = {
   radiusKm: number;
   resumeName: string;
   resumeSource: "inline_form" | "applix_profile" | "not_ready";
-  resumeSnapshot: {
-    fullName: string;
-    email: string;
-    phone: string;
-    location: string;
-    summary: string;
-    skills: string;
-    experience: string;
-    certificates: string;
-  };
+  resumeSnapshot: ResumeSnapshot;
   dailyLimit: number;
   campaignDays: number;
   emailConsent: boolean;
   createdAt: string;
+};
+
+type LaunchFormCache = {
+  step: number;
+  targetRole: string;
+  industry: string;
+  plan: "gentle" | "full";
+  aiConsent: boolean;
+  emailConsent: boolean;
+  resume: ResumeSnapshot;
+  mapSelection: MapSelection;
+  savedAt: string;
+};
+
+const emptyResume: ResumeSnapshot = {
+  fullName: "",
+  email: "",
+  phone: "",
+  location: "",
+  summary: "",
+  skills: "",
+  experience: "",
+  certificates: "",
+};
+
+const defaultMapSelection: MapSelection = {
+  selectedAddress: "",
+  placeId: "",
+  latitude: null,
+  longitude: null,
+  radiusKm: 20,
 };
 
 const steps = [
@@ -82,6 +117,28 @@ const steps = [
   },
 ];
 
+function readLaunchCache(): LaunchFormCache | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(APPLIX_DRAFT_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LaunchFormCache>;
+    return {
+      step: typeof parsed.step === "number" ? Math.min(Math.max(parsed.step, 0), steps.length - 1) : 0,
+      targetRole: parsed.targetRole || "",
+      industry: parsed.industry || "",
+      plan: parsed.plan === "full" ? "full" : "gentle",
+      aiConsent: Boolean(parsed.aiConsent),
+      emailConsent: Boolean(parsed.emailConsent),
+      resume: { ...emptyResume, ...(parsed.resume || {}) },
+      mapSelection: { ...defaultMapSelection, ...(parsed.mapSelection || {}) },
+      savedAt: parsed.savedAt || "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -90,30 +147,69 @@ export default function HomePage() {
   const [plan, setPlan] = useState<"gentle" | "full">("gentle");
   const [aiConsent, setAiConsent] = useState(false);
   const [emailConsent, setEmailConsent] = useState(false);
-  const [resume, setResume] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    location: "",
-    summary: "",
-    skills: "",
-    experience: "",
-    certificates: "",
-  });
-  const [mapSelection, setMapSelection] = useState<MapSelection>({
-    selectedAddress: "",
-    placeId: "",
-    latitude: null,
-    longitude: null,
-    radiusKm: 20,
-  });
+  const [resume, setResume] = useState<ResumeSnapshot>(emptyResume);
+  const [mapSelection, setMapSelection] = useState<MapSelection>(defaultMapSelection);
   const [error, setError] = useState("");
+  const [cacheStatus, setCacheStatus] = useState("Draft autosaves in this browser.");
+  const [cacheLoaded, setCacheLoaded] = useState(false);
 
   const activeStep = steps[step];
   const dailyLimit = plan === "gentle" ? 10 : 100;
   const campaignDays = 10;
 
-  function updateResume(field: keyof typeof resume, value: string) {
+  useEffect(() => {
+    const cache = readLaunchCache();
+    if (cache) {
+      setStep(cache.step);
+      setTargetRole(cache.targetRole);
+      setIndustry(cache.industry);
+      setPlan(cache.plan);
+      setAiConsent(cache.aiConsent);
+      setEmailConsent(cache.emailConsent);
+      setResume(cache.resume);
+      setMapSelection(cache.mapSelection);
+      setCacheStatus("Restored your saved Applix draft from this browser.");
+    }
+    setCacheLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!cacheLoaded || typeof window === "undefined") return;
+
+    const cache: LaunchFormCache = {
+      step,
+      targetRole,
+      industry,
+      plan,
+      aiConsent,
+      emailConsent,
+      resume,
+      mapSelection,
+      savedAt: new Date().toISOString(),
+    };
+
+    window.localStorage.setItem(APPLIX_DRAFT_CACHE_KEY, JSON.stringify(cache));
+    setCacheStatus("Saved in this browser.");
+  }, [cacheLoaded, step, targetRole, industry, plan, aiConsent, emailConsent, resume, mapSelection]);
+
+  function clearSavedDraft() {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(APPLIX_DRAFT_CACHE_KEY);
+      window.sessionStorage.removeItem("applixCampaignDraft");
+    }
+    setStep(0);
+    setTargetRole("");
+    setIndustry("");
+    setPlan("gentle");
+    setAiConsent(false);
+    setEmailConsent(false);
+    setResume(emptyResume);
+    setMapSelection(defaultMapSelection);
+    setError("");
+    setCacheStatus("Saved draft cleared.");
+  }
+
+  function updateResume(field: keyof ResumeSnapshot, value: string) {
     setResume((current) => ({ ...current, [field]: value }));
   }
 
@@ -178,6 +274,17 @@ export default function HomePage() {
     };
 
     sessionStorage.setItem("applixCampaignDraft", JSON.stringify(draft));
+    localStorage.setItem(APPLIX_DRAFT_CACHE_KEY, JSON.stringify({
+      step,
+      targetRole,
+      industry,
+      plan,
+      aiConsent,
+      emailConsent,
+      resume,
+      mapSelection,
+      savedAt: new Date().toISOString(),
+    }));
     router.push("/login?next=/dashboard");
   }
 
@@ -218,6 +325,11 @@ export default function HomePage() {
             <span style={{ ...styles.dot, background: "#ff8a3d" }} />
             <span style={{ ...styles.dot, background: "#5ee7ff" }} />
             <span style={{ ...styles.dot, background: "#8b5cf6" }} />
+          </div>
+
+          <div style={styles.cacheBar}>
+            <span>{cacheStatus}</span>
+            <button type="button" style={styles.clearButton} onClick={clearSavedDraft}>Clear draft</button>
           </div>
 
           <div style={styles.stepNav}>
@@ -371,6 +483,8 @@ const styles = {
   launchCard: { borderRadius: 22, padding: 0, background: "linear-gradient(180deg, rgba(13, 18, 31, 0.98), rgba(8, 12, 20, 0.98))", boxShadow: "0 30px 90px rgba(0, 0, 0, 0.38)", border: "1px solid rgba(255, 138, 61, 0.45)", overflow: "hidden" },
   windowDots: { display: "flex", alignItems: "center", gap: 6, padding: "12px 14px", borderBottom: "1px solid rgba(255, 138, 61, 0.28)" },
   dot: { width: 8, height: 8, borderRadius: 999, display: "block" },
+  cacheBar: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: "12px 18px", color: "#cbd5e1", background: "rgba(94,231,255,0.06)", borderBottom: "1px solid rgba(94,231,255,0.14)", fontSize: 12, fontWeight: 800 },
+  clearButton: { border: "1px solid rgba(255,255,255,0.14)", background: "transparent", color: "#ffd08a", borderRadius: 999, padding: "7px 10px", fontWeight: 900, cursor: "pointer" },
   stepNav: { display: "flex", gap: 8, overflowX: "auto" as const, padding: "14px 18px", borderBottom: "1px solid rgba(255, 138, 61, 0.18)" },
   stepPill: { whiteSpace: "nowrap" as const, border: "1px solid rgba(255,255,255,0.12)", borderRadius: 999, background: "transparent", color: "#9ca3af", padding: "9px 12px", fontWeight: 900, cursor: "pointer" },
   activeStepPill: { whiteSpace: "nowrap" as const, border: 0, borderRadius: 999, background: "linear-gradient(135deg, #ff8a3d, #ffd08a)", color: "#120804", padding: "9px 12px", fontWeight: 900, cursor: "pointer" },
