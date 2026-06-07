@@ -52,9 +52,28 @@ function cleanJson(text: string) {
 
 async function extractPdfText(buffer: Buffer) {
   const pdfModule: any = await import("pdf-parse");
-  const pdfParse = pdfModule.default || pdfModule;
-  const data = await pdfParse(buffer);
-  return data.text || "";
+
+  if (typeof pdfModule.default === "function") {
+    const data = await pdfModule.default(buffer);
+    return data.text || "";
+  }
+
+  if (typeof pdfModule === "function") {
+    const data = await pdfModule(buffer);
+    return data.text || "";
+  }
+
+  if (typeof pdfModule.PDFParse === "function") {
+    const parser = new pdfModule.PDFParse({ data: buffer });
+    try {
+      const result = await parser.getText();
+      return result.text || "";
+    } finally {
+      if (typeof parser.destroy === "function") await parser.destroy();
+    }
+  }
+
+  throw new Error("PDF parser could not read this file. Try DOCX or TXT, or upload a text-based PDF.");
 }
 
 async function extractText(file: File) {
