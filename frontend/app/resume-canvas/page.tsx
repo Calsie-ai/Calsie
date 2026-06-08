@@ -95,11 +95,11 @@ export default function ResumeCanvasPage() {
       experience: resume.experience,
       certificates: resume.certificates,
     });
-    if (!parsing) setStatus("Saved in this browser.");
-  }, [resume, parsing]);
+  }, [resume]);
 
   function update(field: keyof ResumeState, value: string) {
     setResume((current) => ({ ...current, [field]: value }));
+    setStatus("Saved in this browser.");
   }
 
   async function uploadResume(event: ChangeEvent<HTMLInputElement>) {
@@ -124,17 +124,21 @@ export default function ResumeCanvasPage() {
       }
 
       const parsed = data.parsed || {};
-      setResume((current) => ({
-        fullName: parsed.fullName || current.fullName,
-        email: parsed.email || current.email,
-        phone: parsed.phone || current.phone,
-        location: parsed.location || current.location || campaign.targetArea || "",
-        resumeSummary: parsed.resumeSummary || current.resumeSummary,
-        skills: parsed.skills || current.skills,
-        experience: parsed.experience || current.experience,
-        certificates: parsed.certificates || current.certificates,
-      }));
-      setStatus("Resume parsed and filled into the canvas. Review and edit anything you want.");
+      const nextResume = {
+        fullName: parsed.fullName || resume.fullName,
+        email: parsed.email || resume.email,
+        phone: parsed.phone || resume.phone,
+        location: parsed.location || resume.location || campaign.targetArea || "",
+        resumeSummary: parsed.resumeSummary || resume.resumeSummary,
+        skills: parsed.skills || resume.skills,
+        experience: parsed.experience || resume.experience,
+        certificates: parsed.certificates || resume.certificates,
+      };
+      setResume(nextResume);
+
+      const filled = data.filledCount ?? Object.values(nextResume).filter(Boolean).length;
+      const aiText = data.usedOpenAI ? "OpenAI parsed it" : "Fallback parser filled what it could";
+      setStatus(`${aiText}. Filled ${filled} fields from ${data.filename || file.name}. Review and edit the canvas.`);
     } catch (error: any) {
       setStatus(error?.message || "Resume parsing failed. Try DOCX, TXT, or a text-based PDF.");
     } finally {
@@ -280,7 +284,7 @@ const styles = {
   main: { minHeight: "100vh", background: "#e7e9ef", color: "#111827", fontFamily: "Arial, Helvetica, sans-serif", padding: 18 },
   topbar: { maxWidth: 1220, margin: "0 auto 18px", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 18, background: "#ffffff", border: "1px solid #d8dee9", boxShadow: "0 10px 30px rgba(15,23,42,.08)" },
   backLink: { color: "#111827", textDecoration: "none", fontWeight: 900 },
-  status: { marginLeft: "auto", color: "#64748b", fontSize: 13, fontWeight: 800, maxWidth: 460, textAlign: "right" as const },
+  status: { marginLeft: "auto", color: "#64748b", fontSize: 13, fontWeight: 800, maxWidth: 520, textAlign: "right" as const },
   launchTop: { border: 0, borderRadius: 999, padding: "12px 18px", background: "#111827", color: "white", fontWeight: 900, cursor: "pointer" },
   shell: { maxWidth: 1220, margin: "0 auto", display: "grid", gridTemplateColumns: "320px minmax(0, 1fr)", gap: 22, alignItems: "start" },
   sidePanel: { position: "sticky" as const, top: 18, background: "#111827", color: "white", borderRadius: 24, padding: 22, boxShadow: "0 20px 50px rgba(15,23,42,.18)" },
