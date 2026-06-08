@@ -26,13 +26,34 @@ function emptyParsedResume(): ParsedResume {
   };
 }
 
+function getLines(text: string) {
+  return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+}
+
+function findBlock(lines: string[], names: string[]) {
+  const lowerNames = names.map((name) => name.toLowerCase());
+  const stopNames = ["profile", "summary", "skills", "experience", "employment", "education", "certificates", "certifications", "checks", "training", "referees", "references"];
+  const start = lines.findIndex((line) => lowerNames.includes(line.toLowerCase().replace(/:$/, "")));
+  if (start < 0) return "";
+  const collected: string[] = [];
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const clean = lines[index].toLowerCase().replace(/:$/, "");
+    if (stopNames.includes(clean)) break;
+    collected.push(lines[index]);
+  }
+  return collected.join("\n").slice(0, 3000);
+}
+
 function extractBasic(text: string): ParsedResume {
   const parsed = emptyParsedResume();
-  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  parsed.fullName = lines[0] || "";
+  const lines = getLines(text);
+  parsed.fullName = lines.find((line) => !line.includes("@") && !/\d/.test(line) && line.length > 2 && line.length < 60) || "";
   parsed.email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
   parsed.phone = text.match(/(?:\+?61|0)\s?4\d{2}\s?\d{3}\s?\d{3}|\+?\d[\d\s().-]{7,}\d/)?.[0] || "";
-  parsed.resumeSummary = lines.slice(0, 6).join(" ").slice(0, 700);
+  parsed.resumeSummary = findBlock(lines, ["profile", "summary", "professional summary", "objective"]) || lines.slice(0, 8).join(" ").slice(0, 900);
+  parsed.skills = findBlock(lines, ["skills", "key skills", "technical skills", "core skills"]);
+  parsed.experience = findBlock(lines, ["experience", "work experience", "employment", "employment history", "work history"]);
+  parsed.certificates = findBlock(lines, ["certificates", "certifications", "checks", "training"]);
   return parsed;
 }
 
@@ -99,63 +120,61 @@ async function extractText(file: File) {
   throw new Error("Unsupported file type. Upload PDF, DOCX, or TXT for now.");
 }
 
-async function parseWithOpenAI(rawText: string): Promise<ParsedResume> {
+function mergeParsed(aiParsed: any, fallback: ParsedResume): ParsedResume {
+  return {
+    fullName: String(aiParsed?.fullName || fallback.fullName || ""),
+    email: String(aiParsed?.email || fallback.email || ""),
+    phone: String(aiParsed?.phone || fallback.phone || ""),
+    location: String(aiParsed?.location || fallback.location || ""),
+    resumeSummary: String(aiParsed?.resumeSummary || fallback.resumeSummary || ""),
+    skills: String(aiParsed?.skills || fallback.skills || ""),
+    experience: String(aiParsed?.experience || fallback.experience || ""),
+    certificates: String(aiParsed?.certificates || fallback.certificates || ""),
+  };
+}
+
+function countFilled(parsed: ParsedResume) {
+  return Object.values(parsed).filter((value) => String(value || "").trim()).length;
+}
+
+async function parseWithOpenAI(rawText: string): Promise<{ parsed: ParsedResume; usedOpenAI: boolean; openAIError: string }> {
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
   const fallback = extractBasic(rawText);
 
-  if (!apiKey) return fallback;
+  if (!apiKey) return { parsed: fallback, usedOpenAI: false, openAIError: "OPENAI_API_KEY missing" };
 
-  const systemPrompt = `You parse resume text into a clean master resume canvas.
-Do not invent facts. Only use information present in the resume text.
-Return valid JSON only with this exact shape:
-{
-  "fullName": "",
-  "email": "",
-  "phone": "",
-  "location": "",
-  "resumeSummary": "",
-  "skills": "",
-  "experience": "",
-  "certificates": ""
-}
-Keep experience resume-like with company/role/date/bullets when possible.
-For certificates, include certificate names, checks, licences, clearances, or training modules. If none found, return empty string.`;
+  const systemPrompt = `You parse resume text into a clean master resume canvas. Do not invent facts. Return valid JSON only with: fullName, email, phone, location, resumeSummary, skills, experience, certificates.`;
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: rawText.slice(0, 30000) },
-      ],
-    }),
-  });
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: rawText.slice(0, 30000) },
+        ],
+      }),
+    });
 
-  if (!response.ok) return fallback;
+    if (!response.ok) return { parsed: fallback, usedOpenAI: false, openAIError: await response.text() };
 
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content || "";
-  const parsed = cleanJson(content);
-  if (!parsed) return fallback;
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content || "";
+    const aiParsed = cleanJson(content);
+    if (!aiParsed) return { parsed: fallback, usedOpenAI: false, openAIError: "OpenAI returned non-JSON" };
 
-  return {
-    fullName: String(parsed.fullName || fallback.fullName || ""),
-    email: String(parsed.email || fallback.email || ""),
-    phone: String(parsed.phone || fallback.phone || ""),
-    location: String(parsed.location || ""),
-    resumeSummary: String(parsed.resumeSummary || fallback.resumeSummary || ""),
-    skills: String(parsed.skills || ""),
-    experience: String(parsed.experience || ""),
-    certificates: String(parsed.certificates || ""),
-  };
+    return { parsed: mergeParsed(aiParsed, fallback), usedOpenAI: true, openAIError: "" };
+  } catch (error: any) {
+    return { parsed: fallback, usedOpenAI: false, openAIError: error?.message || "OpenAI parse failed" };
+  }
 }
 
 export async function POST(req: Request) {
@@ -176,13 +195,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Could not read text from this resume. Try DOCX, TXT, or a text-based PDF." }, { status: 400 });
     }
 
-    const parsed = await parseWithOpenAI(rawText);
+    const result = await parseWithOpenAI(rawText);
 
     return NextResponse.json({
       ok: true,
       filename: file.name,
       textLength: rawText.length,
-      parsed,
+      textPreview: rawText.slice(0, 700),
+      usedOpenAI: result.usedOpenAI,
+      openAIError: result.openAIError,
+      filledCount: countFilled(result.parsed),
+      parsed: result.parsed,
     });
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message || "Resume parsing failed." }, { status: 500 });
