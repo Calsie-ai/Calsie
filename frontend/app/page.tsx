@@ -54,6 +54,18 @@ export default function HomePage() {
           allowFullScreen
         />
 
+        <div className="applix-blob-spin" aria-hidden="true" />
+        <div className="speed-rays speed-rays-main" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="diamond-spin" aria-hidden="true" />
+        <div className="star-spin" aria-hidden="true">✦</div>
+        <div className="star-spin star-spin-small" aria-hidden="true">✦</div>
+        <div className="atom-spin" aria-hidden="true">⚛</div>
+
         <form className="hotspot-form hotspot-top" onSubmit={submitTop} aria-label="Top APPLIX signup form">
           <input
             value={topEmail}
