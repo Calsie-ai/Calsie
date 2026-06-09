@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 const inviteCode = "Applixvvip26";
 const canvaEmbedUrl = "https://www.canva.com/design/DAHMEDtiZZ0/view?embed";
 
+function hideMissingAsset(event: React.SyntheticEvent<HTMLImageElement>) {
+  event.currentTarget.style.display = "none";
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [topEmail, setTopEmail] = useState("");
@@ -54,17 +58,11 @@ export default function HomePage() {
           allowFullScreen
         />
 
-        <div className="applix-blob-spin" aria-hidden="true" />
-        <div className="speed-rays speed-rays-main" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="diamond-spin" aria-hidden="true" />
-        <div className="star-spin" aria-hidden="true">✦</div>
-        <div className="star-spin star-spin-small" aria-hidden="true">✦</div>
-        <div className="atom-spin" aria-hidden="true">⚛</div>
+        <img className="applix-asset asset-blob" src="/applix-assets/applix-blob.svg" alt="" onError={hideMissingAsset} />
+        <img className="applix-asset asset-rays" src="/applix-assets/rays.svg" alt="" onError={hideMissingAsset} />
+        <img className="applix-asset asset-diamond" src="/applix-assets/diamond.svg" alt="" onError={hideMissingAsset} />
+        <img className="applix-asset asset-star" src="/applix-assets/star.svg" alt="" onError={hideMissingAsset} />
+        <img className="applix-asset asset-atom" src="/applix-assets/atom.svg" alt="" onError={hideMissingAsset} />
 
         <form className="hotspot-form hotspot-top" onSubmit={submitTop} aria-label="Top APPLIX signup form">
           <input
