@@ -41,6 +41,18 @@ select {
   overflow: hidden;
 }
 
+.canva-stage::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6.22%;
+  height: 3px;
+  background: #000000;
+  z-index: 4;
+  pointer-events: none;
+}
+
 .canva-frame {
   position: absolute;
   inset: 0;
