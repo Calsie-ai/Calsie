@@ -7,9 +7,13 @@ export default function HomePage() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (magicLinkSent) return;
+
     setStatus("");
     setLoading(true);
 
@@ -30,7 +34,8 @@ export default function HomePage() {
         return;
       }
 
-      setStatus("Magic link sent. Check your email, then open the link to enter your dashboard.");
+      setMagicLinkSent(true);
+      setStatus("Magic link sent to your email. Please check your email.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not send magic link.");
     } finally {
@@ -48,7 +53,7 @@ export default function HomePage() {
           Sign in with your email. If you have no campaign yet, your dashboard will show a simple start button.
         </p>
 
-        <form className="auth-form" onSubmit={sendMagicLink}>
+        <form className={`auth-form ${magicLinkSent ? "auth-form-sent" : ""}`} onSubmit={sendMagicLink}>
           <label htmlFor="email">Enter your email</label>
           <input
             id="email"
@@ -57,14 +62,15 @@ export default function HomePage() {
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
             autoComplete="email"
+            disabled={loading || magicLinkSent}
             required
           />
-          <button type="submit" disabled={loading}>
-            {loading ? "Sending..." : "Get Magic Link"}
+          <button type="submit" disabled={loading || magicLinkSent}>
+            {magicLinkSent ? "Magic Link Sent" : loading ? "Sending..." : "Get Magic Link"}
           </button>
         </form>
 
-        {status && <p className="form-status">{status}</p>}
+        {status && <p className={magicLinkSent ? "form-status success-status" : "form-status"}>{status}</p>}
       </section>
     </main>
   );
