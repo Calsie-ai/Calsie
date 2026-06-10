@@ -54,10 +54,21 @@ export default function NewCampaignPage() {
       const { error } = await supabase.from("campaigns").insert({
         user_id: userId,
         name: name.trim(),
-        target_role: targetRole.trim(),
-        target_location: targetLocation.trim() || null,
-        daily_cap: dailyCap,
-        notes: notes.trim() || null,
+        location: targetLocation.trim() || null,
+        target_business_type: targetRole.trim(),
+        search: {
+          target_role: targetRole.trim(),
+          target_location: targetLocation.trim() || null,
+          notes: notes.trim() || null,
+        },
+        filters: {
+          location: targetLocation.trim() || null,
+          notes: notes.trim() || null,
+        },
+        outreach: {
+          daily_cap: dailyCap,
+          notes: notes.trim() || null,
+        },
         status: "draft",
       });
 
