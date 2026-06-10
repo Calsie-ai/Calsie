@@ -52,7 +52,11 @@ export default function HomePage() {
       });
 
       if (error) {
-        setStatus(error.message);
+        const message = error.message.toLowerCase().includes("rate")
+          ? "Email rate limit reached. For testing, open Dashboard if you are already signed in, or wait before requesting another magic link."
+          : error.message;
+
+        setStatus(message);
         return;
       }
 
@@ -74,6 +78,10 @@ export default function HomePage() {
         <p className="landing-copy">
           Sign in with your email. If you have no campaign yet, your dashboard will show a simple start button.
         </p>
+
+        <div className="tester-shortcut">
+          <Link className="ghost-link" href="/dashboard">Already logged in? Open Dashboard</Link>
+        </div>
 
         {checkingSession && <p className="muted">Checking your login...</p>}
 
