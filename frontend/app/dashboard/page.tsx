@@ -11,7 +11,7 @@ type Campaign = {
   location: string | null;
   target_business_type: string | null;
   search: { target_role?: string; target_location?: string | null } | null;
-  outreach: { daily_cap?: number } | null;
+  outreach: { daily_cap?: number; hourly_cap?: number; campaign_days?: number } | null;
   status: string;
   created_at: string;
 };
@@ -25,7 +25,15 @@ function getCampaignLocation(campaign: Campaign) {
 }
 
 function getDailyCap(campaign: Campaign) {
-  return campaign.outreach?.daily_cap || 25;
+  return campaign.outreach?.daily_cap || 100;
+}
+
+function getHourlyCap(campaign: Campaign) {
+  return campaign.outreach?.hourly_cap || 5;
+}
+
+function getCampaignDays(campaign: Campaign) {
+  return campaign.outreach?.campaign_days || 10;
 }
 
 export default function DashboardPage() {
@@ -34,6 +42,8 @@ export default function DashboardPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [gmailStatus, setGmailStatus] = useState("Not connected");
+  const [connectingGmail, setConnectingGmail] = useState(false);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -63,6 +73,17 @@ export default function DashboardPage() {
         }
 
         setCampaigns((data || []) as Campaign[]);
+
+        const { data: authData } = await supabase
+          .from("user_email_authorizations")
+          .select("status,provider_email")
+          .eq("user_identifier", userData.user.email || userData.user.id)
+          .eq("provider", "google")
+          .maybeSingle();
+
+        if (authData?.status) {
+          setGmailStatus(authData.provider_email ? `${authData.status}: ${authData.provider_email}` : authData.status);
+        }
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Could not load dashboard.");
       } finally {
@@ -79,6 +100,30 @@ export default function DashboardPage() {
     router.replace("/");
   }
 
+  async function connectGmail() {
+    setConnectingGmail(true);
+    setErrorMessage("");
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase.functions.invoke("connect-gmail", {
+        body: {
+          user_identifier: email,
+          return_to: `${window.location.origin}/dashboard`,
+        },
+      });
+
+      if (error) throw error;
+      const url = data?.authorization_url;
+      if (!url) throw new Error(data?.error || "Google authorization URL was not returned.");
+
+      window.location.href = url;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not start Gmail connection.");
+      setConnectingGmail(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="dashboard-card">
@@ -92,8 +137,17 @@ export default function DashboardPage() {
         </div>
 
         <div className="empty-state">
+          <h2>Google consent</h2>
+          <p>Connect Gmail so Applix can write/send outreach on your behalf. Campaign limit: 5 emails/hour, 100 emails/day, for 10 days. Fresh leads are fetched daily.</p>
+          <p className="muted">Status: {gmailStatus}</p>
+          <button className="primary-button" type="button" onClick={connectGmail} disabled={connectingGmail || !email}>
+            {connectingGmail ? "Opening Google..." : "Connect Gmail"}
+          </button>
+        </div>
+
+        <div className="empty-state">
           <h2>Master Resume</h2>
-          <p>Upload, parse and edit your master resume. Applix will reuse it later for campaigns and tailored resumes.</p>
+          <p>Upload, parse and save your resume source. Applix keeps the original layout and stores parsed JSON separately.</p>
           <Link className="primary-link" href="/resume-canvas">Upload / Edit Master Resume</Link>
         </div>
 
@@ -118,6 +172,8 @@ export default function DashboardPage() {
               const role = getCampaignRole(campaign);
               const location = getCampaignLocation(campaign);
               const dailyCap = getDailyCap(campaign);
+              const hourlyCap = getHourlyCap(campaign);
+              const days = getCampaignDays(campaign);
 
               return (
                 <article className="campaign-row" key={campaign.id}>
@@ -127,7 +183,9 @@ export default function DashboardPage() {
                   </div>
                   <div className="campaign-meta">
                     <span>{campaign.status}</span>
+                    <span>{hourlyCap}/hour</span>
                     <span>{dailyCap}/day</span>
+                    <span>{days} days</span>
                   </div>
                 </article>
               );
