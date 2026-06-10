@@ -106,18 +106,28 @@ export default function DashboardPage() {
 
     try {
       const supabase = getSupabaseClient();
-      const { data, error } = await supabase.functions.invoke("connect-gmail", {
-        body: {
-          user_identifier: email,
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        throw new Error("Missing login session. Please sign in again.");
+      }
+
+      const response = await fetch("/api/applix/connect-gmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          access_token: accessToken,
           return_to: `${window.location.origin}/dashboard`,
-        },
+        }),
       });
 
-      if (error) throw error;
-      const url = data?.authorization_url;
-      if (!url) throw new Error(data?.error || "Google authorization URL was not returned.");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Google authorization URL was not returned.");
+      }
 
-      window.location.href = url;
+      window.location.href = data.authorization_url;
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not start Gmail connection.");
       setConnectingGmail(false);
