@@ -91,6 +91,12 @@ export default function DashboardPage() {
           <button className="ghost-button" type="button" onClick={signOut}>Sign out</button>
         </div>
 
+        <div className="empty-state">
+          <h2>Master Resume</h2>
+          <p>Upload, parse and edit your master resume. Applix will reuse it later for campaigns and tailored resumes.</p>
+          <Link className="primary-link" href="/resume-canvas">Upload / Edit Master Resume</Link>
+        </div>
+
         {loading && <p className="muted">Loading your campaigns...</p>}
         {errorMessage && <p className="error-text">{errorMessage}</p>}
 
