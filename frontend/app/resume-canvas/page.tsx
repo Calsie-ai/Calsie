@@ -54,6 +54,43 @@ function textBlock(value: string) {
   return value.trim() ? [{ text: value.trim() }] : [];
 }
 
+function readableValue(value: any): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value).trim();
+  if (Array.isArray(value)) return value.map(readableValue).filter(Boolean).join("\n");
+
+  if (typeof value === "object") {
+    const direct = value.text || value.name || value.title || value.qualification || value.certificate || value.licence || value.license || value.status || value.role;
+    if (direct && Object.keys(value).length <= 1) return String(direct).trim();
+
+    const parts: string[] = [];
+    if (value.qualification) parts.push(String(value.qualification));
+    if (value.institution) parts.push(String(value.institution));
+    if (value.year) parts.push(String(value.year));
+    if (value.status) parts.push(String(value.status));
+    if (value.availability) parts.push(String(value.availability));
+    if (value.driver_licence || value.driver_license) parts.push(`Driver licence: ${value.driver_licence || value.driver_license}`);
+    if (value.name) parts.push(String(value.name));
+    if (value.title) parts.push(String(value.title));
+    if (value.text) parts.push(String(value.text));
+
+    if (parts.length) return parts.filter(Boolean).join(" — ");
+
+    return Object.entries(value)
+      .map(([key, item]) => `${key.replace(/_/g, " ")}: ${readableValue(item)}`)
+      .filter((line) => !line.endsWith(": "))
+      .join("\n");
+  }
+
+  return "";
+}
+
+function readableList(value: any): string {
+  if (!value) return "";
+  if (Array.isArray(value)) return value.map(readableValue).filter(Boolean).join("\n");
+  return readableValue(value);
+}
+
 export default function ResumeCanvasPage() {
   const router = useRouter();
   const [userId, setUserId] = useState("");
@@ -103,13 +140,13 @@ export default function ResumeCanvasPage() {
             linkedin: existingResume.linkedin || "",
             website: existingResume.website_or_portfolio || "",
             profileSummary: existingResume.profile_summary || "",
-            skills: Array.isArray(existingResume.skills) ? existingResume.skills.join("\n") : "",
-            workExperience: Array.isArray(existingResume.work_experience) ? existingResume.work_experience.map((item: any) => item?.text || item?.role || JSON.stringify(item)).join("\n\n") : "",
-            education: Array.isArray(existingResume.education_locked) ? existingResume.education_locked.map((item: any) => item?.text || JSON.stringify(item)).join("\n") : "",
-            certifications: Array.isArray(existingResume.certifications_locked) ? existingResume.certifications_locked.join("\n") : "",
-            licences: Array.isArray(existingResume.licences_locked) ? existingResume.licences_locked.join("\n") : "",
-            workRights: existingResume.work_rights_locked ? JSON.stringify(existingResume.work_rights_locked, null, 2) : "",
-            references: Array.isArray(existingResume.references_locked) ? existingResume.references_locked.map((item: any) => item?.text || JSON.stringify(item)).join("\n") : "",
+            skills: readableList(existingResume.skills),
+            workExperience: readableList(existingResume.work_experience),
+            education: readableList(existingResume.education_locked),
+            certifications: readableList(existingResume.certifications_locked),
+            licences: readableList(existingResume.licences_locked),
+            workRights: readableValue(existingResume.work_rights_locked),
+            references: readableList(existingResume.references_locked),
             rawText: "",
           });
           setStatus("Loaded your saved Master Resume. Edit and save when ready.");
