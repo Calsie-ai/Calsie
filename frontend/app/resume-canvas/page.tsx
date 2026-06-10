@@ -5,120 +5,74 @@ import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 
-type ResumeState = {
+type ParsedData = {
   fullName: string;
   targetRole: string;
   email: string;
   phone: string;
   location: string;
-  linkedin: string;
-  website: string;
-  profileSummary: string;
+  summary: string;
   skills: string;
-  workExperience: string;
+  experience: string;
   education: string;
   certifications: string;
-  licences: string;
-  workRights: string;
-  references: string;
-  rawText: string;
 };
 
-const emptyResume: ResumeState = {
+const emptyParsed: ParsedData = {
   fullName: "",
   targetRole: "",
   email: "",
   phone: "",
   location: "",
-  linkedin: "",
-  website: "",
-  profileSummary: "",
+  summary: "",
   skills: "",
-  workExperience: "",
+  experience: "",
   education: "",
   certifications: "",
-  licences: "",
-  workRights: "",
-  references: "",
-  rawText: "",
 };
 
 function splitList(value: string) {
-  return value
-    .split(/\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return value.split(/\n|,/).map((item) => item.trim()).filter(Boolean);
 }
 
-function textBlock(value: string) {
+function block(value: string) {
   return value.trim() ? [{ text: value.trim() }] : [];
 }
 
-function readableValue(value: any): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value).trim();
-  if (Array.isArray(value)) return value.map(readableValue).filter(Boolean).join("\n");
-
-  if (typeof value === "object") {
-    const direct = value.text || value.name || value.title || value.qualification || value.certificate || value.licence || value.license || value.status || value.role;
-    if (direct && Object.keys(value).length <= 1) return String(direct).trim();
-
-    const parts: string[] = [];
-    if (value.qualification) parts.push(String(value.qualification));
-    if (value.institution) parts.push(String(value.institution));
-    if (value.year) parts.push(String(value.year));
-    if (value.status) parts.push(String(value.status));
-    if (value.availability) parts.push(String(value.availability));
-    if (value.driver_licence || value.driver_license) parts.push(`Driver licence: ${value.driver_licence || value.driver_license}`);
-    if (value.name) parts.push(String(value.name));
-    if (value.title) parts.push(String(value.title));
-    if (value.text) parts.push(String(value.text));
-
-    if (parts.length) return parts.filter(Boolean).join(" — ");
-
-    return Object.entries(value)
-      .map(([key, item]) => `${key.replace(/_/g, " ")}: ${readableValue(item)}`)
-      .filter((line) => !line.endsWith(": "))
-      .join("\n");
-  }
-
-  return "";
-}
-
-function readableList(value: any): string {
+function toText(value: any): string {
   if (!value) return "";
-  if (Array.isArray(value)) return value.map(readableValue).filter(Boolean).join("\n");
-  return readableValue(value);
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(toText).filter(Boolean).join("\n");
+  if (typeof value === "object") return value.text || Object.values(value).map(toText).filter(Boolean).join(" — ");
+  return String(value);
 }
 
 export default function ResumeCanvasPage() {
   const router = useRouter();
   const [userId, setUserId] = useState("");
   const [resumeId, setResumeId] = useState("");
-  const [resume, setResume] = useState<ResumeState>(emptyResume);
-  const [status, setStatus] = useState("Upload your resume, review the editable master resume, then save it for later.");
-  const [checkingUser, setCheckingUser] = useState(true);
+  const [fileName, setFileName] = useState("");
+  const [fileType, setFileType] = useState("");
+  const [parsed, setParsed] = useState<ParsedData>(emptyParsed);
+  const [status, setStatus] = useState("Upload the original resume. Applix keeps that layout and stores parsed JSON separately.");
+  const [loading, setLoading] = useState(true);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    async function loadMasterResume() {
-      setCheckingUser(true);
-
+    async function load() {
       try {
         const supabase = getSupabaseClient();
         const { data: userData, error: userError } = await supabase.auth.getUser();
-
         if (userError || !userData.user) {
           router.replace("/");
           return;
         }
 
         setUserId(userData.user.id);
-
-        const { data: existingResume, error } = await supabase
+        const { data, error } = await supabase
           .from("resume_profiles")
-          .select("id,full_name,target_role,phone,email,location,linkedin,website_or_portfolio,profile_summary,skills,work_experience,education_locked,certifications_locked,licences_locked,work_rights_locked,references_locked")
+          .select("id,full_name,target_role,email,phone,location,profile_summary,skills,work_experience,education_locked,certifications_locked,original_resume_file_name,original_resume_file_type,parsed_resume_json")
           .eq("profile_id", userData.user.id)
           .order("updated_at", { ascending: false })
           .limit(1)
@@ -129,128 +83,111 @@ export default function ResumeCanvasPage() {
           return;
         }
 
-        if (existingResume) {
-          setResumeId(existingResume.id || "");
-          setResume({
-            fullName: existingResume.full_name || "",
-            targetRole: existingResume.target_role || "",
-            email: existingResume.email || userData.user.email || "",
-            phone: existingResume.phone || "",
-            location: existingResume.location || "",
-            linkedin: existingResume.linkedin || "",
-            website: existingResume.website_or_portfolio || "",
-            profileSummary: existingResume.profile_summary || "",
-            skills: readableList(existingResume.skills),
-            workExperience: readableList(existingResume.work_experience),
-            education: readableList(existingResume.education_locked),
-            certifications: readableList(existingResume.certifications_locked),
-            licences: readableList(existingResume.licences_locked),
-            workRights: readableValue(existingResume.work_rights_locked),
-            references: readableList(existingResume.references_locked),
-            rawText: "",
+        if (data) {
+          const saved = data.parsed_resume_json || {};
+          setResumeId(data.id || "");
+          setFileName(data.original_resume_file_name || "Saved resume layout source");
+          setFileType(data.original_resume_file_type || "");
+          setParsed({
+            fullName: saved.fullName || data.full_name || "",
+            targetRole: saved.targetRole || data.target_role || "",
+            email: saved.email || data.email || userData.user.email || "",
+            phone: saved.phone || data.phone || "",
+            location: saved.location || data.location || "",
+            summary: saved.summary || data.profile_summary || "",
+            skills: saved.skills || toText(data.skills),
+            experience: saved.experience || toText(data.work_experience),
+            education: saved.education || toText(data.education_locked),
+            certifications: saved.certifications || toText(data.certifications_locked),
           });
-          setStatus("Loaded your saved Master Resume. Edit and save when ready.");
+          setStatus("Loaded saved resume layout source and parsed reusable JSON.");
         } else {
-          setResume((current) => ({ ...current, email: userData.user.email || "" }));
-          setStatus("No Master Resume found yet. Upload or type your resume details to create one.");
+          setParsed((current) => ({ ...current, email: userData.user.email || "" }));
+          setStatus("No resume source saved yet. Upload the user's original resume.");
         }
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Could not load Master Resume.");
+        setStatus(error instanceof Error ? error.message : "Could not load resume source.");
       } finally {
-        setCheckingUser(false);
+        setLoading(false);
       }
     }
 
-    loadMasterResume();
+    load();
   }, [router]);
 
-  function update(field: keyof ResumeState, value: string) {
-    setResume((current) => ({ ...current, [field]: value }));
+  function update(field: keyof ParsedData, value: string) {
+    setParsed((current) => ({ ...current, [field]: value }));
   }
 
   async function uploadResume(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file || parsing) return;
+    if (!file) return;
 
+    setFileName(file.name);
+    setFileType(file.type || file.name.split(".").pop() || "");
     setParsing(true);
-    setStatus(`Parsing ${file.name}...`);
+    setStatus(`Parsing ${file.name}. Layout stays as original source.`);
 
     try {
       const formData = new FormData();
       formData.append("resume", file);
-
-      const response = await fetch("/api/applix/parse-resume", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch("/api/applix/parse-resume", { method: "POST", body: formData });
       const data = await response.json();
+      if (!response.ok || !data?.ok) throw new Error(data?.error || "Could not parse resume.");
 
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || "Could not parse resume.");
-      }
-
-      const parsed = data.parsed || {};
-      setResume((current) => ({
+      const p = data.parsed || {};
+      setParsed((current) => ({
         ...current,
-        fullName: parsed.fullName || current.fullName,
-        email: parsed.email || current.email,
-        phone: parsed.phone || current.phone,
-        location: parsed.location || current.location,
-        profileSummary: parsed.resumeSummary || current.profileSummary,
-        skills: parsed.skills || current.skills,
-        workExperience: parsed.experience || current.workExperience,
-        certifications: parsed.certificates || current.certifications,
-        rawText: data.rawText || current.rawText,
+        fullName: p.fullName || current.fullName,
+        email: p.email || current.email,
+        phone: p.phone || current.phone,
+        location: p.location || current.location,
+        summary: p.resumeSummary || current.summary,
+        skills: p.skills || current.skills,
+        experience: p.experience || current.experience,
+        certifications: p.certificates || current.certifications,
       }));
-
-      setStatus("Resume parsed. Review the editable Master Resume and save it.");
+      setStatus("Parsed JSON created. Original resume remains the layout source.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Resume parsing failed. Try DOCX, TXT, or a text-based PDF.");
+      setStatus(error instanceof Error ? error.message : "Resume parsing failed.");
     } finally {
       setParsing(false);
       event.target.value = "";
     }
   }
 
-  async function saveMasterResume(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault();
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setSaving(true);
-    setStatus("Saving Master Resume...");
+    setStatus("Saving layout source and parsed JSON...");
 
     try {
-      if (!userId) {
-        setStatus("Please sign in again before saving.");
-        return;
-      }
-
       const supabase = getSupabaseClient();
-
       await supabase.from("profiles").upsert({
         id: userId,
-        full_name: resume.fullName || null,
-        email: resume.email || null,
-        phone: resume.phone || null,
-        location: resume.location || null,
-        preferred_roles: resume.targetRole ? [resume.targetRole] : [],
+        full_name: parsed.fullName || null,
+        email: parsed.email || null,
+        phone: parsed.phone || null,
+        location: parsed.location || null,
+        preferred_roles: parsed.targetRole ? [parsed.targetRole] : [],
       }, { onConflict: "id" });
 
       const payload = {
         profile_id: userId,
-        full_name: resume.fullName || null,
-        target_role: resume.targetRole || null,
-        phone: resume.phone || null,
-        email: resume.email || null,
-        location: resume.location || null,
-        linkedin: resume.linkedin || null,
-        website_or_portfolio: resume.website || null,
-        profile_summary: resume.profileSummary || null,
-        skills: splitList(resume.skills),
-        work_experience: textBlock(resume.workExperience),
-        education_locked: textBlock(resume.education),
-        certifications_locked: splitList(resume.certifications),
-        licences_locked: splitList(resume.licences),
-        work_rights_locked: resume.workRights.trim() ? { text: resume.workRights.trim() } : {},
-        references_locked: textBlock(resume.references),
+        full_name: parsed.fullName || null,
+        target_role: parsed.targetRole || null,
+        email: parsed.email || null,
+        phone: parsed.phone || null,
+        location: parsed.location || null,
+        profile_summary: parsed.summary || null,
+        skills: splitList(parsed.skills),
+        work_experience: block(parsed.experience),
+        education_locked: block(parsed.education),
+        certifications_locked: splitList(parsed.certifications),
+        original_resume_file_name: fileName || null,
+        original_resume_file_type: fileType || null,
+        original_resume_layout_note: "Do not force this into a generic resume box. Use the uploaded resume as the layout source. Use parsed_resume_json as reusable data.",
+        parsed_resume_json: parsed,
       };
 
       if (resumeId) {
@@ -262,63 +199,59 @@ export default function ResumeCanvasPage() {
         setResumeId(data.id);
       }
 
-      setStatus("Master Resume saved. Applix can reuse it for later campaigns.");
+      setStatus("Saved. Layout source and parsed reusable JSON are now separate.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not save Master Resume.");
+      setStatus(error instanceof Error ? error.message : "Could not save resume source.");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <main style={styles.main}>
-      <section style={styles.card}>
-        <div style={styles.topRow}>
+    <main className="app-shell">
+      <section className="dashboard-card">
+        <div className="dashboard-header">
           <div>
-            <p style={styles.eyebrow}>Master Resume</p>
-            <h1 style={styles.title}>Upload, parse, edit, save.</h1>
-            <p style={styles.copy}>This becomes the user&apos;s permanent Master Resume source for later campaigns and tailored resumes.</p>
+            <p className="eyebrow">Resume Source</p>
+            <h1>Keep layout. Store data.</h1>
+            <p className="muted">The uploaded resume is the user's original layout source. Applix parses and stores JSON separately for later reuse.</p>
           </div>
-          <Link href="/dashboard" style={styles.backLink}>Dashboard</Link>
+          <Link className="ghost-link" href="/dashboard">Dashboard</Link>
         </div>
 
-        <div style={styles.status}>{checkingUser ? "Checking your login..." : status}</div>
+        <p className="form-status">{loading ? "Checking login..." : status}</p>
 
-        <label style={styles.uploadBox}>
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-            onChange={uploadResume}
-            style={styles.fileInput}
-            disabled={parsing || checkingUser}
-          />
-          <strong>{parsing ? "Parsing resume..." : "Upload Resume PDF / DOCX / TXT"}</strong>
-          <span>Applix will parse it and fill the editable Master Resume below.</span>
-        </label>
+        <div className="empty-state">
+          <h2>Original resume layout source</h2>
+          <p>Upload the user's real resume. We keep it as the style/layout source and do not force it into a resume box.</p>
+          <label className="primary-link" style={{ cursor: "pointer" }}>
+            {parsing ? "Parsing..." : "Upload Original Resume"}
+            <input type="file" accept=".pdf,.doc,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" onChange={uploadResume} style={{ display: "none" }} disabled={parsing || loading} />
+          </label>
+          <p className="muted" style={{ marginTop: 14 }}>Current source: {fileName || "No file uploaded"}</p>
+        </div>
 
-        <form onSubmit={saveMasterResume} style={styles.form}>
-          <div style={styles.grid2}>
-            <Field label="Full name" value={resume.fullName} onChange={(value) => update("fullName", value)} />
-            <Field label="Target role" value={resume.targetRole} onChange={(value) => update("targetRole", value)} />
-            <Field label="Email" value={resume.email} onChange={(value) => update("email", value)} />
-            <Field label="Phone" value={resume.phone} onChange={(value) => update("phone", value)} />
-            <Field label="Location" value={resume.location} onChange={(value) => update("location", value)} />
-            <Field label="LinkedIn" value={resume.linkedin} onChange={(value) => update("linkedin", value)} />
-            <Field label="Website / portfolio" value={resume.website} onChange={(value) => update("website", value)} />
+        <form className="campaign-form" onSubmit={save}>
+          <h2>Parsed reusable data</h2>
+          <pre style={{ whiteSpace: "pre-wrap", background: "#050814", color: "#a7f3d0", padding: 16, borderRadius: 16, overflow: "auto", maxHeight: 260 }}>{JSON.stringify(parsed, null, 2)}</pre>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
+            <Field label="Full name" value={parsed.fullName} onChange={(value) => update("fullName", value)} />
+            <Field label="Target role" value={parsed.targetRole} onChange={(value) => update("targetRole", value)} />
+            <Field label="Email" value={parsed.email} onChange={(value) => update("email", value)} />
+            <Field label="Phone" value={parsed.phone} onChange={(value) => update("phone", value)} />
+            <Field label="Location" value={parsed.location} onChange={(value) => update("location", value)} />
           </div>
 
-          <TextArea label="Professional summary" value={resume.profileSummary} onChange={(value) => update("profileSummary", value)} rows={4} />
-          <TextArea label="Skills" value={resume.skills} onChange={(value) => update("skills", value)} rows={5} placeholder="One per line or comma separated" />
-          <TextArea label="Work experience" value={resume.workExperience} onChange={(value) => update("workExperience", value)} rows={8} />
-          <TextArea label="Education" value={resume.education} onChange={(value) => update("education", value)} rows={4} />
-          <TextArea label="Certifications / checks" value={resume.certifications} onChange={(value) => update("certifications", value)} rows={4} />
-          <TextArea label="Licences" value={resume.licences} onChange={(value) => update("licences", value)} rows={3} />
-          <TextArea label="Work rights" value={resume.workRights} onChange={(value) => update("workRights", value)} rows={3} />
-          <TextArea label="References" value={resume.references} onChange={(value) => update("references", value)} rows={3} />
+          <TextArea label="Summary" value={parsed.summary} onChange={(value) => update("summary", value)} rows={4} />
+          <TextArea label="Skills" value={parsed.skills} onChange={(value) => update("skills", value)} rows={4} />
+          <TextArea label="Experience" value={parsed.experience} onChange={(value) => update("experience", value)} rows={6} />
+          <TextArea label="Education" value={parsed.education} onChange={(value) => update("education", value)} rows={3} />
+          <TextArea label="Certifications" value={parsed.certifications} onChange={(value) => update("certifications", value)} rows={3} />
 
-          <div style={styles.actions}>
-            <Link href="/dashboard" style={styles.secondaryButton}>Back</Link>
-            <button type="submit" style={styles.primaryButton} disabled={saving || checkingUser}>{saving ? "Saving..." : "Save Master Resume"}</button>
+          <div className="form-actions">
+            <Link className="ghost-link" href="/dashboard">Back</Link>
+            <button className="primary-button" type="submit" disabled={saving || loading}>{saving ? "Saving..." : "Save Layout Source + JSON"}</button>
           </div>
         </form>
       </section>
@@ -327,40 +260,9 @@ export default function ResumeCanvasPage() {
 }
 
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <label style={styles.label}>
-      {label}
-      <input style={styles.input} value={value} onChange={(event) => onChange(event.target.value)} />
-    </label>
-  );
+  return <label>{label}<input value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
-function TextArea({ label, value, onChange, rows, placeholder }: { label: string; value: string; onChange: (value: string) => void; rows: number; placeholder?: string }) {
-  return (
-    <label style={styles.label}>
-      {label}
-      <textarea style={styles.textarea} value={value} onChange={(event) => onChange(event.target.value)} rows={rows} placeholder={placeholder} />
-    </label>
-  );
+function TextArea({ label, value, onChange, rows }: { label: string; value: string; onChange: (value: string) => void; rows: number }) {
+  return <label>{label}<textarea value={value} onChange={(event) => onChange(event.target.value)} rows={rows} /></label>;
 }
-
-const styles = {
-  main: { minHeight: "100vh", padding: 20, background: "linear-gradient(180deg, #120b2d 0%, #070711 55%, #030306 100%)", color: "white", fontFamily: "Arial, Helvetica, sans-serif" },
-  card: { width: "min(980px, 100%)", margin: "0 auto", border: "1px solid rgba(255,255,255,.16)", borderRadius: 28, padding: "clamp(20px, 4vw, 42px)", background: "rgba(10,12,22,.86)", boxShadow: "0 28px 90px rgba(0,0,0,.45)" },
-  topRow: { display: "flex", justifyContent: "space-between", gap: 18, alignItems: "flex-start", flexWrap: "wrap" as const },
-  eyebrow: { margin: 0, color: "#a7f3d0", fontSize: 13, fontWeight: 900, letterSpacing: ".12em", textTransform: "uppercase" as const },
-  title: { margin: "10px 0 12px", fontSize: "clamp(34px, 6vw, 62px)", lineHeight: .96, letterSpacing: -2.4 },
-  copy: { margin: 0, color: "rgba(255,255,255,.68)", lineHeight: 1.5, maxWidth: 650 },
-  backLink: { border: "1px solid rgba(255,255,255,.18)", borderRadius: 999, padding: "12px 16px", background: "rgba(255,255,255,.06)", color: "white", fontWeight: 850, textDecoration: "none" },
-  status: { marginTop: 20, padding: 14, borderRadius: 16, background: "rgba(255,255,255,.06)", color: "#a7f3d0", fontWeight: 800, lineHeight: 1.4 },
-  uploadBox: { display: "grid", gap: 7, marginTop: 18, padding: 18, borderRadius: 18, background: "rgba(94,231,255,.1)", border: "1px dashed rgba(94,231,255,.55)", cursor: "pointer" },
-  fileInput: { display: "none" },
-  form: { display: "grid", gap: 18, marginTop: 22 },
-  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 },
-  label: { display: "grid", gap: 8, color: "rgba(255,255,255,.88)", fontWeight: 850 },
-  input: { width: "100%", border: "1px solid rgba(255,255,255,.18)", borderRadius: 16, padding: "14px 15px", background: "rgba(255,255,255,.07)", color: "white", outline: "none" },
-  textarea: { width: "100%", border: "1px solid rgba(255,255,255,.18)", borderRadius: 16, padding: "14px 15px", background: "rgba(255,255,255,.07)", color: "white", outline: "none", resize: "vertical" as const, lineHeight: 1.5 },
-  actions: { display: "flex", justifyContent: "space-between", gap: 14, flexWrap: "wrap" as const, marginTop: 10 },
-  primaryButton: { border: 0, borderRadius: 999, padding: "15px 20px", background: "linear-gradient(135deg, #f472b6, #8b5cf6 55%, #22d3ee)", color: "white", fontWeight: 950, cursor: "pointer" },
-  secondaryButton: { border: "1px solid rgba(255,255,255,.18)", borderRadius: 999, padding: "15px 20px", background: "rgba(255,255,255,.06)", color: "white", fontWeight: 850, textDecoration: "none" },
-};
