@@ -72,26 +72,34 @@ function cleanJson(text: string) {
 }
 
 async function extractPdfText(buffer: Buffer) {
-  const pdfModule: any = await import("pdf-parse");
+  try {
+    const pdfModule: any = await import("pdf-parse");
 
-  if (typeof pdfModule.default === "function") {
-    const data = await pdfModule.default(buffer);
-    return data.text || "";
-  }
-
-  if (typeof pdfModule === "function") {
-    const data = await pdfModule(buffer);
-    return data.text || "";
-  }
-
-  if (typeof pdfModule.PDFParse === "function") {
-    const parser = new pdfModule.PDFParse({ data: buffer });
-    try {
-      const result = await parser.getText();
-      return result.text || "";
-    } finally {
-      if (typeof parser.destroy === "function") await parser.destroy();
+    if (typeof pdfModule.default === "function") {
+      const data = await pdfModule.default(buffer);
+      return data.text || "";
     }
+
+    if (typeof pdfModule === "function") {
+      const data = await pdfModule(buffer);
+      return data.text || "";
+    }
+
+    if (typeof pdfModule.PDFParse === "function") {
+      const parser = new pdfModule.PDFParse({ data: buffer });
+      try {
+        const result = await parser.getText();
+        return result.text || "";
+      } finally {
+        if (typeof parser.destroy === "function") await parser.destroy();
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.toLowerCase().includes("dommatrix")) {
+      throw new Error("This PDF parser needs DOMMatrix and failed in the server runtime. For this MVP test, upload DOCX or TXT, or copy the resume text into the editable Master Resume fields.");
+    }
+    throw error;
   }
 
   throw new Error("PDF parser could not read this file. Try DOCX or TXT, or upload a text-based PDF.");
@@ -206,6 +214,7 @@ export async function POST(req: Request) {
       openAIError: result.openAIError,
       filledCount: countFilled(result.parsed),
       parsed: result.parsed,
+      rawText,
     });
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message || "Resume parsing failed." }, { status: 500 });
