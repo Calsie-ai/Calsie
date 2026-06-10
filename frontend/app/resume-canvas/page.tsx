@@ -54,7 +54,7 @@ export default function ResumeCanvasPage() {
   const [fileName, setFileName] = useState("");
   const [fileType, setFileType] = useState("");
   const [parsed, setParsed] = useState<ParsedData>(emptyParsed);
-  const [status, setStatus] = useState("Upload the original resume. Applix keeps that layout and stores parsed JSON separately.");
+  const [status, setStatus] = useState("Upload the original resume. Applix keeps that layout and stores parsed data separately.");
   const [loading, setLoading] = useState(true);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -72,7 +72,7 @@ export default function ResumeCanvasPage() {
         setUserId(userData.user.id);
         const { data, error } = await supabase
           .from("resume_profiles")
-          .select("id,full_name,target_role,email,phone,location,profile_summary,skills,work_experience,education_locked,certifications_locked,original_resume_file_name,original_resume_file_type,parsed_resume_json")
+          .select("id,full_name,target_role,email,phone,location,profile_summary,skills,work_experience,education_locked,certifications_locked")
           .eq("profile_id", userData.user.id)
           .order("updated_at", { ascending: false })
           .limit(1)
@@ -84,23 +84,21 @@ export default function ResumeCanvasPage() {
         }
 
         if (data) {
-          const saved = data.parsed_resume_json || {};
           setResumeId(data.id || "");
-          setFileName(data.original_resume_file_name || "Saved resume layout source");
-          setFileType(data.original_resume_file_type || "");
+          setFileName("Saved resume source");
           setParsed({
-            fullName: saved.fullName || data.full_name || "",
-            targetRole: saved.targetRole || data.target_role || "",
-            email: saved.email || data.email || userData.user.email || "",
-            phone: saved.phone || data.phone || "",
-            location: saved.location || data.location || "",
-            summary: saved.summary || data.profile_summary || "",
-            skills: saved.skills || toText(data.skills),
-            experience: saved.experience || toText(data.work_experience),
-            education: saved.education || toText(data.education_locked),
-            certifications: saved.certifications || toText(data.certifications_locked),
+            fullName: data.full_name || "",
+            targetRole: data.target_role || "",
+            email: data.email || userData.user.email || "",
+            phone: data.phone || "",
+            location: data.location || "",
+            summary: data.profile_summary || "",
+            skills: toText(data.skills),
+            experience: toText(data.work_experience),
+            education: toText(data.education_locked),
+            certifications: toText(data.certifications_locked),
           });
-          setStatus("Loaded saved resume layout source and parsed reusable JSON.");
+          setStatus("Loaded saved parsed resume data. Upload source file again only if replacing the layout/source.");
         } else {
           setParsed((current) => ({ ...current, email: userData.user.email || "" }));
           setStatus("No resume source saved yet. Upload the user's original resume.");
@@ -147,7 +145,7 @@ export default function ResumeCanvasPage() {
         experience: p.experience || current.experience,
         certifications: p.certificates || current.certifications,
       }));
-      setStatus("Parsed JSON created. Original resume remains the layout source.");
+      setStatus("Parsed data created. Original resume remains the layout/source concept; structured data is ready to save.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Resume parsing failed.");
     } finally {
@@ -159,11 +157,11 @@ export default function ResumeCanvasPage() {
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    setStatus("Saving layout source and parsed JSON...");
+    setStatus("Saving parsed reusable data...");
 
     try {
       const supabase = getSupabaseClient();
-      await supabase.from("profiles").upsert({
+      const { error: profileError } = await supabase.from("profiles").upsert({
         id: userId,
         full_name: parsed.fullName || null,
         email: parsed.email || null,
@@ -171,6 +169,8 @@ export default function ResumeCanvasPage() {
         location: parsed.location || null,
         preferred_roles: parsed.targetRole ? [parsed.targetRole] : [],
       }, { onConflict: "id" });
+
+      if (profileError) throw profileError;
 
       const payload = {
         profile_id: userId,
@@ -184,10 +184,6 @@ export default function ResumeCanvasPage() {
         work_experience: block(parsed.experience),
         education_locked: block(parsed.education),
         certifications_locked: splitList(parsed.certifications),
-        original_resume_file_name: fileName || null,
-        original_resume_file_type: fileType || null,
-        original_resume_layout_note: "Do not force this into a generic resume box. Use the uploaded resume as the layout source. Use parsed_resume_json as reusable data.",
-        parsed_resume_json: parsed,
       };
 
       if (resumeId) {
@@ -199,7 +195,7 @@ export default function ResumeCanvasPage() {
         setResumeId(data.id);
       }
 
-      setStatus("Saved. Layout source and parsed reusable JSON are now separate.");
+      setStatus(`Saved. Parsed reusable data is stored. Source file noted for showcase: ${fileName || "not uploaded"}.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not save resume source.");
     } finally {
@@ -214,7 +210,7 @@ export default function ResumeCanvasPage() {
           <div>
             <p className="eyebrow">Resume Source</p>
             <h1>Keep layout. Store data.</h1>
-            <p className="muted">The uploaded resume is the user's original layout source. Applix parses and stores JSON separately for later reuse.</p>
+            <p className="muted">The uploaded resume is the user's original layout source. Applix stores parsed data separately for later reuse.</p>
           </div>
           <Link className="ghost-link" href="/dashboard">Dashboard</Link>
         </div>
@@ -223,7 +219,7 @@ export default function ResumeCanvasPage() {
 
         <div className="empty-state">
           <h2>Original resume layout source</h2>
-          <p>Upload the user's real resume. We keep it as the style/layout source and do not force it into a resume box.</p>
+          <p>Upload the user's real resume. We keep it as the style/layout source concept and do not force it into a resume box.</p>
           <label className="primary-link" style={{ cursor: "pointer" }}>
             {parsing ? "Parsing..." : "Upload Original Resume"}
             <input type="file" accept=".pdf,.doc,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" onChange={uploadResume} style={{ display: "none" }} disabled={parsing || loading} />
@@ -251,7 +247,7 @@ export default function ResumeCanvasPage() {
 
           <div className="form-actions">
             <Link className="ghost-link" href="/dashboard">Back</Link>
-            <button className="primary-button" type="submit" disabled={saving || loading}>{saving ? "Saving..." : "Save Layout Source + JSON"}</button>
+            <button className="primary-button" type="submit" disabled={saving || loading}>{saving ? "Saving..." : "Save Parsed Data"}</button>
           </div>
         </form>
       </section>
