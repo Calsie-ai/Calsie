@@ -1,105 +1,134 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const CACHE_KEY = "applixChatLaunchCache";
+import { getSupabaseClient } from "../../lib/supabaseClient";
 
 type ResumeState = {
   fullName: string;
+  targetRole: string;
   email: string;
   phone: string;
   location: string;
-  resumeSummary: string;
+  linkedin: string;
+  website: string;
+  profileSummary: string;
   skills: string;
-  experience: string;
-  certificates: string;
-};
-
-type CampaignState = {
-  targetRole?: string;
-  companyType?: string;
-  targetArea?: string;
-  radiusKm?: number;
-  plan?: "gentle" | "full";
-  aiConsent?: boolean;
-  emailConsent?: boolean;
-  fullName?: string;
-  email?: string;
-  phone?: string;
-  resumeSummary?: string;
-  skills?: string;
-  experience?: string;
-  certificates?: string;
+  workExperience: string;
+  education: string;
+  certifications: string;
+  licences: string;
+  workRights: string;
+  references: string;
+  rawText: string;
 };
 
 const emptyResume: ResumeState = {
   fullName: "",
+  targetRole: "",
   email: "",
   phone: "",
   location: "",
-  resumeSummary: "",
+  linkedin: "",
+  website: "",
+  profileSummary: "",
   skills: "",
-  experience: "",
-  certificates: "",
+  workExperience: "",
+  education: "",
+  certifications: "",
+  licences: "",
+  workRights: "",
+  references: "",
+  rawText: "",
 };
 
-function readCampaign(): CampaignState {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+function splitList(value: string) {
+  return value
+    .split(/\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
-function saveCampaign(updates: Partial<CampaignState>) {
-  if (typeof window === "undefined") return;
-  const current = readCampaign();
-  window.localStorage.setItem(CACHE_KEY, JSON.stringify({ ...current, ...updates }));
+function textBlock(value: string) {
+  return value.trim() ? [{ text: value.trim() }] : [];
 }
 
 export default function ResumeCanvasPage() {
   const router = useRouter();
+  const [userId, setUserId] = useState("");
+  const [resumeId, setResumeId] = useState("");
   const [resume, setResume] = useState<ResumeState>(emptyResume);
-  const [campaign, setCampaign] = useState<CampaignState>({});
-  const [status, setStatus] = useState("Upload a resume or edit the canvas directly.");
+  const [status, setStatus] = useState("Upload your resume, review the editable master resume, then save it for later.");
+  const [checkingUser, setCheckingUser] = useState(true);
   const [parsing, setParsing] = useState(false);
-
-  const dailyLimit = campaign.plan === "full" ? 100 : 10;
-
-  useEffect(() => {
-    const saved = readCampaign();
-    setCampaign(saved);
-    setResume({
-      fullName: saved.fullName || "",
-      email: saved.email || "",
-      phone: saved.phone || "",
-      location: saved.targetArea || "",
-      resumeSummary: saved.resumeSummary || "",
-      skills: saved.skills || "",
-      experience: saved.experience || "",
-      certificates: saved.certificates || "",
-    });
-  }, []);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    saveCampaign({
-      fullName: resume.fullName,
-      email: resume.email,
-      phone: resume.phone,
-      resumeSummary: resume.resumeSummary,
-      skills: resume.skills,
-      experience: resume.experience,
-      certificates: resume.certificates,
-    });
-  }, [resume]);
+    async function loadMasterResume() {
+      setCheckingUser(true);
+
+      try {
+        const supabase = getSupabaseClient();
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+
+        if (userError || !userData.user) {
+          router.replace("/");
+          return;
+        }
+
+        setUserId(userData.user.id);
+
+        const { data: existingResume, error } = await supabase
+          .from("resume_profiles")
+          .select("id,full_name,target_role,phone,email,location,linkedin,website_or_portfolio,profile_summary,skills,work_experience,education_locked,certifications_locked,licences_locked,work_rights_locked,references_locked")
+          .eq("profile_id", userData.user.id)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          setStatus(error.message);
+          return;
+        }
+
+        if (existingResume) {
+          setResumeId(existingResume.id || "");
+          setResume({
+            fullName: existingResume.full_name || "",
+            targetRole: existingResume.target_role || "",
+            email: existingResume.email || userData.user.email || "",
+            phone: existingResume.phone || "",
+            location: existingResume.location || "",
+            linkedin: existingResume.linkedin || "",
+            website: existingResume.website_or_portfolio || "",
+            profileSummary: existingResume.profile_summary || "",
+            skills: Array.isArray(existingResume.skills) ? existingResume.skills.join("\n") : "",
+            workExperience: Array.isArray(existingResume.work_experience) ? existingResume.work_experience.map((item: any) => item?.text || item?.role || JSON.stringify(item)).join("\n\n") : "",
+            education: Array.isArray(existingResume.education_locked) ? existingResume.education_locked.map((item: any) => item?.text || JSON.stringify(item)).join("\n") : "",
+            certifications: Array.isArray(existingResume.certifications_locked) ? existingResume.certifications_locked.join("\n") : "",
+            licences: Array.isArray(existingResume.licences_locked) ? existingResume.licences_locked.join("\n") : "",
+            workRights: existingResume.work_rights_locked ? JSON.stringify(existingResume.work_rights_locked, null, 2) : "",
+            references: Array.isArray(existingResume.references_locked) ? existingResume.references_locked.map((item: any) => item?.text || JSON.stringify(item)).join("\n") : "",
+            rawText: "",
+          });
+          setStatus("Loaded your saved Master Resume. Edit and save when ready.");
+        } else {
+          setResume((current) => ({ ...current, email: userData.user.email || "" }));
+          setStatus("No Master Resume found yet. Upload or type your resume details to create one.");
+        }
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Could not load Master Resume.");
+      } finally {
+        setCheckingUser(false);
+      }
+    }
+
+    loadMasterResume();
+  }, [router]);
 
   function update(field: keyof ResumeState, value: string) {
     setResume((current) => ({ ...current, [field]: value }));
-    setStatus("Saved in this browser.");
   }
 
   async function uploadResume(event: ChangeEvent<HTMLInputElement>) {
@@ -124,183 +153,177 @@ export default function ResumeCanvasPage() {
       }
 
       const parsed = data.parsed || {};
-      const nextResume = {
-        fullName: parsed.fullName || resume.fullName,
-        email: parsed.email || resume.email,
-        phone: parsed.phone || resume.phone,
-        location: parsed.location || resume.location || campaign.targetArea || "",
-        resumeSummary: parsed.resumeSummary || resume.resumeSummary,
-        skills: parsed.skills || resume.skills,
-        experience: parsed.experience || resume.experience,
-        certificates: parsed.certificates || resume.certificates,
-      };
-      setResume(nextResume);
+      setResume((current) => ({
+        ...current,
+        fullName: parsed.fullName || current.fullName,
+        email: parsed.email || current.email,
+        phone: parsed.phone || current.phone,
+        location: parsed.location || current.location,
+        profileSummary: parsed.resumeSummary || current.profileSummary,
+        skills: parsed.skills || current.skills,
+        workExperience: parsed.experience || current.workExperience,
+        certifications: parsed.certificates || current.certifications,
+        rawText: data.rawText || current.rawText,
+      }));
 
-      const filled = data.filledCount ?? Object.values(nextResume).filter(Boolean).length;
-      const aiText = data.usedOpenAI ? "OpenAI parsed it" : "Fallback parser filled what it could";
-      setStatus(`${aiText}. Filled ${filled} fields from ${data.filename || file.name}. Review and edit the canvas.`);
-    } catch (error: any) {
-      setStatus(error?.message || "Resume parsing failed. Try DOCX, TXT, or a text-based PDF.");
+      setStatus("Resume parsed. Review the editable Master Resume and save it.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Resume parsing failed. Try DOCX, TXT, or a text-based PDF.");
     } finally {
       setParsing(false);
       event.target.value = "";
     }
   }
 
-  function launch() {
-    const draft = {
-      targetRole: campaign.targetRole || "",
-      industry: campaign.companyType || "",
-      selectedAddress: campaign.targetArea || resume.location || "",
-      placeId: "chat-area",
-      latitude: null,
-      longitude: null,
-      radiusKm: campaign.radiusKm || 20,
-      resumeName: resume.fullName || "Applix resume",
-      resumeSource: "resume_canvas_document",
-      resumeSnapshot: {
-        fullName: resume.fullName,
-        email: resume.email,
-        phone: resume.phone,
-        location: resume.location || campaign.targetArea || "",
-        summary: resume.resumeSummary,
-        skills: resume.skills,
-        experience: resume.experience,
-        certificates: resume.certificates,
-      },
-      dailyLimit,
-      campaignDays: 10,
-      emailConsent: Boolean(campaign.emailConsent),
-      createdAt: new Date().toISOString(),
-    };
+  async function saveMasterResume(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    setSaving(true);
+    setStatus("Saving Master Resume...");
 
-    sessionStorage.setItem("applixCampaignDraft", JSON.stringify(draft));
-    saveCampaign({
-      fullName: resume.fullName,
-      email: resume.email,
-      phone: resume.phone,
-      resumeSummary: resume.resumeSummary,
-      skills: resume.skills,
-      experience: resume.experience,
-      certificates: resume.certificates,
-    });
-    router.push("/login?next=/dashboard");
+    try {
+      if (!userId) {
+        setStatus("Please sign in again before saving.");
+        return;
+      }
+
+      const supabase = getSupabaseClient();
+
+      await supabase.from("profiles").upsert({
+        id: userId,
+        full_name: resume.fullName || null,
+        email: resume.email || null,
+        phone: resume.phone || null,
+        location: resume.location || null,
+        preferred_roles: resume.targetRole ? [resume.targetRole] : [],
+      }, { onConflict: "id" });
+
+      const payload = {
+        profile_id: userId,
+        full_name: resume.fullName || null,
+        target_role: resume.targetRole || null,
+        phone: resume.phone || null,
+        email: resume.email || null,
+        location: resume.location || null,
+        linkedin: resume.linkedin || null,
+        website_or_portfolio: resume.website || null,
+        profile_summary: resume.profileSummary || null,
+        skills: splitList(resume.skills),
+        work_experience: textBlock(resume.workExperience),
+        education_locked: textBlock(resume.education),
+        certifications_locked: splitList(resume.certifications),
+        licences_locked: splitList(resume.licences),
+        work_rights_locked: resume.workRights.trim() ? { text: resume.workRights.trim() } : {},
+        references_locked: textBlock(resume.references),
+      };
+
+      if (resumeId) {
+        const { error } = await supabase.from("resume_profiles").update(payload).eq("id", resumeId).eq("profile_id", userId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.from("resume_profiles").insert(payload).select("id").single();
+        if (error) throw error;
+        setResumeId(data.id);
+      }
+
+      setStatus("Master Resume saved. Applix can reuse it for later campaigns.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not save Master Resume.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <main style={styles.main}>
-      <header style={styles.topbar}>
-        <Link href="/" style={styles.backLink}>← Back to Applix chat</Link>
-        <div style={styles.status}>{status}</div>
-        <button style={styles.launchTop} onClick={launch}>Save master & continue</button>
-      </header>
-
-      <section style={styles.shell}>
-        <aside style={styles.sidePanel}>
-          <p style={styles.eyebrow}>Campaign</p>
-          <h1 style={styles.sideTitle}>Resume Canvas</h1>
-          <p style={styles.sideCopy}>Upload your existing resume to autofill this white document, then edit anything. This becomes your master source of truth.</p>
-
-          <label style={styles.uploadBox}>
-            <input
-              type="file"
-              accept=".pdf,.doc,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-              onChange={uploadResume}
-              style={styles.fileInput}
-              disabled={parsing}
-            />
-            <strong>{parsing ? "Parsing resume..." : "Upload PDF / DOCX / TXT"}</strong>
-            <span>Applix will fill the canvas automatically.</span>
-          </label>
-
-          <div style={styles.memoryBox}>
-            <strong>Target role</strong><span>{campaign.targetRole || "Not set"}</span>
-            <strong>Company type</strong><span>{campaign.companyType || "Not set"}</span>
-            <strong>Area</strong><span>{campaign.targetArea ? `${campaign.targetArea} (${campaign.radiusKm || 20}km)` : "Not set"}</span>
-            <strong>Pace</strong><span>{dailyLimit}/day for 10 days</span>
+      <section style={styles.card}>
+        <div style={styles.topRow}>
+          <div>
+            <p style={styles.eyebrow}>Master Resume</p>
+            <h1 style={styles.title}>Upload, parse, edit, save.</h1>
+            <p style={styles.copy}>This becomes the user&apos;s permanent Master Resume source for later campaigns and tailored resumes.</p>
           </div>
-          <p style={styles.note}>Certificates can be uploaded later. For now, type certificate names or let Applix extract them from the resume.</p>
-        </aside>
+          <Link href="/dashboard" style={styles.backLink}>Dashboard</Link>
+        </div>
 
-        <section style={styles.paperWrap}>
-          <article style={styles.paper}>
-            <input
-              style={styles.nameInput}
-              value={resume.fullName}
-              onChange={(event) => update("fullName", event.target.value)}
-              placeholder="Your Full Name"
-            />
-            <div style={styles.contactRow}>
-              <input style={styles.inlineInput} value={resume.email} onChange={(event) => update("email", event.target.value)} placeholder="email@example.com" />
-              <span>•</span>
-              <input style={styles.inlineInput} value={resume.phone} onChange={(event) => update("phone", event.target.value)} placeholder="Phone" />
-              <span>•</span>
-              <input style={styles.inlineInput} value={resume.location} onChange={(event) => update("location", event.target.value)} placeholder="Location" />
-            </div>
+        <div style={styles.status}>{checkingUser ? "Checking your login..." : status}</div>
 
-            <SectionTitle title="Profile" />
-            <textarea
-              style={styles.paragraphInput}
-              value={resume.resumeSummary}
-              onChange={(event) => update("resumeSummary", event.target.value)}
-              placeholder="Write a short professional summary. Example: Motivated support worker with experience in person-centred care..."
-            />
+        <label style={styles.uploadBox}>
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+            onChange={uploadResume}
+            style={styles.fileInput}
+            disabled={parsing || checkingUser}
+          />
+          <strong>{parsing ? "Parsing resume..." : "Upload Resume PDF / DOCX / TXT"}</strong>
+          <span>Applix will parse it and fill the editable Master Resume below.</span>
+        </label>
 
-            <SectionTitle title="Skills" />
-            <textarea
-              style={styles.paragraphInput}
-              value={resume.skills}
-              onChange={(event) => update("skills", event.target.value)}
-              placeholder="Type skills separated by commas or lines. Example: Communication, documentation, client support, teamwork..."
-            />
+        <form onSubmit={saveMasterResume} style={styles.form}>
+          <div style={styles.grid2}>
+            <Field label="Full name" value={resume.fullName} onChange={(value) => update("fullName", value)} />
+            <Field label="Target role" value={resume.targetRole} onChange={(value) => update("targetRole", value)} />
+            <Field label="Email" value={resume.email} onChange={(value) => update("email", value)} />
+            <Field label="Phone" value={resume.phone} onChange={(value) => update("phone", value)} />
+            <Field label="Location" value={resume.location} onChange={(value) => update("location", value)} />
+            <Field label="LinkedIn" value={resume.linkedin} onChange={(value) => update("linkedin", value)} />
+            <Field label="Website / portfolio" value={resume.website} onChange={(value) => update("website", value)} />
+          </div>
 
-            <SectionTitle title="Experience" />
-            <textarea
-              style={styles.experienceInput}
-              value={resume.experience}
-              onChange={(event) => update("experience", event.target.value)}
-              placeholder={"Add your experience like a resume. Example:\nCompany Name — Role\nDates\n- Responsibility or achievement\n- Responsibility or achievement"}
-            />
+          <TextArea label="Professional summary" value={resume.profileSummary} onChange={(value) => update("profileSummary", value)} rows={4} />
+          <TextArea label="Skills" value={resume.skills} onChange={(value) => update("skills", value)} rows={5} placeholder="One per line or comma separated" />
+          <TextArea label="Work experience" value={resume.workExperience} onChange={(value) => update("workExperience", value)} rows={8} />
+          <TextArea label="Education" value={resume.education} onChange={(value) => update("education", value)} rows={4} />
+          <TextArea label="Certifications / checks" value={resume.certifications} onChange={(value) => update("certifications", value)} rows={4} />
+          <TextArea label="Licences" value={resume.licences} onChange={(value) => update("licences", value)} rows={3} />
+          <TextArea label="Work rights" value={resume.workRights} onChange={(value) => update("workRights", value)} rows={3} />
+          <TextArea label="References" value={resume.references} onChange={(value) => update("references", value)} rows={3} />
 
-            <SectionTitle title="Certificates / Checks" />
-            <textarea
-              style={styles.paragraphInput}
-              value={resume.certificates}
-              onChange={(event) => update("certificates", event.target.value)}
-              placeholder="Type certificate/check names. Example: First Aid, CPR, Police Check, WWCC, NDIS Worker Screening, or None."
-            />
-          </article>
-        </section>
+          <div style={styles.actions}>
+            <Link href="/dashboard" style={styles.secondaryButton}>Back</Link>
+            <button type="submit" style={styles.primaryButton} disabled={saving || checkingUser}>{saving ? "Saving..." : "Save Master Resume"}</button>
+          </div>
+        </form>
       </section>
     </main>
   );
 }
 
-function SectionTitle({ title }: { title: string }) {
-  return <h2 style={styles.sectionTitle}>{title}</h2>;
+function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label style={styles.label}>
+      {label}
+      <input style={styles.input} value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+function TextArea({ label, value, onChange, rows, placeholder }: { label: string; value: string; onChange: (value: string) => void; rows: number; placeholder?: string }) {
+  return (
+    <label style={styles.label}>
+      {label}
+      <textarea style={styles.textarea} value={value} onChange={(event) => onChange(event.target.value)} rows={rows} placeholder={placeholder} />
+    </label>
+  );
 }
 
 const styles = {
-  main: { minHeight: "100vh", background: "#e7e9ef", color: "#111827", fontFamily: "Arial, Helvetica, sans-serif", padding: 18 },
-  topbar: { maxWidth: 1220, margin: "0 auto 18px", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 18, background: "#ffffff", border: "1px solid #d8dee9", boxShadow: "0 10px 30px rgba(15,23,42,.08)" },
-  backLink: { color: "#111827", textDecoration: "none", fontWeight: 900 },
-  status: { marginLeft: "auto", color: "#64748b", fontSize: 13, fontWeight: 800, maxWidth: 520, textAlign: "right" as const },
-  launchTop: { border: 0, borderRadius: 999, padding: "12px 18px", background: "#111827", color: "white", fontWeight: 900, cursor: "pointer" },
-  shell: { maxWidth: 1220, margin: "0 auto", display: "grid", gridTemplateColumns: "320px minmax(0, 1fr)", gap: 22, alignItems: "start" },
-  sidePanel: { position: "sticky" as const, top: 18, background: "#111827", color: "white", borderRadius: 24, padding: 22, boxShadow: "0 20px 50px rgba(15,23,42,.18)" },
-  eyebrow: { margin: 0, color: "#5ee7ff", fontSize: 11, letterSpacing: 2, fontWeight: 900, textTransform: "uppercase" as const },
-  sideTitle: { margin: "12px 0", fontSize: 34, lineHeight: 1, letterSpacing: -1.2 },
-  sideCopy: { color: "#cbd5e1", lineHeight: 1.5, fontWeight: 700 },
-  uploadBox: { display: "grid", gap: 7, marginTop: 18, padding: 16, borderRadius: 18, background: "rgba(94,231,255,.1)", border: "1px dashed rgba(94,231,255,.55)", cursor: "pointer" },
+  main: { minHeight: "100vh", padding: 20, background: "linear-gradient(180deg, #120b2d 0%, #070711 55%, #030306 100%)", color: "white", fontFamily: "Arial, Helvetica, sans-serif" },
+  card: { width: "min(980px, 100%)", margin: "0 auto", border: "1px solid rgba(255,255,255,.16)", borderRadius: 28, padding: "clamp(20px, 4vw, 42px)", background: "rgba(10,12,22,.86)", boxShadow: "0 28px 90px rgba(0,0,0,.45)" },
+  topRow: { display: "flex", justifyContent: "space-between", gap: 18, alignItems: "flex-start", flexWrap: "wrap" as const },
+  eyebrow: { margin: 0, color: "#a7f3d0", fontSize: 13, fontWeight: 900, letterSpacing: ".12em", textTransform: "uppercase" as const },
+  title: { margin: "10px 0 12px", fontSize: "clamp(34px, 6vw, 62px)", lineHeight: .96, letterSpacing: -2.4 },
+  copy: { margin: 0, color: "rgba(255,255,255,.68)", lineHeight: 1.5, maxWidth: 650 },
+  backLink: { border: "1px solid rgba(255,255,255,.18)", borderRadius: 999, padding: "12px 16px", background: "rgba(255,255,255,.06)", color: "white", fontWeight: 850, textDecoration: "none" },
+  status: { marginTop: 20, padding: 14, borderRadius: 16, background: "rgba(255,255,255,.06)", color: "#a7f3d0", fontWeight: 800, lineHeight: 1.4 },
+  uploadBox: { display: "grid", gap: 7, marginTop: 18, padding: 18, borderRadius: 18, background: "rgba(94,231,255,.1)", border: "1px dashed rgba(94,231,255,.55)", cursor: "pointer" },
   fileInput: { display: "none" },
-  memoryBox: { display: "grid", gridTemplateColumns: "110px 1fr", gap: 9, marginTop: 18, padding: 14, borderRadius: 16, background: "rgba(255,255,255,.07)", color: "#dbeafe", fontSize: 13, lineHeight: 1.4 },
-  note: { marginTop: 18, color: "#ffd08a", lineHeight: 1.5, fontWeight: 800, fontSize: 13 },
-  paperWrap: { display: "flex", justifyContent: "center" },
-  paper: { width: "min(100%, 820px)", minHeight: "calc(100vh - 120px)", background: "#ffffff", padding: "54px 64px", boxShadow: "0 25px 70px rgba(15,23,42,.16)", border: "1px solid #dde3ee" },
-  nameInput: { width: "100%", border: 0, borderBottom: "2px solid #111827", padding: "0 0 10px", fontSize: 38, fontWeight: 900, letterSpacing: -1.3, outline: "none", textAlign: "center" as const, color: "#111827" },
-  contactRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12, color: "#64748b", flexWrap: "wrap" as const },
-  inlineInput: { border: 0, minWidth: 130, textAlign: "center" as const, color: "#334155", fontWeight: 700, outline: "none", fontSize: 14 },
-  sectionTitle: { margin: "30px 0 10px", paddingBottom: 7, borderBottom: "1.5px solid #111827", color: "#111827", textTransform: "uppercase" as const, letterSpacing: 1.4, fontSize: 15 },
-  paragraphInput: { width: "100%", minHeight: 86, border: "1px solid transparent", borderRadius: 8, padding: 10, resize: "vertical" as const, outline: "none", fontFamily: "Arial, Helvetica, sans-serif", fontSize: 15, lineHeight: 1.55, color: "#111827", background: "#fbfdff" },
-  experienceInput: { width: "100%", minHeight: 190, border: "1px solid transparent", borderRadius: 8, padding: 10, resize: "vertical" as const, outline: "none", fontFamily: "Arial, Helvetica, sans-serif", fontSize: 15, lineHeight: 1.55, color: "#111827", background: "#fbfdff" },
+  form: { display: "grid", gap: 18, marginTop: 22 },
+  grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 },
+  label: { display: "grid", gap: 8, color: "rgba(255,255,255,.88)", fontWeight: 850 },
+  input: { width: "100%", border: "1px solid rgba(255,255,255,.18)", borderRadius: 16, padding: "14px 15px", background: "rgba(255,255,255,.07)", color: "white", outline: "none" },
+  textarea: { width: "100%", border: "1px solid rgba(255,255,255,.18)", borderRadius: 16, padding: "14px 15px", background: "rgba(255,255,255,.07)", color: "white", outline: "none", resize: "vertical" as const, lineHeight: 1.5 },
+  actions: { display: "flex", justifyContent: "space-between", gap: 14, flexWrap: "wrap" as const, marginTop: 10 },
+  primaryButton: { border: 0, borderRadius: 999, padding: "15px 20px", background: "linear-gradient(135deg, #f472b6, #8b5cf6 55%, #22d3ee)", color: "white", fontWeight: 950, cursor: "pointer" },
+  secondaryButton: { border: "1px solid rgba(255,255,255,.18)", borderRadius: 999, padding: "15px 20px", background: "rgba(255,255,255,.06)", color: "white", fontWeight: 850, textDecoration: "none" },
 };
