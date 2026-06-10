@@ -11,7 +11,9 @@ export default function NewCampaignPage() {
   const [name, setName] = useState("");
   const [targetRole, setTargetRole] = useState("");
   const [targetLocation, setTargetLocation] = useState("");
-  const [dailyCap, setDailyCap] = useState(25);
+  const [dailyCap, setDailyCap] = useState(100);
+  const [hourlyCap, setHourlyCap] = useState(5);
+  const [campaignDays, setCampaignDays] = useState(10);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingUser, setCheckingUser] = useState(true);
@@ -59,6 +61,8 @@ export default function NewCampaignPage() {
         search: {
           target_role: targetRole.trim(),
           target_location: targetLocation.trim() || null,
+          fetch_frequency: "daily",
+          campaign_days: campaignDays,
           notes: notes.trim() || null,
         },
         filters: {
@@ -66,7 +70,11 @@ export default function NewCampaignPage() {
           notes: notes.trim() || null,
         },
         outreach: {
+          gmail_consent_required: true,
+          hourly_cap: hourlyCap,
           daily_cap: dailyCap,
+          campaign_days: campaignDays,
+          total_cap: dailyCap * campaignDays,
           notes: notes.trim() || null,
         },
         status: "draft",
@@ -90,7 +98,7 @@ export default function NewCampaignPage() {
       <section className="dashboard-card narrow-card">
         <p className="eyebrow">New campaign</p>
         <h1>Tell Applix what to target</h1>
-        <p className="muted">This is the simple campaign setup for now. Automation and n8n can connect after this is saved.</p>
+        <p className="muted">Applix will fetch fresh leads every day and prepare outreach with safe limits.</p>
 
         {checkingUser ? (
           <p className="muted">Checking your login...</p>
@@ -98,12 +106,12 @@ export default function NewCampaignPage() {
           <form className="campaign-form" onSubmit={createCampaign}>
             <label>
               Campaign name
-              <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Disability support worker applications" required />
+              <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Entry level IT campaign" required />
             </label>
 
             <label>
               Target role
-              <input value={targetRole} onChange={(event) => setTargetRole(event.target.value)} placeholder="Support worker" required />
+              <input value={targetRole} onChange={(event) => setTargetRole(event.target.value)} placeholder="IT Assistant, Trainee, Data Entry" required />
             </label>
 
             <label>
@@ -112,13 +120,28 @@ export default function NewCampaignPage() {
             </label>
 
             <label>
-              Daily sending cap
+              Emails per hour
+              <input type="number" min="1" max="10" value={hourlyCap} onChange={(event) => setHourlyCap(Number(event.target.value))} required />
+            </label>
+
+            <label>
+              Emails per day
               <input type="number" min="1" max="100" value={dailyCap} onChange={(event) => setDailyCap(Number(event.target.value))} required />
             </label>
 
             <label>
+              Campaign days
+              <input type="number" min="1" max="30" value={campaignDays} onChange={(event) => setCampaignDays(Number(event.target.value))} required />
+            </label>
+
+            <div className="empty-state">
+              <h2>Sending plan</h2>
+              <p>Google consent required first. Limit: {hourlyCap} emails/hour, {dailyCap} emails/day, for {campaignDays} days. Fresh leads will be fetched every day.</p>
+            </div>
+
+            <label>
               Notes / campaign details
-              <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="What kind of companies, job boards, tone, filters, or email approach should Applix use?" rows={5} />
+              <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Company type, filters, tone, exclusions, job boards, notes..." rows={5} />
             </label>
 
             {errorMessage && <p className="error-text">{errorMessage}</p>}
