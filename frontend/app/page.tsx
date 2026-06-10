@@ -1,91 +1,71 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-
-const inviteCode = "Applixvvip26";
-const canvaEmbedUrl = "https://www.canva.com/design/DAHMEDtiZZ0/view?embed";
-
-function hideMissingAsset(event: React.SyntheticEvent<HTMLImageElement>) {
-  event.currentTarget.style.display = "none";
-}
+import { getSupabaseClient } from "../lib/supabaseClient";
 
 export default function HomePage() {
-  const router = useRouter();
-  const [topEmail, setTopEmail] = useState("");
-  const [bottomEmail, setBottomEmail] = useState("");
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function launch(email: string) {
-    const cleanEmail = email.trim();
+  async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatus("");
+    setLoading(true);
 
-    if (typeof window !== "undefined") {
-      if (cleanEmail) {
-        window.localStorage.setItem("applixAccessEmail", cleanEmail);
+    try {
+      const supabase = getSupabaseClient();
+      const redirectTo = `${window.location.origin}/dashboard`;
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: redirectTo,
+          shouldCreateUser: true,
+        },
+      });
+
+      if (error) {
+        setStatus(error.message);
+        return;
       }
 
-      window.sessionStorage.setItem(
-        "applixCampaignDraft",
-        JSON.stringify({
-          email: cleanEmail,
-          inviteCode,
-          source: "canva-applix-landing",
-          createdAt: new Date().toISOString(),
-        })
-      );
+      setStatus("Magic link sent. Check your email, then open the link to enter your dashboard.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not send magic link.");
+    } finally {
+      setLoading(false);
     }
-
-    router.push("/resume-canvas");
-  }
-
-  function submitTop(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    launch(topEmail);
-  }
-
-  function submitBottom(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    launch(bottomEmail);
   }
 
   return (
-    <main className="canva-landing-page">
-      <div className="canva-stage" aria-label="APPLIX landing page from Canva design">
-        <iframe
-          className="canva-frame"
-          src={canvaEmbedUrl}
-          title="APPLIX landing page"
-          loading="eager"
-          allowFullScreen
-        />
+    <main className="landing-shell">
+      <section className="landing-card">
+        <div className="brand-mark">APPLIX</div>
+        <p className="eyebrow">Symbiotic Job Hunter</p>
+        <h1>Start your job campaign with a magic link.</h1>
+        <p className="landing-copy">
+          Sign in with your email. If you have no campaign yet, your dashboard will show a simple start button.
+        </p>
 
-        <img className="applix-asset asset-blob" src="/applix-assets/applix-blob.svg" alt="" onError={hideMissingAsset} />
-        <img className="applix-asset asset-rays" src="/applix-assets/rays.svg" alt="" onError={hideMissingAsset} />
-        <img className="applix-asset asset-diamond" src="/applix-assets/diamond.svg" alt="" onError={hideMissingAsset} />
-        <img className="applix-asset asset-star" src="/applix-assets/star.svg" alt="" onError={hideMissingAsset} />
-        <img className="applix-asset asset-atom" src="/applix-assets/atom.svg" alt="" onError={hideMissingAsset} />
-
-        <form className="hotspot-form hotspot-top" onSubmit={submitTop} aria-label="Top APPLIX signup form">
+        <form className="auth-form" onSubmit={sendMagicLink}>
+          <label htmlFor="email">Enter your email</label>
           <input
-            value={topEmail}
-            onChange={(event) => setTopEmail(event.target.value)}
+            id="email"
             type="email"
-            aria-label="Email address"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="you@example.com"
             autoComplete="email"
+            required
           />
-          <button type="submit" aria-label="Get Magic Link" />
+          <button type="submit" disabled={loading}>
+            {loading ? "Sending..." : "Get Magic Link"}
+          </button>
         </form>
 
-        <form className="hotspot-form hotspot-bottom" onSubmit={submitBottom} aria-label="Bottom APPLIX signup form">
-          <input
-            value={bottomEmail}
-            onChange={(event) => setBottomEmail(event.target.value)}
-            type="email"
-            aria-label="Email address"
-            autoComplete="email"
-          />
-          <button type="submit" aria-label="Signup/Register" />
-        </form>
-      </div>
+        {status && <p className="form-status">{status}</p>}
+      </section>
     </main>
   );
 }
