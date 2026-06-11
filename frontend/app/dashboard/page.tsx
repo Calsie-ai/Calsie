@@ -42,13 +42,16 @@ export default function DashboardPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [gmailStatus, setGmailStatus] = useState("Not connected");
   const [connectingGmail, setConnectingGmail] = useState(false);
+  const [launchingCampaignId, setLaunchingCampaignId] = useState("");
 
   useEffect(() => {
     async function loadDashboard() {
       setLoading(true);
       setErrorMessage("");
+      setSuccessMessage("");
 
       try {
         const supabase = getSupabaseClient();
@@ -103,6 +106,7 @@ export default function DashboardPage() {
   async function connectGmail() {
     setConnectingGmail(true);
     setErrorMessage("");
+    setSuccessMessage("");
 
     try {
       const supabase = getSupabaseClient();
@@ -134,6 +138,45 @@ export default function DashboardPage() {
     }
   }
 
+  async function launchApplixTest(campaignId: string) {
+    setLaunchingCampaignId(campaignId);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        throw new Error("Missing login session. Please sign in again.");
+      }
+
+      const response = await fetch("/api/applix/launch-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          access_token: accessToken,
+          campaign_id: campaignId,
+          batch_size: 10,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Could not launch Applix test.");
+      }
+
+      const generatedCount = data.result?.generated?.length ?? data.result?.count ?? 10;
+      setSuccessMessage(`Launch Applix Test started. Real recipients are OFF. Batch size: ${generatedCount}. Test inbox pattern: sajan3310giri+applix001@gmail.com to sajan3310giri+applix010@gmail.com.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not launch Applix test.");
+    } finally {
+      setLaunchingCampaignId("");
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="dashboard-card">
@@ -161,8 +204,14 @@ export default function DashboardPage() {
           <Link className="primary-link" href="/resume-canvas">Upload / Edit Master Resume</Link>
         </div>
 
+        <div className="empty-state">
+          <h2>Test launch plan</h2>
+          <p>TEST MODE is ON. Real recipients are OFF. First batch sends only to your Gmail aliases: sajan3310giri+applix001@gmail.com through sajan3310giri+applix010@gmail.com.</p>
+        </div>
+
         {loading && <p className="muted">Loading your campaigns...</p>}
         {errorMessage && <p className="error-text">{errorMessage}</p>}
+        {successMessage && <p className="form-status success-status">{successMessage}</p>}
 
         {!loading && campaigns.length === 0 && (
           <div className="empty-state">
@@ -184,12 +233,16 @@ export default function DashboardPage() {
               const dailyCap = getDailyCap(campaign);
               const hourlyCap = getHourlyCap(campaign);
               const days = getCampaignDays(campaign);
+              const launching = launchingCampaignId === campaign.id;
 
               return (
                 <article className="campaign-row" key={campaign.id}>
                   <div>
                     <h3>{campaign.name}</h3>
                     <p>{role}{location ? ` in ${location}` : ""}</p>
+                    <button className="primary-button small-action" type="button" onClick={() => launchApplixTest(campaign.id)} disabled={launching || gmailStatus === "Not connected"}>
+                      {launching ? "Launching test..." : "Launch Applix Test"}
+                    </button>
                   </div>
                   <div className="campaign-meta">
                     <span>{campaign.status}</span>
