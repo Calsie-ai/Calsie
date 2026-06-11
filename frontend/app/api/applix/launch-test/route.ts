@@ -4,6 +4,7 @@ export const runtime = "nodejs";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bnshgtrqbfuphhhdgccs.supabase.co";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const TEST_RECIPIENT_EMAIL = "hostsajan@gmail.com";
 
 export async function POST(req: Request) {
   try {
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     const launchPlan = {
       test_mode: true,
       real_recipients: false,
-      test_email_pattern: "sajan3310giri+applix{{number}}@gmail.com",
+      test_recipient_email: TEST_RECIPIENT_EMAIL,
       subject_prefix: "[APPLIX TEST #{{number}}]",
       batch_size: batchSize,
     };
@@ -42,9 +43,7 @@ export async function POST(req: Request) {
         min_lead_score: 0,
         test_mode: true,
         real_recipients: false,
-        test_email_base: "sajan3310giri",
-        test_email_domain: "gmail.com",
-        test_alias_prefix: "applix",
+        test_recipient_email: TEST_RECIPIENT_EMAIL,
         subject_prefix: "[APPLIX TEST #{{number}}]",
       }),
     });
@@ -62,7 +61,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      message: `Launch test created for ${batchSize} emails. Real recipients are OFF.`,
+      message: `Launch test created for ${batchSize} emails. Real recipients are OFF. Test recipient: ${TEST_RECIPIENT_EMAIL}.`,
       launch_plan: launchPlan,
       result: data,
     });
