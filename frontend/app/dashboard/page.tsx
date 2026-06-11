@@ -16,6 +16,8 @@ type Campaign = {
   created_at: string;
 };
 
+const TEST_RECIPIENT_EMAIL = "hostsajan@gmail.com";
+
 function getCampaignRole(campaign: Campaign) {
   return campaign.search?.target_role || campaign.target_business_type || "Target not set";
 }
@@ -169,7 +171,7 @@ export default function DashboardPage() {
       }
 
       const generatedCount = data.result?.generated?.length ?? data.result?.count ?? 10;
-      setSuccessMessage(`Launch Applix Test started. Real recipients are OFF. Batch size: ${generatedCount}. Test inbox pattern: sajan3310giri+applix001@gmail.com to sajan3310giri+applix010@gmail.com.`);
+      setSuccessMessage(`Launch Applix Test started. Real recipients are OFF. Batch size: ${generatedCount}. Test emails will go only to ${TEST_RECIPIENT_EMAIL}.`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not launch Applix test.");
     } finally {
@@ -206,7 +208,7 @@ export default function DashboardPage() {
 
         <div className="empty-state">
           <h2>Test launch plan</h2>
-          <p>TEST MODE is ON. Real recipients are OFF. First batch sends only to your Gmail aliases: sajan3310giri+applix001@gmail.com through sajan3310giri+applix010@gmail.com.</p>
+          <p>TEST MODE is ON. Real recipients are OFF. First batch sends only to {TEST_RECIPIENT_EMAIL}. Subject prefix: [APPLIX TEST #001]. Batch size: 10.</p>
         </div>
 
         {loading && <p className="muted">Loading your campaigns...</p>}
