@@ -53,7 +53,7 @@ export default function HomePage() {
 
       if (error) {
         const message = error.message.toLowerCase().includes("rate")
-          ? "Email rate limit reached. If you are already signed in, open Home. Otherwise wait a moment and request another magic link."
+          ? "Email rate limit reached. Wait a moment and request another magic link."
           : error.message;
 
         setStatus(message);
@@ -70,55 +70,56 @@ export default function HomePage() {
   }
 
   return (
-    <main className="setup-shell">
-      <button className="setup-back" type="button" aria-label="Back">←</button>
+    <main className="applix-login-shell">
+      <button className="applix-back-button" type="button" aria-label="Back">←</button>
+      <div className="applix-info-button" aria-hidden="true">i</div>
 
-      <section className="setup-hero">
-        <div className="setup-brand">APPLIX</div>
-        <p className="setup-kicker">AI job automation</p>
-        <h1>{signedInEmail ? "You're all set up!" : "Welcome to Applix"}</h1>
-        <p className="setup-copy">
-          Upload your resume once. Applix finds relevant jobs, writes tailored emails, attaches your resume, and tracks every step.
-        </p>
-      </section>
-
-      <section className="glass-login-card">
-        {checkingSession && <p className="glass-muted">Checking your login...</p>}
-
-        {!checkingSession && signedInEmail && (
-          <div className="glass-stack">
-            <div className="setup-checklist">
-              <span>✓ Gmail-ready automation</span>
-              <span>✓ Resume workflow ready</span>
-              <span>✓ Job tracker ready</span>
-            </div>
-            <p className="glass-muted">Signed in as {signedInEmail}</p>
-            <Link className="glass-primary-button" href="/dashboard">Home</Link>
-            <Link className="glass-outline-button" href="/tracker">See what's new</Link>
+      <section className="applix-login-stage">
+        <div className="applix-logo-scene" aria-label="Applix logo">
+          <div className="applix-orb">
+            <span>APPLIX</span>
           </div>
-        )}
+          <div className="applix-hand">
+            <span className="hand-palm" />
+            <span className="hand-finger finger-one" />
+            <span className="hand-finger finger-two" />
+          </div>
+        </div>
 
-        {!checkingSession && !signedInEmail && (
-          <form className="glass-auth-form" onSubmit={sendMagicLink}>
-            <label htmlFor="email">Enter your email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-              disabled={loading || magicLinkSent}
-              required
-            />
-            <button className="glass-primary-button" type="submit" disabled={loading || magicLinkSent}>
-              {magicLinkSent ? "Magic link sent" : loading ? "Sending..." : "Get magic link"}
-            </button>
-            <Link className="glass-outline-button" href="/dashboard">Already signed in? Home</Link>
-          </form>
-        )}
+        <section className="applix-glass-card">
+          <div className="applix-card-pill">Signup/Login</div>
 
-        {status && <p className={magicLinkSent ? "glass-status glass-success" : "glass-status"}>{status}</p>}
+          {checkingSession && <p className="applix-card-muted">Checking your login...</p>}
+
+          {!checkingSession && signedInEmail && (
+            <div className="applix-signed-in-card">
+              <p className="applix-card-label">Signed in as</p>
+              <p className="applix-signed-email">{signedInEmail}</p>
+              <Link className="applix-magic-button" href="/dashboard">Home</Link>
+            </div>
+          )}
+
+          {!checkingSession && !signedInEmail && (
+            <form className="applix-magic-form" onSubmit={sendMagicLink}>
+              <label htmlFor="email">Enter Your Email</label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                disabled={loading || magicLinkSent}
+                required
+              />
+              <button className="applix-magic-button" type="submit" disabled={loading || magicLinkSent}>
+                {magicLinkSent ? "Magic Link Sent" : loading ? "Sending..." : "Get Magic Link"}
+              </button>
+            </form>
+          )}
+
+          {status && <p className={magicLinkSent ? "applix-card-status success" : "applix-card-status"}>{status}</p>}
+        </section>
       </section>
     </main>
   );
