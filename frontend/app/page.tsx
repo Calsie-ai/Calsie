@@ -22,7 +22,7 @@ export default function HomePage() {
           setSignedInEmail(data.user.email || "");
         }
       } catch {
-        // Keep the normal magic-link form visible if Supabase is not configured yet.
+        // Keep the magic-link form visible if Supabase is not configured yet.
       } finally {
         setCheckingSession(false);
       }
@@ -70,56 +70,51 @@ export default function HomePage() {
   }
 
   return (
-    <main className="applix-login-shell">
-      <button className="applix-back-button" type="button" aria-label="Back">←</button>
-      <div className="applix-info-button" aria-hidden="true">i</div>
+    <main className="applix-setup-shell">
+      <button className="applix-setup-back" type="button" aria-label="Back">←</button>
+      <div className="applix-setup-info" aria-hidden="true">i</div>
 
-      <section className="applix-login-stage">
-        <div className="applix-logo-scene" aria-label="Applix logo">
-          <div className="applix-orb">
-            <span>APPLIX</span>
-          </div>
-          <div className="applix-hand">
-            <span className="hand-palm" />
-            <span className="hand-finger finger-one" />
-            <span className="hand-finger finger-two" />
-          </div>
+      <section className="applix-setup-center">
+        <div className="applix-setup-orb" aria-label="Applix logo">
+          <span>APPLIX</span>
         </div>
 
-        <section className="applix-glass-card">
-          <div className="applix-card-pill">Signup/Login</div>
+        <p className="applix-setup-kicker">AI job automation</p>
+        <h1>{signedInEmail ? "You're all set up!" : "Welcome to Applix"}</h1>
+        <p className="applix-setup-copy">
+          Find relevant jobs, write tailored emails, attach your resume, and track everything automatically.
+        </p>
+      </section>
 
-          {checkingSession && <p className="applix-card-muted">Checking your login...</p>}
+      <section className="applix-setup-bottom">
+        {checkingSession && <p className="applix-setup-status">Checking your login...</p>}
 
-          {!checkingSession && signedInEmail && (
-            <div className="applix-signed-in-card">
-              <p className="applix-card-label">Signed in as</p>
-              <p className="applix-signed-email">{signedInEmail}</p>
-              <Link className="applix-magic-button" href="/dashboard">Home</Link>
-            </div>
-          )}
+        {!checkingSession && signedInEmail && (
+          <div className="applix-setup-actions">
+            <Link className="applix-setup-outline" href="/tracker">See what's new</Link>
+            <Link className="applix-setup-primary" href="/dashboard">Home</Link>
+          </div>
+        )}
 
-          {!checkingSession && !signedInEmail && (
-            <form className="applix-magic-form" onSubmit={sendMagicLink}>
-              <label htmlFor="email">Enter Your Email</label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-                disabled={loading || magicLinkSent}
-                required
-              />
-              <button className="applix-magic-button" type="submit" disabled={loading || magicLinkSent}>
-                {magicLinkSent ? "Magic Link Sent" : loading ? "Sending..." : "Get Magic Link"}
-              </button>
-            </form>
-          )}
+        {!checkingSession && !signedInEmail && (
+          <form className="applix-setup-form" onSubmit={sendMagicLink}>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="Enter your email"
+              autoComplete="email"
+              disabled={loading || magicLinkSent}
+              required
+            />
+            <button className="applix-setup-primary" type="submit" disabled={loading || magicLinkSent}>
+              {magicLinkSent ? "Magic link sent" : loading ? "Sending..." : "Get magic link"}
+            </button>
+          </form>
+        )}
 
-          {status && <p className={magicLinkSent ? "applix-card-status success" : "applix-card-status"}>{status}</p>}
-        </section>
+        {status && <p className={magicLinkSent ? "applix-setup-status success" : "applix-setup-status"}>{status}</p>}
       </section>
     </main>
   );
