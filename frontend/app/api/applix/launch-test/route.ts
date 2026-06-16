@@ -4,7 +4,6 @@ export const runtime = "nodejs";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bnshgtrqbfuphhhdgccs.supabase.co";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const TEST_RECIPIENT_EMAIL = "hostsajan@gmail.com";
 
 export async function POST(req: Request) {
   try {
@@ -21,15 +20,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Missing campaign_id." }, { status: 400 });
     }
 
-    const launchPlan = {
-      test_mode: true,
-      real_recipients: false,
-      test_recipient_email: TEST_RECIPIENT_EMAIL,
-      subject_prefix: "[APPLIX TEST #{{number}}]",
-      batch_size: batchSize,
-    };
-
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-outreach-drafts`, {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/launch-applix-test`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -38,33 +29,18 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         campaign_id: campaignId,
-        limit: batchSize,
-        dry_run: false,
-        min_lead_score: 0,
-        test_mode: true,
-        real_recipients: false,
-        test_recipient_email: TEST_RECIPIENT_EMAIL,
-        subject_prefix: "[APPLIX TEST #{{number}}]",
+        target_email_count: batchSize,
+        user_identifier: body.user_identifier,
       }),
     });
 
     const data = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      return NextResponse.json({
-        ok: false,
-        error: data.error || `Launch test failed with ${response.status}`,
-        details: data,
-        launch_plan: launchPlan,
-      }, { status: response.status });
-    }
-
     return NextResponse.json({
-      ok: true,
-      message: `Launch test created for ${batchSize} emails. Real recipients are OFF. Test recipient: ${TEST_RECIPIENT_EMAIL}.`,
-      launch_plan: launchPlan,
+      ok: Boolean(response.ok && data.ok),
+      message: response.ok && data.ok ? "Launch test finished." : "Launch test finished with issues.",
       result: data,
-    });
+    }, { status: response.ok ? 200 : response.status });
   } catch (error) {
     return NextResponse.json({
       ok: false,
