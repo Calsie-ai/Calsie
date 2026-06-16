@@ -15,6 +15,201 @@ button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .7; }
 
+.setup-shell {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  align-content: space-between;
+  justify-items: center;
+  padding: clamp(28px, 5vw, 56px) 18px 42px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 14%, rgba(255,255,255,.26), transparent 10%),
+    linear-gradient(180deg, #0576d9 0%, #18a7df 30%, #86cfc9 56%, #f6c66b 78%, #df7b24 100%);
+}
+
+.setup-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255,255,255,.22), transparent 26%),
+    linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+  pointer-events: none;
+}
+
+.setup-back {
+  position: absolute;
+  top: clamp(26px, 7vw, 56px);
+  left: clamp(24px, 8vw, 72px);
+  z-index: 2;
+  width: 70px;
+  height: 70px;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.48);
+  color: rgba(0,0,0,.82);
+  font-size: 42px;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 20px 45px rgba(0,0,0,.12);
+  backdrop-filter: blur(18px);
+}
+
+.setup-hero {
+  position: relative;
+  z-index: 1;
+  width: min(760px, 100%);
+  margin-top: clamp(110px, 23vh, 260px);
+  text-align: center;
+}
+
+.setup-brand {
+  display: inline-grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  margin-bottom: 22px;
+  border-radius: 30px;
+  background: rgba(255,255,255,.22);
+  border: 1px solid rgba(255,255,255,.38);
+  color: white;
+  font-weight: 950;
+  letter-spacing: -1px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.14);
+  backdrop-filter: blur(22px);
+}
+
+.setup-kicker {
+  margin: 0 0 16px;
+  color: rgba(255,255,255,.82);
+  font-size: 13px;
+  font-weight: 950;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.setup-hero h1 {
+  margin: 0;
+  color: rgba(255,255,255,.95);
+  font-size: clamp(52px, 10vw, 92px);
+  line-height: .95;
+  letter-spacing: -4px;
+  text-shadow: 0 18px 45px rgba(0,0,0,.12);
+}
+
+.setup-copy {
+  max-width: 660px;
+  margin: 24px auto 0;
+  color: rgba(255,255,255,.82);
+  font-size: clamp(17px, 2.3vw, 21px);
+  line-height: 1.45;
+}
+
+.glass-login-card {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 100%);
+  display: grid;
+  gap: 16px;
+  margin-top: 48px;
+}
+
+.glass-stack,
+.glass-auth-form {
+  display: grid;
+  gap: 16px;
+}
+
+.glass-auth-form label {
+  color: rgba(255,255,255,.92);
+  font-size: 15px;
+  font-weight: 950;
+  text-align: center;
+}
+
+.glass-auth-form input {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,.42);
+  border-radius: 999px;
+  padding: 20px 24px;
+  background: rgba(255,255,255,.2);
+  color: rgba(0,0,0,.85);
+  outline: none;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 22px 55px rgba(0,0,0,.1);
+  backdrop-filter: blur(20px);
+}
+
+.glass-auth-form input::placeholder { color: rgba(0,0,0,.42); }
+
+.glass-auth-form input:focus {
+  border-color: rgba(255,255,255,.86);
+  box-shadow: 0 0 0 5px rgba(255,255,255,.22), 0 22px 55px rgba(0,0,0,.1);
+}
+
+.glass-primary-button,
+.glass-outline-button {
+  min-height: 78px;
+  width: 100%;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 28px;
+  font-size: clamp(20px, 4.5vw, 31px);
+  font-weight: 950;
+  letter-spacing: -.7px;
+}
+
+.glass-primary-button {
+  border: 0;
+  background: rgba(255,255,255,.52);
+  color: rgba(18,18,24,.92);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 24px 70px rgba(0,0,0,.14);
+  backdrop-filter: blur(22px);
+}
+
+.glass-outline-button {
+  border: 4px solid rgba(255,255,255,.86);
+  background: rgba(255,255,255,.06);
+  color: white;
+  box-shadow: 0 22px 55px rgba(0,0,0,.1);
+  backdrop-filter: blur(14px);
+}
+
+.glass-status,
+.glass-muted {
+  margin: 0;
+  color: rgba(255,255,255,.92);
+  text-align: center;
+  line-height: 1.45;
+  font-weight: 800;
+  text-shadow: 0 12px 30px rgba(0,0,0,.1);
+}
+
+.glass-success {
+  padding: 15px 18px;
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 22px;
+  background: rgba(255,255,255,.16);
+  backdrop-filter: blur(14px);
+}
+
+.setup-checklist {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 28px;
+  background: rgba(255,255,255,.14);
+  color: rgba(255,255,255,.95);
+  font-weight: 900;
+  text-align: center;
+  backdrop-filter: blur(16px);
+}
+
 .landing-shell,
 .app-shell {
   min-height: 100vh;
@@ -223,6 +418,14 @@ textarea:disabled,
 }
 
 @media (max-width: 640px) {
+  .setup-shell { padding-bottom: 28px; }
+  .setup-back { width: 58px; height: 58px; font-size: 34px; }
+  .setup-hero { margin-top: 120px; }
+  .setup-hero h1 { letter-spacing: -2.5px; }
+  .setup-copy { display: none; }
+  .glass-primary-button,
+  .glass-outline-button { min-height: 68px; }
+
   .dashboard-header,
   .section-title-row,
   .form-actions,
