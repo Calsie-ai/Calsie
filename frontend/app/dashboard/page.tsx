@@ -38,6 +38,14 @@ function getCampaignDays(campaign: Campaign) {
   return campaign.outreach?.campaign_days || 10;
 }
 
+function shortJson(value: unknown) {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -48,6 +56,7 @@ export default function DashboardPage() {
   const [gmailStatus, setGmailStatus] = useState("Not connected");
   const [connectingGmail, setConnectingGmail] = useState(false);
   const [launchingCampaignId, setLaunchingCampaignId] = useState("");
+  const [launchResult, setLaunchResult] = useState<any>(null);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -109,6 +118,7 @@ export default function DashboardPage() {
     setConnectingGmail(true);
     setErrorMessage("");
     setSuccessMessage("");
+    setLaunchResult(null);
 
     try {
       const supabase = getSupabaseClient();
@@ -144,6 +154,7 @@ export default function DashboardPage() {
     setLaunchingCampaignId(campaignId);
     setErrorMessage("");
     setSuccessMessage("");
+    setLaunchResult(null);
 
     try {
       const supabase = getSupabaseClient();
@@ -161,17 +172,25 @@ export default function DashboardPage() {
           access_token: accessToken,
           campaign_id: campaignId,
           batch_size: 10,
+          user_identifier: email,
         }),
       });
 
       const data = await response.json().catch(() => ({}));
+      setLaunchResult(data.result || data);
+
+      const result = data.result || {};
+      const version = result.version || "unknown";
+      const sentCount = result.sent_count ?? 0;
+      const gmailStatusCode = result.gmail_send_status ?? "not returned";
+      const disabled = result.sends_disabled_in_this_gateway;
 
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Could not launch Applix test.");
+        const errors = Array.isArray(result.errors) ? result.errors.join(" | ") : data.error;
+        throw new Error(errors || "Could not launch Applix test.");
       }
 
-      const generatedCount = data.result?.generated?.length ?? data.result?.count ?? 10;
-      setSuccessMessage(`Launch Applix Test started. Real recipients are OFF. Batch size: ${generatedCount}. Test emails will go only to ${TEST_RECIPIENT_EMAIL}.`);
+      setSuccessMessage(`Launch result: ${version}. Sent count: ${sentCount}. Gmail status: ${gmailStatusCode}. Sending disabled: ${disabled}. Test inbox: ${TEST_RECIPIENT_EMAIL}.`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not launch Applix test.");
     } finally {
@@ -193,7 +212,7 @@ export default function DashboardPage() {
 
         <div className="empty-state">
           <h2>Google consent</h2>
-          <p>Connect Gmail so Applix can write/send outreach on your behalf. Campaign limit: 5 emails/hour, 100 emails/day, for 10 days. Fresh leads are fetched daily.</p>
+          <p>Connect Gmail so Applix can prepare and test outreach from your connected account. Real recipients stay off during test mode.</p>
           <p className="muted">Status: {gmailStatus}</p>
           <button className="primary-button" type="button" onClick={connectGmail} disabled={connectingGmail || !email}>
             {connectingGmail ? "Opening Google..." : "Connect Gmail"}
@@ -208,12 +227,26 @@ export default function DashboardPage() {
 
         <div className="empty-state">
           <h2>Test launch plan</h2>
-          <p>TEST MODE is ON. Real recipients are OFF. First batch sends only to {TEST_RECIPIENT_EMAIL}. Subject prefix: [APPLIX TEST #001]. Batch size: 10.</p>
+          <p>TEST MODE is ON. Real recipients are OFF. The test run should show the live backend version, sent count, Gmail status and any errors below.</p>
         </div>
 
         {loading && <p className="muted">Loading your campaigns...</p>}
         {errorMessage && <p className="error-text">{errorMessage}</p>}
         {successMessage && <p className="form-status success-status">{successMessage}</p>}
+        {launchResult && (
+          <pre className="form-status" style={{ whiteSpace: "pre-wrap", overflowX: "auto" }}>
+            {shortJson({
+              version: launchResult.version,
+              ok: launchResult.ok,
+              sent_count: launchResult.sent_count,
+              gmail_send_status: launchResult.gmail_send_status,
+              gmail_error: launchResult.gmail_error,
+              sends_disabled_in_this_gateway: launchResult.sends_disabled_in_this_gateway,
+              user_identifier: launchResult.user_identifier,
+              errors: launchResult.errors,
+            })}
+          </pre>
+        )}
 
         {!loading && campaigns.length === 0 && (
           <div className="empty-state">
