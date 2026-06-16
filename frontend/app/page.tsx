@@ -53,7 +53,7 @@ export default function HomePage() {
 
       if (error) {
         const message = error.message.toLowerCase().includes("rate")
-          ? "Email rate limit reached. For testing, open Dashboard if you are already signed in, or wait before requesting another magic link."
+          ? "Email rate limit reached. If you are already signed in, open Home. Otherwise wait a moment and request another magic link."
           : error.message;
 
         setStatus(message);
@@ -61,7 +61,7 @@ export default function HomePage() {
       }
 
       setMagicLinkSent(true);
-      setStatus("Magic link sent to your email. Please check your email.");
+      setStatus("Magic link sent. Check your email to continue into Applix.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not send magic link.");
     } finally {
@@ -70,30 +70,36 @@ export default function HomePage() {
   }
 
   return (
-    <main className="landing-shell">
-      <section className="landing-card">
-        <div className="brand-mark">APPLIX</div>
-        <p className="eyebrow">Symbiotic Job Hunter</p>
-        <h1>Start your job campaign with a magic link.</h1>
-        <p className="landing-copy">
-          Sign in with your email. If you have no campaign yet, your dashboard will show a simple start button.
+    <main className="setup-shell">
+      <button className="setup-back" type="button" aria-label="Back">←</button>
+
+      <section className="setup-hero">
+        <div className="setup-brand">APPLIX</div>
+        <p className="setup-kicker">AI job automation</p>
+        <h1>{signedInEmail ? "You're all set up!" : "Welcome to Applix"}</h1>
+        <p className="setup-copy">
+          Upload your resume once. Applix finds relevant jobs, writes tailored emails, attaches your resume, and tracks every step.
         </p>
+      </section>
 
-        <div className="tester-shortcut">
-          <Link className="ghost-link" href="/dashboard">Already logged in? Open Dashboard</Link>
-        </div>
-
-        {checkingSession && <p className="muted">Checking your login...</p>}
+      <section className="glass-login-card">
+        {checkingSession && <p className="glass-muted">Checking your login...</p>}
 
         {!checkingSession && signedInEmail && (
-          <div className="already-signed-in">
-            <p className="form-status success-status">You are already signed in as {signedInEmail}.</p>
-            <Link className="primary-link" href="/dashboard">Open Dashboard</Link>
+          <div className="glass-stack">
+            <div className="setup-checklist">
+              <span>✓ Gmail-ready automation</span>
+              <span>✓ Resume workflow ready</span>
+              <span>✓ Job tracker ready</span>
+            </div>
+            <p className="glass-muted">Signed in as {signedInEmail}</p>
+            <Link className="glass-primary-button" href="/dashboard">Home</Link>
+            <Link className="glass-outline-button" href="/tracker">See what's new</Link>
           </div>
         )}
 
         {!checkingSession && !signedInEmail && (
-          <form className={`auth-form ${magicLinkSent ? "auth-form-sent" : ""}`} onSubmit={sendMagicLink}>
+          <form className="glass-auth-form" onSubmit={sendMagicLink}>
             <label htmlFor="email">Enter your email</label>
             <input
               id="email"
@@ -105,13 +111,14 @@ export default function HomePage() {
               disabled={loading || magicLinkSent}
               required
             />
-            <button type="submit" disabled={loading || magicLinkSent}>
-              {magicLinkSent ? "Magic Link Sent" : loading ? "Sending..." : "Get Magic Link"}
+            <button className="glass-primary-button" type="submit" disabled={loading || magicLinkSent}>
+              {magicLinkSent ? "Magic link sent" : loading ? "Sending..." : "Get magic link"}
             </button>
+            <Link className="glass-outline-button" href="/dashboard">Already signed in? Home</Link>
           </form>
         )}
 
-        {status && <p className={magicLinkSent ? "form-status success-status" : "form-status"}>{status}</p>}
+        {status && <p className={magicLinkSent ? "glass-status glass-success" : "glass-status"}>{status}</p>}
       </section>
     </main>
   );
