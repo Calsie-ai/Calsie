@@ -47,6 +47,13 @@ function toText(value: any): string {
   return String(value);
 }
 
+function safeExt(file: File) {
+  const ext = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (ext) return ext;
+  if (file.type === "application/pdf") return "pdf";
+  return "bin";
+}
+
 export default function ResumeCanvasPage() {
   const router = useRouter();
   const [userId, setUserId] = useState("");
@@ -127,9 +134,23 @@ export default function ResumeCanvasPage() {
     setFileName(file.name);
     setFileType(file.type || file.name.split(".").pop() || "");
     setParsing(true);
-    setStatus(`Parsing ${file.name}. Layout stays as original source.`);
+    setStatus(`Processing ${file.name}.`);
 
     try {
+      const supabase = getSupabaseClient();
+      if (!userId) throw new Error("Missing user session. Please refresh and sign in again.");
+
+      const path = `${userId}/master-source.${safeExt(file)}`;
+      const { error: storageError } = await supabase.storage
+        .from("resumes")
+        .upload(path, file, {
+          upsert: true,
+          contentType: file.type || "application/octet-stream",
+        });
+
+      if (storageError) throw storageError;
+      setFilePath(path);
+
       const formData = new FormData();
       formData.append("resume", file);
       const response = await fetch("/api/applix/parse-resume", { method: "POST", body: formData });
@@ -148,7 +169,7 @@ export default function ResumeCanvasPage() {
         experience: p.experience || current.experience,
         certifications: p.certificates || current.certifications,
       }));
-      setStatus("Parsed data created. Add the private source path if needed, then save.");
+      setStatus("Source file saved. Parsed data created. Click Save Parsed Data.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Resume parsing failed.");
     } finally {
@@ -227,10 +248,11 @@ export default function ResumeCanvasPage() {
           <h2>Original resume layout source</h2>
           <p>Upload the user's real resume. We keep it as the style/layout source concept and do not force it into a resume box.</p>
           <label className="primary-link" style={{ cursor: "pointer" }}>
-            {parsing ? "Parsing..." : "Upload Original Resume"}
+            {parsing ? "Processing..." : "Upload Original Resume"}
             <input type="file" accept=".pdf,.doc,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" onChange={uploadResume} style={{ display: "none" }} disabled={parsing || loading} />
           </label>
           <p className="muted" style={{ marginTop: 14 }}>Current source: {fileName || "No file uploaded"}</p>
+          {filePath && <p className="muted">Private path: {filePath}</p>}
         </div>
 
         <form className="campaign-form" onSubmit={save}>
