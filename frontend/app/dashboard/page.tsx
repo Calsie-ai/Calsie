@@ -16,7 +16,29 @@ type Campaign = {
   created_at: string;
 };
 
+type JobTrackerRow = {
+  queue_id: string;
+  campaign_id: string;
+  campaign_name: string;
+  job_name: string;
+  company_name: string;
+  website: string | null;
+  progress: string;
+  ai_subject?: string | null;
+};
+
 const TEST_RECIPIENT_EMAIL = "hostsajan@gmail.com";
+
+const JOB_PROGRESS_OPTIONS = [
+  { value: "generated", label: "Generated" },
+  { value: "emailed", label: "Email sent" },
+  { value: "email_replied", label: "Email replied" },
+  { value: "interview_set", label: "Interview set" },
+  { value: "interview_done", label: "Done interview" },
+  { value: "offer", label: "Offer" },
+  { value: "rejected", label: "Rejected" },
+  { value: "closed", label: "Closed" },
+];
 
 function getCampaignRole(campaign: Campaign) {
   return campaign.search?.target_role || campaign.target_business_type || "Target not set";
@@ -46,17 +68,119 @@ function shortJson(value: unknown) {
   }
 }
 
+function textValue(value: unknown) {
+  if (value === undefined || value === null) return "";
+  return String(value).trim();
+}
+
+function getFirstValue(row: any, keys: string[]) {
+  for (const key of keys) {
+    const value = textValue(row?.[key]);
+    if (value) return value;
+  }
+  return "";
+}
+
+function normalizeWebsite(value: string | null) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function getProgressLabel(value: string) {
+  return JOB_PROGRESS_OPTIONS.find((option) => option.value === value)?.label || value;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [jobTrackerRows, setJobTrackerRows] = useState<JobTrackerRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trackerLoading, setTrackerLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [gmailStatus, setGmailStatus] = useState("Not connected");
   const [connectingGmail, setConnectingGmail] = useState(false);
   const [launchingCampaignId, setLaunchingCampaignId] = useState("");
+  const [updatingTrackerId, setUpdatingTrackerId] = useState("");
   const [launchResult, setLaunchResult] = useState<any>(null);
+
+  async function loadJobTrackerRows(campaignList: Campaign[]) {
+    if (!campaignList.length) {
+      setJobTrackerRows([]);
+      return;
+    }
+
+    setTrackerLoading(true);
+
+    try {
+      const supabase = getSupabaseClient();
+      const campaignById = new Map(campaignList.map((campaign) => [campaign.id, campaign]));
+      const campaignIds = campaignList.map((campaign) => campaign.id);
+
+      const { data: queueData, error: queueError } = await supabase
+        .from("outreach_queue")
+        .select("id,campaign_id,campaign_lead_id,status,review_status,recipient_email,ai_notes,created_at")
+        .in("campaign_id", campaignIds)
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (queueError) {
+        setJobTrackerRows([]);
+        return;
+      }
+
+      const queueRows = queueData || [];
+      const leadIds = Array.from(new Set(queueRows.map((row: any) => row.campaign_lead_id).filter(Boolean)));
+      const leadById = new Map<string, any>();
+
+      if (leadIds.length) {
+        const { data: leadsData } = await supabase
+          .from("campaign_leads")
+          .select("*")
+          .in("id", leadIds);
+
+        for (const lead of leadsData || []) {
+          leadById.set(String(lead.id), lead);
+        }
+      }
+
+      const rows = queueRows.map((queue: any) => {
+        const campaign = campaignById.get(String(queue.campaign_id));
+        const lead = leadById.get(String(queue.campaign_lead_id)) || {};
+        const aiNotes = typeof queue.ai_notes === "object" && queue.ai_notes !== null ? queue.ai_notes : {};
+        const companyName =
+          getFirstValue(lead, ["company_name", "business_name", "name", "title", "employer", "organisation"]) ||
+          "Company not found";
+        const jobName =
+          getFirstValue(lead, ["job_title", "role", "position", "title", "business_category", "category"]) ||
+          aiNotes.ai_subject ||
+          getCampaignRole(campaign || ({} as Campaign));
+        const website = normalizeWebsite(
+          getFirstValue(lead, ["website", "website_url", "url", "domain", "company_website"])
+        );
+
+        return {
+          queue_id: String(queue.id),
+          campaign_id: String(queue.campaign_id),
+          campaign_name: campaign?.name || "Campaign",
+          job_name: jobName,
+          company_name: companyName,
+          website,
+          progress: aiNotes.job_tracker_status || (queue.status === "sent" ? "emailed" : "generated"),
+          ai_subject: aiNotes.ai_subject || null,
+        } as JobTrackerRow;
+      });
+
+      setJobTrackerRows(rows);
+    } catch {
+      setJobTrackerRows([]);
+    } finally {
+      setTrackerLoading(false);
+    }
+  }
 
   useEffect(() => {
     async function loadDashboard() {
@@ -86,7 +210,9 @@ export default function DashboardPage() {
           return;
         }
 
-        setCampaigns((data || []) as Campaign[]);
+        const loadedCampaigns = (data || []) as Campaign[];
+        setCampaigns(loadedCampaigns);
+        await loadJobTrackerRows(loadedCampaigns);
 
         const { data: authData } = await supabase
           .from("user_email_authorizations")
@@ -191,10 +317,54 @@ export default function DashboardPage() {
       }
 
       setSuccessMessage(`Launch result: ${version}. Sent count: ${sentCount}. Gmail status: ${gmailStatusCode}. Sending disabled: ${disabled}. Test inbox: ${TEST_RECIPIENT_EMAIL}.`);
+      await loadJobTrackerRows(campaigns);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not launch Applix test.");
     } finally {
       setLaunchingCampaignId("");
+    }
+  }
+
+  async function updateJobProgress(row: JobTrackerRow, nextProgress: string) {
+    setUpdatingTrackerId(row.queue_id);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const previousRows = jobTrackerRows;
+    setJobTrackerRows((rows) => rows.map((item) => item.queue_id === row.queue_id ? { ...item, progress: nextProgress } : item));
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: currentRow, error: readError } = await supabase
+        .from("outreach_queue")
+        .select("ai_notes")
+        .eq("id", row.queue_id)
+        .maybeSingle();
+
+      if (readError) throw readError;
+
+      const existingNotes = typeof currentRow?.ai_notes === "object" && currentRow.ai_notes !== null ? currentRow.ai_notes : {};
+      const { error: updateError } = await supabase
+        .from("outreach_queue")
+        .update({
+          ai_notes: {
+            ...existingNotes,
+            job_tracker_status: nextProgress,
+            job_tracker_status_label: getProgressLabel(nextProgress),
+            job_tracker_updated_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.queue_id);
+
+      if (updateError) throw updateError;
+
+      setSuccessMessage(`Updated ${row.company_name} to ${getProgressLabel(nextProgress)}.`);
+    } catch (error) {
+      setJobTrackerRows(previousRows);
+      setErrorMessage(error instanceof Error ? error.message : "Could not update job progress.");
+    } finally {
+      setUpdatingTrackerId("");
     }
   }
 
@@ -288,6 +458,64 @@ export default function DashboardPage() {
                 </article>
               );
             })}
+          </div>
+        )}
+
+        {!loading && (
+          <div className="empty-state" style={{ marginTop: 24 }}>
+            <div className="section-title-row">
+              <h2>Job tracker</h2>
+              <button className="ghost-button" type="button" onClick={() => loadJobTrackerRows(campaigns)} disabled={trackerLoading || campaigns.length === 0}>
+                {trackerLoading ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
+
+            <p className="muted">Track each generated job/company and move it through your application progress.</p>
+
+            {jobTrackerRows.length === 0 ? (
+              <p className="muted">No tracker rows yet. Launch a campaign test first to generate queue rows.</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: "12px", borderBottom: "1px solid rgba(148, 163, 184, 0.25)" }}>Job / Company</th>
+                      <th style={{ textAlign: "left", padding: "12px", borderBottom: "1px solid rgba(148, 163, 184, 0.25)", width: 260 }}>Tracker progress</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {jobTrackerRows.map((row) => (
+                      <tr key={row.queue_id}>
+                        <td style={{ padding: "12px", borderBottom: "1px solid rgba(148, 163, 184, 0.18)", verticalAlign: "top" }}>
+                          <strong>{row.job_name}</strong>
+                          <p className="muted" style={{ margin: "4px 0" }}>{row.company_name}</p>
+                          {row.website ? (
+                            <a className="primary-link small" href={row.website} target="_blank" rel="noreferrer">
+                              Open company website
+                            </a>
+                          ) : (
+                            <span className="muted">No website found</span>
+                          )}
+                          <p className="muted" style={{ margin: "6px 0 0" }}>Campaign: {row.campaign_name}</p>
+                        </td>
+                        <td style={{ padding: "12px", borderBottom: "1px solid rgba(148, 163, 184, 0.18)", verticalAlign: "top" }}>
+                          <select
+                            value={row.progress}
+                            onChange={(event) => updateJobProgress(row, event.target.value)}
+                            disabled={updatingTrackerId === row.queue_id}
+                            style={{ width: "100%", padding: "10px", borderRadius: 10 }}
+                          >
+                            {JOB_PROGRESS_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </section>
