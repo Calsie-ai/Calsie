@@ -11,204 +11,259 @@ html, body {
 
 a { color: inherit; text-decoration: none; }
 button, input, textarea, select { font: inherit; }
-
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .7; }
 
-.setup-shell {
+.applix-login-shell {
   position: relative;
   min-height: 100vh;
-  display: grid;
-  align-content: space-between;
-  justify-items: center;
-  padding: clamp(28px, 5vw, 56px) 18px 42px;
   overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 42px 18px;
   background:
-    radial-gradient(circle at 20% 14%, rgba(255,255,255,.26), transparent 10%),
-    linear-gradient(180deg, #0576d9 0%, #18a7df 30%, #86cfc9 56%, #f6c66b 78%, #df7b24 100%);
+    radial-gradient(circle at 83% 15%, rgba(128, 90, 255, .34), transparent 20%),
+    radial-gradient(circle at 18% 12%, rgba(217, 119, 255, .25), transparent 22%),
+    linear-gradient(180deg, #a77aff 0%, #5f2ac3 23%, #080b12 56%, #010103 100%);
 }
 
-.setup-shell::before {
+.applix-login-shell::before {
   content: "";
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 30%, rgba(255,255,255,.22), transparent 26%),
-    linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+    linear-gradient(120deg, transparent 0 72%, rgba(0, 249, 255, .9) 72.25%, transparent 73%),
+    linear-gradient(128deg, transparent 0 76%, rgba(143, 51, 255, .7) 76.15%, transparent 77%),
+    radial-gradient(circle at 52% 42%, rgba(255,255,255,.12), transparent 18%);
+  opacity: .72;
   pointer-events: none;
 }
 
-.setup-back {
+.applix-back-button,
+.applix-info-button {
   position: absolute;
-  top: clamp(26px, 7vw, 56px);
-  left: clamp(24px, 8vw, 72px);
   z-index: 2;
-  width: 70px;
-  height: 70px;
-  border: 0;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: rgba(255,255,255,.48);
-  color: rgba(0,0,0,.82);
-  font-size: 42px;
-  line-height: 1;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 20px 45px rgba(0,0,0,.12);
+  color: rgba(0,0,0,.72);
+  background: rgba(153, 231, 255, .72);
+  border: 1px solid rgba(255,255,255,.42);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 16px 42px rgba(0,0,0,.18);
+  backdrop-filter: blur(14px);
+}
+
+.applix-back-button {
+  top: 54px;
+  left: 28px;
+  width: 54px;
+  height: 54px;
+  font-size: 32px;
+  border: 0;
+}
+
+.applix-info-button {
+  top: 52px;
+  right: 42px;
+  width: 46px;
+  height: 46px;
+  font-size: 30px;
+  font-family: Georgia, serif;
+  font-style: italic;
+  color: rgba(255,255,255,.9);
+  background: rgba(30, 190, 255, .26);
+  border-color: rgba(93, 231, 255, .8);
+}
+
+.applix-login-stage {
+  position: relative;
+  z-index: 1;
+  width: min(1100px, 100%);
+  display: grid;
+  grid-template-columns: 1fr minmax(320px, 410px);
+  align-items: center;
+  gap: clamp(30px, 8vw, 96px);
+}
+
+.applix-logo-scene {
+  position: relative;
+  min-height: 420px;
+  display: grid;
+  place-items: center;
+}
+
+.applix-orb {
+  position: relative;
+  width: clamp(230px, 28vw, 340px);
+  height: clamp(230px, 28vw, 340px);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255,255,255,.95), transparent 11%),
+    radial-gradient(circle at 70% 74%, rgba(0,255,230,.34), transparent 24%),
+    radial-gradient(circle at 30% 74%, rgba(255,112,238,.42), transparent 26%),
+    linear-gradient(135deg, rgba(245,210,255,.78), rgba(31,16,75,.28) 45%, rgba(8,255,235,.18));
+  border: 2px solid rgba(255, 220, 154, .8);
+  box-shadow:
+    inset 0 0 35px rgba(255,255,255,.38),
+    inset 0 -35px 60px rgba(0, 255, 220, .15),
+    0 0 38px rgba(244, 150, 255, .55),
+    0 34px 90px rgba(0,0,0,.42);
+  backdrop-filter: blur(8px);
+}
+
+.applix-orb::before {
+  content: "";
+  position: absolute;
+  inset: 10px 22px auto 28px;
+  height: 44px;
+  border-radius: 50%;
+  border-top: 4px solid rgba(255,255,255,.62);
+  transform: rotate(-10deg);
+  filter: blur(.2px);
+}
+
+.applix-orb span {
+  color: #f2a2ff;
+  font-size: clamp(44px, 6vw, 72px);
+  font-weight: 950;
+  letter-spacing: 3px;
+  text-shadow: 0 5px 0 rgba(80, 27, 102, .26), 0 0 25px rgba(255, 153, 243, .7);
+}
+
+.applix-hand {
+  position: absolute;
+  left: 50%;
+  bottom: 38px;
+  width: 210px;
+  height: 170px;
+  transform: translateX(-42%) rotate(-8deg);
+  filter: drop-shadow(0 26px 32px rgba(0,0,0,.5));
+}
+
+.hand-palm,
+.hand-finger {
+  position: absolute;
+  display: block;
+  background:
+    linear-gradient(90deg, rgba(255,119,238,.45) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(110,68,255,.65) 1px, transparent 1px),
+    linear-gradient(135deg, #ff83ec, #6659ff 65%, #7cf7ff);
+  background-size: 10px 10px, 10px 10px, auto;
+  border: 1px solid rgba(229, 151, 255, .72);
+}
+
+.hand-palm {
+  width: 118px;
+  height: 86px;
+  left: 54px;
+  bottom: 8px;
+  border-radius: 30px 28px 36px 34px;
+  transform: skew(-10deg) rotate(16deg);
+}
+
+.hand-finger {
+  width: 42px;
+  height: 128px;
+  border-radius: 999px;
+  bottom: 68px;
+}
+
+.finger-one {
+  left: 42px;
+  transform: rotate(-38deg);
+}
+
+.finger-two {
+  right: 28px;
+  transform: rotate(38deg);
+}
+
+.applix-glass-card {
+  width: min(420px, 100%);
+  padding: 32px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(7, 8, 18, .9), rgba(12, 13, 22, .72) 54%, rgba(130, 82, 255, .72));
+  box-shadow: 0 34px 90px rgba(0,0,0,.44), inset 0 1px 0 rgba(255,255,255,.22);
   backdrop-filter: blur(18px);
 }
 
-.setup-hero {
-  position: relative;
-  z-index: 1;
-  width: min(760px, 100%);
-  margin-top: clamp(110px, 23vh, 260px);
-  text-align: center;
-}
-
-.setup-brand {
-  display: inline-grid;
-  place-items: center;
-  width: 92px;
-  height: 92px;
-  margin-bottom: 22px;
-  border-radius: 30px;
-  background: rgba(255,255,255,.22);
-  border: 1px solid rgba(255,255,255,.38);
-  color: white;
-  font-weight: 950;
-  letter-spacing: -1px;
-  box-shadow: 0 24px 70px rgba(0,0,0,.14);
-  backdrop-filter: blur(22px);
-}
-
-.setup-kicker {
-  margin: 0 0 16px;
-  color: rgba(255,255,255,.82);
-  font-size: 13px;
-  font-weight: 950;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-}
-
-.setup-hero h1 {
-  margin: 0;
-  color: rgba(255,255,255,.95);
-  font-size: clamp(52px, 10vw, 92px);
-  line-height: .95;
-  letter-spacing: -4px;
-  text-shadow: 0 18px 45px rgba(0,0,0,.12);
-}
-
-.setup-copy {
-  max-width: 660px;
-  margin: 24px auto 0;
-  color: rgba(255,255,255,.82);
-  font-size: clamp(17px, 2.3vw, 21px);
-  line-height: 1.45;
-}
-
-.glass-login-card {
-  position: relative;
-  z-index: 1;
-  width: min(560px, 100%);
-  display: grid;
-  gap: 16px;
-  margin-top: 48px;
-}
-
-.glass-stack,
-.glass-auth-form {
-  display: grid;
-  gap: 16px;
-}
-
-.glass-auth-form label {
-  color: rgba(255,255,255,.92);
-  font-size: 15px;
-  font-weight: 950;
-  text-align: center;
-}
-
-.glass-auth-form input {
-  width: 100%;
-  border: 1px solid rgba(255,255,255,.42);
-  border-radius: 999px;
-  padding: 20px 24px;
-  background: rgba(255,255,255,.2);
-  color: rgba(0,0,0,.85);
-  outline: none;
-  text-align: center;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 22px 55px rgba(0,0,0,.1);
-  backdrop-filter: blur(20px);
-}
-
-.glass-auth-form input::placeholder { color: rgba(0,0,0,.42); }
-
-.glass-auth-form input:focus {
-  border-color: rgba(255,255,255,.86);
-  box-shadow: 0 0 0 5px rgba(255,255,255,.22), 0 22px 55px rgba(0,0,0,.1);
-}
-
-.glass-primary-button,
-.glass-outline-button {
-  min-height: 78px;
-  width: 100%;
-  border-radius: 999px;
+.applix-card-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 18px 28px;
-  font-size: clamp(20px, 4.5vw, 31px);
-  font-weight: 950;
-  letter-spacing: -.7px;
-}
-
-.glass-primary-button {
-  border: 0;
-  background: rgba(255,255,255,.52);
-  color: rgba(18,18,24,.92);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.52), 0 24px 70px rgba(0,0,0,.14);
-  backdrop-filter: blur(22px);
-}
-
-.glass-outline-button {
-  border: 4px solid rgba(255,255,255,.86);
-  background: rgba(255,255,255,.06);
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.42);
   color: white;
-  box-shadow: 0 22px 55px rgba(0,0,0,.1);
-  backdrop-filter: blur(14px);
+  font-size: 13px;
+  font-weight: 850;
+  background: rgba(255,255,255,.06);
 }
 
-.glass-status,
-.glass-muted {
-  margin: 0;
-  color: rgba(255,255,255,.92);
-  text-align: center;
-  line-height: 1.45;
-  font-weight: 800;
-  text-shadow: 0 12px 30px rgba(0,0,0,.1);
-}
-
-.glass-success {
-  padding: 15px 18px;
-  border: 1px solid rgba(255,255,255,.3);
-  border-radius: 22px;
-  background: rgba(255,255,255,.16);
-  backdrop-filter: blur(14px);
-}
-
-.setup-checklist {
+.applix-magic-form,
+.applix-signed-in-card {
   display: grid;
-  gap: 10px;
-  padding: 18px;
-  border: 1px solid rgba(255,255,255,.3);
-  border-radius: 28px;
-  background: rgba(255,255,255,.14);
-  color: rgba(255,255,255,.95);
-  font-weight: 900;
-  text-align: center;
-  backdrop-filter: blur(16px);
+  gap: 13px;
 }
+
+.applix-magic-form label,
+.applix-card-label {
+  margin: 0;
+  color: rgba(255,255,255,.9);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.applix-magic-form input {
+  width: 100%;
+  border: 1px solid rgba(202, 163, 255, .66);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: rgba(5, 6, 11, .72);
+  color: white;
+  outline: none;
+  box-shadow: inset 0 0 18px rgba(122, 56, 255, .28), 0 0 0 1px rgba(255,255,255,.04);
+}
+
+.applix-magic-form input::placeholder { color: rgba(255,255,255,.36); }
+
+.applix-magic-form input:focus {
+  border-color: rgba(255,255,255,.92);
+  box-shadow: 0 0 0 4px rgba(158, 107, 255, .2), inset 0 0 18px rgba(122, 56, 255, .28);
+}
+
+.applix-magic-button {
+  justify-self: end;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: white;
+  font-size: 14px;
+  font-weight: 900;
+  background: linear-gradient(135deg, rgba(115, 80, 255, .95), rgba(194, 82, 255, .72));
+  box-shadow: 0 16px 38px rgba(78, 36, 180, .46), inset 0 1px 0 rgba(255,255,255,.25);
+}
+
+.applix-card-muted,
+.applix-card-status,
+.applix-signed-email {
+  margin: 0;
+  color: rgba(255,255,255,.86);
+  line-height: 1.45;
+}
+
+.applix-card-status {
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+.applix-card-status.success { color: #d9fff6; }
+.applix-signed-email { font-weight: 900; }
 
 .landing-shell,
 .app-shell {
@@ -417,14 +472,30 @@ textarea:disabled,
   text-transform: uppercase;
 }
 
+@media (max-width: 820px) {
+  .applix-login-stage {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding-top: 62px;
+  }
+
+  .applix-logo-scene {
+    min-height: 330px;
+    transform: scale(.82);
+  }
+
+  .applix-glass-card {
+    width: min(420px, 100%);
+    margin: 0 auto;
+  }
+}
+
 @media (max-width: 640px) {
-  .setup-shell { padding-bottom: 28px; }
-  .setup-back { width: 58px; height: 58px; font-size: 34px; }
-  .setup-hero { margin-top: 120px; }
-  .setup-hero h1 { letter-spacing: -2.5px; }
-  .setup-copy { display: none; }
-  .glass-primary-button,
-  .glass-outline-button { min-height: 68px; }
+  .applix-login-shell { padding: 28px 14px; }
+  .applix-back-button { top: 24px; left: 18px; width: 48px; height: 48px; font-size: 28px; }
+  .applix-info-button { top: 24px; right: 18px; width: 42px; height: 42px; }
+  .applix-logo-scene { min-height: 300px; transform: scale(.72); }
+  .applix-glass-card { padding: 24px; }
 
   .dashboard-header,
   .section-title-row,
