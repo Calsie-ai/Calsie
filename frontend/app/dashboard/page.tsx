@@ -40,6 +40,76 @@ const JOB_PROGRESS_OPTIONS = [
   { value: "closed", label: "Closed" },
 ];
 
+const GENERIC_ROLE_WORDS = new Set([
+  "entry",
+  "level",
+  "junior",
+  "role",
+  "roles",
+  "job",
+  "jobs",
+  "wanted",
+  "full",
+  "time",
+  "part",
+  "casual",
+]);
+
+const IRRELEVANT_FOR_IT = [
+  "personal trainer",
+  "fitness",
+  "gym",
+  "pilates",
+  "yoga",
+  "massage",
+  "chef",
+  "cook",
+  "barista",
+  "waiter",
+  "waitress",
+  "hairdresser",
+  "beauty",
+  "nail",
+  "cleaner",
+  "cleaning",
+  "driver",
+  "delivery",
+  "labourer",
+  "warehouse",
+];
+
+const IT_RELEVANCE_KEYWORDS = [
+  "it",
+  "information technology",
+  "desktop",
+  "helpdesk",
+  "help desk",
+  "service desk",
+  "technical support",
+  "tech support",
+  "support",
+  "systems",
+  "system",
+  "network",
+  "administrator",
+  "administration",
+  "analyst",
+  "developer",
+  "engineer",
+  "software",
+  "hardware",
+  "computer",
+  "cyber",
+  "security",
+  "cloud",
+  "data",
+  "database",
+  "technician",
+  "programmer",
+  "qa",
+  "testing",
+];
+
 function getCampaignRole(campaign: Campaign) {
   return campaign.search?.target_role || campaign.target_business_type || "Target not set";
 }
@@ -92,6 +162,52 @@ function getProgressLabel(value: string) {
   return JOB_PROGRESS_OPTIONS.find((option) => option.value === value)?.label || value;
 }
 
+function wordsFrom(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length >= 3 && !GENERIC_ROLE_WORDS.has(word));
+}
+
+function isItCampaign(campaign: Campaign | undefined) {
+  const role = getCampaignRole(campaign || ({} as Campaign)).toLowerCase();
+  const name = (campaign?.name || "").toLowerCase();
+  const combined = `${role} ${name}`;
+  return /\bit\b/.test(combined) || combined.includes("information technology") || combined.includes("tech support") || combined.includes("desktop support");
+}
+
+function isRelevantTrackerRow(params: {
+  campaign?: Campaign;
+  lead: any;
+  jobName: string;
+  companyName: string;
+  aiSubject?: string | null;
+}) {
+  const { campaign, lead, jobName, companyName, aiSubject } = params;
+  const campaignRole = getCampaignRole(campaign || ({} as Campaign));
+  const haystack = [
+    jobName,
+    companyName,
+    aiSubject || "",
+    getFirstValue(lead, ["description", "snippet", "category", "business_category", "industry"]),
+  ].join(" ").toLowerCase();
+
+  if (!campaign || campaignRole === "Target not set") return true;
+
+  if (isItCampaign(campaign)) {
+    if (IRRELEVANT_FOR_IT.some((badWord) => haystack.includes(badWord))) {
+      return false;
+    }
+    return IT_RELEVANCE_KEYWORDS.some((keyword) => haystack.includes(keyword));
+  }
+
+  const roleWords = wordsFrom(campaignRole);
+  if (!roleWords.length) return true;
+  return roleWords.some((word) => haystack.includes(word));
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -125,7 +241,7 @@ export default function DashboardPage() {
         .select("id,campaign_id,campaign_lead_id,status,review_status,recipient_email,ai_notes,created_at")
         .in("campaign_id", campaignIds)
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(150);
 
       if (queueError) {
         setJobTrackerRows([]);
@@ -147,32 +263,47 @@ export default function DashboardPage() {
         }
       }
 
-      const rows = queueRows.map((queue: any) => {
-        const campaign = campaignById.get(String(queue.campaign_id));
-        const lead = leadById.get(String(queue.campaign_lead_id)) || {};
-        const aiNotes = typeof queue.ai_notes === "object" && queue.ai_notes !== null ? queue.ai_notes : {};
-        const companyName =
-          getFirstValue(lead, ["company_name", "business_name", "name", "title", "employer", "organisation"]) ||
-          "Company not found";
-        const jobName =
-          getFirstValue(lead, ["job_title", "role", "position", "title", "business_category", "category"]) ||
-          aiNotes.ai_subject ||
-          getCampaignRole(campaign || ({} as Campaign));
-        const website = normalizeWebsite(
-          getFirstValue(lead, ["website", "website_url", "url", "domain", "company_website"])
-        );
+      const rows = queueRows
+        .map((queue: any) => {
+          const campaign = campaignById.get(String(queue.campaign_id));
+          const lead = leadById.get(String(queue.campaign_lead_id)) || {};
+          const aiNotes = typeof queue.ai_notes === "object" && queue.ai_notes !== null ? queue.ai_notes : {};
+          const companyName =
+            getFirstValue(lead, ["company_name", "business_name", "name", "employer", "organisation", "company"]) ||
+            "Company not found";
+          const jobName =
+            getFirstValue(lead, ["job_title", "role", "position", "title", "business_category", "category"])
+              .replace(/\s+/g, " ") ||
+            aiNotes.ai_subject ||
+            getCampaignRole(campaign || ({} as Campaign));
+          const website = normalizeWebsite(
+            getFirstValue(lead, ["website", "website_url", "url", "domain", "company_website"])
+          );
 
-        return {
-          queue_id: String(queue.id),
-          campaign_id: String(queue.campaign_id),
-          campaign_name: campaign?.name || "Campaign",
-          job_name: jobName,
-          company_name: companyName,
-          website,
-          progress: aiNotes.job_tracker_status || (queue.status === "sent" ? "emailed" : "generated"),
-          ai_subject: aiNotes.ai_subject || null,
-        } as JobTrackerRow;
-      });
+          return {
+            queue_id: String(queue.id),
+            campaign_id: String(queue.campaign_id),
+            campaign_name: campaign?.name || "Campaign",
+            job_name: jobName,
+            company_name: companyName,
+            website,
+            progress: aiNotes.job_tracker_status || (queue.status === "sent" ? "emailed" : "generated"),
+            ai_subject: aiNotes.ai_subject || null,
+            _campaign: campaign,
+            _lead: lead,
+          } as JobTrackerRow & { _campaign?: Campaign; _lead: any };
+        })
+        .filter((row) =>
+          isRelevantTrackerRow({
+            campaign: row._campaign,
+            lead: row._lead,
+            jobName: row.job_name,
+            companyName: row.company_name,
+            aiSubject: row.ai_subject,
+          })
+        )
+        .map(({ _campaign, _lead, ...row }) => row)
+        .slice(0, 50);
 
       setJobTrackerRows(rows);
     } catch {
@@ -470,10 +601,10 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <p className="muted">Track each generated job/company and move it through your application progress.</p>
+            <p className="muted">Only relevant jobs for the campaign are shown. Bad matches like fitness/personal trainer are hidden for IT campaigns.</p>
 
             {jobTrackerRows.length === 0 ? (
-              <p className="muted">No tracker rows yet. Launch a campaign test first to generate queue rows.</p>
+              <p className="muted">No relevant tracker rows yet. Launch a campaign test first to generate queue rows.</p>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12 }}>
