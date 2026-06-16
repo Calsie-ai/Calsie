@@ -53,6 +53,7 @@ export default function ResumeCanvasPage() {
   const [resumeId, setResumeId] = useState("");
   const [fileName, setFileName] = useState("");
   const [fileType, setFileType] = useState("");
+  const [filePath, setFilePath] = useState("");
   const [parsed, setParsed] = useState<ParsedData>(emptyParsed);
   const [status, setStatus] = useState("Upload the original resume. Applix keeps that layout and stores parsed data separately.");
   const [loading, setLoading] = useState(true);
@@ -72,7 +73,7 @@ export default function ResumeCanvasPage() {
         setUserId(userData.user.id);
         const { data, error } = await supabase
           .from("resume_profiles")
-          .select("id,full_name,target_role,email,phone,location,profile_summary,skills,work_experience,education_locked,certifications_locked")
+          .select("id,full_name,target_role,email,phone,location,profile_summary,skills,work_experience,education_locked,certifications_locked,resume_file_path,resume_file_name,resume_file_type")
           .eq("profile_id", userData.user.id)
           .order("updated_at", { ascending: false })
           .limit(1)
@@ -85,7 +86,9 @@ export default function ResumeCanvasPage() {
 
         if (data) {
           setResumeId(data.id || "");
-          setFileName("Saved resume source");
+          setFileName(data.resume_file_name || "Saved resume source");
+          setFileType(data.resume_file_type || "");
+          setFilePath(data.resume_file_path || "");
           setParsed({
             fullName: data.full_name || "",
             targetRole: data.target_role || "",
@@ -98,7 +101,7 @@ export default function ResumeCanvasPage() {
             education: toText(data.education_locked),
             certifications: toText(data.certifications_locked),
           });
-          setStatus("Loaded saved parsed resume data. Upload source file again only if replacing the layout/source.");
+          setStatus("Loaded saved parsed resume data.");
         } else {
           setParsed((current) => ({ ...current, email: userData.user.email || "" }));
           setStatus("No resume source saved yet. Upload the user's original resume.");
@@ -145,7 +148,7 @@ export default function ResumeCanvasPage() {
         experience: p.experience || current.experience,
         certifications: p.certificates || current.certifications,
       }));
-      setStatus("Parsed data created. Original resume remains the layout/source concept; structured data is ready to save.");
+      setStatus("Parsed data created. Add the private source path if needed, then save.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Resume parsing failed.");
     } finally {
@@ -184,6 +187,9 @@ export default function ResumeCanvasPage() {
         work_experience: block(parsed.experience),
         education_locked: block(parsed.education),
         certifications_locked: splitList(parsed.certifications),
+        resume_file_path: filePath || null,
+        resume_file_name: fileName || null,
+        resume_file_type: fileType || null,
       };
 
       if (resumeId) {
@@ -195,7 +201,7 @@ export default function ResumeCanvasPage() {
         setResumeId(data.id);
       }
 
-      setStatus(`Saved. Parsed reusable data is stored. Source file noted for showcase: ${fileName || "not uploaded"}.`);
+      setStatus(`Saved. Parsed reusable data is stored. Source file: ${fileName || "not set"}.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not save resume source.");
     } finally {
@@ -237,6 +243,9 @@ export default function ResumeCanvasPage() {
             <Field label="Email" value={parsed.email} onChange={(value) => update("email", value)} />
             <Field label="Phone" value={parsed.phone} onChange={(value) => update("phone", value)} />
             <Field label="Location" value={parsed.location} onChange={(value) => update("location", value)} />
+            <Field label="Source file path" value={filePath} onChange={setFilePath} />
+            <Field label="Source file name" value={fileName} onChange={setFileName} />
+            <Field label="Source file type" value={fileType} onChange={setFileType} />
           </div>
 
           <TextArea label="Summary" value={parsed.summary} onChange={(value) => update("summary", value)} rows={4} />
