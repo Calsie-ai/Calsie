@@ -16,99 +16,14 @@ type Campaign = {
   created_at: string;
 };
 
-type JobTrackerRow = {
-  queue_id: string;
-  campaign_id: string;
-  campaign_name: string;
-  job_name: string;
-  company_name: string;
-  website: string | null;
-  progress: string;
-  ai_subject?: string | null;
+type HomeStatus = {
+  resumeReady: boolean;
+  gmailReady: boolean;
+  aiReady: boolean;
+  trackerReady: boolean;
 };
 
 const TEST_RECIPIENT_EMAIL = "hostsajan@gmail.com";
-
-const JOB_PROGRESS_OPTIONS = [
-  { value: "generated", label: "Generated" },
-  { value: "emailed", label: "Email sent" },
-  { value: "email_replied", label: "Email replied" },
-  { value: "interview_set", label: "Interview set" },
-  { value: "interview_done", label: "Done interview" },
-  { value: "offer", label: "Offer" },
-  { value: "rejected", label: "Rejected" },
-  { value: "closed", label: "Closed" },
-];
-
-const GENERIC_ROLE_WORDS = new Set([
-  "entry",
-  "level",
-  "junior",
-  "role",
-  "roles",
-  "job",
-  "jobs",
-  "wanted",
-  "full",
-  "time",
-  "part",
-  "casual",
-]);
-
-const IRRELEVANT_FOR_IT = [
-  "personal trainer",
-  "fitness",
-  "gym",
-  "pilates",
-  "yoga",
-  "massage",
-  "chef",
-  "cook",
-  "barista",
-  "waiter",
-  "waitress",
-  "hairdresser",
-  "beauty",
-  "nail",
-  "cleaner",
-  "cleaning",
-  "driver",
-  "delivery",
-  "labourer",
-  "warehouse",
-];
-
-const IT_RELEVANCE_KEYWORDS = [
-  "it",
-  "information technology",
-  "desktop",
-  "helpdesk",
-  "help desk",
-  "service desk",
-  "technical support",
-  "tech support",
-  "support",
-  "systems",
-  "system",
-  "network",
-  "administrator",
-  "administration",
-  "analyst",
-  "developer",
-  "engineer",
-  "software",
-  "hardware",
-  "computer",
-  "cyber",
-  "security",
-  "cloud",
-  "data",
-  "database",
-  "technician",
-  "programmer",
-  "qa",
-  "testing",
-];
 
 function getCampaignRole(campaign: Campaign) {
   return campaign.search?.target_role || campaign.target_business_type || "Target not set";
@@ -116,18 +31,6 @@ function getCampaignRole(campaign: Campaign) {
 
 function getCampaignLocation(campaign: Campaign) {
   return campaign.search?.target_location || campaign.location || "";
-}
-
-function getDailyCap(campaign: Campaign) {
-  return campaign.outreach?.daily_cap || 100;
-}
-
-function getHourlyCap(campaign: Campaign) {
-  return campaign.outreach?.hourly_cap || 5;
-}
-
-function getCampaignDays(campaign: Campaign) {
-  return campaign.outreach?.campaign_days || 10;
 }
 
 function shortJson(value: unknown) {
@@ -138,180 +41,27 @@ function shortJson(value: unknown) {
   }
 }
 
-function textValue(value: unknown) {
-  if (value === undefined || value === null) return "";
-  return String(value).trim();
-}
-
-function getFirstValue(row: any, keys: string[]) {
-  for (const key of keys) {
-    const value = textValue(row?.[key]);
-    if (value) return value;
-  }
-  return "";
-}
-
-function normalizeWebsite(value: string | null) {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-}
-
-function getProgressLabel(value: string) {
-  return JOB_PROGRESS_OPTIONS.find((option) => option.value === value)?.label || value;
-}
-
-function wordsFrom(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .map((word) => word.trim())
-    .filter((word) => word.length >= 3 && !GENERIC_ROLE_WORDS.has(word));
-}
-
-function isItCampaign(campaign: Campaign | undefined) {
-  const role = getCampaignRole(campaign || ({} as Campaign)).toLowerCase();
-  const name = (campaign?.name || "").toLowerCase();
-  const combined = `${role} ${name}`;
-  return /\bit\b/.test(combined) || combined.includes("information technology") || combined.includes("tech support") || combined.includes("desktop support");
-}
-
-function isRelevantTrackerRow(params: {
-  campaign?: Campaign;
-  lead: any;
-  jobName: string;
-  companyName: string;
-  aiSubject?: string | null;
-}) {
-  const { campaign, lead, jobName, companyName, aiSubject } = params;
-  const campaignRole = getCampaignRole(campaign || ({} as Campaign));
-  const haystack = [
-    jobName,
-    companyName,
-    aiSubject || "",
-    getFirstValue(lead, ["description", "snippet", "category", "business_category", "industry"]),
-  ].join(" ").toLowerCase();
-
-  if (!campaign || campaignRole === "Target not set") return true;
-
-  if (isItCampaign(campaign)) {
-    if (IRRELEVANT_FOR_IT.some((badWord) => haystack.includes(badWord))) {
-      return false;
-    }
-    return IT_RELEVANCE_KEYWORDS.some((keyword) => haystack.includes(keyword));
-  }
-
-  const roleWords = wordsFrom(campaignRole);
-  if (!roleWords.length) return true;
-  return roleWords.some((word) => haystack.includes(word));
-}
-
 export default function DashboardPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [jobTrackerRows, setJobTrackerRows] = useState<JobTrackerRow[]>([]);
+  const [status, setStatus] = useState<HomeStatus>({
+    resumeReady: false,
+    gmailReady: false,
+    aiReady: false,
+    trackerReady: false,
+  });
   const [loading, setLoading] = useState(true);
-  const [trackerLoading, setTrackerLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [gmailStatus, setGmailStatus] = useState("Not connected");
   const [connectingGmail, setConnectingGmail] = useState(false);
   const [launchingCampaignId, setLaunchingCampaignId] = useState("");
-  const [updatingTrackerId, setUpdatingTrackerId] = useState("");
   const [launchResult, setLaunchResult] = useState<any>(null);
 
-  async function loadJobTrackerRows(campaignList: Campaign[]) {
-    if (!campaignList.length) {
-      setJobTrackerRows([]);
-      return;
-    }
-
-    setTrackerLoading(true);
-
-    try {
-      const supabase = getSupabaseClient();
-      const campaignById = new Map(campaignList.map((campaign) => [campaign.id, campaign]));
-      const campaignIds = campaignList.map((campaign) => campaign.id);
-
-      const { data: queueData, error: queueError } = await supabase
-        .from("outreach_queue")
-        .select("id,campaign_id,campaign_lead_id,status,review_status,recipient_email,ai_notes,created_at")
-        .in("campaign_id", campaignIds)
-        .order("created_at", { ascending: false })
-        .limit(150);
-
-      if (queueError) {
-        setJobTrackerRows([]);
-        return;
-      }
-
-      const queueRows = queueData || [];
-      const leadIds = Array.from(new Set(queueRows.map((row: any) => row.campaign_lead_id).filter(Boolean)));
-      const leadById = new Map<string, any>();
-
-      if (leadIds.length) {
-        const { data: leadsData } = await supabase
-          .from("campaign_leads")
-          .select("*")
-          .in("id", leadIds);
-
-        for (const lead of leadsData || []) {
-          leadById.set(String(lead.id), lead);
-        }
-      }
-
-      const rows = queueRows
-        .map((queue: any) => {
-          const campaign = campaignById.get(String(queue.campaign_id));
-          const lead = leadById.get(String(queue.campaign_lead_id)) || {};
-          const aiNotes = typeof queue.ai_notes === "object" && queue.ai_notes !== null ? queue.ai_notes : {};
-          const companyName =
-            getFirstValue(lead, ["company_name", "business_name", "name", "employer", "organisation", "company"]) ||
-            "Company not found";
-          const jobName =
-            getFirstValue(lead, ["job_title", "role", "position", "title", "business_category", "category"])
-              .replace(/\s+/g, " ") ||
-            aiNotes.ai_subject ||
-            getCampaignRole(campaign || ({} as Campaign));
-          const website = normalizeWebsite(
-            getFirstValue(lead, ["website", "website_url", "url", "domain", "company_website"])
-          );
-
-          return {
-            queue_id: String(queue.id),
-            campaign_id: String(queue.campaign_id),
-            campaign_name: campaign?.name || "Campaign",
-            job_name: jobName,
-            company_name: companyName,
-            website,
-            progress: aiNotes.job_tracker_status || (queue.status === "sent" ? "emailed" : "generated"),
-            ai_subject: aiNotes.ai_subject || null,
-            _campaign: campaign,
-            _lead: lead,
-          } as JobTrackerRow & { _campaign?: Campaign; _lead: any };
-        })
-        .filter((row) =>
-          isRelevantTrackerRow({
-            campaign: row._campaign,
-            lead: row._lead,
-            jobName: row.job_name,
-            companyName: row.company_name,
-            aiSubject: row.ai_subject,
-          })
-        )
-        .map(({ _campaign, _lead, ...row }) => row)
-        .slice(0, 50);
-
-      setJobTrackerRows(rows);
-    } catch {
-      setJobTrackerRows([]);
-    } finally {
-      setTrackerLoading(false);
-    }
-  }
+  const setupCount = [status.resumeReady, status.gmailReady, status.aiReady, status.trackerReady].filter(Boolean).length;
+  const allSet = setupCount >= 3;
+  const latestCampaign = campaigns[0];
 
   useEffect(() => {
     async function loadDashboard() {
@@ -328,33 +78,54 @@ export default function DashboardPage() {
           return;
         }
 
-        setEmail(userData.user.email || "");
+        const userEmail = userData.user.email || "";
+        setEmail(userEmail);
 
-        const { data, error } = await supabase
+        const { data: campaignData, error: campaignError } = await supabase
           .from("campaigns")
           .select("id,name,location,target_business_type,search,outreach,status,created_at")
           .eq("user_id", userData.user.id)
           .order("created_at", { ascending: false });
 
-        if (error) {
-          setErrorMessage(error.message);
+        if (campaignError) {
+          setErrorMessage(campaignError.message);
           return;
         }
 
-        const loadedCampaigns = (data || []) as Campaign[];
+        const loadedCampaigns = (campaignData || []) as Campaign[];
         setCampaigns(loadedCampaigns);
-        await loadJobTrackerRows(loadedCampaigns);
 
         const { data: authData } = await supabase
           .from("user_email_authorizations")
           .select("status,provider_email")
-          .eq("user_identifier", userData.user.email || userData.user.id)
+          .eq("user_identifier", userEmail || userData.user.id)
           .eq("provider", "google")
           .maybeSingle();
 
+        const gmailReady = authData?.status === "connected";
         if (authData?.status) {
           setGmailStatus(authData.provider_email ? `${authData.status}: ${authData.provider_email}` : authData.status);
         }
+
+        const { data: resumeData } = await supabase
+          .from("resume_profiles")
+          .select("resume_file_path,full_name")
+          .eq("profile_id", userData.user.id)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const { count: trackerCount } = await supabase
+          .from("outreach_queue")
+          .select("id", { count: "exact", head: true })
+          .in("campaign_id", loadedCampaigns.map((campaign) => campaign.id));
+
+        setStatus({
+          resumeReady: Boolean(resumeData?.resume_file_path),
+          gmailReady,
+          aiReady: true,
+          trackerReady: Boolean((trackerCount || 0) > 0),
+        });
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Could not load dashboard.");
       } finally {
@@ -440,15 +211,14 @@ export default function DashboardPage() {
       const version = result.version || "unknown";
       const sentCount = result.sent_count ?? 0;
       const gmailStatusCode = result.gmail_send_status ?? "not returned";
-      const disabled = result.sends_disabled_in_this_gateway;
 
       if (!response.ok || !data.ok) {
         const errors = Array.isArray(result.errors) ? result.errors.join(" | ") : data.error;
         throw new Error(errors || "Could not launch Applix test.");
       }
 
-      setSuccessMessage(`Launch result: ${version}. Sent count: ${sentCount}. Gmail status: ${gmailStatusCode}. Sending disabled: ${disabled}. Test inbox: ${TEST_RECIPIENT_EMAIL}.`);
-      await loadJobTrackerRows(campaigns);
+      setSuccessMessage(`Automation finished: ${version}. Sent count: ${sentCount}. Gmail status: ${gmailStatusCode}. Test inbox: ${TEST_RECIPIENT_EMAIL}.`);
+      setStatus((current) => ({ ...current, trackerReady: true }));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not launch Applix test.");
     } finally {
@@ -456,198 +226,107 @@ export default function DashboardPage() {
     }
   }
 
-  async function updateJobProgress(row: JobTrackerRow, nextProgress: string) {
-    setUpdatingTrackerId(row.queue_id);
-    setErrorMessage("");
-    setSuccessMessage("");
-
-    const previousRows = jobTrackerRows;
-    setJobTrackerRows((rows) => rows.map((item) => item.queue_id === row.queue_id ? { ...item, progress: nextProgress } : item));
-
-    try {
-      const supabase = getSupabaseClient();
-      const { data: currentRow, error: readError } = await supabase
-        .from("outreach_queue")
-        .select("ai_notes")
-        .eq("id", row.queue_id)
-        .maybeSingle();
-
-      if (readError) throw readError;
-
-      const existingNotes = typeof currentRow?.ai_notes === "object" && currentRow.ai_notes !== null ? currentRow.ai_notes : {};
-      const { error: updateError } = await supabase
-        .from("outreach_queue")
-        .update({
-          ai_notes: {
-            ...existingNotes,
-            job_tracker_status: nextProgress,
-            job_tracker_status_label: getProgressLabel(nextProgress),
-            job_tracker_updated_at: new Date().toISOString(),
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", row.queue_id);
-
-      if (updateError) throw updateError;
-
-      setSuccessMessage(`Updated ${row.company_name} to ${getProgressLabel(nextProgress)}.`);
-    } catch (error) {
-      setJobTrackerRows(previousRows);
-      setErrorMessage(error instanceof Error ? error.message : "Could not update job progress.");
-    } finally {
-      setUpdatingTrackerId("");
-    }
-  }
-
   return (
-    <main className="app-shell">
-      <section className="dashboard-card">
-        <div className="dashboard-header">
-          <div>
-            <p className="eyebrow">Dashboard</p>
-            <h1>Welcome to Applix</h1>
-            {email && <p className="muted">Signed in as {email}</p>}
+    <main className="applix-home-shell">
+      <button className="applix-setup-back" type="button" aria-label="Back" onClick={() => router.push("/")}>←</button>
+      <button className="home-signout" type="button" onClick={signOut}>Sign out</button>
+
+      <section className="applix-home-center">
+        <div className="applix-setup-orb small-home-orb" aria-label="Applix logo">
+          <span>APPLIX</span>
+        </div>
+
+        <p className="applix-setup-kicker">Home</p>
+        <h1>{allSet ? "You're all set up!" : "Finish setup"}</h1>
+        {email && <p className="applix-home-copy">Signed in as {email}</p>}
+      </section>
+
+      <section className="applix-home-bottom">
+        <div className="home-check-grid">
+          <div className={status.resumeReady ? "home-check ready" : "home-check"}>
+            <span>{status.resumeReady ? "✓" : "1"}</span>
+            <div>
+              <strong>Resume connected</strong>
+              <p>{status.resumeReady ? "Your source resume is saved." : "Upload your master resume."}</p>
+            </div>
           </div>
-          <button className="ghost-button" type="button" onClick={signOut}>Sign out</button>
+
+          <div className={status.gmailReady ? "home-check ready" : "home-check"}>
+            <span>{status.gmailReady ? "✓" : "2"}</span>
+            <div>
+              <strong>Gmail connected</strong>
+              <p>{status.gmailReady ? gmailStatus : "Connect Gmail to send from your account."}</p>
+            </div>
+          </div>
+
+          <div className={status.aiReady ? "home-check ready" : "home-check"}>
+            <span>{status.aiReady ? "✓" : "3"}</span>
+            <div>
+              <strong>AI writer ready</strong>
+              <p>Unique job emails can be generated automatically.</p>
+            </div>
+          </div>
+
+          <div className={status.trackerReady ? "home-check ready" : "home-check"}>
+            <span>{status.trackerReady ? "✓" : "4"}</span>
+            <div>
+              <strong>Job tracker ready</strong>
+              <p>{status.trackerReady ? "Tracker rows are available." : "Run automation to create tracker rows."}</p>
+            </div>
+          </div>
         </div>
 
-        <div className="empty-state">
-          <h2>Google consent</h2>
-          <p>Connect Gmail so Applix can prepare and test outreach from your connected account. Real recipients stay off during test mode.</p>
-          <p className="muted">Status: {gmailStatus}</p>
-          <button className="primary-button" type="button" onClick={connectGmail} disabled={connectingGmail || !email}>
-            {connectingGmail ? "Opening Google..." : "Connect Gmail"}
-          </button>
+        {errorMessage && <p className="applix-setup-status">{errorMessage}</p>}
+        {successMessage && <p className="applix-setup-status success">{successMessage}</p>}
+        {loading && <p className="applix-setup-status">Loading setup...</p>}
+
+        <div className="applix-home-actions">
+          {latestCampaign ? (
+            <button
+              className="applix-setup-primary"
+              type="button"
+              onClick={() => launchApplixTest(latestCampaign.id)}
+              disabled={Boolean(launchingCampaignId) || !status.gmailReady || !status.resumeReady}
+            >
+              {launchingCampaignId ? "Running..." : "Start automation"}
+            </button>
+          ) : (
+            <Link className="applix-setup-primary" href="/campaign/new">Start automation</Link>
+          )}
+
+          <div className="home-action-row">
+            <Link className="applix-setup-outline" href="/tracker">View tracker</Link>
+            <Link className="applix-setup-outline" href="/resume-canvas">Edit resume</Link>
+          </div>
+
+          {!status.gmailReady && (
+            <button className="applix-setup-outline" type="button" onClick={connectGmail} disabled={connectingGmail || !email}>
+              {connectingGmail ? "Opening Gmail..." : "Connect Gmail"}
+            </button>
+          )}
         </div>
 
-        <div className="empty-state">
-          <h2>Master Resume</h2>
-          <p>Upload, parse and save your resume source. Applix keeps the original layout and stores parsed JSON separately.</p>
-          <Link className="primary-link" href="/resume-canvas">Upload / Edit Master Resume</Link>
-        </div>
+        {latestCampaign && (
+          <div className="home-campaign-card">
+            <p className="applix-setup-kicker">Latest campaign</p>
+            <strong>{latestCampaign.name}</strong>
+            <p>{getCampaignRole(latestCampaign)}{getCampaignLocation(latestCampaign) ? ` in ${getCampaignLocation(latestCampaign)}` : ""}</p>
+          </div>
+        )}
 
-        <div className="empty-state">
-          <h2>Test launch plan</h2>
-          <p>TEST MODE is ON. Real recipients are OFF. The test run should show the live backend version, sent count, Gmail status and any errors below.</p>
-        </div>
-
-        {loading && <p className="muted">Loading your campaigns...</p>}
-        {errorMessage && <p className="error-text">{errorMessage}</p>}
-        {successMessage && <p className="form-status success-status">{successMessage}</p>}
         {launchResult && (
-          <pre className="form-status" style={{ whiteSpace: "pre-wrap", overflowX: "auto" }}>
-            {shortJson({
+          <details className="home-dev-details">
+            <summary>Developer details</summary>
+            <pre>{shortJson({
               version: launchResult.version,
               ok: launchResult.ok,
               sent_count: launchResult.sent_count,
               gmail_send_status: launchResult.gmail_send_status,
               gmail_error: launchResult.gmail_error,
-              sends_disabled_in_this_gateway: launchResult.sends_disabled_in_this_gateway,
               user_identifier: launchResult.user_identifier,
               errors: launchResult.errors,
-            })}
-          </pre>
-        )}
-
-        {!loading && campaigns.length === 0 && (
-          <div className="empty-state">
-            <h2>No campaign yet</h2>
-            <p>Create your first campaign so Applix knows what jobs to target and how many emails to send daily.</p>
-            <Link className="primary-link" href="/campaign/new">Start campaign now</Link>
-          </div>
-        )}
-
-        {!loading && campaigns.length > 0 && (
-          <div className="campaign-list">
-            <div className="section-title-row">
-              <h2>Your campaigns</h2>
-              <Link className="primary-link small" href="/campaign/new">New campaign</Link>
-            </div>
-            {campaigns.map((campaign) => {
-              const role = getCampaignRole(campaign);
-              const location = getCampaignLocation(campaign);
-              const dailyCap = getDailyCap(campaign);
-              const hourlyCap = getHourlyCap(campaign);
-              const days = getCampaignDays(campaign);
-              const launching = launchingCampaignId === campaign.id;
-
-              return (
-                <article className="campaign-row" key={campaign.id}>
-                  <div>
-                    <h3>{campaign.name}</h3>
-                    <p>{role}{location ? ` in ${location}` : ""}</p>
-                    <button className="primary-button small-action" type="button" onClick={() => launchApplixTest(campaign.id)} disabled={launching || gmailStatus === "Not connected"}>
-                      {launching ? "Launching test..." : "Launch Applix Test"}
-                    </button>
-                  </div>
-                  <div className="campaign-meta">
-                    <span>{campaign.status}</span>
-                    <span>{hourlyCap}/hour</span>
-                    <span>{dailyCap}/day</span>
-                    <span>{days} days</span>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-
-        {!loading && (
-          <div className="empty-state" style={{ marginTop: 24 }}>
-            <div className="section-title-row">
-              <h2>Job tracker</h2>
-              <button className="ghost-button" type="button" onClick={() => loadJobTrackerRows(campaigns)} disabled={trackerLoading || campaigns.length === 0}>
-                {trackerLoading ? "Refreshing..." : "Refresh"}
-              </button>
-            </div>
-
-            <p className="muted">Only relevant jobs for the campaign are shown. Bad matches like fitness/personal trainer are hidden for IT campaigns.</p>
-
-            {jobTrackerRows.length === 0 ? (
-              <p className="muted">No relevant tracker rows yet. Launch a campaign test first to generate queue rows.</p>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12 }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left", padding: "12px", borderBottom: "1px solid rgba(148, 163, 184, 0.25)" }}>Job / Company</th>
-                      <th style={{ textAlign: "left", padding: "12px", borderBottom: "1px solid rgba(148, 163, 184, 0.25)", width: 260 }}>Tracker progress</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {jobTrackerRows.map((row) => (
-                      <tr key={row.queue_id}>
-                        <td style={{ padding: "12px", borderBottom: "1px solid rgba(148, 163, 184, 0.18)", verticalAlign: "top" }}>
-                          <strong>{row.job_name}</strong>
-                          <p className="muted" style={{ margin: "4px 0" }}>{row.company_name}</p>
-                          {row.website ? (
-                            <a className="primary-link small" href={row.website} target="_blank" rel="noreferrer">
-                              Open company website
-                            </a>
-                          ) : (
-                            <span className="muted">No website found</span>
-                          )}
-                          <p className="muted" style={{ margin: "6px 0 0" }}>Campaign: {row.campaign_name}</p>
-                        </td>
-                        <td style={{ padding: "12px", borderBottom: "1px solid rgba(148, 163, 184, 0.18)", verticalAlign: "top" }}>
-                          <select
-                            value={row.progress}
-                            onChange={(event) => updateJobProgress(row, event.target.value)}
-                            disabled={updatingTrackerId === row.queue_id}
-                            style={{ width: "100%", padding: "10px", borderRadius: 10 }}
-                          >
-                            {JOB_PROGRESS_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+            })}</pre>
+          </details>
         )}
       </section>
     </main>
