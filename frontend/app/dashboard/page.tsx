@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 
@@ -11,7 +11,7 @@ type Campaign = {
   location: string | null;
   target_business_type: string | null;
   search: { target_role?: string; target_location?: string | null } | null;
-  outreach: { daily_cap?: number; hourly_cap?: number; campaign_days?: number } | null;
+  outreach: { daily_cap?: number; hourly_cap?: number; campaign_days?: number; starts_at?: string; mode?: string } | null;
   status: string;
   created_at: string;
 };
@@ -23,22 +23,12 @@ type HomeStatus = {
   trackerReady: boolean;
 };
 
-const TEST_RECIPIENT_EMAIL = "hostsajan@gmail.com";
-
 function getCampaignRole(campaign: Campaign) {
   return campaign.search?.target_role || campaign.target_business_type || "Target not set";
 }
 
 function getCampaignLocation(campaign: Campaign) {
   return campaign.search?.target_location || campaign.location || "";
-}
-
-function shortJson(value: unknown) {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
 }
 
 function StatusDot({ ready, children }: { ready: boolean; children: ReactNode }) {
@@ -69,6 +59,12 @@ function StatusDot({ ready, children }: { ready: boolean; children: ReactNode })
   );
 }
 
+function defaultStartTime() {
+  const date = new Date(Date.now() + 60 * 60 * 1000);
+  date.setMinutes(0, 0, 0);
+  return date.toISOString().slice(0, 16);
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -84,10 +80,22 @@ export default function DashboardPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [gmailStatus, setGmailStatus] = useState("Not connected");
   const [connectingGmail, setConnectingGmail] = useState(false);
-  const [launchingCampaignId, setLaunchingCampaignId] = useState("");
-  const [launchResult, setLaunchResult] = useState<any>(null);
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduleStartsAt, setScheduleStartsAt] = useState(defaultStartTime);
+  const [dailyCap, setDailyCap] = useState(25);
+  const [hourlyCap, setHourlyCap] = useState(10);
 
   const latestCampaign = campaigns[0];
+  const isScheduled = latestCampaign?.status === "scheduled" || latestCampaign?.outreach?.mode === "scheduled";
+  const canSchedule = Boolean(latestCampaign && status.resumeReady && status.gmailReady && !scheduling);
+
+  const scheduleLabel = useMemo(() => {
+    if (!latestCampaign) return "Create campaign first";
+    if (!status.resumeReady) return "Upload resume first";
+    if (!status.gmailReady) return "Connect Gmail first";
+    if (scheduling) return "Scheduling...";
+    return isScheduled ? "Update schedule" : "Schedule email sends";
+  }, [latestCampaign, status.resumeReady, status.gmailReady, scheduling, isScheduled]);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -121,6 +129,11 @@ export default function DashboardPage() {
         const loadedCampaigns = (campaignData || []) as Campaign[];
         setCampaigns(loadedCampaigns);
 
+        const latest = loadedCampaigns[0];
+        if (latest?.outreach?.starts_at) setScheduleStartsAt(String(latest.outreach.starts_at).slice(0, 16));
+        if (latest?.outreach?.daily_cap) setDailyCap(Number(latest.outreach.daily_cap));
+        if (latest?.outreach?.hourly_cap) setHourlyCap(Number(latest.outreach.hourly_cap));
+
         const { data: authData } = await supabase
           .from("user_email_authorizations")
           .select("status,provider_email")
@@ -141,16 +154,20 @@ export default function DashboardPage() {
           .limit(1)
           .maybeSingle();
 
-        const { count: trackerCount } = await supabase
-          .from("outreach_queue")
-          .select("id", { count: "exact", head: true })
-          .in("campaign_id", loadedCampaigns.map((campaign) => campaign.id));
+        let trackerReady = false;
+        if (loadedCampaigns.length > 0) {
+          const { count: trackerCount } = await supabase
+            .from("outreach_queue")
+            .select("id", { count: "exact", head: true })
+            .in("campaign_id", loadedCampaigns.map((campaign) => campaign.id));
+          trackerReady = Boolean((trackerCount || 0) > 0);
+        }
 
         setStatus({
           resumeReady: Boolean(resumeData?.resume_file_path),
           gmailReady,
           aiReady: true,
-          trackerReady: Boolean((trackerCount || 0) > 0 || loadedCampaigns.length > 0),
+          trackerReady,
         });
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Could not load dashboard.");
@@ -172,7 +189,6 @@ export default function DashboardPage() {
     setConnectingGmail(true);
     setErrorMessage("");
     setSuccessMessage("");
-    setLaunchResult(null);
 
     try {
       const supabase = getSupabaseClient();
@@ -204,11 +220,15 @@ export default function DashboardPage() {
     }
   }
 
-  async function launchApplixTest(campaignId: string) {
-    setLaunchingCampaignId(campaignId);
+  async function scheduleCampaign() {
+    if (!latestCampaign) {
+      router.push("/campaign/new");
+      return;
+    }
+
+    setScheduling(true);
     setErrorMessage("");
     setSuccessMessage("");
-    setLaunchResult(null);
 
     try {
       const supabase = getSupabaseClient();
@@ -219,36 +239,37 @@ export default function DashboardPage() {
         throw new Error("Missing login session. Please sign in again.");
       }
 
-      const response = await fetch("/api/applix/launch-test", {
+      const startsAt = scheduleStartsAt ? new Date(scheduleStartsAt).toISOString() : new Date().toISOString();
+      const response = await fetch("/api/applix/schedule-campaign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           access_token: accessToken,
-          campaign_id: campaignId,
-          batch_size: 10,
-          user_identifier: email,
+          campaign_id: latestCampaign.id,
+          enabled: true,
+          starts_at: startsAt,
+          timezone: "Australia/Sydney",
+          daily_cap: dailyCap,
+          hourly_cap: hourlyCap,
+          campaign_days: latestCampaign.outreach?.campaign_days || 14,
         }),
       });
 
       const data = await response.json().catch(() => ({}));
-      setLaunchResult(data.result || data);
-
-      const result = data.result || {};
-      const version = result.version || "unknown";
-      const sentCount = result.sent_count ?? 0;
-      const gmailStatusCode = result.gmail_send_status ?? "not returned";
-
       if (!response.ok || !data.ok) {
-        const errors = Array.isArray(result.errors) ? result.errors.join(" | ") : data.error;
-        throw new Error(errors || "Could not launch Applix test.");
+        throw new Error(data.error || "Could not schedule email sends.");
       }
 
-      setSuccessMessage(`Automation finished: ${version}. Sent count: ${sentCount}. Gmail status: ${gmailStatusCode}. Test inbox: ${TEST_RECIPIENT_EMAIL}.`);
-      setStatus((current) => ({ ...current, trackerReady: true }));
+      setCampaigns((current) => current.map((campaign) => (
+        campaign.id === latestCampaign.id
+          ? { ...campaign, status: "scheduled", outreach: { ...(campaign.outreach || {}), ...data.schedule } }
+          : campaign
+      )));
+      setSuccessMessage(`Scheduled. Applix will send up to ${hourlyCap} emails per hour and ${dailyCap} per day.`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not launch Applix test.");
+      setErrorMessage(error instanceof Error ? error.message : "Could not schedule email sends.");
     } finally {
-      setLaunchingCampaignId("");
+      setScheduling(false);
     }
   }
 
@@ -278,39 +299,18 @@ export default function DashboardPage() {
 
       <section
         className="applix-home-center"
-        style={{
-          alignContent: "center",
-          paddingTop: "12px",
-          width: "min(760px, 100%)",
-        }}
+        style={{ alignContent: "center", paddingTop: "12px", width: "min(760px, 100%)" }}
       >
         <img
           src="/applix-logo.svg"
           alt="Applix logo"
-          style={{
-            width: "clamp(230px, 34vw, 390px)",
-            height: "auto",
-            display: "block",
-            objectFit: "contain",
-            marginBottom: "-20px",
-            filter: "drop-shadow(0 24px 52px rgba(0, 0, 0, .45))",
-          }}
+          style={{ width: "clamp(230px, 34vw, 390px)", height: "auto", display: "block", objectFit: "contain", marginBottom: "-20px", filter: "drop-shadow(0 24px 52px rgba(0, 0, 0, .45))" }}
         />
 
-        <p
-          style={{
-            margin: "0 0 8px",
-            color: "#ff7fa8",
-            fontSize: "clamp(32px, 6vw, 64px)",
-            lineHeight: .9,
-            fontWeight: 950,
-            letterSpacing: ".16em",
-            textShadow: "0 0 22px rgba(255, 80, 180, .28)",
-          }}
-        >
+        <p style={{ margin: "0 0 8px", color: "#ff7fa8", fontSize: "clamp(32px, 6vw, 64px)", lineHeight: .9, fontWeight: 950, letterSpacing: ".16em", textShadow: "0 0 22px rgba(255, 80, 180, .28)" }}>
           APPLIX
         </p>
-        <h1 style={{ fontSize: "clamp(36px, 6.8vw, 72px)", letterSpacing: "-2px" }}>Your job automation is ready</h1>
+        <h1 style={{ fontSize: "clamp(36px, 6.8vw, 72px)", letterSpacing: "-2px" }}>{isScheduled ? "Email sending is scheduled" : "Your job automation is ready"}</h1>
         {email && <p className="applix-home-copy" style={{ marginTop: "16px" }}>Signed in as {email}</p>}
       </section>
 
@@ -320,21 +320,47 @@ export default function DashboardPage() {
         {loading && <p className="applix-setup-status">Loading setup...</p>}
 
         <div className="applix-home-actions" style={{ gap: "14px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: "10px",
+              padding: "12px",
+              borderRadius: "24px",
+              border: "1px solid rgba(255,255,255,.16)",
+              background: "rgba(255,255,255,.08)",
+              backdropFilter: "blur(18px)",
+            }}
+          >
+            <label style={{ display: "grid", gap: "6px", color: "rgba(255,255,255,.72)", fontSize: "12px", fontWeight: 900 }}>
+              Start time
+              <input type="datetime-local" value={scheduleStartsAt} onChange={(event) => setScheduleStartsAt(event.target.value)} style={{ minWidth: 0, border: 0, borderRadius: "14px", padding: "12px", background: "rgba(0,0,0,.3)", color: "white" }} />
+            </label>
+            <label style={{ display: "grid", gap: "6px", color: "rgba(255,255,255,.72)", fontSize: "12px", fontWeight: 900 }}>
+              Per hour
+              <input type="number" min="1" max="50" value={hourlyCap} onChange={(event) => setHourlyCap(Number(event.target.value))} style={{ minWidth: 0, border: 0, borderRadius: "14px", padding: "12px", background: "rgba(0,0,0,.3)", color: "white" }} />
+            </label>
+            <label style={{ display: "grid", gap: "6px", color: "rgba(255,255,255,.72)", fontSize: "12px", fontWeight: 900 }}>
+              Per day
+              <input type="number" min="1" max="200" value={dailyCap} onChange={(event) => setDailyCap(Number(event.target.value))} style={{ minWidth: 0, border: 0, borderRadius: "14px", padding: "12px", background: "rgba(0,0,0,.3)", color: "white" }} />
+            </label>
+          </div>
+
           {latestCampaign ? (
             <button
               className="applix-setup-primary"
               type="button"
-              onClick={() => launchApplixTest(latestCampaign.id)}
-              disabled={Boolean(launchingCampaignId) || !status.gmailReady || !status.resumeReady}
+              onClick={scheduleCampaign}
+              disabled={!canSchedule}
               style={{ gap: "12px" }}
             >
               <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "58px", height: "58px", objectFit: "contain" }} />
-              {launchingCampaignId ? "Running..." : "Start automation"}
+              {scheduleLabel}
             </button>
           ) : (
             <Link className="applix-setup-primary" href="/campaign/new" style={{ gap: "12px" }}>
               <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "58px", height: "58px", objectFit: "contain" }} />
-              Start automation
+              Create campaign first
             </Link>
           )}
 
@@ -352,18 +378,7 @@ export default function DashboardPage() {
 
         <div
           aria-label="Setup status"
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: "10px 18px",
-            padding: "14px 18px",
-            border: "1px solid rgba(255,255,255,.18)",
-            borderRadius: "999px",
-            background: "rgba(255,255,255,.08)",
-            backdropFilter: "blur(18px)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,.14), 0 18px 45px rgba(0,0,0,.14)",
-          }}
+          style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "10px 18px", padding: "14px 18px", border: "1px solid rgba(255,255,255,.18)", borderRadius: "999px", background: "rgba(255,255,255,.08)", backdropFilter: "blur(18px)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.14), 0 18px 45px rgba(0,0,0,.14)" }}
         >
           <StatusDot ready={status.resumeReady}>Resume ready</StatusDot>
           <StatusDot ready={status.gmailReady}>Gmail connected</StatusDot>
@@ -375,22 +390,8 @@ export default function DashboardPage() {
             <p className="applix-setup-kicker" style={{ marginBottom: "8px" }}>Latest campaign</p>
             <strong>{latestCampaign.name}</strong>
             <p>{getCampaignRole(latestCampaign)}{getCampaignLocation(latestCampaign) ? ` in ${getCampaignLocation(latestCampaign)}` : ""}</p>
+            {isScheduled && <p style={{ marginTop: "8px", color: "#8fffd2", fontWeight: 900 }}>Scheduled sender is active.</p>}
           </div>
-        )}
-
-        {launchResult && (
-          <details className="home-dev-details">
-            <summary>Developer details</summary>
-            <pre>{shortJson({
-              version: launchResult.version,
-              ok: launchResult.ok,
-              sent_count: launchResult.sent_count,
-              gmail_send_status: launchResult.gmail_send_status,
-              gmail_error: launchResult.gmail_error,
-              user_identifier: launchResult.user_identifier,
-              errors: launchResult.errors,
-            })}</pre>
-          </details>
         )}
       </section>
     </main>
