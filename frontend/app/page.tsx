@@ -75,7 +75,7 @@ export default function HomePage() {
       <div className="applix-setup-info" aria-hidden="true">i</div>
 
       <section className="applix-setup-center">
-        <img className="applix-setup-orb" src="/applix-logo.svg" alt="Applix logo" />
+        <img className="applix-brand-logo" src="/applix-logo.svg" alt="Applix logo" />
 
         <p className="applix-setup-kicker">AI job automation</p>
         <h1>{signedInEmail ? "You're all set up!" : "Welcome to Applix"}</h1>
