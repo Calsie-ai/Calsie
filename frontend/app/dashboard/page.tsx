@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 
@@ -41,7 +41,7 @@ function shortJson(value: unknown) {
   }
 }
 
-function StatusDot({ ready, children }: { ready: boolean; children: React.ReactNode }) {
+function StatusDot({ ready, children }: { ready: boolean; children: ReactNode }) {
   return (
     <span
       style={{
@@ -150,7 +150,7 @@ export default function DashboardPage() {
           resumeReady: Boolean(resumeData?.resume_file_path),
           gmailReady,
           aiReady: true,
-          trackerReady: Boolean((trackerCount || 0) > 0),
+          trackerReady: Boolean((trackerCount || 0) > 0 || loadedCampaigns.length > 0),
         });
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Could not load dashboard.");
