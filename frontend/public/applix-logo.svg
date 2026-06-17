@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Applix logo</title>
+  <desc id="desc">A stylized paper plane logo in black and pink.</desc>
+  <path d="M68 202 434 58 331 430 234 304 126 385 164 251Z" fill="#fff" stroke="#050505" stroke-width="20" stroke-linejoin="round"/>
+  <path d="M164 251 434 58 234 304" fill="none" stroke="#050505" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M218 230 378 104 340 322Z" fill="#ff7f93" opacity=".9"/>
+  <path d="M234 304 210 415 331 430Z" fill="#fff" stroke="#050505" stroke-width="20" stroke-linejoin="round"/>
+</svg>
