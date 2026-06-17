@@ -41,6 +41,34 @@ function shortJson(value: unknown) {
   }
 }
 
+function StatusDot({ ready, children }: { ready: boolean; children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "8px",
+        color: ready ? "rgba(220, 255, 240, .96)" : "rgba(255, 255, 255, .62)",
+        fontSize: "clamp(12px, 1.8vw, 14px)",
+        fontWeight: 850,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: "9px",
+          height: "9px",
+          borderRadius: "999px",
+          background: ready ? "#8fffd2" : "rgba(255,255,255,.34)",
+          boxShadow: ready ? "0 0 18px rgba(143,255,210,.7)" : "none",
+        }}
+      />
+      {children}
+    </span>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -59,8 +87,6 @@ export default function DashboardPage() {
   const [launchingCampaignId, setLaunchingCampaignId] = useState("");
   const [launchResult, setLaunchResult] = useState<any>(null);
 
-  const setupCount = [status.resumeReady, status.gmailReady, status.aiReady, status.trackerReady].filter(Boolean).length;
-  const allSet = setupCount >= 3;
   const latestCampaign = campaigns[0];
 
   useEffect(() => {
@@ -227,85 +253,94 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="applix-home-shell">
-      <button className="applix-setup-back" type="button" aria-label="Back" onClick={() => router.push("/")}>←</button>
-      <button className="home-signout" type="button" onClick={signOut}>Sign out</button>
+    <main className="applix-home-shell" style={{ gridTemplateRows: "auto 1fr auto", paddingTop: "24px" }}>
+      <header
+        style={{
+          position: "relative",
+          zIndex: 2,
+          width: "min(980px, 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+        }}
+      >
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "12px" }}>
+          <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "54px", height: "54px", objectFit: "contain" }} />
+          <div style={{ textAlign: "left" }}>
+            <strong style={{ display: "block", color: "#ff7fa8", letterSpacing: ".18em", fontSize: "16px" }}>APPLIX</strong>
+            <span style={{ color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 800 }}>Approved by Sajan</span>
+          </div>
+        </div>
 
-      <section className="applix-home-center">
+        <button className="home-signout" type="button" onClick={signOut} style={{ position: "static" }}>Sign out</button>
+      </header>
+
+      <section
+        className="applix-home-center"
+        style={{
+          alignContent: "center",
+          paddingTop: "12px",
+          width: "min(760px, 100%)",
+        }}
+      >
         <img
           src="/applix-logo.svg"
           alt="Applix logo"
           style={{
-            width: "clamp(220px, 36vw, 360px)",
+            width: "clamp(230px, 34vw, 390px)",
             height: "auto",
             display: "block",
             objectFit: "contain",
-            marginBottom: "-16px",
-            filter: "drop-shadow(0 22px 45px rgba(0, 0, 0, .4))",
+            marginBottom: "-20px",
+            filter: "drop-shadow(0 24px 52px rgba(0, 0, 0, .45))",
           }}
         />
 
-        <p className="applix-setup-kicker">Home</p>
-        <h1>{allSet ? "You're all set up!" : "Finish setup"}</h1>
-        {email && <p className="applix-home-copy">Signed in as {email}</p>}
+        <p
+          style={{
+            margin: "0 0 8px",
+            color: "#ff7fa8",
+            fontSize: "clamp(32px, 6vw, 64px)",
+            lineHeight: .9,
+            fontWeight: 950,
+            letterSpacing: ".16em",
+            textShadow: "0 0 22px rgba(255, 80, 180, .28)",
+          }}
+        >
+          APPLIX
+        </p>
+        <h1 style={{ fontSize: "clamp(36px, 6.8vw, 72px)", letterSpacing: "-2px" }}>Your job automation is ready</h1>
+        {email && <p className="applix-home-copy" style={{ marginTop: "16px" }}>Signed in as {email}</p>}
       </section>
 
-      <section className="applix-home-bottom">
-        <div className="home-check-grid">
-          <div className={status.resumeReady ? "home-check ready" : "home-check"}>
-            <span>{status.resumeReady ? "✓" : "1"}</span>
-            <div>
-              <strong>Resume connected</strong>
-              <p>{status.resumeReady ? "Your source resume is saved." : "Upload your master resume."}</p>
-            </div>
-          </div>
-
-          <div className={status.gmailReady ? "home-check ready" : "home-check"}>
-            <span>{status.gmailReady ? "✓" : "2"}</span>
-            <div>
-              <strong>Gmail connected</strong>
-              <p>{status.gmailReady ? gmailStatus : "Connect Gmail to send from your account."}</p>
-            </div>
-          </div>
-
-          <div className={status.aiReady ? "home-check ready" : "home-check"}>
-            <span>{status.aiReady ? "✓" : "3"}</span>
-            <div>
-              <strong>AI writer ready</strong>
-              <p>Unique job emails can be generated automatically.</p>
-            </div>
-          </div>
-
-          <div className={status.trackerReady ? "home-check ready" : "home-check"}>
-            <span>{status.trackerReady ? "✓" : "4"}</span>
-            <div>
-              <strong>Job tracker ready</strong>
-              <p>{status.trackerReady ? "Tracker rows are available." : "Run automation to create tracker rows."}</p>
-            </div>
-          </div>
-        </div>
-
+      <section className="applix-home-bottom" style={{ width: "min(760px, 100%)", gap: "14px" }}>
         {errorMessage && <p className="applix-setup-status">{errorMessage}</p>}
         {successMessage && <p className="applix-setup-status success">{successMessage}</p>}
         {loading && <p className="applix-setup-status">Loading setup...</p>}
 
-        <div className="applix-home-actions">
+        <div className="applix-home-actions" style={{ gap: "14px" }}>
           {latestCampaign ? (
             <button
               className="applix-setup-primary"
               type="button"
               onClick={() => launchApplixTest(latestCampaign.id)}
               disabled={Boolean(launchingCampaignId) || !status.gmailReady || !status.resumeReady}
+              style={{ gap: "12px" }}
             >
+              <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "58px", height: "58px", objectFit: "contain" }} />
               {launchingCampaignId ? "Running..." : "Start automation"}
             </button>
           ) : (
-            <Link className="applix-setup-primary" href="/campaign/new">Start automation</Link>
+            <Link className="applix-setup-primary" href="/campaign/new" style={{ gap: "12px" }}>
+              <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "58px", height: "58px", objectFit: "contain" }} />
+              Start automation
+            </Link>
           )}
 
           <div className="home-action-row">
             <Link className="applix-setup-outline" href="/tracker">View tracker</Link>
-            <Link className="applix-setup-outline" href="/resume-canvas">Edit resume</Link>
+            <Link className="applix-setup-outline" href="/resume-canvas">Upload/Update Resume</Link>
           </div>
 
           {!status.gmailReady && (
@@ -315,9 +350,29 @@ export default function DashboardPage() {
           )}
         </div>
 
+        <div
+          aria-label="Setup status"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: "10px 18px",
+            padding: "14px 18px",
+            border: "1px solid rgba(255,255,255,.18)",
+            borderRadius: "999px",
+            background: "rgba(255,255,255,.08)",
+            backdropFilter: "blur(18px)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,.14), 0 18px 45px rgba(0,0,0,.14)",
+          }}
+        >
+          <StatusDot ready={status.resumeReady}>Resume ready</StatusDot>
+          <StatusDot ready={status.gmailReady}>Gmail connected</StatusDot>
+          <StatusDot ready={status.trackerReady}>Tracker ready</StatusDot>
+        </div>
+
         {latestCampaign && (
-          <div className="home-campaign-card">
-            <p className="applix-setup-kicker">Latest campaign</p>
+          <div className="home-campaign-card" style={{ padding: "14px 18px" }}>
+            <p className="applix-setup-kicker" style={{ marginBottom: "8px" }}>Latest campaign</p>
             <strong>{latestCampaign.name}</strong>
             <p>{getCampaignRole(latestCampaign)}{getCampaignLocation(latestCampaign) ? ` in ${getCampaignLocation(latestCampaign)}` : ""}</p>
           </div>
