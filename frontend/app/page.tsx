@@ -116,7 +116,6 @@ export default function HomePage() {
 
         {!checkingSession && signedInEmail && (
           <div className="applix-setup-actions">
-            <Link className="applix-setup-outline" href="/tracker">See what's new</Link>
             <Link className="applix-setup-primary" href="/dashboard">Home</Link>
           </div>
         )}
