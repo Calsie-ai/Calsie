@@ -9,18 +9,7 @@ type ScheduleBody = {
   access_token?: string;
   campaign_id?: string;
   enabled?: boolean;
-  starts_at?: string;
-  timezone?: string;
-  daily_cap?: number;
-  hourly_cap?: number;
-  campaign_days?: number;
 };
-
-function clampNumber(value: unknown, min: number, max: number, fallback: number) {
-  const numberValue = Number(value);
-  if (!Number.isFinite(numberValue)) return fallback;
-  return Math.max(min, Math.min(max, Math.round(numberValue)));
-}
 
 export async function POST(req: Request) {
   try {
@@ -41,20 +30,17 @@ export async function POST(req: Request) {
     }
 
     const enabled = body.enabled !== false;
-    const startsAt = body.starts_at || new Date().toISOString();
-    const dailyCap = clampNumber(body.daily_cap, 1, 200, 25);
-    const hourlyCap = clampNumber(body.hourly_cap, 1, 50, 10);
-    const campaignDays = clampNumber(body.campaign_days, 1, 90, 14);
+    const now = new Date().toISOString();
 
-    const schedule = {
+    const outreach = {
       enabled,
-      starts_at: startsAt,
-      timezone: body.timezone || "Australia/Sydney",
-      daily_cap: dailyCap,
-      hourly_cap: hourlyCap,
-      campaign_days: campaignDays,
-      mode: "scheduled",
-      updated_at: new Date().toISOString(),
+      mode: "applix_default",
+      starts_at: now,
+      timezone: "Australia/Sydney",
+      daily_job_target: 100,
+      send_strategy: "qualified_count_divided_by_24_hours",
+      daily_email_cap: "qualified_leads_only",
+      updated_at: now,
     };
 
     const response = await fetch(`${SUPABASE_URL}/rest/v1/campaigns?id=eq.${encodeURIComponent(campaignId)}`, {
@@ -67,18 +53,18 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         status: enabled ? "scheduled" : "paused",
-        outreach: schedule,
+        outreach,
       }),
     });
 
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-      return NextResponse.json({ ok: false, error: "Could not save schedule.", details: data }, { status: response.status });
+      return NextResponse.json({ ok: false, error: "Could not start campaign.", details: data }, { status: response.status });
     }
 
-    return NextResponse.json({ ok: true, schedule, campaign: Array.isArray(data) ? data[0] : data });
+    return NextResponse.json({ ok: true, outreach, campaign: Array.isArray(data) ? data[0] : data });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Could not schedule campaign." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Could not start campaign." }, { status: 500 });
   }
 }
