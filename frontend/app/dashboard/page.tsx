@@ -232,9 +232,18 @@ export default function DashboardPage() {
       <button className="home-signout" type="button" onClick={signOut}>Sign out</button>
 
       <section className="applix-home-center">
-        <div className="applix-setup-orb small-home-orb" aria-label="Applix logo">
-          <span>APPLIX</span>
-        </div>
+        <img
+          src="/applix-logo.svg"
+          alt="Applix logo"
+          style={{
+            width: "clamp(52px, 10vw, 86px)",
+            height: "auto",
+            display: "block",
+            objectFit: "contain",
+            marginBottom: "10px",
+            filter: "drop-shadow(0 14px 28px rgba(0, 0, 0, .35))",
+          }}
+        />
 
         <p className="applix-setup-kicker">Home</p>
         <h1>{allSet ? "You're all set up!" : "Finish setup"}</h1>
