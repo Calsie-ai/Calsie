@@ -236,12 +236,12 @@ export default function DashboardPage() {
           src="/applix-logo.svg"
           alt="Applix logo"
           style={{
-            width: "clamp(52px, 10vw, 86px)",
+            width: "clamp(220px, 36vw, 360px)",
             height: "auto",
             display: "block",
             objectFit: "contain",
-            marginBottom: "10px",
-            filter: "drop-shadow(0 14px 28px rgba(0, 0, 0, .35))",
+            marginBottom: "-16px",
+            filter: "drop-shadow(0 22px 45px rgba(0, 0, 0, .4))",
           }}
         />
 
