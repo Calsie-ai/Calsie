@@ -75,7 +75,34 @@ export default function HomePage() {
       <div className="applix-setup-info" aria-hidden="true">i</div>
 
       <section className="applix-setup-center">
-        <img className="applix-brand-logo" src="/applix-logo.svg" alt="Applix logo" />
+        <div style={{ display: "grid", placeItems: "center", marginBottom: "24px" }}>
+          <img
+            src="/applix-logo.svg"
+            alt="Applix logo"
+            style={{
+              width: "clamp(150px, 24vw, 240px)",
+              height: "auto",
+              display: "block",
+              objectFit: "contain",
+              marginBottom: "12px",
+              filter: "drop-shadow(0 22px 45px rgba(0, 0, 0, .35))",
+            }}
+          />
+          <h2
+            aria-label="APPLIX"
+            style={{
+              margin: 0,
+              fontSize: "clamp(42px, 8vw, 76px)",
+              lineHeight: 0.9,
+              fontWeight: 950,
+              letterSpacing: "0.16em",
+              color: "#ff7fa8",
+              textShadow: "0 0 20px rgba(255, 80, 180, .24)",
+            }}
+          >
+            APPLIX
+          </h2>
+        </div>
 
         <p className="applix-setup-kicker">AI job automation</p>
         <h1>{signedInEmail ? "You're all set up!" : "Welcome to Applix"}</h1>
