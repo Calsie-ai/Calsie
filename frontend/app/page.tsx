@@ -75,16 +75,16 @@ export default function HomePage() {
       <div className="applix-setup-info" aria-hidden="true">i</div>
 
       <section className="applix-setup-center">
-        <div style={{ display: "grid", placeItems: "center", marginBottom: "24px" }}>
+        <div style={{ display: "grid", placeItems: "center", marginBottom: "18px" }}>
           <img
             src="/applix-logo.svg"
             alt="Applix logo"
             style={{
-              width: "clamp(150px, 24vw, 240px)",
+              width: "clamp(280px, 46vw, 430px)",
               height: "auto",
               display: "block",
               objectFit: "contain",
-              marginBottom: "12px",
+              marginBottom: "-18px",
               filter: "drop-shadow(0 22px 45px rgba(0, 0, 0, .35))",
             }}
           />
