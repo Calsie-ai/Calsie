@@ -62,7 +62,7 @@ export default function ResumeCanvasPage() {
   const [fileType, setFileType] = useState("");
   const [filePath, setFilePath] = useState("");
   const [parsed, setParsed] = useState<ParsedData>(emptyParsed);
-  const [status, setStatus] = useState("Upload the original resume. Applix keeps that layout and stores parsed data separately.");
+  const [status, setStatus] = useState("Upload or update your resume. Applix will keep the original file and prepare reusable data privately.");
   const [loading, setLoading] = useState(true);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -93,7 +93,7 @@ export default function ResumeCanvasPage() {
 
         if (data) {
           setResumeId(data.id || "");
-          setFileName(data.resume_file_name || "Saved resume source");
+          setFileName(data.resume_file_name || "Saved resume");
           setFileType(data.resume_file_type || "");
           setFilePath(data.resume_file_path || "");
           setParsed({
@@ -108,13 +108,13 @@ export default function ResumeCanvasPage() {
             education: toText(data.education_locked),
             certifications: toText(data.certifications_locked),
           });
-          setStatus("Loaded saved parsed resume data.");
+          setStatus("Resume is connected. Upload a new file anytime to update it.");
         } else {
           setParsed((current) => ({ ...current, email: userData.user.email || "" }));
-          setStatus("No resume source saved yet. Upload the user's original resume.");
+          setStatus("No resume connected yet. Upload your resume to activate Applix.");
         }
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Could not load resume source.");
+        setStatus(error instanceof Error ? error.message : "Could not load resume.");
       } finally {
         setLoading(false);
       }
@@ -123,10 +123,6 @@ export default function ResumeCanvasPage() {
     load();
   }, [router]);
 
-  function update(field: keyof ParsedData, value: string) {
-    setParsed((current) => ({ ...current, [field]: value }));
-  }
-
   async function uploadResume(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -134,7 +130,7 @@ export default function ResumeCanvasPage() {
     setFileName(file.name);
     setFileType(file.type || file.name.split(".").pop() || "");
     setParsing(true);
-    setStatus(`Processing ${file.name}.`);
+    setStatus(`Processing ${file.name}...`);
 
     try {
       const supabase = getSupabaseClient();
@@ -169,9 +165,9 @@ export default function ResumeCanvasPage() {
         experience: p.experience || current.experience,
         certifications: p.certificates || current.certifications,
       }));
-      setStatus("Source file saved. Parsed data created. Click Save Parsed Data.");
+      setStatus("Resume uploaded and prepared. Click Save resume to finish.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Resume parsing failed.");
+      setStatus(error instanceof Error ? error.message : "Resume upload failed.");
     } finally {
       setParsing(false);
       event.target.value = "";
@@ -181,7 +177,7 @@ export default function ResumeCanvasPage() {
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    setStatus("Saving parsed reusable data...");
+    setStatus("Saving resume...");
 
     try {
       const supabase = getSupabaseClient();
@@ -222,74 +218,129 @@ export default function ResumeCanvasPage() {
         setResumeId(data.id);
       }
 
-      setStatus(`Saved. Parsed reusable data is stored. Source file: ${fileName || "not set"}.`);
+      setStatus("Resume saved. Applix can now use it for automation.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not save resume source.");
+      setStatus(error instanceof Error ? error.message : "Could not save resume.");
     } finally {
       setSaving(false);
     }
   }
 
+  const resumeReady = Boolean(fileName || filePath);
+
   return (
-    <main className="app-shell">
-      <section className="dashboard-card">
-        <div className="dashboard-header">
-          <div>
-            <p className="eyebrow">Resume Source</p>
-            <h1>Keep layout. Store data.</h1>
-            <p className="muted">The uploaded resume is the user's original layout source. Applix stores parsed data separately for later reuse.</p>
+    <main className="applix-home-shell" style={{ gridTemplateRows: "auto 1fr", overflow: "auto", paddingTop: "24px" }}>
+      <header
+        style={{
+          position: "relative",
+          zIndex: 2,
+          width: "min(980px, 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+        }}
+      >
+        <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", gap: "12px" }}>
+          <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "54px", height: "54px", objectFit: "contain" }} />
+          <div style={{ textAlign: "left" }}>
+            <strong style={{ display: "block", color: "#ff7fa8", letterSpacing: ".18em", fontSize: "16px" }}>APPLIX</strong>
+            <span style={{ color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 800 }}>Resume</span>
           </div>
-          <Link className="ghost-link" href="/dashboard">Dashboard</Link>
-        </div>
+        </Link>
 
-        <p className="form-status">{loading ? "Checking login..." : status}</p>
+        <Link className="applix-setup-outline" href="/dashboard" style={{ width: "auto", minHeight: "48px", padding: "10px 18px", fontSize: "15px", borderWidth: "1px" }}>
+          Home
+        </Link>
+      </header>
 
-        <div className="empty-state">
-          <h2>Original resume layout source</h2>
-          <p>Upload the user's real resume. We keep it as the style/layout source concept and do not force it into a resume box.</p>
-          <label className="primary-link" style={{ cursor: "pointer" }}>
-            {parsing ? "Processing..." : "Upload Original Resume"}
-            <input type="file" accept=".pdf,.doc,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" onChange={uploadResume} style={{ display: "none" }} disabled={parsing || loading} />
+      <section
+        className="applix-home-center"
+        style={{
+          alignContent: "center",
+          width: "min(760px, 100%)",
+          paddingTop: "24px",
+          paddingBottom: "36px",
+        }}
+      >
+        <img
+          src="/applix-logo.svg"
+          alt="Applix logo"
+          style={{
+            width: "clamp(230px, 34vw, 390px)",
+            height: "auto",
+            objectFit: "contain",
+            marginBottom: "-20px",
+            filter: "drop-shadow(0 24px 52px rgba(0, 0, 0, .45))",
+          }}
+        />
+
+        <p
+          style={{
+            margin: "0 0 8px",
+            color: "#ff7fa8",
+            fontSize: "clamp(32px, 6vw, 64px)",
+            lineHeight: .9,
+            fontWeight: 950,
+            letterSpacing: ".16em",
+            textShadow: "0 0 22px rgba(255, 80, 180, .28)",
+          }}
+        >
+          APPLIX
+        </p>
+
+        <h1 style={{ margin: 0, fontSize: "clamp(36px, 6.8vw, 72px)", lineHeight: .95, letterSpacing: "-2px" }}>
+          {resumeReady ? "Resume is connected" : "Upload your resume"}
+        </h1>
+
+        <p className="applix-home-copy" style={{ marginTop: "16px" }}>{loading ? "Checking resume..." : status}</p>
+
+        <form onSubmit={save} style={{ width: "min(680px, 100%)", display: "grid", gap: "14px", marginTop: "32px" }}>
+          <label
+            className="applix-setup-primary"
+            style={{
+              cursor: parsing || loading ? "not-allowed" : "pointer",
+              gap: "12px",
+              minHeight: "74px",
+              fontSize: "clamp(20px, 3vw, 30px)",
+            }}
+          >
+            <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "54px", height: "54px", objectFit: "contain" }} />
+            {parsing ? "Processing..." : resumeReady ? "Upload new resume" : "Upload resume"}
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              onChange={uploadResume}
+              style={{ display: "none" }}
+              disabled={parsing || loading}
+            />
           </label>
-          <p className="muted" style={{ marginTop: 14 }}>Current source: {fileName || "No file uploaded"}</p>
-          {filePath && <p className="muted">Private path: {filePath}</p>}
-        </div>
 
-        <form className="campaign-form" onSubmit={save}>
-          <h2>Parsed reusable data</h2>
-          <pre style={{ whiteSpace: "pre-wrap", background: "#050814", color: "#a7f3d0", padding: 16, borderRadius: 16, overflow: "auto", maxHeight: 260 }}>{JSON.stringify(parsed, null, 2)}</pre>
+          {resumeReady && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: "10px",
+                padding: "14px 18px",
+                border: "1px solid rgba(255,255,255,.18)",
+                borderRadius: "999px",
+                background: "rgba(255,255,255,.08)",
+                color: "rgba(255,255,255,.78)",
+                fontWeight: 850,
+              }}
+            >
+              <span style={{ width: 9, height: 9, borderRadius: 999, background: "#8fffd2", boxShadow: "0 0 18px rgba(143,255,210,.7)" }} />
+              {fileName || "Resume uploaded"}
+            </div>
+          )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-            <Field label="Full name" value={parsed.fullName} onChange={(value) => update("fullName", value)} />
-            <Field label="Target role" value={parsed.targetRole} onChange={(value) => update("targetRole", value)} />
-            <Field label="Email" value={parsed.email} onChange={(value) => update("email", value)} />
-            <Field label="Phone" value={parsed.phone} onChange={(value) => update("phone", value)} />
-            <Field label="Location" value={parsed.location} onChange={(value) => update("location", value)} />
-            <Field label="Source file path" value={filePath} onChange={setFilePath} />
-            <Field label="Source file name" value={fileName} onChange={setFileName} />
-            <Field label="Source file type" value={fileType} onChange={setFileType} />
-          </div>
-
-          <TextArea label="Summary" value={parsed.summary} onChange={(value) => update("summary", value)} rows={4} />
-          <TextArea label="Skills" value={parsed.skills} onChange={(value) => update("skills", value)} rows={4} />
-          <TextArea label="Experience" value={parsed.experience} onChange={(value) => update("experience", value)} rows={6} />
-          <TextArea label="Education" value={parsed.education} onChange={(value) => update("education", value)} rows={3} />
-          <TextArea label="Certifications" value={parsed.certifications} onChange={(value) => update("certifications", value)} rows={3} />
-
-          <div className="form-actions">
-            <Link className="ghost-link" href="/dashboard">Back</Link>
-            <button className="primary-button" type="submit" disabled={saving || loading}>{saving ? "Saving..." : "Save Parsed Data"}</button>
-          </div>
+          <button className="applix-setup-outline" type="submit" disabled={saving || loading || parsing || !filePath} style={{ minHeight: "64px", fontSize: "22px", borderWidth: "2px" }}>
+            {saving ? "Saving..." : "Save resume"}
+          </button>
         </form>
       </section>
     </main>
   );
-}
-
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label>{label}<input value={value} onChange={(event) => onChange(event.target.value)} /></label>;
-}
-
-function TextArea({ label, value, onChange, rows }: { label: string; value: string; onChange: (value: string) => void; rows: number }) {
-  return <label>{label}<textarea value={value} onChange={(event) => onChange(event.target.value)} rows={rows} /></label>;
 }
