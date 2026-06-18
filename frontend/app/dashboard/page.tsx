@@ -50,10 +50,11 @@ export default function DashboardPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [connectingGmail, setConnectingGmail] = useState(false);
   const [startingCampaign, setStartingCampaign] = useState(false);
+  const [deletingCampaignId, setDeletingCampaignId] = useState<string | null>(null);
 
   const latestCampaign = campaigns[0];
   const isRunning = latestCampaign?.status === "scheduled" || latestCampaign?.status === "active" || latestCampaign?.outreach?.mode === "applix_default";
-  const canStart = Boolean(latestCampaign && status.resumeReady && status.gmailReady && !startingCampaign);
+  const canStart = Boolean(latestCampaign && status.resumeReady && status.gmailReady && !startingCampaign && !deletingCampaignId);
 
   const startLabel = (() => {
     if (!latestCampaign) return "Create campaign first";
@@ -204,6 +205,38 @@ export default function DashboardPage() {
     }
   }
 
+  async function deleteCampaign(campaign: Campaign) {
+    const confirmed = window.confirm(`Delete campaign "${campaign.name}"? This will delete only this campaign.`);
+    if (!confirmed) return;
+
+    setDeletingCampaignId(campaign.id);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error("Missing login session. Please sign in again.");
+
+      const response = await fetch("/api/applix/delete-campaign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_token: accessToken, campaign_id: campaign.id }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || "Could not delete campaign.");
+
+      setCampaigns((current) => current.filter((item) => item.id !== campaign.id));
+      setSuccessMessage(`Deleted campaign "${campaign.name}".`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not delete campaign.");
+    } finally {
+      setDeletingCampaignId(null);
+    }
+  }
+
   return (
     <main className="applix-home-shell" style={{ gridTemplateRows: "auto 1fr auto", paddingTop: "24px" }}>
       <header style={{ position: "relative", zIndex: 2, width: "min(980px, 100%)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
@@ -274,6 +307,15 @@ export default function DashboardPage() {
             <strong>{latestCampaign.name}</strong>
             <p>{getCampaignRole(latestCampaign)}{getCampaignLocation(latestCampaign) ? ` in ${getCampaignLocation(latestCampaign)}` : ""}</p>
             {isRunning && <p style={{ marginTop: "8px", color: "#8fffd2", fontWeight: 900 }}>Default Applix campaign is active.</p>}
+            <button
+              className="applix-setup-outline"
+              type="button"
+              onClick={() => deleteCampaign(latestCampaign)}
+              disabled={deletingCampaignId === latestCampaign.id || startingCampaign}
+              style={{ marginTop: "12px" }}
+            >
+              {deletingCampaignId === latestCampaign.id ? "Deleting campaign..." : "Delete this campaign"}
+            </button>
           </div>
         )}
       </section>
