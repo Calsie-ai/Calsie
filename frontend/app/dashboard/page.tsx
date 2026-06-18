@@ -152,8 +152,11 @@ export default function DashboardPage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error || "Could not start campaign.");
 
-      setMessage("Campaign started. Applix will fetch fresh leads daily and respect the email sending limits.");
-      await loadDashboard();
+      const count = data.job_fetch?.count;
+      const saved = data.job_fetch?.saved;
+      const countText = typeof count === "number" ? ` ${count} real jobs were fetched${saved === false ? ", but need saving setup checked" : " and saved"}.` : " Real job fetching has started.";
+      setMessage(`Campaign started.${countText} Opening the job tracker...`);
+      router.push("/tracker");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not start campaign.");
     } finally {
@@ -244,10 +247,11 @@ export default function DashboardPage() {
 
         <div className="empty-state">
           <h2>4. Start Campaign</h2>
-          <p>Limit: 5 emails/hour, 100 emails/day, 10 days. New leads fetched daily.</p>
+          <p>Limit: 5 emails/hour, 100 emails/day, 10 days. New jobs are fetched from Outscraper when the campaign starts.</p>
           <button className="primary-button" type="button" onClick={startCampaign} disabled={!canStartCampaign}>
             {campaignRunning ? "Campaign running" : canStartCampaign ? "Start Campaign" : "Complete setup first"}
           </button>
+          <Link className="ghost-link" href="/tracker" style={{ marginTop: "12px", display: "inline-flex" }}>Open job tracker</Link>
         </div>
       </section>
     </main>
