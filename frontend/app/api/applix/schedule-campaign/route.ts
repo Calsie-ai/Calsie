@@ -4,6 +4,7 @@ export const runtime = "nodejs";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bnshgtrqbfuphhhdgccs.supabase.co";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const EDGE_FUNCTION_NAME = process.env.OUTSCRAPER_JOBS_FUNCTION || "outscraper-jobs";
 
 type ScheduleBody = {
   access_token?: string;
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
       daily_job_target: 100,
       send_strategy: "qualified_count_divided_by_24_hours",
       daily_email_cap: "qualified_leads_only",
+      first_fetch_triggered_at: enabled ? now : null,
       updated_at: now,
     };
 
@@ -63,7 +65,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Could not start campaign.", details: data }, { status: response.status });
     }
 
-    return NextResponse.json({ ok: true, outreach, campaign: Array.isArray(data) ? data[0] : data });
+    let jobFetch = null;
+
+    if (enabled) {
+      const edgeResponse = await fetch(`${SUPABASE_URL}/functions/v1/${EDGE_FUNCTION_NAME}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+          "apikey": SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ campaign_id: campaignId, trigger: "campaign_start" }),
+        cache: "no-store",
+      });
+
+      jobFetch = await edgeResponse.json().catch(() => null);
+
+      if (!edgeResponse.ok || jobFetch?.ok === false) {
+        return NextResponse.json({
+          ok: false,
+          error: jobFetch?.error || "Campaign was scheduled, but the first Outscraper job fetch failed.",
+          campaign: Array.isArray(data) ? data[0] : data,
+          outreach,
+          job_fetch: jobFetch,
+        }, { status: 502 });
+      }
+    }
+
+    return NextResponse.json({ ok: true, outreach, campaign: Array.isArray(data) ? data[0] : data, job_fetch: jobFetch });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Could not start campaign." }, { status: 500 });
   }
