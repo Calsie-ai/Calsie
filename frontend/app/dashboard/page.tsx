@@ -165,7 +165,7 @@ export default function DashboardPage() {
   }
 
   async function deleteCampaign(campaign: Campaign) {
-    const confirmed = window.confirm(`Delete campaign "${campaign.name}"?`);
+    const confirmed = window.confirm(`Delete campaign "${campaign.name}"? This will remove it from your Applix dashboard.`);
     if (!confirmed) return;
 
     setBusy(true);
@@ -225,7 +225,24 @@ export default function DashboardPage() {
               <p><strong>{latestCampaign.name}</strong></p>
               <p>{roleFor(latestCampaign)}{locationFor(latestCampaign) ? ` in ${locationFor(latestCampaign)}` : ""}</p>
               <p className="muted">Status: {latestCampaign.status}</p>
-              <button className="ghost-button" type="button" onClick={() => deleteCampaign(latestCampaign)} disabled={busy}>Delete campaign</button>
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "14px" }}>
+                <Link className="ghost-link" href="/campaign/new">Create another campaign</Link>
+                <button
+                  type="button"
+                  onClick={() => deleteCampaign(latestCampaign)}
+                  disabled={busy}
+                  style={{
+                    border: "1px solid rgba(248,113,113,.45)",
+                    borderRadius: "999px",
+                    padding: "12px 16px",
+                    background: "rgba(127,29,29,.32)",
+                    color: "#fecaca",
+                    fontWeight: 900,
+                  }}
+                >
+                  {busy ? "Deleting..." : "Delete campaign"}
+                </button>
+              </div>
             </>
           ) : (
             <>
