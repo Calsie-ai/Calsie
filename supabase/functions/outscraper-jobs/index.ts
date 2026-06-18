@@ -1,0 +1,134 @@
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const outscraperKey = Deno.env.get("OUTSCRAPER_API_KEY") || "";
+const outscraperJobsUrl = Deno.env.get("OUTSCRAPER_JOBS_URL") || "https://api.app.outscraper.com/jobs/search";
+
+type OutscraperJob = Record<string, unknown>;
+
+type RequestBody = {
+  role?: string;
+  location?: string;
+};
+
+function cleanText(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function pickText(job: OutscraperJob, keys: string[], fallback = "") {
+  for (const key of keys) {
+    const value = cleanText(job[key]);
+    if (value) return value;
+  }
+  return fallback;
+}
+
+function normalizeJobs(payload: unknown, fallbackLocation: string) {
+  const raw = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as Record<string, unknown>)?.data)
+      ? (payload as Record<string, unknown>).data
+      : Array.isArray((payload as Record<string, unknown>)?.results)
+        ? (payload as Record<string, unknown>).results
+        : [];
+
+  const flattened = raw.flatMap((item) => Array.isArray(item) ? item : [item]) as OutscraperJob[];
+
+  return flattened.map((job) => ({
+    title: pickText(job, ["title", "job_title", "name"], "Untitled job"),
+    company: pickText(job, ["company", "company_name", "employer_name"], "Unknown company"),
+    location: pickText(job, ["location", "address", "city"], fallbackLocation),
+    source: "Outscraper",
+    apply_url: pickText(job, ["apply_link", "apply_url", "url", "job_url", "link"]),
+    description: pickText(job, ["description", "snippet", "summary"]),
+    posted_at: pickText(job, ["posted_at", "date", "created_at", "published_at"]),
+    status: "new",
+  })).filter((job) => job.title !== "Untitled job" || job.company !== "Unknown company");
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error("Missing Supabase Edge Function database secrets.");
+    }
+
+    if (!outscraperKey) {
+      throw new Error("Missing OUTSCRAPER_API_KEY Edge Function secret.");
+    }
+
+    const authHeader = req.headers.get("authorization") || "";
+    const body = (await req.json().catch(() => ({}))) as RequestBody;
+    const role = cleanText(body.role, "support worker");
+    const location = cleanText(body.location, "Sydney NSW");
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const userClient = createClient(supabaseUrl, serviceRoleKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userError } = await userClient.auth.getUser();
+
+    if (userError || !userData.user) {
+      return new Response(JSON.stringify({ ok: false, error: "Please sign in again." }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const query = `${role} ${location}`;
+    const url = new URL(outscraperJobsUrl);
+    url.searchParams.set("query", query);
+    url.searchParams.set("async", "false");
+
+    const providerResponse = await fetch(url.toString(), {
+      headers: { "X-API-KEY": outscraperKey },
+    });
+
+    const providerPayload = await providerResponse.json().catch(() => null);
+
+    if (!providerResponse.ok) {
+      return new Response(JSON.stringify({ ok: false, error: "Outscraper rejected the job search.", details: providerPayload }), {
+        status: providerResponse.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const rows = normalizeJobs(providerPayload, location).slice(0, 50).map((job) => ({
+      ...job,
+      user_id: userData.user.id,
+    }));
+
+    if (rows.length === 0) {
+      return new Response(JSON.stringify({ ok: true, count: 0, saved: true, jobs: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data, error } = await supabase.from("jobs").insert(rows).select();
+
+    if (error) {
+      return new Response(JSON.stringify({ ok: true, count: rows.length, saved: false, error: error.message, jobs: rows }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ ok: true, count: rows.length, saved: true, jobs: data || rows }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : "Could not fetch jobs." }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
