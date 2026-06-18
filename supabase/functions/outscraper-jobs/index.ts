@@ -16,6 +16,17 @@ type OutscraperJob = Record<string, unknown>;
 type RequestBody = {
   role?: string;
   location?: string;
+  campaign_id?: string;
+  trigger?: string;
+};
+
+type CampaignRow = {
+  id: string;
+  user_id: string;
+  name?: string | null;
+  location?: string | null;
+  target_business_type?: string | null;
+  search?: { target_role?: string | null; target_location?: string | null } | null;
 };
 
 function cleanText(value: unknown, fallback = "") {
@@ -69,8 +80,6 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("authorization") || "";
     const body = (await req.json().catch(() => ({}))) as RequestBody;
-    const role = cleanText(body.role, "support worker");
-    const location = cleanText(body.location, "Sydney NSW");
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const userClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -85,6 +94,23 @@ serve(async (req) => {
       });
     }
 
+    let campaign: CampaignRow | null = null;
+
+    if (body.campaign_id) {
+      const { data, error } = await supabase
+        .from("campaigns")
+        .select("id,user_id,name,location,target_business_type,search")
+        .eq("id", body.campaign_id)
+        .eq("user_id", userData.user.id)
+        .maybeSingle();
+
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("Campaign was not found for this user.");
+      campaign = data as CampaignRow;
+    }
+
+    const role = cleanText(body.role || campaign?.search?.target_role || campaign?.target_business_type || campaign?.name, "support worker");
+    const location = cleanText(body.location || campaign?.search?.target_location || campaign?.location, "Sydney NSW");
     const query = `${role} ${location}`;
     const url = new URL(outscraperJobsUrl);
     url.searchParams.set("query", query);
@@ -106,10 +132,11 @@ serve(async (req) => {
     const rows = normalizeJobs(providerPayload, location).slice(0, 50).map((job) => ({
       ...job,
       user_id: userData.user.id,
+      campaign_id: campaign?.id || null,
     }));
 
     if (rows.length === 0) {
-      return new Response(JSON.stringify({ ok: true, count: 0, saved: true, jobs: [] }), {
+      return new Response(JSON.stringify({ ok: true, count: 0, saved: true, role, location, trigger: body.trigger || "manual", jobs: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -117,12 +144,12 @@ serve(async (req) => {
     const { data, error } = await supabase.from("jobs").insert(rows).select();
 
     if (error) {
-      return new Response(JSON.stringify({ ok: true, count: rows.length, saved: false, error: error.message, jobs: rows }), {
+      return new Response(JSON.stringify({ ok: true, count: rows.length, saved: false, error: error.message, role, location, trigger: body.trigger || "manual", jobs: rows }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, count: rows.length, saved: true, jobs: data || rows }), {
+    return new Response(JSON.stringify({ ok: true, count: rows.length, saved: true, role, location, trigger: body.trigger || "manual", jobs: data || rows }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
