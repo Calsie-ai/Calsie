@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/applix-send",
-      "schedule": "0 0 * * *"
-    }
-  ]
-}
