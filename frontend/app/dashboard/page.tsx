@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 
@@ -11,127 +11,88 @@ type Campaign = {
   location: string | null;
   target_business_type: string | null;
   search: { target_role?: string; target_location?: string | null } | null;
-  outreach: { mode?: string; daily_job_target?: number; last_qualified_count?: number; last_target_email_count?: number } | null;
+  outreach: { hourly_cap?: number; daily_cap?: number; campaign_days?: number; mode?: string } | null;
   status: string;
   created_at: string;
 };
 
-type HomeStatus = {
-  resumeReady: boolean;
-  gmailReady: boolean;
-  aiReady: boolean;
-  trackerReady: boolean;
-};
-
-function getCampaignRole(campaign: Campaign) {
+function roleFor(campaign: Campaign) {
   return campaign.search?.target_role || campaign.target_business_type || "Target not set";
 }
 
-function getCampaignLocation(campaign: Campaign) {
+function locationFor(campaign: Campaign) {
   return campaign.search?.target_location || campaign.location || "";
-}
-
-function StatusDot({ ready, children }: { ready: boolean; children: ReactNode }) {
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", color: ready ? "rgba(220, 255, 240, .96)" : "rgba(255, 255, 255, .62)", fontSize: "clamp(12px, 1.8vw, 14px)", fontWeight: 850, whiteSpace: "nowrap" }}>
-      <span aria-hidden="true" style={{ width: "9px", height: "9px", borderRadius: "999px", background: ready ? "#8fffd2" : "rgba(255,255,255,.34)", boxShadow: ready ? "0 0 18px rgba(143,255,210,.7)" : "none" }} />
-      {children}
-    </span>
-  );
 }
 
 export default function DashboardPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [status, setStatus] = useState<HomeStatus>({ resumeReady: false, gmailReady: false, aiReady: false, trackerReady: false });
+  const [resumeReady, setResumeReady] = useState(false);
+  const [gmailReady, setGmailReady] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [connectingGmail, setConnectingGmail] = useState(false);
-  const [startingCampaign, setStartingCampaign] = useState(false);
-  const [deletingCampaignId, setDeletingCampaignId] = useState<string | null>(null);
 
-  const latestCampaign = campaigns[0];
-  const isRunning = latestCampaign?.status === "scheduled" || latestCampaign?.status === "active" || latestCampaign?.outreach?.mode === "applix_default";
-  const canStart = Boolean(latestCampaign && status.resumeReady && status.gmailReady && !startingCampaign && !deletingCampaignId);
-
-  const startLabel = (() => {
-    if (!latestCampaign) return "Create campaign first";
-    if (!status.resumeReady) return "Upload resume first";
-    if (!status.gmailReady) return "Connect Gmail first";
-    if (startingCampaign) return "Starting...";
-    return isRunning ? "Campaign running" : "Start Campaign";
-  })();
+  const latestCampaign = campaigns[0] || null;
+  const campaignRunning = latestCampaign?.status === "scheduled" || latestCampaign?.status === "active";
+  const canStartCampaign = Boolean(latestCampaign && resumeReady && gmailReady && !campaignRunning && !busy);
 
   useEffect(() => {
-    async function loadDashboard() {
-      setLoading(true);
-      setErrorMessage("");
-      setSuccessMessage("");
-
-      try {
-        const supabase = getSupabaseClient();
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-
-        if (userError || !userData.user) {
-          router.replace("/");
-          return;
-        }
-
-        const userEmail = userData.user.email || "";
-        setEmail(userEmail);
-
-        const { data: campaignData, error: campaignError } = await supabase
-          .from("campaigns")
-          .select("id,name,location,target_business_type,search,outreach,status,created_at")
-          .eq("user_id", userData.user.id)
-          .order("created_at", { ascending: false });
-
-        if (campaignError) {
-          setErrorMessage(campaignError.message);
-          return;
-        }
-
-        const loadedCampaigns = (campaignData || []) as Campaign[];
-        setCampaigns(loadedCampaigns);
-
-        const { data: authData } = await supabase
-          .from("user_email_authorizations")
-          .select("status,provider_email")
-          .eq("user_identifier", userEmail || userData.user.id)
-          .eq("provider", "google")
-          .maybeSingle();
-
-        const gmailReady = authData?.status === "connected";
-
-        const { data: resumeData } = await supabase
-          .from("resume_profiles")
-          .select("resume_file_path,full_name")
-          .eq("profile_id", userData.user.id)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        let trackerReady = false;
-        if (loadedCampaigns.length > 0) {
-          const { count: trackerCount } = await supabase
-            .from("outreach_queue")
-            .select("id", { count: "exact", head: true })
-            .in("campaign_id", loadedCampaigns.map((campaign) => campaign.id));
-          trackerReady = Boolean((trackerCount || 0) > 0);
-        }
-
-        setStatus({ resumeReady: Boolean(resumeData?.resume_file_path), gmailReady, aiReady: true, trackerReady });
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Could not load dashboard.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadDashboard();
-  }, [router]);
+  }, []);
+
+  async function loadDashboard() {
+    setLoading(true);
+    setErrorMessage("");
+    setMessage("");
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !userData.user) {
+        router.replace("/");
+        return;
+      }
+
+      const userEmail = userData.user.email || "";
+      setEmail(userEmail);
+
+      const { data: campaignData, error: campaignError } = await supabase
+        .from("campaigns")
+        .select("id,name,location,target_business_type,search,outreach,status,created_at")
+        .eq("user_id", userData.user.id)
+        .order("created_at", { ascending: false });
+
+      if (campaignError) throw campaignError;
+      setCampaigns((campaignData || []) as Campaign[]);
+
+      const { data: resumeData } = await supabase
+        .from("resume_profiles")
+        .select("id,full_name,skills,work_experience")
+        .eq("profile_id", userData.user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      setResumeReady(Boolean(resumeData?.id));
+
+      const { data: authData } = await supabase
+        .from("user_email_authorizations")
+        .select("status")
+        .eq("user_identifier", userEmail || userData.user.id)
+        .eq("provider", "google")
+        .maybeSingle();
+
+      setGmailReady(authData?.status === "connected");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not load dashboard.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function signOut() {
     const supabase = getSupabaseClient();
@@ -140,9 +101,9 @@ export default function DashboardPage() {
   }
 
   async function connectGmail() {
-    setConnectingGmail(true);
+    setBusy(true);
     setErrorMessage("");
-    setSuccessMessage("");
+    setMessage("");
 
     try {
       const supabase = getSupabaseClient();
@@ -161,8 +122,8 @@ export default function DashboardPage() {
 
       window.location.href = data.authorization_url;
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not start Gmail connection.");
-      setConnectingGmail(false);
+      setErrorMessage(error instanceof Error ? error.message : "Could not connect Gmail.");
+      setBusy(false);
     }
   }
 
@@ -172,9 +133,9 @@ export default function DashboardPage() {
       return;
     }
 
-    setStartingCampaign(true);
+    setBusy(true);
     setErrorMessage("");
-    setSuccessMessage("");
+    setMessage("");
 
     try {
       const supabase = getSupabaseClient();
@@ -191,27 +152,22 @@ export default function DashboardPage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error || "Could not start campaign.");
 
-      setCampaigns((current) => current.map((campaign) => (
-        campaign.id === latestCampaign.id
-          ? { ...campaign, status: "scheduled", outreach: { ...(campaign.outreach || {}), ...data.outreach } }
-          : campaign
-      )));
-
-      setSuccessMessage("Campaign started. Applix will scan 100 jobs per day, email only qualified leads, and spread sends across 24 hours.");
+      setMessage("Campaign started. Applix will fetch fresh leads daily and respect the email sending limits.");
+      await loadDashboard();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not start campaign.");
     } finally {
-      setStartingCampaign(false);
+      setBusy(false);
     }
   }
 
   async function deleteCampaign(campaign: Campaign) {
-    const confirmed = window.confirm(`Delete campaign "${campaign.name}"? This will delete only this campaign.`);
+    const confirmed = window.confirm(`Delete campaign "${campaign.name}"?`);
     if (!confirmed) return;
 
-    setDeletingCampaignId(campaign.id);
+    setBusy(true);
     setErrorMessage("");
-    setSuccessMessage("");
+    setMessage("");
 
     try {
       const supabase = getSupabaseClient();
@@ -228,96 +184,71 @@ export default function DashboardPage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error || "Could not delete campaign.");
 
+      setMessage("Campaign deleted.");
       setCampaigns((current) => current.filter((item) => item.id !== campaign.id));
-      setSuccessMessage(`Deleted campaign "${campaign.name}".`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not delete campaign.");
     } finally {
-      setDeletingCampaignId(null);
+      setBusy(false);
     }
   }
 
   return (
-    <main className="applix-home-shell" style={{ gridTemplateRows: "auto 1fr auto", paddingTop: "24px" }}>
-      <header style={{ position: "relative", zIndex: 2, width: "min(980px, 100%)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: "12px" }}>
-          <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "54px", height: "54px", objectFit: "contain" }} />
-          <div style={{ textAlign: "left" }}>
-            <strong style={{ display: "block", color: "#ff7fa8", letterSpacing: ".18em", fontSize: "16px" }}>APPLIX</strong>
-            <span style={{ color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 800 }}>Approved by Sajan</span>
+    <main className="app-shell">
+      <section className="dashboard-card">
+        <div className="dashboard-header">
+          <div>
+            <p className="eyebrow">Dashboard</p>
+            <h1>Applix setup</h1>
+            {email && <p className="muted">Signed in as {email}</p>}
           </div>
+          <button className="ghost-button" type="button" onClick={signOut}>Sign out</button>
         </div>
 
-        <button className="home-signout" type="button" onClick={signOut} style={{ position: "static" }}>Sign out</button>
-      </header>
+        {loading && <p className="form-status">Loading setup...</p>}
+        {message && <p className="form-status success-status">{message}</p>}
+        {errorMessage && <p className="error-text">{errorMessage}</p>}
 
-      <section className="applix-home-center" style={{ alignContent: "center", paddingTop: "12px", width: "min(760px, 100%)" }}>
-        <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "clamp(230px, 34vw, 390px)", height: "auto", display: "block", objectFit: "contain", marginBottom: "-20px", filter: "drop-shadow(0 24px 52px rgba(0, 0, 0, .45))" }} />
-        <p style={{ margin: "0 0 8px", color: "#ff7fa8", fontSize: "clamp(32px, 6vw, 64px)", lineHeight: .9, fontWeight: 950, letterSpacing: ".16em", textShadow: "0 0 22px rgba(255, 80, 180, .28)" }}>APPLIX</p>
-        <h1 style={{ fontSize: "clamp(36px, 6.8vw, 72px)", letterSpacing: "-2px" }}>{isRunning ? "Campaign is running" : "Your job automation is ready"}</h1>
-        {email && <p className="applix-home-copy" style={{ marginTop: "16px" }}>Signed in as {email}</p>}
-      </section>
-
-      <section className="applix-home-bottom" style={{ width: "min(760px, 100%)", gap: "14px" }}>
-        {errorMessage && <p className="applix-setup-status">{errorMessage}</p>}
-        {successMessage && <p className="applix-setup-status success">{successMessage}</p>}
-        {loading && <p className="applix-setup-status">Loading setup...</p>}
-
-        <div className="home-campaign-card" style={{ padding: "18px", textAlign: "center" }}>
-          <p className="applix-setup-kicker" style={{ marginBottom: "8px" }}>Default campaign plan</p>
-          <p style={{ margin: 0, color: "rgba(255,255,255,.78)", lineHeight: 1.5, fontWeight: 850 }}>
-            Applix scans 100 jobs per day, emails only qualified leads, and spreads qualified emails across 24 hours.
-          </p>
+        <div className="empty-state">
+          <h2>1. Master Resume</h2>
+          <p>{resumeReady ? "Resume data is saved." : "Upload and parse the user's resume source first."}</p>
+          <Link className="primary-link" href="/resume-canvas">Upload / Update Resume</Link>
         </div>
 
-        <div className="applix-home-actions" style={{ gap: "14px" }}>
+        <div className="empty-state">
+          <h2>2. Campaign</h2>
           {latestCampaign ? (
-            <button className="applix-setup-primary" type="button" onClick={startCampaign} disabled={!canStart} style={{ gap: "12px" }}>
-              <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "58px", height: "58px", objectFit: "contain" }} />
-              {startLabel}
-            </button>
+            <>
+              <p><strong>{latestCampaign.name}</strong></p>
+              <p>{roleFor(latestCampaign)}{locationFor(latestCampaign) ? ` in ${locationFor(latestCampaign)}` : ""}</p>
+              <p className="muted">Status: {latestCampaign.status}</p>
+              <button className="ghost-button" type="button" onClick={() => deleteCampaign(latestCampaign)} disabled={busy}>Delete campaign</button>
+            </>
           ) : (
-            <Link className="applix-setup-primary" href="/campaign/new" style={{ gap: "12px" }}>
-              <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "58px", height: "58px", objectFit: "contain" }} />
-              Create campaign first
-            </Link>
+            <>
+              <p>No campaign yet. Create one for daily lead fetching.</p>
+              <Link className="primary-link" href="/campaign/new">Create campaign</Link>
+            </>
           )}
+        </div>
 
-          <div className="home-action-row">
-            <Link className="applix-setup-outline" href="/tracker">View tracker</Link>
-            <Link className="applix-setup-outline" href="/resume-canvas">Upload/Update Resume</Link>
-          </div>
-
-          {!status.gmailReady && (
-            <button className="applix-setup-outline" type="button" onClick={connectGmail} disabled={connectingGmail || !email}>
-              {connectingGmail ? "Opening Gmail..." : "Connect Gmail"}
+        <div className="empty-state">
+          <h2>3. Gmail Consent</h2>
+          <p>{gmailReady ? "Gmail is connected." : "Connect Gmail so Applix can write/send outreach on the user's behalf."}</p>
+          {!gmailReady && (
+            <button className="primary-button" type="button" onClick={connectGmail} disabled={busy || !email}>
+              {busy ? "Opening..." : "Connect Gmail"}
             </button>
           )}
         </div>
 
-        <div aria-label="Setup status" style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "10px 18px", padding: "14px 18px", border: "1px solid rgba(255,255,255,.18)", borderRadius: "999px", background: "rgba(255,255,255,.08)", backdropFilter: "blur(18px)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.14), 0 18px 45px rgba(0,0,0,.14)" }}>
-          <StatusDot ready={status.resumeReady}>Resume ready</StatusDot>
-          <StatusDot ready={status.gmailReady}>Gmail connected</StatusDot>
-          <StatusDot ready={status.trackerReady}>Tracker ready</StatusDot>
+        <div className="empty-state">
+          <h2>4. Start Campaign</h2>
+          <p>Limit: 5 emails/hour, 100 emails/day, 10 days. New leads fetched daily.</p>
+          <button className="primary-button" type="button" onClick={startCampaign} disabled={!canStartCampaign}>
+            {campaignRunning ? "Campaign running" : canStartCampaign ? "Start Campaign" : "Complete setup first"}
+          </button>
         </div>
-
-        {latestCampaign && (
-          <div className="home-campaign-card" style={{ padding: "14px 18px" }}>
-            <p className="applix-setup-kicker" style={{ marginBottom: "8px" }}>Latest campaign</p>
-            <strong>{latestCampaign.name}</strong>
-            <p>{getCampaignRole(latestCampaign)}{getCampaignLocation(latestCampaign) ? ` in ${getCampaignLocation(latestCampaign)}` : ""}</p>
-            {isRunning && <p style={{ marginTop: "8px", color: "#8fffd2", fontWeight: 900 }}>Default Applix campaign is active.</p>}
-            <button
-              className="applix-setup-outline"
-              type="button"
-              onClick={() => deleteCampaign(latestCampaign)}
-              disabled={deletingCampaignId === latestCampaign.id || startingCampaign}
-              style={{ marginTop: "12px" }}
-            >
-              {deletingCampaignId === latestCampaign.id ? "Deleting campaign..." : "Delete this campaign"}
-            </button>
-          </div>
-        )}
       </section>
     </main>
   );
