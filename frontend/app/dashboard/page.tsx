@@ -197,78 +197,79 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="app-shell">
-      <section className="dashboard-card">
-        <div className="dashboard-header">
-          <div>
-            <p className="eyebrow">Dashboard</p>
-            <h1>Applix setup</h1>
-            {email && <p className="muted">Signed in as {email}</p>}
+    <main className="applix-home-shell">
+      <button className="applix-setup-back" type="button" onClick={() => router.back()} aria-label="Go back">
+        ←
+      </button>
+      <button className="home-signout" type="button" onClick={signOut}>Sign out</button>
+      <div className="applix-setup-info" title={email || "Applix dashboard"}>i</div>
+
+      <section className="applix-home-center" style={{ paddingTop: "clamp(70px, 8vh, 100px)" }}>
+        <div style={{ fontSize: "clamp(88px, 15vw, 150px)", lineHeight: 0.85, filter: "drop-shadow(0 18px 25px rgba(0,0,0,.32))" }}>
+          📨
+        </div>
+        <p style={{ margin: "10px 0 12px", color: "#ff7bad", fontSize: "clamp(46px, 8vw, 74px)", fontWeight: 950, letterSpacing: ".18em" }}>
+          APPLIX
+        </p>
+        <p className="applix-setup-kicker">AI Job Automation</p>
+        <h1>Welcome back</h1>
+        <p className="applix-home-copy">
+          Find relevant jobs, write tailored emails, attach your resume, and track everything automatically.
+        </p>
+        {email && <p className="applix-setup-status" style={{ marginTop: 14 }}>Signed in as {email}</p>}
+      </section>
+
+      <section className="applix-home-bottom">
+        {loading && <p className="applix-setup-status success">Loading your Applix workspace...</p>}
+        {message && <p className="applix-setup-status success">{message}</p>}
+        {errorMessage && <p className="error-text" style={{ textAlign: "center" }}>{errorMessage}</p>}
+
+        <div className="home-check-grid">
+          <div className={`home-check ${resumeReady ? "ready" : ""}`}>
+            <span>{resumeReady ? "✓" : "1"}</span>
+            <div>
+              <strong>Master Resume</strong>
+              <p>{resumeReady ? "Resume data is saved." : "Upload your resume first."}</p>
+            </div>
           </div>
-          <button className="ghost-button" type="button" onClick={signOut}>Sign out</button>
+          <div className={`home-check ${gmailReady ? "ready" : ""}`}>
+            <span>{gmailReady ? "✓" : "2"}</span>
+            <div>
+              <strong>Gmail Consent</strong>
+              <p>{gmailReady ? "Gmail is connected." : "Connect Gmail to prepare outreach."}</p>
+            </div>
+          </div>
         </div>
 
-        {loading && <p className="form-status">Loading setup...</p>}
-        {message && <p className="form-status success-status">{message}</p>}
-        {errorMessage && <p className="error-text">{errorMessage}</p>}
-
-        <div className="empty-state">
-          <h2>1. Master Resume</h2>
-          <p>{resumeReady ? "Resume data is saved." : "Upload and parse the user's resume source first."}</p>
-          <Link className="primary-link" href="/resume-canvas">Upload / Update Resume</Link>
-        </div>
-
-        <div className="empty-state">
-          <h2>2. Campaign</h2>
+        <div className="home-campaign-card">
           {latestCampaign ? (
             <>
-              <p><strong>{latestCampaign.name}</strong></p>
+              <strong>{latestCampaign.name}</strong>
               <p>{roleFor(latestCampaign)}{locationFor(latestCampaign) ? ` in ${locationFor(latestCampaign)}` : ""}</p>
-              <p className="muted">Status: {latestCampaign.status}</p>
-              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "14px" }}>
-                <Link className="ghost-link" href="/campaign/new">Create another campaign</Link>
-                <button
-                  type="button"
-                  onClick={() => deleteCampaign(latestCampaign)}
-                  disabled={busy}
-                  style={{
-                    border: "1px solid rgba(248,113,113,.45)",
-                    borderRadius: "999px",
-                    padding: "12px 16px",
-                    background: "rgba(127,29,29,.32)",
-                    color: "#fecaca",
-                    fontWeight: 900,
-                  }}
-                >
+              <p>Status: {latestCampaign.status}</p>
+              <div className="home-action-row" style={{ marginTop: 16 }}>
+                <Link className="ghost-link" href="/campaign/new">New campaign</Link>
+                <button className="ghost-button" type="button" onClick={() => deleteCampaign(latestCampaign)} disabled={busy} style={{ borderColor: "rgba(248,113,113,.55)", background: "rgba(127,29,29,.34)", color: "#fecaca" }}>
                   {busy ? "Deleting..." : "Delete campaign"}
                 </button>
               </div>
             </>
           ) : (
             <>
-              <p>No campaign yet. Create one for daily lead fetching.</p>
-              <Link className="primary-link" href="/campaign/new">Create campaign</Link>
+              <strong>No campaign yet</strong>
+              <p>Create a campaign so Applix can fetch jobs and prepare outreach.</p>
             </>
           )}
         </div>
 
-        <div className="empty-state">
-          <h2>3. Gmail Consent</h2>
-          <p>{gmailReady ? "Gmail is connected." : "Connect Gmail so Applix can write/send outreach on the user's behalf."}</p>
-          {!gmailReady && (
-            <button className="primary-button" type="button" onClick={connectGmail} disabled={busy || !email}>
-              {busy ? "Opening..." : "Connect Gmail"}
-            </button>
-          )}
-        </div>
-
-        <div className="empty-state">
-          <h2>4. Start Campaign</h2>
-          <p>Limit: 5 emails/hour, 100 emails/day, 10 days. New jobs are fetched from Outscraper when the campaign starts.</p>
-          <button className="primary-button" type="button" onClick={startCampaign} disabled={!canStartCampaign}>
+        <div className="applix-home-actions">
+          {!resumeReady && <Link className="applix-setup-outline" href="/resume-canvas">Upload Resume</Link>}
+          {!gmailReady && <button className="applix-setup-outline" type="button" onClick={connectGmail} disabled={busy || !email}>{busy ? "Opening..." : "Connect Gmail"}</button>}
+          {!latestCampaign && <Link className="applix-setup-outline" href="/campaign/new">Create Campaign</Link>}
+          <button className="applix-setup-primary" type="button" onClick={startCampaign} disabled={!canStartCampaign}>
             {campaignRunning ? "Campaign running" : canStartCampaign ? "Start Campaign" : "Complete setup first"}
           </button>
-          <Link className="ghost-link" href="/tracker" style={{ marginTop: "12px", display: "inline-flex" }}>Open job tracker</Link>
+          <Link className="applix-setup-outline" href="/tracker">Open Job Tracker</Link>
         </div>
       </section>
     </main>
