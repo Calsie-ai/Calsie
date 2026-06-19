@@ -38,6 +38,15 @@ function cleanText(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null) {
+    const record = error as Record<string, unknown>;
+    return String(record.message || record.details || record.hint || record.code || JSON.stringify(record));
+  }
+  return fallback;
+}
+
 function getCampaignRole(campaign?: Campaign | null) {
   return cleanText(campaign?.search?.target_role) || cleanText(campaign?.target_business_type) || cleanText(campaign?.name, "support worker");
 }
@@ -84,7 +93,7 @@ export default function TrackerPage() {
       .limit(1)
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) throw new Error(`Campaign load failed: ${getErrorMessage(error, "Unknown campaign error")}`);
     return (data || null) as Campaign | null;
   }
 
@@ -127,10 +136,10 @@ export default function TrackerPage() {
         .order("created_at", { ascending: false })
         .limit(80);
 
-      if (savedJobsError) throw savedJobsError;
+      if (savedJobsError) throw new Error(`Jobs load failed: ${getErrorMessage(savedJobsError, "Unknown jobs error")}`);
       setJobs((savedJobsData || []).map(mapSavedJob));
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not load tracker data.");
+      setErrorMessage(getErrorMessage(error, "Could not load tracker data."));
       setJobs([]);
     } finally {
       setLoading(false);
@@ -172,7 +181,7 @@ export default function TrackerPage() {
       setActionMessage(`Fetched ${result.count || 0} jobs. Saved ${result.inserted_count ?? 0}. Skipped ${result.duplicate_count ?? 0} duplicates.`);
       await loadTracker();
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Could not fetch jobs.");
+      setActionMessage(getErrorMessage(error, "Could not fetch jobs."));
     } finally {
       setFetchingJobs(false);
     }
@@ -232,7 +241,7 @@ export default function TrackerPage() {
           ) : (
             <p style={{ margin: 0, color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>Create your campaign first. Pro users have one active campaign only.</p>
           )}
-          {actionMessage && <p style={{ marginTop: "12px", color: actionMessage.toLowerCase().includes("could not") || actionMessage.toLowerCase().includes("missing") || actionMessage.toLowerCase().includes("create") ? "#fca5a5" : "#a7f3d0", fontWeight: 850 }}>{actionMessage}</p>}
+          {actionMessage && <p style={{ marginTop: "12px", color: actionMessage.toLowerCase().includes("could not") || actionMessage.toLowerCase().includes("missing") || actionMessage.toLowerCase().includes("create") || actionMessage.toLowerCase().includes("failed") ? "#fca5a5" : "#a7f3d0", fontWeight: 850 }}>{actionMessage}</p>}
         </div>
 
         <button className="primary-button" type="button" onClick={fetchRealJobs} disabled={fetchingJobs || loading || !campaign?.id} style={{ minHeight: "52px", whiteSpace: "nowrap", marginBottom: "18px" }}>
