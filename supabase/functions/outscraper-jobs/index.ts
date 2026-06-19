@@ -18,6 +18,7 @@ type RequestBody = {
   location?: string;
   campaign_id?: string;
   trigger?: string;
+  force_refresh?: boolean;
 };
 
 type CampaignRow = {
@@ -93,17 +94,23 @@ function normalizeJobs(payload: unknown, fallbackLocation: string) {
   return uniqueJobs(jobs);
 }
 
-async function loadExistingJobKeys(supabase: ReturnType<typeof createClient>, userId: string, campaignId: string | null) {
+async function loadCachedJobs(supabase: ReturnType<typeof createClient>, userId: string, campaignId: string | null) {
   let query = supabase
     .from("jobs")
-    .select("title,company,apply_url")
-    .eq("user_id", userId);
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(80);
 
   query = campaignId ? query.eq("campaign_id", campaignId) : query.is("campaign_id", null);
 
-  const { data, error } = await query.limit(1000);
+  const { data, error } = await query;
   if (error) throw error;
+  return data || [];
+}
 
+async function loadExistingJobKeys(supabase: ReturnType<typeof createClient>, userId: string, campaignId: string | null) {
+  const data = await loadCachedJobs(supabase, userId, campaignId);
   return new Set((data || []).map((job) => jobKey(job)).filter(Boolean));
 }
 
@@ -115,14 +122,6 @@ serve(async (req) => {
   try {
     if (!supabaseUrl || !serviceRoleKey) {
       throw new Error("Missing Supabase Edge Function database secrets.");
-    }
-
-    if (!outscraperKey) {
-      throw new Error("Missing OUTSCRAPER_API_KEY Edge Function secret.");
-    }
-
-    if (!outscraperJobsUrl) {
-      throw new Error("Missing OUTSCRAPER_JOBS_URL Edge Function secret. Add the real OutScraper jobs API endpoint; the old default endpoint returned HTTP 404.");
     }
 
     const authHeader = req.headers.get("authorization") || "";
@@ -159,6 +158,22 @@ serve(async (req) => {
     const role = cleanText(campaign?.search?.target_role || campaign?.target_business_type || campaign?.name || body.role, "support worker");
     const location = cleanText(campaign?.search?.target_location || campaign?.location || body.location, "Sydney NSW");
     const campaignId = campaign?.id || cleanText(body.campaign_id) || null;
+    const cachedJobs = await loadCachedJobs(supabase, userData.user.id, campaignId);
+
+    if (!body.force_refresh && cachedJobs.length > 0) {
+      return new Response(JSON.stringify({ ok: true, count: cachedJobs.length, inserted_count: 0, duplicate_count: 0, saved: true, cached: true, scraped: false, campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: cachedJobs }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!outscraperKey) {
+      throw new Error("Missing OUTSCRAPER_API_KEY Edge Function secret.");
+    }
+
+    if (!outscraperJobsUrl) {
+      throw new Error("Missing OUTSCRAPER_JOBS_URL Edge Function secret. Add the real OutScraper jobs API endpoint; the old default endpoint returned HTTP 404.");
+    }
+
     const query = `${role} ${location}`;
     const url = new URL(outscraperJobsUrl);
     url.searchParams.set("query", query);
@@ -186,7 +201,7 @@ serve(async (req) => {
     const normalizedJobs = normalizeJobs(providerPayload, location).slice(0, 50);
 
     if (normalizedJobs.length === 0) {
-      return new Response(JSON.stringify({ ok: true, count: 0, inserted_count: 0, duplicate_count: 0, saved: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: [] }), {
+      return new Response(JSON.stringify({ ok: true, count: 0, inserted_count: 0, duplicate_count: 0, saved: true, cached: false, scraped: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -201,7 +216,7 @@ serve(async (req) => {
       }));
 
     if (rows.length === 0) {
-      return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: 0, duplicate_count: normalizedJobs.length, saved: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: [] }), {
+      return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: 0, duplicate_count: normalizedJobs.length, saved: true, cached: true, scraped: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: cachedJobs }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -214,7 +229,7 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: data?.length || rows.length, duplicate_count: normalizedJobs.length - rows.length, saved: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: data || rows }), {
+    return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: data?.length || rows.length, duplicate_count: normalizedJobs.length - rows.length, saved: true, cached: false, scraped: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: data || rows }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
