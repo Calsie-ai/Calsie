@@ -9,7 +9,7 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const outscraperKey = Deno.env.get("OUTSCRAPER_API_KEY") || "";
-const outscraperJobsUrl = Deno.env.get("OUTSCRAPER_JOBS_URL") || "https://api.app.outscraper.com/jobs/search";
+const outscraperJobsUrl = Deno.env.get("OUTSCRAPER_JOBS_URL") || "";
 
 type OutscraperJob = Record<string, unknown>;
 
@@ -121,6 +121,10 @@ serve(async (req) => {
       throw new Error("Missing OUTSCRAPER_API_KEY Edge Function secret.");
     }
 
+    if (!outscraperJobsUrl) {
+      throw new Error("Missing OUTSCRAPER_JOBS_URL Edge Function secret. Add the real OutScraper jobs API endpoint; the old default endpoint returned HTTP 404.");
+    }
+
     const authHeader = req.headers.get("authorization") || "";
     const body = (await req.json().catch(() => ({}))) as RequestBody;
 
@@ -173,7 +177,7 @@ serve(async (req) => {
     }
 
     if (!providerResponse.ok) {
-      return new Response(JSON.stringify({ ok: false, error: `Outscraper rejected the job search with HTTP ${providerResponse.status}.`, provider_status: providerResponse.status, provider_status_text: providerResponse.statusText, query, role, location, campaign_id: campaignId, details: providerPayload }), {
+      return new Response(JSON.stringify({ ok: false, error: `Outscraper rejected the job search with HTTP ${providerResponse.status}.`, provider_status: providerResponse.status, provider_status_text: providerResponse.statusText, requested_url: url.toString(), query, role, location, campaign_id: campaignId, details: providerPayload }), {
         status: providerResponse.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -182,7 +186,7 @@ serve(async (req) => {
     const normalizedJobs = normalizeJobs(providerPayload, location).slice(0, 50);
 
     if (normalizedJobs.length === 0) {
-      return new Response(JSON.stringify({ ok: true, count: 0, inserted_count: 0, duplicate_count: 0, saved: true, campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: [] }), {
+      return new Response(JSON.stringify({ ok: true, count: 0, inserted_count: 0, duplicate_count: 0, saved: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -197,7 +201,7 @@ serve(async (req) => {
       }));
 
     if (rows.length === 0) {
-      return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: 0, duplicate_count: normalizedJobs.length, saved: true, campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: [] }), {
+      return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: 0, duplicate_count: normalizedJobs.length, saved: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -205,12 +209,12 @@ serve(async (req) => {
     const { data, error } = await supabase.from("jobs").insert(rows).select();
 
     if (error) {
-      return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: 0, duplicate_count: normalizedJobs.length - rows.length, saved: false, error: error.message, campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: rows }), {
+      return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: 0, duplicate_count: normalizedJobs.length - rows.length, saved: false, error: error.message, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: rows }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: data?.length || rows.length, duplicate_count: normalizedJobs.length - rows.length, saved: true, campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: data || rows }), {
+    return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: data?.length || rows.length, duplicate_count: normalizedJobs.length - rows.length, saved: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: data || rows }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
