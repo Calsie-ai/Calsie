@@ -1,106 +1,71 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 
-type Campaign = {
-  id: string;
-  name: string | null;
-  target_business_type?: string | null;
-  location?: string | null;
-  status?: string | null;
-  created_at?: string | null;
-};
-
-type QueueRow = {
-  id: string;
-  campaign_id?: string | null;
-  business_name?: string | null;
-  company_name?: string | null;
-  recipient_email?: string | null;
-  email?: string | null;
-  contact_email?: string | null;
-  subject?: string | null;
-  status?: string | null;
-  sent_at?: string | null;
-  created_at?: string | null;
-  [key: string]: unknown;
-};
-
-type JobRow = {
-  id: string;
-  user_id?: string | null;
-  title?: string | null;
-  company?: string | null;
-  location?: string | null;
-  source?: string | null;
-  apply_url?: string | null;
-  description?: string | null;
-  posted_at?: string | null;
-  status?: string | null;
-  created_at?: string | null;
-};
-
-type DisplayJob = {
+type TrackerJob = {
   id: string;
   title: string;
   company: string;
   location: string;
-  source: string;
+  description: string;
   applyUrl?: string | null;
-  postedAt?: string | null;
-  status: string;
 };
 
-function displayDate(value: unknown) {
-  if (!value || typeof value !== "string") return "-";
+type GatewayJobRow = {
+  id: string;
+  external_job_id?: string | null;
+  title?: string | null;
+  company?: string | null;
+  location?: string | null;
+  description?: string | null;
+  apply_url?: string | null;
+  source_url?: string | null;
+  refreshed_at?: string | null;
+  posted_at?: string | null;
+};
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+type JobsRow = {
+  id: string;
+  title?: string | null;
+  company?: string | null;
+  location?: string | null;
+  description?: string | null;
+  apply_url?: string | null;
+  source?: string | null;
+  created_at?: string | null;
+};
 
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function cleanText(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
-function getCompany(row: QueueRow) {
-  return row.business_name || row.company_name || "Untitled lead";
+function trimDescription(value: string) {
+  if (!value) return "No description saved yet.";
+  return value.length > 180 ? `${value.slice(0, 180).trim()}...` : value;
 }
 
-function getStatus(row: QueueRow | JobRow) {
-  return row.status || "new";
-}
-
-function jobFromQueue(row: QueueRow, campaign?: Campaign): DisplayJob {
-  const company = getCompany(row);
-
+function mapGatewayJob(row: GatewayJobRow): TrackerJob {
   return {
-    id: `queue-${row.id}`,
-    title: row.subject || campaign?.target_business_type || campaign?.name || "Qualified job lead",
-    company,
-    location: campaign?.location || "-",
-    source: "Outreach queue",
-    applyUrl: null,
-    postedAt: row.sent_at || row.created_at || campaign?.created_at || null,
-    status: getStatus(row),
+    id: row.id || row.external_job_id || crypto.randomUUID(),
+    title: cleanText(row.title, "Untitled job"),
+    company: cleanText(row.company, "Company not found"),
+    location: cleanText(row.location, "Location not listed"),
+    description: cleanText(row.description, "No description saved yet."),
+    applyUrl: cleanText(row.apply_url) || cleanText(row.source_url) || null,
   };
 }
 
-function jobFromTable(row: JobRow): DisplayJob {
+function mapSavedJob(row: JobsRow): TrackerJob {
   return {
     id: row.id,
-    title: row.title || "Untitled job",
-    company: row.company || "Unknown company",
-    location: row.location || "-",
-    source: row.source || "Job source",
-    applyUrl: row.apply_url || null,
-    postedAt: row.posted_at || row.created_at || null,
-    status: getStatus(row),
+    title: cleanText(row.title, "Untitled job"),
+    company: cleanText(row.company, "Company not found"),
+    location: cleanText(row.location, "Location not listed"),
+    description: cleanText(row.description, "No description saved yet."),
+    applyUrl: cleanText(row.apply_url) || null,
   };
 }
 
@@ -108,30 +73,13 @@ export default function TrackerPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [accessToken, setAccessToken] = useState("");
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [jobs, setJobs] = useState<JobRow[]>([]);
-  const [queueRows, setQueueRows] = useState<QueueRow[]>([]);
+  const [jobs, setJobs] = useState<TrackerJob[]>([]);
   const [role, setRole] = useState("support worker");
   const [location, setLocation] = useState("Sydney NSW");
   const [loading, setLoading] = useState(true);
   const [fetchingJobs, setFetchingJobs] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
-
-  const campaignById = useMemo(() => {
-    return campaigns.reduce<Record<string, Campaign>>((map, campaign) => {
-      map[campaign.id] = campaign;
-      return map;
-    }, {});
-  }, [campaigns]);
-
-  const displayJobs = useMemo(() => {
-    if (jobs.length > 0) {
-      return jobs.map(jobFromTable);
-    }
-
-    return queueRows.map((row) => jobFromQueue(row, row.campaign_id ? campaignById[row.campaign_id] : undefined));
-  }, [campaignById, jobs, queueRows]);
 
   async function loadTracker() {
     setLoading(true);
@@ -151,53 +99,34 @@ export default function TrackerPage() {
       setEmail(userEmail);
       setAccessToken(sessionData.session?.access_token || "");
 
-      const { data: jobData, error: jobError } = await supabase
+      const { data: gatewayData, error: gatewayError } = await supabase
+        .from("jobs_gateway")
+        .select("id,external_job_id,title,company,location,description,apply_url,source_url,refreshed_at,posted_at")
+        .eq("user_id", userData.user.id)
+        .order("refreshed_at", { ascending: false })
+        .limit(80);
+
+      if (!gatewayError && gatewayData && gatewayData.length > 0) {
+        setJobs((gatewayData as GatewayJobRow[]).map(mapGatewayJob));
+        return;
+      }
+
+      const { data: savedJobsData, error: savedJobsError } = await supabase
         .from("jobs")
-        .select("id,user_id,title,company,location,source,apply_url,description,posted_at,status,created_at")
+        .select("id,title,company,location,description,apply_url,source,created_at")
         .eq("user_id", userData.user.id)
         .order("created_at", { ascending: false })
         .limit(80);
 
-      if (!jobError && jobData) {
-        setJobs(jobData as JobRow[]);
-      } else {
-        setJobs([]);
-      }
-
-      const { data: campaignData, error: campaignError } = await supabase
-        .from("campaigns")
-        .select("id,name,target_business_type,location,status,created_at")
-        .eq("user_id", userData.user.id)
-        .order("created_at", { ascending: false });
-
-      if (campaignError) {
-        if (jobs.length === 0) throw new Error(campaignError.message);
+      if (!savedJobsError && savedJobsData) {
+        setJobs((savedJobsData as JobsRow[]).map(mapSavedJob));
         return;
       }
 
-      const loadedCampaigns = (campaignData || []) as Campaign[];
-      setCampaigns(loadedCampaigns);
-
-      if (loadedCampaigns.length === 0) {
-        setQueueRows([]);
-        return;
-      }
-
-      const campaignIds = loadedCampaigns.map((campaign) => campaign.id);
-      const { data: queueData, error: queueError } = await supabase
-        .from("outreach_queue")
-        .select("*")
-        .in("campaign_id", campaignIds)
-        .order("created_at", { ascending: false })
-        .limit(80);
-
-      if (!queueError && queueData) {
-        setQueueRows(queueData as QueueRow[]);
-      } else {
-        setQueueRows([]);
-      }
+      setJobs([]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not load tracker data.");
+      setJobs([]);
     } finally {
       setLoading(false);
     }
@@ -276,7 +205,7 @@ export default function TrackerPage() {
 
       <section style={{ position: "relative", zIndex: 1, width: "min(1180px, 100%)", padding: "38px 0 26px" }}>
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
-          <p className="applix-setup-kicker" style={{ marginBottom: "10px" }}>Live Supabase job data</p>
+          <p className="applix-setup-kicker" style={{ marginBottom: "10px" }}>Real job data</p>
           <h1 style={{ margin: 0, fontSize: "clamp(38px, 7vw, 76px)", lineHeight: .95, letterSpacing: "-2px" }}>Job tracker</h1>
           {email && <p className="applix-home-copy" style={{ marginTop: "12px" }}>Signed in as {email}</p>}
         </div>
@@ -301,40 +230,40 @@ export default function TrackerPage() {
         {errorMessage && <p className="applix-setup-status">{errorMessage}</p>}
         {loading && <p className="applix-setup-status">Loading tracker...</p>}
 
-        {!loading && !errorMessage && displayJobs.length === 0 && (
+        {!loading && !errorMessage && jobs.length === 0 && (
           <div className="home-campaign-card" style={{ padding: "28px", textAlign: "center", background: "rgba(255,255,255,.075)", borderColor: "rgba(255,255,255,.14)" }}>
             <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "110px", height: "110px", objectFit: "contain", marginBottom: "8px" }} />
-            <h2 style={{ margin: "0 0 10px", fontSize: "clamp(28px, 5vw, 44px)" }}>Tracker is ready for jobs</h2>
+            <h2 style={{ margin: "0 0 10px", fontSize: "clamp(28px, 5vw, 44px)" }}>Tracker is ready for real jobs</h2>
             <p style={{ margin: "0 auto 20px", maxWidth: "560px", color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>
-              Fetch real job listings above. Applix will save them into Supabase and show them here.
+              Fetch real job listings above. Applix will save them into Supabase and show them here with company, location, description, and approval button.
             </p>
           </div>
         )}
 
-        {!loading && !errorMessage && displayJobs.length > 0 && (
+        {!loading && !errorMessage && jobs.length > 0 && (
           <div className="home-campaign-card" style={{ padding: "0", overflow: "hidden", textAlign: "left", background: "rgba(255,255,255,.075)", borderColor: "rgba(255,255,255,.14)", boxShadow: "0 28px 80px rgba(0,0,0,.26)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr 1fr .75fr .7fr .6fr", gap: "0", padding: "14px 18px", borderBottom: "1px solid rgba(255,255,255,.14)", color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 900, letterSpacing: ".12em", textTransform: "uppercase" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.15fr .85fr .8fr 1.55fr .65fr", gap: "0", padding: "14px 18px", borderBottom: "1px solid rgba(255,255,255,.14)", color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 900, letterSpacing: ".12em", textTransform: "uppercase" }}>
               <span>Job title</span>
               <span>Company</span>
               <span>Location</span>
-              <span>Source</span>
-              <span>Status</span>
+              <span>Description</span>
               <span>Apply</span>
             </div>
 
-            {displayJobs.map((job) => (
-              <div key={job.id} style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr 1fr .75fr .7fr .6fr", gap: "0", padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,.1)", alignItems: "center" }}>
+            {jobs.map((job) => (
+              <div key={job.id} style={{ display: "grid", gridTemplateColumns: "1.15fr .85fr .8fr 1.55fr .65fr", gap: "0", padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,.1)", alignItems: "center" }}>
                 <strong style={{ color: "white" }}>{job.title}</strong>
                 <span style={{ color: "rgba(255,255,255,.72)", overflow: "hidden", textOverflow: "ellipsis" }}>{job.company}</span>
                 <span style={{ color: "rgba(255,255,255,.72)" }}>{job.location}</span>
-                <span style={{ color: "rgba(255,255,255,.62)" }}>{job.source}</span>
-                <span style={{ color: "#8fffd2", fontWeight: 900 }}>{job.status}</span>
+                <span style={{ color: "rgba(255,255,255,.64)", lineHeight: 1.35 }}>{trimDescription(job.description)}</span>
                 <span>
-                  {job.applyUrl ? (
-                    <a href={job.applyUrl} target="_blank" rel="noreferrer" style={{ color: "#a7f3d0", fontWeight: 950 }}>View</a>
-                  ) : (
-                    <span style={{ color: "rgba(255,255,255,.45)" }}>{displayDate(job.postedAt)}</span>
-                  )}
+                  <Link
+                    href={`/matching?jobId=${encodeURIComponent(job.id)}`}
+                    className="applix-setup-outline"
+                    style={{ minHeight: "42px", padding: "9px 12px", fontSize: "13px", width: "auto", whiteSpace: "nowrap" }}
+                  >
+                    Review / Apply
+                  </Link>
                 </span>
               </div>
             ))}
