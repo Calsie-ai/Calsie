@@ -97,6 +97,25 @@ export default function TrackerPage() {
     return (data || null) as Campaign | null;
   }
 
+  async function getFreshAccessToken() {
+    const supabase = getSupabaseClient();
+    const { data: sessionData } = await supabase.auth.getSession();
+    let token = sessionData.session?.access_token || "";
+
+    const expiresAt = sessionData.session?.expires_at ? sessionData.session.expires_at * 1000 : 0;
+    const expiresSoon = expiresAt > 0 && expiresAt - Date.now() < 2 * 60 * 1000;
+
+    if (!token || expiresSoon) {
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) throw new Error(`Session refresh failed: ${refreshError.message}`);
+      token = refreshData.session?.access_token || "";
+    }
+
+    if (!token) throw new Error("Please sign in again before fetching jobs.");
+    setAccessToken(token);
+    return token;
+  }
+
   async function loadTracker() {
     setLoading(true);
     setErrorMessage("");
@@ -152,11 +171,6 @@ export default function TrackerPage() {
   }, [router]);
 
   async function fetchRealJobs() {
-    if (!accessToken) {
-      setActionMessage("Please sign in again before fetching jobs.");
-      return;
-    }
-
     if (!campaign?.id) {
       setActionMessage("Create your campaign first so Applix can fetch matching jobs.");
       return;
@@ -166,10 +180,12 @@ export default function TrackerPage() {
     setActionMessage("");
 
     try {
+      const freshAccessToken = await getFreshAccessToken();
+
       const response = await fetch("/api/applix/fetch-jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: accessToken, role, location, campaign_id: campaign.id }),
+        body: JSON.stringify({ access_token: freshAccessToken, role, location, campaign_id: campaign.id }),
       });
 
       const result = await response.json().catch(() => null);
