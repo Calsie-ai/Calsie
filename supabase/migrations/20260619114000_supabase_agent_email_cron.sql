@@ -1,13 +1,14 @@
--- Supabase-side scheduler for the Applix 10-day agent email sender.
--- This keeps cron/backend automation inside Supabase, not Vercel.
+-- Supabase-side scheduler for the Applix 10-day agent orchestrator.
+-- This keeps backend automation inside Supabase, not Vercel.
 --
 -- Runs every hour and calls:
---   /functions/v1/applix-agent-email-scheduler
+--   /functions/v1/applix-agent-orchestrator
 --
 -- Required before this cron can work:
 -- 1. Deploy Edge Functions:
 --      gmail-send-test
 --      applix-agent-email-scheduler
+--      applix-agent-orchestrator
 -- 2. Store your service role key in Supabase Vault with name:
 --      applix_service_role_key
 --
@@ -21,19 +22,20 @@ create extension if not exists pg_net with schema extensions;
 select cron.unschedule(jobid)
 from cron.job
 where jobname in (
+  'applix-agent-orchestrator-hourly',
   'applix-agent-email-scheduler-hourly',
   'applix-email-send-hourly',
   'applix-vercel-email-send-hourly'
 );
 
--- Schedule the Supabase Edge Function hourly.
+-- Schedule the full Applix agent orchestrator hourly.
 select cron.schedule(
-  'applix-agent-email-scheduler-hourly',
+  'applix-agent-orchestrator-hourly',
   '0 * * * *',
   $$
   select
     net.http_post(
-      url := 'https://bnshgtrqbfuphhhdgccs.supabase.co/functions/v1/applix-agent-email-scheduler',
+      url := 'https://bnshgtrqbfuphhhdgccs.supabase.co/functions/v1/applix-agent-orchestrator',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
         'Authorization', 'Bearer ' || (
@@ -50,10 +52,13 @@ select cron.schedule(
         )
       ),
       body := jsonb_build_object(
+        'test_mode', true,
         'test_recipient_email', 'hostsajan@gmail.com',
         'agent_days', 10,
-        'daily_limit', 100,
-        'hourly_limit', 4
+        'daily_job_limit', 100,
+        'daily_email_limit', 100,
+        'hourly_email_limit', 4,
+        'max_campaigns', 10
       )
     );
   $$
