@@ -75,13 +75,12 @@ function mapSavedJob(row: JobsRow): TrackerJob {
 export default function TrackerPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [accessToken, setAccessToken] = useState("");
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [jobs, setJobs] = useState<TrackerJob[]>([]);
   const [role, setRole] = useState("support worker");
   const [location, setLocation] = useState("Sydney NSW");
   const [loading, setLoading] = useState(true);
-  const [fetchingJobs, setFetchingJobs] = useState(false);
+  const [reloadingJobs, setReloadingJobs] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [jobsMode, setJobsMode] = useState("");
@@ -136,25 +135,6 @@ export default function TrackerPage() {
     return (allSavedJobs.data || []) as JobsRow[];
   }
 
-  async function getFreshAccessToken() {
-    const supabase = getSupabaseClient();
-    const { data: sessionData } = await supabase.auth.getSession();
-    let token = sessionData.session?.access_token || "";
-
-    const expiresAt = sessionData.session?.expires_at ? sessionData.session.expires_at * 1000 : 0;
-    const expiresSoon = expiresAt > 0 && expiresAt - Date.now() < 2 * 60 * 1000;
-
-    if (!token || expiresSoon) {
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError) throw new Error(`Session refresh failed: ${refreshError.message}`);
-      token = refreshData.session?.access_token || "";
-    }
-
-    if (!token) throw new Error("Please sign in again before fetching jobs.");
-    setAccessToken(token);
-    return token;
-  }
-
   async function loadTracker() {
     setLoading(true);
     setErrorMessage("");
@@ -163,7 +143,6 @@ export default function TrackerPage() {
     try {
       const supabase = getSupabaseClient();
       const { data: userData, error: userError } = await supabase.auth.getUser();
-      const { data: sessionData } = await supabase.auth.getSession();
 
       if (userError || !userData.user) {
         router.replace("/");
@@ -172,7 +151,6 @@ export default function TrackerPage() {
 
       const userEmail = userData.user.email || "";
       setEmail(userEmail);
-      setAccessToken(sessionData.session?.access_token || "");
 
       const loadedCampaign = await loadSingleCampaign(supabase, userData.user.id);
       setCampaign(loadedCampaign);
@@ -197,37 +175,17 @@ export default function TrackerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  async function fetchRealJobs() {
-    if (!campaign?.id) {
-      setActionMessage("Create your campaign first so Applix can fetch matching jobs.");
-      return;
-    }
-
-    setFetchingJobs(true);
+  async function reloadSavedJobsOnly() {
+    setReloadingJobs(true);
     setActionMessage("");
 
     try {
-      const freshAccessToken = await getFreshAccessToken();
-
-      const response = await fetch("/api/applix/fetch-jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: freshAccessToken, role, location, campaign_id: campaign.id }),
-      });
-
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok || !result?.ok) {
-        throw new Error(result?.error || "Could not fetch jobs.");
-      }
-
-      const cachedLabel = result.cached ? "Loaded saved jobs" : "Fetched jobs";
-      setActionMessage(`${cachedLabel}: ${result.count || 0}. Saved ${result.inserted_count ?? 0}. Skipped ${result.duplicate_count ?? 0} duplicates.`);
       await loadTracker();
+      setActionMessage("Reloaded saved jobs from Supabase. No scraper was called.");
     } catch (error) {
-      setActionMessage(getErrorMessage(error, "Could not fetch jobs."));
+      setActionMessage(getErrorMessage(error, "Could not reload saved jobs."));
     } finally {
-      setFetchingJobs(false);
+      setReloadingJobs(false);
     }
   }
 
@@ -289,8 +247,8 @@ export default function TrackerPage() {
           {actionMessage && <p style={{ marginTop: "12px", color: actionMessage.toLowerCase().includes("could not") || actionMessage.toLowerCase().includes("missing") || actionMessage.toLowerCase().includes("create") || actionMessage.toLowerCase().includes("failed") ? "#fca5a5" : "#a7f3d0", fontWeight: 850 }}>{actionMessage}</p>}
         </div>
 
-        <button className="primary-button" type="button" onClick={fetchRealJobs} disabled={fetchingJobs || loading || !campaign?.id} style={{ minHeight: "52px", whiteSpace: "nowrap", marginBottom: "18px" }}>
-          {fetchingJobs ? "Loading saved jobs..." : "Load / fetch jobs for this campaign"}
+        <button className="primary-button" type="button" onClick={reloadSavedJobsOnly} disabled={reloadingJobs || loading} style={{ minHeight: "52px", whiteSpace: "nowrap", marginBottom: "18px" }}>
+          {reloadingJobs ? "Reloading saved jobs..." : "Reload saved jobs"}
         </button>
 
         {errorMessage && <p className="applix-setup-status">{errorMessage}</p>}
