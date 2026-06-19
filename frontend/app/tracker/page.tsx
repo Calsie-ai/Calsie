@@ -5,6 +5,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 
+type Campaign = {
+  id: string;
+  name?: string | null;
+  target_business_type?: string | null;
+  location?: string | null;
+  search?: { target_role?: string | null; target_location?: string | null } | null;
+  created_at?: string | null;
+};
+
 type TrackerJob = {
   id: string;
   title: string;
@@ -42,6 +51,14 @@ function cleanText(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+function getCampaignRole(campaign?: Campaign | null) {
+  return cleanText(campaign?.search?.target_role) || cleanText(campaign?.target_business_type) || cleanText(campaign?.name, "support worker");
+}
+
+function getCampaignLocation(campaign?: Campaign | null) {
+  return cleanText(campaign?.search?.target_location) || cleanText(campaign?.location, "Sydney NSW");
+}
+
 function trimDescription(value: string) {
   if (!value) return "No description saved yet.";
   return value.length > 180 ? `${value.slice(0, 180).trim()}...` : value;
@@ -73,6 +90,7 @@ export default function TrackerPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [accessToken, setAccessToken] = useState("");
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [jobs, setJobs] = useState<TrackerJob[]>([]);
   const [role, setRole] = useState("support worker");
   const [location, setLocation] = useState("Sydney NSW");
@@ -80,6 +98,19 @@ export default function TrackerPage() {
   const [fetchingJobs, setFetchingJobs] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+
+  async function loadSingleCampaign(supabase: ReturnType<typeof getSupabaseClient>, userId: string) {
+    const { data, error } = await supabase
+      .from("campaigns")
+      .select("id,name,target_business_type,location,search,created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return (data || null) as Campaign | null;
+  }
 
   async function loadTracker() {
     setLoading(true);
@@ -99,24 +130,38 @@ export default function TrackerPage() {
       setEmail(userEmail);
       setAccessToken(sessionData.session?.access_token || "");
 
-      const { data: gatewayData, error: gatewayError } = await supabase
+      const loadedCampaign = await loadSingleCampaign(supabase, userData.user.id);
+      setCampaign(loadedCampaign);
+
+      const campaignRole = getCampaignRole(loadedCampaign);
+      const campaignLocation = getCampaignLocation(loadedCampaign);
+      setRole(campaignRole);
+      setLocation(campaignLocation);
+
+      let gatewayQuery = supabase
         .from("jobs_gateway")
         .select("id,external_job_id,title,company,location,description,apply_url,source_url,refreshed_at,posted_at")
         .eq("user_id", userData.user.id)
         .order("refreshed_at", { ascending: false })
         .limit(80);
 
+      const { data: gatewayData, error: gatewayError } = await gatewayQuery;
+
       if (!gatewayError && gatewayData && gatewayData.length > 0) {
         setJobs((gatewayData as GatewayJobRow[]).map(mapGatewayJob));
         return;
       }
 
-      const { data: savedJobsData, error: savedJobsError } = await supabase
+      let savedJobsQuery = supabase
         .from("jobs")
         .select("id,title,company,location,description,apply_url,source,created_at")
         .eq("user_id", userData.user.id)
         .order("created_at", { ascending: false })
         .limit(80);
+
+      if (loadedCampaign?.id) savedJobsQuery = savedJobsQuery.eq("campaign_id", loadedCampaign.id);
+
+      const { data: savedJobsData, error: savedJobsError } = await savedJobsQuery;
 
       if (!savedJobsError && savedJobsData) {
         setJobs((savedJobsData as JobsRow[]).map(mapSavedJob));
@@ -143,6 +188,11 @@ export default function TrackerPage() {
       return;
     }
 
+    if (!campaign?.id) {
+      setActionMessage("Create your campaign first so Applix can fetch matching jobs.");
+      return;
+    }
+
     setFetchingJobs(true);
     setActionMessage("");
 
@@ -150,7 +200,7 @@ export default function TrackerPage() {
       const response = await fetch("/api/applix/fetch-jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: accessToken, role, location }),
+        body: JSON.stringify({ access_token: accessToken, role, location, campaign_id: campaign.id }),
       });
 
       const result = await response.json().catch(() => null);
@@ -194,7 +244,7 @@ export default function TrackerPage() {
           <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "54px", height: "54px", objectFit: "contain" }} />
           <div style={{ textAlign: "left" }}>
             <strong style={{ display: "block", color: "#ff7fa8", letterSpacing: ".18em", fontSize: "16px" }}>APPLIX</strong>
-            <span style={{ color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 800 }}>Tracker</span>
+            <span style={{ color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 800 }}>Pro Tracker</span>
           </div>
         </Link>
 
@@ -205,27 +255,29 @@ export default function TrackerPage() {
 
       <section style={{ position: "relative", zIndex: 1, width: "min(1180px, 100%)", padding: "38px 0 26px" }}>
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
-          <p className="applix-setup-kicker" style={{ marginBottom: "10px" }}>Real job data</p>
+          <p className="applix-setup-kicker" style={{ marginBottom: "10px" }}>Single campaign pro flow</p>
           <h1 style={{ margin: 0, fontSize: "clamp(38px, 7vw, 76px)", lineHeight: .95, letterSpacing: "-2px" }}>Job tracker</h1>
           {email && <p className="applix-home-copy" style={{ marginTop: "12px" }}>Signed in as {email}</p>}
         </div>
 
         <div className="home-campaign-card" style={{ padding: "18px", marginBottom: "18px", textAlign: "left", background: "rgba(255,255,255,.075)", borderColor: "rgba(255,255,255,.14)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "12px", alignItems: "end" }}>
-            <label style={{ display: "grid", gap: "8px", color: "rgba(255,255,255,.82)", fontWeight: 900 }}>
-              Job title
-              <input value={role} onChange={(event) => setRole(event.target.value)} placeholder="support worker" />
-            </label>
-            <label style={{ display: "grid", gap: "8px", color: "rgba(255,255,255,.82)", fontWeight: 900 }}>
-              Location
-              <input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Sydney NSW" />
-            </label>
-            <button className="primary-button" type="button" onClick={fetchRealJobs} disabled={fetchingJobs || loading} style={{ minHeight: "52px", whiteSpace: "nowrap" }}>
-              {fetchingJobs ? "Fetching..." : "Fetch real jobs"}
-            </button>
-          </div>
-          {actionMessage && <p style={{ marginTop: "12px", color: actionMessage.toLowerCase().includes("could not") || actionMessage.toLowerCase().includes("missing") ? "#fca5a5" : "#a7f3d0", fontWeight: 850 }}>{actionMessage}</p>}
+          <p className="applix-setup-kicker" style={{ marginBottom: "8px" }}>Saved campaign</p>
+          {campaign ? (
+            <>
+              <strong>{campaign.name || role}</strong>
+              <p style={{ margin: "8px 0 0", color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>
+                {role} in {location}
+              </p>
+            </>
+          ) : (
+            <p style={{ margin: 0, color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>Create your campaign first. Pro users have one active campaign only.</p>
+          )}
+          {actionMessage && <p style={{ marginTop: "12px", color: actionMessage.toLowerCase().includes("could not") || actionMessage.toLowerCase().includes("missing") || actionMessage.toLowerCase().includes("create") ? "#fca5a5" : "#a7f3d0", fontWeight: 850 }}>{actionMessage}</p>}
         </div>
+
+        <button className="primary-button" type="button" onClick={fetchRealJobs} disabled={fetchingJobs || loading || !campaign?.id} style={{ minHeight: "52px", whiteSpace: "nowrap", marginBottom: "18px" }}>
+          {fetchingJobs ? "Fetching campaign jobs..." : "Fetch jobs for this campaign"}
+        </button>
 
         {errorMessage && <p className="applix-setup-status">{errorMessage}</p>}
         {loading && <p className="applix-setup-status">Loading tracker...</p>}
@@ -233,9 +285,9 @@ export default function TrackerPage() {
         {!loading && !errorMessage && jobs.length === 0 && (
           <div className="home-campaign-card" style={{ padding: "28px", textAlign: "center", background: "rgba(255,255,255,.075)", borderColor: "rgba(255,255,255,.14)" }}>
             <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "110px", height: "110px", objectFit: "contain", marginBottom: "8px" }} />
-            <h2 style={{ margin: "0 0 10px", fontSize: "clamp(28px, 5vw, 44px)" }}>Tracker is ready for real jobs</h2>
+            <h2 style={{ margin: "0 0 10px", fontSize: "clamp(28px, 5vw, 44px)" }}>Tracker is ready for campaign jobs</h2>
             <p style={{ margin: "0 auto 20px", maxWidth: "560px", color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>
-              Fetch real job listings above. Applix will save them into Supabase and show them here with company, location, description, and approval button.
+              Fetch jobs for the saved campaign. Applix will continue the Supabase OutScraper pipeline and show matching jobs here.
             </p>
           </div>
         )}
