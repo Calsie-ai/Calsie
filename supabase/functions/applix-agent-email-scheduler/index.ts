@@ -7,6 +7,7 @@ const TEST_RECIPIENT_EMAIL = "hostsajan@gmail.com";
 const DEFAULT_AGENT_DAYS = 10;
 const DEFAULT_HOURLY_LIMIT = 4;
 const DEFAULT_DAILY_LIMIT = 100;
+const GMAIL_SEND_FUNCTION_NAME = Deno.env.get("GMAIL_SEND_FUNCTION_NAME") || "gmail-send-test";
 
 function env(name: string) {
   return Deno.env.get(name) ?? "";
@@ -65,6 +66,32 @@ function addDays(date: Date, days: number) {
   return next;
 }
 
+function pickSubject(row: Row) {
+  return txt(row.subject || row.email_subject || row.draft_subject || row.title, "Applix test email");
+}
+
+function pickBody(row: Row) {
+  return txt(
+    row.email_body || row.body || row.draft_body || row.message || row.content,
+    "Hi,\n\nThis is a test email from your Applix launched agent.\n\nRegards,\nApplix"
+  );
+}
+
+async function callGmailSendTest(payload: Row) {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/${GMAIL_SEND_FUNCTION_NAME}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  return { ok: response.ok && data?.ok !== false, status: response.status, data };
+}
+
 Deno.serve(async (req) => {
   try {
     if (req.method !== "POST" && req.method !== "GET") {
@@ -86,6 +113,7 @@ Deno.serve(async (req) => {
     const agentDays = num(input.agent_days, DEFAULT_AGENT_DAYS, 1, 30);
     const dailyLimit = num(input.daily_limit, DEFAULT_DAILY_LIMIT, 1, 100);
     const hourlyLimit = num(input.hourly_limit, Math.floor(dailyLimit / 24) || DEFAULT_HOURLY_LIMIT, 1, 4);
+    const dryRun = Boolean(input.dry_run ?? false);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
@@ -116,61 +144,132 @@ Deno.serve(async (req) => {
     });
 
     const results: Row[] = [];
-    let preparedCount = 0;
+    let sentCount = 0;
+    let failedCount = 0;
+    let skippedCount = 0;
 
     for (const campaign of activeCampaigns) {
-      if (preparedCount >= hourlyLimit) break;
+      if (sentCount >= hourlyLimit) break;
 
-      const remaining = hourlyLimit - preparedCount;
+      const remaining = hourlyLimit - sentCount;
       const queueResult = await supabase
         .from("outreach_queue")
-        .select("id,campaign_id,recipient_email,status,review_status,attempt_count,created_at,ai_notes")
+        .select("*")
         .eq("campaign_id", campaign.id)
-        .in("status", ["queued_test", "queued", "pending", "ready"])
+        .in("status", ["ready_to_send_test", "queued_test", "queued", "pending", "ready"])
         .order("created_at", { ascending: true })
         .limit(remaining);
 
       if (queueResult.error) {
         results.push({ campaign_id: campaign.id, ok: false, error: queueResult.error.message });
+        failedCount += 1;
         continue;
       }
 
       const rows = queueResult.data || [];
       if (!rows.length) {
-        results.push({ campaign_id: campaign.id, ok: true, prepared: 0, message: "No queued rows found." });
+        results.push({ campaign_id: campaign.id, ok: true, sent: 0, message: "No queued rows found." });
         continue;
       }
 
       for (const row of rows) {
-        const updateResult = await supabase
+        const subject = pickSubject(row);
+        const body = pickBody(row);
+        const attemptCount = Number(row.attempt_count || 0) + 1;
+
+        await supabase
           .from("outreach_queue")
           .update({
             recipient_email: testRecipient,
-            status: "ready_to_send_test",
+            status: dryRun ? "ready_to_send_test" : "sending_test",
             review_status: "ready_for_test_send",
             updated_at: now.toISOString(),
+            attempt_count: attemptCount,
             ai_notes: {
               ...(row.ai_notes || {}),
               test_mode: true,
               forced_test_recipient_email: testRecipient,
+              gmail_send_function_name: GMAIL_SEND_FUNCTION_NAME,
               agent_scheduler: "applix-agent-email-scheduler",
               send_window_days: agentDays,
               hourly_limit: hourlyLimit,
               daily_limit: dailyLimit,
-              safety_note: "This function schedules the next test batch only. It does not perform the final email provider send.",
             },
           })
-          .eq("id", row.id)
-          .select("id,campaign_id,recipient_email,status,review_status")
-          .maybeSingle();
+          .eq("id", row.id);
 
-        if (updateResult.error) {
-          results.push({ campaign_id: campaign.id, queue_id: row.id, ok: false, error: updateResult.error.message });
+        if (dryRun) {
+          skippedCount += 1;
+          results.push({ campaign_id: campaign.id, queue_id: row.id, ok: true, dry_run: true, recipient: testRecipient, subject });
           continue;
         }
 
-        preparedCount += 1;
-        results.push({ campaign_id: campaign.id, queue_id: row.id, ok: true, prepared_for: testRecipient, row: updateResult.data });
+        const gmailResult = await callGmailSendTest({
+          queue_id: row.id,
+          campaign_id: campaign.id,
+          user_identifier: campaign.user_id,
+          user_id: campaign.user_id,
+          to: testRecipient,
+          recipient_email: testRecipient,
+          subject,
+          body,
+          text: body,
+          test_mode: true,
+          source: "applix-agent-email-scheduler",
+        });
+
+        if (gmailResult.ok) {
+          sentCount += 1;
+          await supabase
+            .from("outreach_queue")
+            .update({
+              recipient_email: testRecipient,
+              status: "sent_test",
+              review_status: "sent_test",
+              sent_at: now.toISOString(),
+              updated_at: now.toISOString(),
+              ai_notes: {
+                ...(row.ai_notes || {}),
+                test_mode: true,
+                forced_test_recipient_email: testRecipient,
+                gmail_send_function_name: GMAIL_SEND_FUNCTION_NAME,
+                gmail_result: gmailResult.data,
+                agent_scheduler: "applix-agent-email-scheduler",
+              },
+            })
+            .eq("id", row.id);
+        } else {
+          failedCount += 1;
+          await supabase
+            .from("outreach_queue")
+            .update({
+              recipient_email: testRecipient,
+              status: "send_failed_test",
+              review_status: "send_failed_test",
+              updated_at: now.toISOString(),
+              ai_notes: {
+                ...(row.ai_notes || {}),
+                test_mode: true,
+                forced_test_recipient_email: testRecipient,
+                gmail_send_function_name: GMAIL_SEND_FUNCTION_NAME,
+                gmail_error: gmailResult.data,
+                gmail_status: gmailResult.status,
+                agent_scheduler: "applix-agent-email-scheduler",
+              },
+            })
+            .eq("id", row.id);
+        }
+
+        results.push({
+          campaign_id: campaign.id,
+          queue_id: row.id,
+          ok: gmailResult.ok,
+          recipient: testRecipient,
+          subject,
+          gmail_function: GMAIL_SEND_FUNCTION_NAME,
+          gmail_status: gmailResult.status,
+          gmail_result: gmailResult.data,
+        });
       }
 
       const outreach = campaign.outreach || {};
@@ -183,7 +282,13 @@ Deno.serve(async (req) => {
             agent_email_hourly_limit: hourlyLimit,
             agent_email_daily_limit: dailyLimit,
             last_email_scheduler_run_at: now.toISOString(),
-            last_email_scheduler_prepared_count: preparedCount,
+            last_email_scheduler_result: {
+              sent_count: sentCount,
+              failed_count: failedCount,
+              skipped_count: skippedCount,
+              gmail_send_function_name: GMAIL_SEND_FUNCTION_NAME,
+              test_recipient_email: testRecipient,
+            },
           },
         })
         .eq("id", campaign.id);
@@ -192,14 +297,17 @@ Deno.serve(async (req) => {
     return reply({
       ok: true,
       function: "applix-agent-email-scheduler",
-      mode: "prepare_next_test_batch",
+      mode: dryRun ? "dry_run" : "gmail_send_test_batch",
+      gmail_send_function_name: GMAIL_SEND_FUNCTION_NAME,
       test_recipient_email: testRecipient,
       agent_days: agentDays,
       hourly_limit: hourlyLimit,
       daily_limit: dailyLimit,
       checked_campaigns: campaigns.length,
       active_campaigns: activeCampaigns.length,
-      prepared_count: preparedCount,
+      sent_count: sentCount,
+      failed_count: failedCount,
+      skipped_count: skippedCount,
       ran_at: now.toISOString(),
       results,
     });
