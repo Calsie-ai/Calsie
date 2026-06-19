@@ -164,10 +164,16 @@ serve(async (req) => {
       headers: { "X-API-KEY": outscraperKey },
     });
 
-    const providerPayload = await providerResponse.json().catch(() => null);
+    const providerText = await providerResponse.text().catch(() => "");
+    let providerPayload: unknown = providerText;
+    try {
+      providerPayload = providerText ? JSON.parse(providerText) : null;
+    } catch {
+      providerPayload = providerText;
+    }
 
     if (!providerResponse.ok) {
-      return new Response(JSON.stringify({ ok: false, error: "Outscraper rejected the job search.", details: providerPayload }), {
+      return new Response(JSON.stringify({ ok: false, error: `Outscraper rejected the job search with HTTP ${providerResponse.status}.`, provider_status: providerResponse.status, provider_status_text: providerResponse.statusText, query, role, location, campaign_id: campaignId, details: providerPayload }), {
         status: providerResponse.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
