@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 
@@ -72,6 +72,17 @@ function mapSavedJob(row: JobsRow): TrackerJob {
   };
 }
 
+function csvCell(value: string) {
+  return `"${value.replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
+}
+
+function safeFileName(value: string) {
+  return cleanText(value, "applix-jobs")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "applix-jobs";
+}
+
 export default function TrackerPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -84,6 +95,15 @@ export default function TrackerPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [jobsMode, setJobsMode] = useState("");
+
+  const jobsCsvHref = useMemo(() => {
+    const header = ["Job Title", "Company", "Location", "Description", "Apply URL"];
+    const rows = jobs.map((job) => [job.title, job.company, job.location, job.description, job.applyUrl || ""]);
+    const csv = [header, ...rows].map((row) => row.map((cell) => csvCell(cell)).join(",")).join("\n");
+    return `data:text/csv;charset=utf-8,${encodeURIComponent(`\uFEFF${csv}`)}`;
+  }, [jobs]);
+
+  const jobsFileName = `${safeFileName(campaign?.name || role)}-saved-jobs.csv`;
 
   async function loadSingleCampaign(supabase: ReturnType<typeof getSupabaseClient>, userId: string) {
     const { data, error } = await supabase
@@ -215,7 +235,7 @@ export default function TrackerPage() {
           <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "54px", height: "54px", objectFit: "contain" }} />
           <div style={{ textAlign: "left" }}>
             <strong style={{ display: "block", color: "#ff7fa8", letterSpacing: ".18em", fontSize: "16px" }}>APPLIX</strong>
-            <span style={{ color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 800 }}>Pro Tracker</span>
+            <span style={{ color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 800 }}>Saved Jobs Export</span>
           </div>
         </Link>
 
@@ -226,7 +246,7 @@ export default function TrackerPage() {
 
       <section style={{ position: "relative", zIndex: 1, width: "min(1180px, 100%)", padding: "38px 0 26px" }}>
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
-          <p className="applix-setup-kicker" style={{ marginBottom: "10px" }}>Saved jobs tracker</p>
+          <p className="applix-setup-kicker" style={{ marginBottom: "10px" }}>Saved jobs export</p>
           <h1 style={{ margin: 0, fontSize: "clamp(38px, 7vw, 76px)", lineHeight: .95, letterSpacing: "-2px" }}>Job tracker</h1>
           {email && <p className="applix-home-copy" style={{ marginTop: "12px" }}>Signed in as {email}</p>}
         </div>
@@ -247,9 +267,14 @@ export default function TrackerPage() {
           {actionMessage && <p style={{ marginTop: "12px", color: actionMessage.toLowerCase().includes("could not") || actionMessage.toLowerCase().includes("missing") || actionMessage.toLowerCase().includes("create") || actionMessage.toLowerCase().includes("failed") ? "#fca5a5" : "#a7f3d0", fontWeight: 850 }}>{actionMessage}</p>}
         </div>
 
-        <button className="primary-button" type="button" onClick={reloadSavedJobsOnly} disabled={reloadingJobs || loading} style={{ minHeight: "52px", whiteSpace: "nowrap", marginBottom: "18px" }}>
-          {reloadingJobs ? "Reloading saved jobs..." : "Reload saved jobs"}
-        </button>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "18px" }}>
+          <button className="primary-button" type="button" onClick={reloadSavedJobsOnly} disabled={reloadingJobs || loading} style={{ minHeight: "52px", whiteSpace: "nowrap" }}>
+            {reloadingJobs ? "Reloading saved jobs..." : "Reload saved jobs"}
+          </button>
+          <a className="primary-button" href={jobsCsvHref} download={jobsFileName} aria-disabled={loading || jobs.length === 0} style={{ minHeight: "52px", whiteSpace: "nowrap", opacity: loading || jobs.length === 0 ? .45 : 1, pointerEvents: loading || jobs.length === 0 ? "none" : "auto" }}>
+            Download Excel file
+          </a>
+        </div>
 
         {errorMessage && <p className="applix-setup-status">{errorMessage}</p>}
         {loading && <p className="applix-setup-status">Loading tracker...</p>}
@@ -259,36 +284,26 @@ export default function TrackerPage() {
             <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "110px", height: "110px", objectFit: "contain", marginBottom: "8px" }} />
             <h2 style={{ margin: "0 0 10px", fontSize: "clamp(28px, 5vw, 44px)" }}>No saved jobs yet</h2>
             <p style={{ margin: "0 auto 20px", maxWidth: "620px", color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>
-              Once a scrape saves jobs into Supabase, this tracker will load those saved jobs again without scraping repeatedly.
+              Once a scrape saves jobs into Supabase, this tracker will load those saved jobs again and let the user download them.
             </p>
           </div>
         )}
 
         {!loading && !errorMessage && jobs.length > 0 && (
           <div className="home-campaign-card" style={{ padding: "0", overflow: "hidden", textAlign: "left", background: "rgba(255,255,255,.075)", borderColor: "rgba(255,255,255,.14)", boxShadow: "0 28px 80px rgba(0,0,0,.26)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.15fr .85fr .8fr 1.55fr .65fr", gap: "0", padding: "14px 18px", borderBottom: "1px solid rgba(255,255,255,.14)", color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 900, letterSpacing: ".12em", textTransform: "uppercase" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.15fr .85fr .8fr 1.55fr", gap: "0", padding: "14px 18px", borderBottom: "1px solid rgba(255,255,255,.14)", color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 900, letterSpacing: ".12em", textTransform: "uppercase" }}>
               <span>Job title</span>
               <span>Company</span>
               <span>Location</span>
               <span>Description</span>
-              <span>Apply</span>
             </div>
 
             {jobs.map((job) => (
-              <div key={job.id} style={{ display: "grid", gridTemplateColumns: "1.15fr .85fr .8fr 1.55fr .65fr", gap: "0", padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,.1)", alignItems: "center" }}>
+              <div key={job.id} style={{ display: "grid", gridTemplateColumns: "1.15fr .85fr .8fr 1.55fr", gap: "0", padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,.1)", alignItems: "center" }}>
                 <strong style={{ color: "white" }}>{job.title}</strong>
                 <span style={{ color: "rgba(255,255,255,.72)", overflow: "hidden", textOverflow: "ellipsis" }}>{job.company}</span>
                 <span style={{ color: "rgba(255,255,255,.72)" }}>{job.location}</span>
                 <span style={{ color: "rgba(255,255,255,.64)", lineHeight: 1.35 }}>{trimDescription(job.description)}</span>
-                <span>
-                  <Link
-                    href={`/matching?jobId=${encodeURIComponent(job.id)}`}
-                    className="applix-setup-outline"
-                    style={{ minHeight: "42px", padding: "9px 12px", fontSize: "13px", width: "auto", whiteSpace: "nowrap" }}
-                  >
-                    Review / Apply
-                  </Link>
-                </span>
               </div>
             ))}
           </div>
