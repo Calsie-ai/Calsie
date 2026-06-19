@@ -11,7 +11,7 @@ type Campaign = {
   location: string | null;
   target_business_type: string | null;
   search: { target_role?: string; target_location?: string | null } | null;
-  outreach: { hourly_cap?: number; daily_cap?: number; campaign_days?: number; mode?: string } | null;
+  outreach: { hourly_cap?: number; daily_cap?: number; campaign_days?: number; mode?: string; agent_days?: number; last_agent_run_started_at?: string; last_agent_run_finished_at?: string } | null;
   status: string;
   created_at: string;
 };
@@ -22,6 +22,14 @@ function roleFor(campaign: Campaign) {
 
 function locationFor(campaign: Campaign) {
   return campaign.search?.target_location || campaign.location || "";
+}
+
+function statusLabel(status: string) {
+  if (status === "launched") return "Agent launched";
+  if (status === "active") return "Agent active";
+  if (status === "scheduled") return "Scheduled";
+  if (status === "paused") return "Paused";
+  return status || "Draft";
 }
 
 export default function DashboardPage() {
@@ -36,7 +44,7 @@ export default function DashboardPage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const latestCampaign = campaigns[0] || null;
-  const campaignRunning = latestCampaign?.status === "scheduled" || latestCampaign?.status === "active";
+  const campaignRunning = latestCampaign?.status === "scheduled" || latestCampaign?.status === "active" || latestCampaign?.status === "launched";
   const canStartCampaign = Boolean(latestCampaign && resumeReady && gmailReady && !campaignRunning && !busy);
 
   useEffect(() => {
@@ -152,10 +160,9 @@ export default function DashboardPage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error || "Could not start campaign.");
 
-      const count = data.job_fetch?.count;
-      const saved = data.job_fetch?.saved;
-      const countText = typeof count === "number" ? ` ${count} real jobs were fetched${saved === false ? ", but need saving setup checked" : " and saved"}.` : " Real job fetching has started.";
-      setMessage(`Campaign started.${countText} Opening the job tracker...`);
+      const agentSummary = data.agent_run?.active_agent_campaigns ?? data.agent_run?.checked_campaigns;
+      const summaryText = typeof agentSummary === "number" ? ` First agent run checked ${agentSummary} campaign${agentSummary === 1 ? "" : "s"}.` : " First agent run started.";
+      setMessage(`Campaign launched.${summaryText} Opening the tracker...`);
       router.push("/tracker");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not start campaign.");
@@ -214,7 +221,7 @@ export default function DashboardPage() {
         <p className="applix-setup-kicker">AI Job Automation</p>
         <h1>Welcome back</h1>
         <p className="applix-home-copy">
-          Find relevant jobs, write tailored emails, attach your resume, and track everything automatically.
+          Find relevant jobs, prepare tailored outreach, and track everything automatically.
         </p>
         {email && <p className="applix-setup-status" style={{ marginTop: 14 }}>Signed in as {email}</p>}
       </section>
@@ -246,7 +253,8 @@ export default function DashboardPage() {
             <>
               <strong>{latestCampaign.name}</strong>
               <p>{roleFor(latestCampaign)}{locationFor(latestCampaign) ? ` in ${locationFor(latestCampaign)}` : ""}</p>
-              <p>Status: {latestCampaign.status}</p>
+              <p>Status: {statusLabel(latestCampaign.status)}</p>
+              {latestCampaign.status === "launched" && <p>Agent runs in the background for {latestCampaign.outreach?.agent_days || 10} days.</p>}
               <div className="home-action-row" style={{ marginTop: 16 }}>
                 <Link className="ghost-link" href="/campaign/new">New campaign</Link>
                 <button className="ghost-button" type="button" onClick={() => deleteCampaign(latestCampaign)} disabled={busy} style={{ borderColor: "rgba(248,113,113,.55)", background: "rgba(127,29,29,.34)", color: "#fecaca" }}>
@@ -267,7 +275,7 @@ export default function DashboardPage() {
           {!gmailReady && <button className="applix-setup-outline" type="button" onClick={connectGmail} disabled={busy || !email}>{busy ? "Opening..." : "Connect Gmail"}</button>}
           {!latestCampaign && <Link className="applix-setup-outline" href="/campaign/new">Create Campaign</Link>}
           <button className="applix-setup-primary" type="button" onClick={startCampaign} disabled={!canStartCampaign}>
-            {campaignRunning ? "Campaign running" : canStartCampaign ? "Start Campaign" : "Complete setup first"}
+            {campaignRunning ? "Agent running" : canStartCampaign ? "Start Campaign" : "Complete setup first"}
           </button>
           <Link className="applix-setup-outline" href="/tracker">Open Job Tracker</Link>
         </div>
