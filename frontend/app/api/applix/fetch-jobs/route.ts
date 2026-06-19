@@ -10,6 +10,7 @@ type FetchJobsBody = {
   access_token?: string;
   role?: string;
   location?: string;
+  campaign_id?: string;
 };
 
 function cleanText(value: unknown, fallback = "") {
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
     const token = body.access_token;
     const role = cleanText(body.role, "support worker");
     const location = cleanText(body.location, "Sydney NSW");
+    const campaignId = cleanText(body.campaign_id);
 
     if (!token) {
       return NextResponse.json({ ok: false, error: "Missing session. Please sign in again." }, { status: 401 });
@@ -38,7 +40,7 @@ export async function POST(req: Request) {
         "Authorization": `Bearer ${token}`,
         "apikey": SUPABASE_ANON_KEY,
       },
-      body: JSON.stringify({ role, location }),
+      body: JSON.stringify({ role, location, ...(campaignId ? { campaign_id: campaignId } : {}) }),
       cache: "no-store",
     });
 
