@@ -17,6 +17,23 @@ function cleanText(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+function getDetailsSummary(value: unknown) {
+  if (!value) return "";
+  if (typeof value === "string") return value.slice(0, 220);
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => typeof item === "object" && item ? JSON.stringify(item) : String(item))
+      .join(" | ")
+      .slice(0, 220);
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const message = record.error || record.message || record.detail || record.details;
+    return message ? String(message).slice(0, 220) : JSON.stringify(value).slice(0, 220);
+  }
+  return String(value).slice(0, 220);
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as FetchJobsBody;
@@ -47,7 +64,9 @@ export async function POST(req: Request) {
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-      return NextResponse.json({ ok: false, error: data?.error || "Outscraper Edge Function could not fetch jobs.", details: data }, { status: response.status });
+      const details = getDetailsSummary(data?.attempts || data?.details || data);
+      const error = details ? `${data?.error || "Job fetch failed."} ${details}` : data?.error || "Outscraper Edge Function could not fetch jobs.";
+      return NextResponse.json({ ok: false, error, details: data }, { status: response.status });
     }
 
     return NextResponse.json(data);
