@@ -32,6 +32,7 @@ type JobsRow = {
   apply_url?: string | null;
   source?: string | null;
   created_at?: string | null;
+  campaign_id?: string | null;
 };
 
 function cleanText(value: unknown, fallback = "") {
@@ -83,6 +84,7 @@ export default function TrackerPage() {
   const [fetchingJobs, setFetchingJobs] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [jobsMode, setJobsMode] = useState("");
 
   async function loadSingleCampaign(supabase: ReturnType<typeof getSupabaseClient>, userId: string) {
     const { data, error } = await supabase
@@ -95,6 +97,43 @@ export default function TrackerPage() {
 
     if (error) throw new Error(`Campaign load failed: ${getErrorMessage(error, "Unknown campaign error")}`);
     return (data || null) as Campaign | null;
+  }
+
+  async function loadSavedJobs(supabase: ReturnType<typeof getSupabaseClient>, userId: string, campaignId?: string | null) {
+    const select = "id,title,company,location,description,apply_url,source,created_at,campaign_id";
+
+    if (campaignId) {
+      const campaignJobs = await supabase
+        .from("jobs")
+        .select(select)
+        .eq("user_id", userId)
+        .eq("campaign_id", campaignId)
+        .order("created_at", { ascending: false })
+        .limit(80);
+
+      if (campaignJobs.error) throw new Error(`Jobs load failed: ${getErrorMessage(campaignJobs.error, "Unknown jobs error")}`);
+      if ((campaignJobs.data || []).length > 0) {
+        setJobsMode("Showing saved jobs for this campaign.");
+        return (campaignJobs.data || []) as JobsRow[];
+      }
+    }
+
+    const allSavedJobs = await supabase
+      .from("jobs")
+      .select(select)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(80);
+
+    if (allSavedJobs.error) throw new Error(`Saved jobs load failed: ${getErrorMessage(allSavedJobs.error, "Unknown saved jobs error")}`);
+
+    if ((allSavedJobs.data || []).length > 0) {
+      setJobsMode(campaignId ? "Showing saved scraped jobs for this user. These were not linked to the current campaign." : "Showing saved scraped jobs for this user.");
+    } else {
+      setJobsMode("");
+    }
+
+    return (allSavedJobs.data || []) as JobsRow[];
   }
 
   async function getFreshAccessToken() {
@@ -119,6 +158,7 @@ export default function TrackerPage() {
   async function loadTracker() {
     setLoading(true);
     setErrorMessage("");
+    setJobsMode("");
 
     try {
       const supabase = getSupabaseClient();
@@ -142,21 +182,8 @@ export default function TrackerPage() {
       setRole(campaignRole);
       setLocation(campaignLocation);
 
-      if (!loadedCampaign?.id) {
-        setJobs([]);
-        return;
-      }
-
-      const { data: savedJobsData, error: savedJobsError } = await supabase
-        .from("jobs")
-        .select("id,title,company,location,description,apply_url,source,created_at")
-        .eq("user_id", userData.user.id)
-        .eq("campaign_id", loadedCampaign.id)
-        .order("created_at", { ascending: false })
-        .limit(80);
-
-      if (savedJobsError) throw new Error(`Jobs load failed: ${getErrorMessage(savedJobsError, "Unknown jobs error")}`);
-      setJobs((savedJobsData || []).map(mapSavedJob));
+      const savedJobsData = await loadSavedJobs(supabase, userData.user.id, loadedCampaign?.id || null);
+      setJobs(savedJobsData.map(mapSavedJob));
     } catch (error) {
       setErrorMessage(getErrorMessage(error, "Could not load tracker data."));
       setJobs([]);
@@ -194,7 +221,8 @@ export default function TrackerPage() {
         throw new Error(result?.error || "Could not fetch jobs.");
       }
 
-      setActionMessage(`Fetched ${result.count || 0} jobs. Saved ${result.inserted_count ?? 0}. Skipped ${result.duplicate_count ?? 0} duplicates.`);
+      const cachedLabel = result.cached ? "Loaded saved jobs" : "Fetched jobs";
+      setActionMessage(`${cachedLabel}: ${result.count || 0}. Saved ${result.inserted_count ?? 0}. Skipped ${result.duplicate_count ?? 0} duplicates.`);
       await loadTracker();
     } catch (error) {
       setActionMessage(getErrorMessage(error, "Could not fetch jobs."));
@@ -240,7 +268,7 @@ export default function TrackerPage() {
 
       <section style={{ position: "relative", zIndex: 1, width: "min(1180px, 100%)", padding: "38px 0 26px" }}>
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
-          <p className="applix-setup-kicker" style={{ marginBottom: "10px" }}>Single campaign pro flow</p>
+          <p className="applix-setup-kicker" style={{ marginBottom: "10px" }}>Saved jobs tracker</p>
           <h1 style={{ margin: 0, fontSize: "clamp(38px, 7vw, 76px)", lineHeight: .95, letterSpacing: "-2px" }}>Job tracker</h1>
           {email && <p className="applix-home-copy" style={{ marginTop: "12px" }}>Signed in as {email}</p>}
         </div>
@@ -253,15 +281,16 @@ export default function TrackerPage() {
               <p style={{ margin: "8px 0 0", color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>
                 {role} in {location}
               </p>
+              {jobsMode && <p style={{ margin: "10px 0 0", color: "#a7f3d0", fontWeight: 850 }}>{jobsMode}</p>}
             </>
           ) : (
-            <p style={{ margin: 0, color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>Create your campaign first. Pro users have one active campaign only.</p>
+            <p style={{ margin: 0, color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>No campaign found yet. Showing any saved scraped jobs for this user if available.</p>
           )}
           {actionMessage && <p style={{ marginTop: "12px", color: actionMessage.toLowerCase().includes("could not") || actionMessage.toLowerCase().includes("missing") || actionMessage.toLowerCase().includes("create") || actionMessage.toLowerCase().includes("failed") ? "#fca5a5" : "#a7f3d0", fontWeight: 850 }}>{actionMessage}</p>}
         </div>
 
         <button className="primary-button" type="button" onClick={fetchRealJobs} disabled={fetchingJobs || loading || !campaign?.id} style={{ minHeight: "52px", whiteSpace: "nowrap", marginBottom: "18px" }}>
-          {fetchingJobs ? "Fetching campaign jobs..." : "Fetch jobs for this campaign"}
+          {fetchingJobs ? "Loading saved jobs..." : "Load / fetch jobs for this campaign"}
         </button>
 
         {errorMessage && <p className="applix-setup-status">{errorMessage}</p>}
@@ -270,9 +299,9 @@ export default function TrackerPage() {
         {!loading && !errorMessage && jobs.length === 0 && (
           <div className="home-campaign-card" style={{ padding: "28px", textAlign: "center", background: "rgba(255,255,255,.075)", borderColor: "rgba(255,255,255,.14)" }}>
             <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "110px", height: "110px", objectFit: "contain", marginBottom: "8px" }} />
-            <h2 style={{ margin: "0 0 10px", fontSize: "clamp(28px, 5vw, 44px)" }}>Tracker is ready for campaign jobs</h2>
-            <p style={{ margin: "0 auto 20px", maxWidth: "560px", color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>
-              Fetch jobs for the saved campaign. Applix will continue the Supabase OutScraper pipeline and show only jobs saved for this campaign.
+            <h2 style={{ margin: "0 0 10px", fontSize: "clamp(28px, 5vw, 44px)" }}>No saved jobs yet</h2>
+            <p style={{ margin: "0 auto 20px", maxWidth: "620px", color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>
+              Once a scrape saves jobs into Supabase, this tracker will load those saved jobs again without scraping repeatedly.
             </p>
           </div>
         )}
