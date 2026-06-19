@@ -19,6 +19,7 @@ type RequestBody = {
   campaign_id?: string;
   trigger?: string;
   force_refresh?: boolean;
+  demo_jobs?: boolean;
 };
 
 type CampaignRow = {
@@ -94,6 +95,43 @@ function normalizeJobs(payload: unknown, fallbackLocation: string) {
   return uniqueJobs(jobs);
 }
 
+function demoJobs(role: string, location: string): NormalizedJob[] {
+  const safeRole = cleanText(role, "IT support");
+  const safeLocation = cleanText(location, "Sydney NSW");
+  return [
+    {
+      title: `Demo ${safeRole} Assistant`,
+      company: "Applix Demo Company",
+      location: safeLocation,
+      source: "Demo Cache",
+      apply_url: "https://example.com/applix-demo-job-1",
+      description: "Demo job used to test the Applix tracker table without spending OutScraper credit.",
+      posted_at: new Date().toISOString(),
+      status: "new",
+    },
+    {
+      title: `Demo Junior ${safeRole}`,
+      company: "Sample Technology Group",
+      location: safeLocation,
+      source: "Demo Cache",
+      apply_url: "https://example.com/applix-demo-job-2",
+      description: "Sample campaign job for validating review, matching, and apply buttons before running a paid scrape.",
+      posted_at: new Date().toISOString(),
+      status: "new",
+    },
+    {
+      title: "Demo Service Desk Officer",
+      company: "Sydney Support Services",
+      location: safeLocation,
+      source: "Demo Cache",
+      apply_url: "https://example.com/applix-demo-job-3",
+      description: "Test row saved to Supabase so the tracker can be checked without calling OutScraper.",
+      posted_at: new Date().toISOString(),
+      status: "new",
+    },
+  ];
+}
+
 async function loadCachedJobs(supabase: ReturnType<typeof createClient>, userId: string, campaignId: string | null) {
   let query = supabase
     .from("jobs")
@@ -162,6 +200,26 @@ serve(async (req) => {
 
     if (!body.force_refresh && cachedJobs.length > 0) {
       return new Response(JSON.stringify({ ok: true, count: cachedJobs.length, inserted_count: 0, duplicate_count: 0, saved: true, cached: true, scraped: false, campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: cachedJobs }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (body.demo_jobs) {
+      const existingKeys = await loadExistingJobKeys(supabase, userData.user.id, campaignId);
+      const rows = demoJobs(role, location)
+        .filter((job) => !existingKeys.has(jobKey(job)))
+        .map((job) => ({ ...job, user_id: userData.user.id, campaign_id: campaignId }));
+
+      if (rows.length === 0) {
+        return new Response(JSON.stringify({ ok: true, count: cachedJobs.length, inserted_count: 0, duplicate_count: cachedJobs.length, saved: true, cached: true, scraped: false, demo: true, campaign_id: campaignId, role, location, jobs: cachedJobs }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data, error } = await supabase.from("jobs").insert(rows).select();
+      if (error) throw new Error(error.message);
+
+      return new Response(JSON.stringify({ ok: true, count: rows.length, inserted_count: data?.length || rows.length, duplicate_count: 0, saved: true, cached: false, scraped: false, demo: true, campaign_id: campaignId, role, location, jobs: data || rows }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
