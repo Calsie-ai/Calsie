@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bnshgtrqbfuphhhdgccs.supabase.co";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const EDGE_FUNCTION_NAME = process.env.OUTSCRAPER_JOBS_FUNCTION || "outscraper-jobs";
+const AGENT_FUNCTION_NAME = process.env.APPLIX_AGENT_FUNCTION || "applix-agent-orchestrator";
 
 type ScheduleBody = {
   access_token?: string;
@@ -35,13 +35,15 @@ export async function POST(req: Request) {
 
     const outreach = {
       enabled,
-      mode: "applix_default",
+      mode: "applix_agent",
       starts_at: now,
+      launched_at: enabled ? now : null,
       timezone: "Australia/Sydney",
-      daily_job_target: 100,
-      send_strategy: "qualified_count_divided_by_24_hours",
-      daily_email_cap: "qualified_leads_only",
-      first_fetch_triggered_at: enabled ? now : null,
+      agent_days: 10,
+      daily_job_limit: 100,
+      hourly_limit: 4,
+      test_mode: true,
+      first_agent_triggered_at: enabled ? now : null,
       updated_at: now,
     };
 
@@ -54,7 +56,7 @@ export async function POST(req: Request) {
         "Prefer": "return=representation",
       },
       body: JSON.stringify({
-        status: enabled ? "scheduled" : "paused",
+        status: enabled ? "launched" : "paused",
         outreach,
       }),
     });
@@ -65,34 +67,42 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Could not start campaign.", details: data }, { status: response.status });
     }
 
-    let jobFetch = null;
+    let agentRun = null;
 
     if (enabled) {
-      const edgeResponse = await fetch(`${SUPABASE_URL}/functions/v1/${EDGE_FUNCTION_NAME}`, {
+      const edgeResponse = await fetch(`${SUPABASE_URL}/functions/v1/${AGENT_FUNCTION_NAME}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${accessToken}`,
           "apikey": SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ campaign_id: campaignId, trigger: "campaign_start" }),
+        body: JSON.stringify({
+          campaign_id: campaignId,
+          test_mode: true,
+          agent_days: 10,
+          daily_job_limit: 100,
+          hourly_email_limit: 4,
+          max_campaigns: 1,
+          trigger: "start_campaign_ui",
+        }),
         cache: "no-store",
       });
 
-      jobFetch = await edgeResponse.json().catch(() => null);
+      agentRun = await edgeResponse.json().catch(() => null);
 
-      if (!edgeResponse.ok || jobFetch?.ok === false) {
+      if (!edgeResponse.ok || agentRun?.ok === false) {
         return NextResponse.json({
           ok: false,
-          error: jobFetch?.error || "Campaign was scheduled, but the first Outscraper job fetch failed.",
+          error: agentRun?.error || "Campaign was launched, but the first agent run failed.",
           campaign: Array.isArray(data) ? data[0] : data,
           outreach,
-          job_fetch: jobFetch,
+          agent_run: agentRun,
         }, { status: 502 });
       }
     }
 
-    return NextResponse.json({ ok: true, outreach, campaign: Array.isArray(data) ? data[0] : data, job_fetch: jobFetch });
+    return NextResponse.json({ ok: true, outreach, campaign: Array.isArray(data) ? data[0] : data, agent_run: agentRun });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Could not start campaign." }, { status: 500 });
   }
