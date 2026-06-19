@@ -56,11 +56,6 @@ function getCampaignLocation(campaign?: Campaign | null) {
   return cleanText(campaign?.search?.target_location) || cleanText(campaign?.location, "Sydney NSW");
 }
 
-function trimDescription(value: string) {
-  if (!value) return "No description saved yet.";
-  return value.length > 180 ? `${value.slice(0, 180).trim()}...` : value;
-}
-
 function mapSavedJob(row: JobsRow): TrackerJob {
   return {
     id: row.id,
@@ -132,7 +127,7 @@ export default function TrackerPage() {
 
       if (campaignJobs.error) throw new Error(`Jobs load failed: ${getErrorMessage(campaignJobs.error, "Unknown jobs error")}`);
       if ((campaignJobs.data || []).length > 0) {
-        setJobsMode("Showing saved jobs for this campaign.");
+        setJobsMode("Saved campaign jobs are ready to download.");
         return (campaignJobs.data || []) as JobsRow[];
       }
     }
@@ -147,7 +142,7 @@ export default function TrackerPage() {
     if (allSavedJobs.error) throw new Error(`Saved jobs load failed: ${getErrorMessage(allSavedJobs.error, "Unknown saved jobs error")}`);
 
     if ((allSavedJobs.data || []).length > 0) {
-      setJobsMode(campaignId ? "Showing saved scraped jobs for this user. These were not linked to the current campaign." : "Showing saved scraped jobs for this user.");
+      setJobsMode(campaignId ? "Saved jobs are ready to download. Some may not be linked to this campaign." : "Saved jobs are ready to download.");
     } else {
       setJobsMode("");
     }
@@ -262,7 +257,7 @@ export default function TrackerPage() {
               {jobsMode && <p style={{ margin: "10px 0 0", color: "#a7f3d0", fontWeight: 850 }}>{jobsMode}</p>}
             </>
           ) : (
-            <p style={{ margin: 0, color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>No campaign found yet. Showing any saved scraped jobs for this user if available.</p>
+            <p style={{ margin: 0, color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>No campaign found yet. Saved jobs will be available as a downloadable file when they exist.</p>
           )}
           {actionMessage && <p style={{ marginTop: "12px", color: actionMessage.toLowerCase().includes("could not") || actionMessage.toLowerCase().includes("missing") || actionMessage.toLowerCase().includes("create") || actionMessage.toLowerCase().includes("failed") ? "#fca5a5" : "#a7f3d0", fontWeight: 850 }}>{actionMessage}</p>}
         </div>
@@ -284,28 +279,17 @@ export default function TrackerPage() {
             <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "110px", height: "110px", objectFit: "contain", marginBottom: "8px" }} />
             <h2 style={{ margin: "0 0 10px", fontSize: "clamp(28px, 5vw, 44px)" }}>No saved jobs yet</h2>
             <p style={{ margin: "0 auto 20px", maxWidth: "620px", color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>
-              Once a scrape saves jobs into Supabase, this tracker will load those saved jobs again and let the user download them.
+              Once a scrape saves jobs into Supabase, users will download the saved jobs file from here.
             </p>
           </div>
         )}
 
         {!loading && !errorMessage && jobs.length > 0 && (
-          <div className="home-campaign-card" style={{ padding: "0", overflow: "hidden", textAlign: "left", background: "rgba(255,255,255,.075)", borderColor: "rgba(255,255,255,.14)", boxShadow: "0 28px 80px rgba(0,0,0,.26)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.15fr .85fr .8fr 1.55fr", gap: "0", padding: "14px 18px", borderBottom: "1px solid rgba(255,255,255,.14)", color: "rgba(255,255,255,.62)", fontSize: "12px", fontWeight: 900, letterSpacing: ".12em", textTransform: "uppercase" }}>
-              <span>Job title</span>
-              <span>Company</span>
-              <span>Location</span>
-              <span>Description</span>
-            </div>
-
-            {jobs.map((job) => (
-              <div key={job.id} style={{ display: "grid", gridTemplateColumns: "1.15fr .85fr .8fr 1.55fr", gap: "0", padding: "16px 18px", borderBottom: "1px solid rgba(255,255,255,.1)", alignItems: "center" }}>
-                <strong style={{ color: "white" }}>{job.title}</strong>
-                <span style={{ color: "rgba(255,255,255,.72)", overflow: "hidden", textOverflow: "ellipsis" }}>{job.company}</span>
-                <span style={{ color: "rgba(255,255,255,.72)" }}>{job.location}</span>
-                <span style={{ color: "rgba(255,255,255,.64)", lineHeight: 1.35 }}>{trimDescription(job.description)}</span>
-              </div>
-            ))}
+          <div className="home-campaign-card" style={{ padding: "34px", textAlign: "center", background: "rgba(255,255,255,.075)", borderColor: "rgba(255,255,255,.14)", boxShadow: "0 28px 80px rgba(0,0,0,.26)" }}>
+            <h2 style={{ margin: "0 0 10px", fontSize: "clamp(28px, 5vw, 44px)" }}>{jobs.length} saved jobs ready</h2>
+            <p style={{ margin: "0 auto", maxWidth: "640px", color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>
+              Job details are not displayed on this page. Download the Excel-compatible file to import or track the saved jobs.
+            </p>
           </div>
         )}
       </section>
