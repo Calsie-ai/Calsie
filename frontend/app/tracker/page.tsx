@@ -23,19 +23,6 @@ type TrackerJob = {
   applyUrl?: string | null;
 };
 
-type GatewayJobRow = {
-  id: string;
-  external_job_id?: string | null;
-  title?: string | null;
-  company?: string | null;
-  location?: string | null;
-  description?: string | null;
-  apply_url?: string | null;
-  source_url?: string | null;
-  refreshed_at?: string | null;
-  posted_at?: string | null;
-};
-
 type JobsRow = {
   id: string;
   title?: string | null;
@@ -62,17 +49,6 @@ function getCampaignLocation(campaign?: Campaign | null) {
 function trimDescription(value: string) {
   if (!value) return "No description saved yet.";
   return value.length > 180 ? `${value.slice(0, 180).trim()}...` : value;
-}
-
-function mapGatewayJob(row: GatewayJobRow): TrackerJob {
-  return {
-    id: row.id || row.external_job_id || crypto.randomUUID(),
-    title: cleanText(row.title, "Untitled job"),
-    company: cleanText(row.company, "Company not found"),
-    location: cleanText(row.location, "Location not listed"),
-    description: cleanText(row.description, "No description saved yet."),
-    applyUrl: cleanText(row.apply_url) || cleanText(row.source_url) || null,
-  };
 }
 
 function mapSavedJob(row: JobsRow): TrackerJob {
@@ -138,37 +114,21 @@ export default function TrackerPage() {
       setRole(campaignRole);
       setLocation(campaignLocation);
 
-      let gatewayQuery = supabase
-        .from("jobs_gateway")
-        .select("id,external_job_id,title,company,location,description,apply_url,source_url,refreshed_at,posted_at")
-        .eq("user_id", userData.user.id)
-        .order("refreshed_at", { ascending: false })
-        .limit(80);
-
-      const { data: gatewayData, error: gatewayError } = await gatewayQuery;
-
-      if (!gatewayError && gatewayData && gatewayData.length > 0) {
-        setJobs((gatewayData as GatewayJobRow[]).map(mapGatewayJob));
+      if (!loadedCampaign?.id) {
+        setJobs([]);
         return;
       }
 
-      let savedJobsQuery = supabase
+      const { data: savedJobsData, error: savedJobsError } = await supabase
         .from("jobs")
         .select("id,title,company,location,description,apply_url,source,created_at")
         .eq("user_id", userData.user.id)
+        .eq("campaign_id", loadedCampaign.id)
         .order("created_at", { ascending: false })
         .limit(80);
 
-      if (loadedCampaign?.id) savedJobsQuery = savedJobsQuery.eq("campaign_id", loadedCampaign.id);
-
-      const { data: savedJobsData, error: savedJobsError } = await savedJobsQuery;
-
-      if (!savedJobsError && savedJobsData) {
-        setJobs((savedJobsData as JobsRow[]).map(mapSavedJob));
-        return;
-      }
-
-      setJobs([]);
+      if (savedJobsError) throw savedJobsError;
+      setJobs((savedJobsData || []).map(mapSavedJob));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not load tracker data.");
       setJobs([]);
@@ -209,7 +169,7 @@ export default function TrackerPage() {
         throw new Error(result?.error || "Could not fetch jobs.");
       }
 
-      setActionMessage(`Fetched ${result.count || 0} jobs${result.saved === false ? ", but they were not saved" : " and saved them"}.`);
+      setActionMessage(`Fetched ${result.count || 0} jobs. Saved ${result.inserted_count ?? 0}. Skipped ${result.duplicate_count ?? 0} duplicates.`);
       await loadTracker();
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Could not fetch jobs.");
@@ -287,7 +247,7 @@ export default function TrackerPage() {
             <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "110px", height: "110px", objectFit: "contain", marginBottom: "8px" }} />
             <h2 style={{ margin: "0 0 10px", fontSize: "clamp(28px, 5vw, 44px)" }}>Tracker is ready for campaign jobs</h2>
             <p style={{ margin: "0 auto 20px", maxWidth: "560px", color: "rgba(255,255,255,.72)", lineHeight: 1.5 }}>
-              Fetch jobs for the saved campaign. Applix will continue the Supabase OutScraper pipeline and show matching jobs here.
+              Fetch jobs for the saved campaign. Applix will continue the Supabase OutScraper pipeline and show only jobs saved for this campaign.
             </p>
           </div>
         )}
