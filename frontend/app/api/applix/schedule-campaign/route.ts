@@ -12,6 +12,19 @@ type ScheduleBody = {
   enabled?: boolean;
 };
 
+async function getCurrentUser(accessToken: string) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) return null;
+  return response.json().catch(() => null) as Promise<{ id?: string; email?: string } | null>;
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as ScheduleBody;
@@ -30,6 +43,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Missing NEXT_PUBLIC_SUPABASE_ANON_KEY." }, { status: 500 });
     }
 
+    const currentUser = await getCurrentUser(accessToken);
+    const senderUserIdentifier = currentUser?.email || currentUser?.id || null;
     const enabled = body.enabled !== false;
     const now = new Date().toISOString();
 
@@ -43,6 +58,7 @@ export async function POST(req: Request) {
       daily_job_limit: 100,
       hourly_limit: 4,
       test_mode: true,
+      sender_user_identifier: senderUserIdentifier,
       first_agent_triggered_at: enabled ? now : null,
       updated_at: now,
     };
@@ -83,6 +99,7 @@ export async function POST(req: Request) {
           agent_days: 10,
           daily_job_limit: 100,
           hourly_email_limit: 4,
+          sender_user_identifier: senderUserIdentifier,
           max_campaigns: 1,
           trigger: "start_campaign_ui",
         }),
