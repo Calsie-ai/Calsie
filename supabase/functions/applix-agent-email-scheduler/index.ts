@@ -151,6 +151,14 @@ Deno.serve(async (req) => {
     for (const campaign of activeCampaigns) {
       if (sentCount >= hourlyLimit) break;
 
+      const outreach = campaign.outreach || {};
+      const senderUserIdentifier = txt(input.sender_user_identifier || outreach.sender_user_identifier || outreach.gmail_user_identifier || campaign.user_id);
+      if (!senderUserIdentifier) {
+        results.push({ campaign_id: campaign.id, ok: false, error: "Missing sender_user_identifier." });
+        failedCount += 1;
+        continue;
+      }
+
       const remaining = hourlyLimit - sentCount;
       const queueResult = await supabase
         .from("outreach_queue")
@@ -189,6 +197,7 @@ Deno.serve(async (req) => {
               ...(row.ai_notes || {}),
               test_mode: true,
               forced_test_recipient_email: testRecipient,
+              sender_user_identifier: senderUserIdentifier,
               gmail_send_function_name: GMAIL_SEND_FUNCTION_NAME,
               agent_scheduler: "applix-agent-email-scheduler",
               send_window_days: agentDays,
@@ -207,8 +216,8 @@ Deno.serve(async (req) => {
         const gmailResult = await callGmailSendTest({
           queue_id: row.id,
           campaign_id: campaign.id,
-          user_identifier: campaign.user_id,
-          user_id: campaign.user_id,
+          user_identifier: senderUserIdentifier,
+          sender_user_identifier: senderUserIdentifier,
           to: testRecipient,
           recipient_email: testRecipient,
           subject,
@@ -232,6 +241,7 @@ Deno.serve(async (req) => {
                 ...(row.ai_notes || {}),
                 test_mode: true,
                 forced_test_recipient_email: testRecipient,
+                sender_user_identifier: senderUserIdentifier,
                 gmail_send_function_name: GMAIL_SEND_FUNCTION_NAME,
                 gmail_result: gmailResult.data,
                 agent_scheduler: "applix-agent-email-scheduler",
@@ -251,6 +261,7 @@ Deno.serve(async (req) => {
                 ...(row.ai_notes || {}),
                 test_mode: true,
                 forced_test_recipient_email: testRecipient,
+                sender_user_identifier: senderUserIdentifier,
                 gmail_send_function_name: GMAIL_SEND_FUNCTION_NAME,
                 gmail_error: gmailResult.data,
                 gmail_status: gmailResult.status,
@@ -265,6 +276,7 @@ Deno.serve(async (req) => {
           queue_id: row.id,
           ok: gmailResult.ok,
           recipient: testRecipient,
+          sender_user_identifier: senderUserIdentifier,
           subject,
           gmail_function: GMAIL_SEND_FUNCTION_NAME,
           gmail_status: gmailResult.status,
@@ -272,12 +284,12 @@ Deno.serve(async (req) => {
         });
       }
 
-      const outreach = campaign.outreach || {};
       await supabase
         .from("campaigns")
         .update({
           outreach: {
             ...outreach,
+            sender_user_identifier: senderUserIdentifier,
             agent_days: agentDays,
             agent_email_hourly_limit: hourlyLimit,
             agent_email_daily_limit: dailyLimit,
@@ -288,6 +300,7 @@ Deno.serve(async (req) => {
               skipped_count: skippedCount,
               gmail_send_function_name: GMAIL_SEND_FUNCTION_NAME,
               test_recipient_email: testRecipient,
+              sender_user_identifier: senderUserIdentifier,
             },
           },
         })
