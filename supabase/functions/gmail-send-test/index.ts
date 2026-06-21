@@ -2,6 +2,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 type Row = Record<string, any>;
 
+type ResumeAttachment = {
+  fileName: string;
+  contentType: string;
+  base64: string;
+};
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") ?? "";
@@ -21,23 +27,83 @@ function txt(value: unknown, fallback = "") {
   return text || fallback;
 }
 
-function base64Url(input: string) {
-  const bytes = new TextEncoder().encode(input);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function makeRawEmail(from: string, to: string, subject: string, body: string) {
-  const safeSubject = subject.replace(/[\r\n]+/g, " ").trim() || "Applix test email";
+function safeHeader(value: string, fallback: string) {
+  return txt(value, fallback).replace(/[\r\n]+/g, " ").trim() || fallback;
+}
+
+function safeFileName(value: string, fallback = "resume.pdf") {
+  const cleaned = txt(value, fallback).replace(/[\r\n\\/]+/g, " ").trim();
+  return cleaned || fallback;
+}
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+function base64Url(input: string) {
+  const bytes = new TextEncoder().encode(input);
+  return bytesToBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function wrapBase64(value: string) {
+  return value.replace(/.{1,76}/g, "$&\r\n").trim();
+}
+
+function makeRawEmail(from: string, to: string, subject: string, body: string, attachment?: ResumeAttachment | null) {
+  const safeSubject = safeHeader(subject, "Applix test email");
+  const safeFrom = safeHeader(from, TEST_RECIPIENT_EMAIL);
+  const safeTo = safeHeader(to, TEST_RECIPIENT_EMAIL);
+
+  if (!attachment) {
+    const message = [
+      `From: ${safeFrom}`,
+      `To: ${safeTo}`,
+      `Subject: ${safeSubject}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/plain; charset=UTF-8",
+      "",
+      body,
+    ].join("\r\n");
+
+    return base64Url(message);
+  }
+
+  const boundary = `applix_${crypto.randomUUID()}`;
+  const fileName = safeFileName(attachment.fileName);
+  const contentType = safeHeader(attachment.contentType, "application/octet-stream");
+
   const message = [
-    `From: ${from}`,
-    `To: ${to}`,
+    `From: ${safeFrom}`,
+    `To: ${safeTo}`,
     `Subject: ${safeSubject}`,
     "MIME-Version: 1.0",
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
     "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: 7bit",
     "",
     body,
+    "",
+    `--${boundary}`,
+    `Content-Type: ${contentType}; name="${fileName}"`,
+    "Content-Transfer-Encoding: base64",
+    `Content-Disposition: attachment; filename="${fileName}"`,
+    "",
+    wrapBase64(attachment.base64),
+    "",
+    `--${boundary}--`,
+    "",
   ].join("\r\n");
 
   return base64Url(message);
@@ -59,6 +125,54 @@ async function refreshAccessToken(refreshToken: string) {
   return { ok: response.ok, status: response.status, data };
 }
 
+async function findResumeProfile(supabase: ReturnType<typeof createClient>, userIdentifier: string) {
+  if (isUuid(userIdentifier)) {
+    const byProfileId = await supabase
+      .from("resume_profiles")
+      .select("profile_id,email,resume_file_path,resume_file_name,resume_file_type,updated_at")
+      .eq("profile_id", userIdentifier)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (byProfileId.data?.resume_file_path || byProfileId.error) return byProfileId;
+  }
+
+  return await supabase
+    .from("resume_profiles")
+    .select("profile_id,email,resume_file_path,resume_file_name,resume_file_type,updated_at")
+    .eq("email", userIdentifier)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+}
+
+async function getResumeAttachment(supabase: ReturnType<typeof createClient>, userIdentifier: string): Promise<{ attachment: ResumeAttachment | null; error: string | null }> {
+  const profileResult = await findResumeProfile(supabase, userIdentifier);
+  if (profileResult.error) return { attachment: null, error: profileResult.error.message };
+
+  const profile = profileResult.data as Row | null;
+  const filePath = txt(profile?.resume_file_path);
+  if (!filePath) return { attachment: null, error: "No saved resume file path found for this sender." };
+
+  const downloadResult = await supabase.storage.from("resumes").download(filePath);
+  if (downloadResult.error) return { attachment: null, error: downloadResult.error.message };
+
+  const blob = downloadResult.data;
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const fileName = safeFileName(txt(profile?.resume_file_name) || filePath.split("/").pop() || "resume.pdf");
+  const contentType = txt(profile?.resume_file_type) || blob.type || "application/octet-stream";
+
+  return {
+    attachment: {
+      fileName,
+      contentType,
+      base64: bytesToBase64(bytes),
+    },
+    error: null,
+  };
+}
+
 Deno.serve(async (req) => {
   try {
     if (req.method !== "POST") return json({ ok: false, error: "Use POST" }, 405);
@@ -71,7 +185,10 @@ Deno.serve(async (req) => {
     const userIdentifier = txt(input.user_identifier || input.user_id || input.sender_user_identifier);
     const to = txt(input.to || input.recipient_email, TEST_RECIPIENT_EMAIL).toLowerCase();
     const subject = txt(input.subject || input.email_subject, "Applix test email");
-    const body = txt(input.body || input.text || input.email_body, "This is a test email from Applix.");
+    const body = txt(
+      input.body || input.text || input.email_body,
+      "Hi,\n\nI hope you are well. I am reaching out through Applix with interest in this opportunity. I have attached my resume for your review and would appreciate the chance to be considered.\n\nKind regards,\nApplix Candidate"
+    );
 
     if (!userIdentifier) return json({ ok: false, error: "user_identifier is required" }, 400);
     if (to !== TEST_RECIPIENT_EMAIL) {
@@ -89,7 +206,7 @@ Deno.serve(async (req) => {
 
     if (authResult.error) return json({ ok: false, error: authResult.error.message }, 500);
     const auth = authResult.data as Row | null;
-    if (!auth) return json({ ok: false, error: "No connected Gmail authorization found for this user_identifier" }, 404);
+    if (!auth) return json({ ok: false, error: "No connected Gmail authorization found for this user_identifier", user_identifier: userIdentifier }, 404);
 
     let accessToken = txt(auth.access_token_encrypted);
     const refreshToken = txt(auth.refresh_token_encrypted);
@@ -124,8 +241,9 @@ Deno.serve(async (req) => {
 
     if (!accessToken) return json({ ok: false, error: "Missing Gmail access token. Reconnect Gmail." }, 401);
 
+    const resumeResult = await getResumeAttachment(supabase, userIdentifier);
     const fromEmail = txt(auth.provider_email, TEST_RECIPIENT_EMAIL);
-    const raw = makeRawEmail(fromEmail, TEST_RECIPIENT_EMAIL, subject, body);
+    const raw = makeRawEmail(fromEmail, TEST_RECIPIENT_EMAIL, subject, body, resumeResult.attachment);
 
     const sendResponse = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
       method: "POST",
@@ -138,7 +256,7 @@ Deno.serve(async (req) => {
 
     const sendData = await sendResponse.json().catch(() => ({}));
     if (!sendResponse.ok) {
-      return json({ ok: false, error: "Gmail send failed", status: sendResponse.status, details: sendData }, sendResponse.status);
+      return json({ ok: false, error: "Gmail send failed", status: sendResponse.status, details: sendData, resume_error: resumeResult.error }, sendResponse.status);
     }
 
     return json({
@@ -148,6 +266,9 @@ Deno.serve(async (req) => {
       from: fromEmail,
       to: TEST_RECIPIENT_EMAIL,
       subject,
+      attachment_added: Boolean(resumeResult.attachment),
+      attachment_name: resumeResult.attachment?.fileName || null,
+      attachment_error: resumeResult.error,
       gmail_message_id: sendData.id || null,
       gmail_thread_id: sendData.threadId || null,
     });
