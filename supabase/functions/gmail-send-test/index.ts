@@ -125,12 +125,12 @@ async function refreshAccessToken(refreshToken: string) {
   return { ok: response.ok, status: response.status, data };
 }
 
-async function findResumeProfile(supabase: ReturnType<typeof createClient>, userIdentifier: string) {
-  if (isUuid(userIdentifier)) {
+async function findResumeProfile(supabase: ReturnType<typeof createClient>, resumeProfileId: string, senderIdentifier: string) {
+  if (isUuid(resumeProfileId)) {
     const byProfileId = await supabase
       .from("resume_profiles")
       .select("profile_id,email,resume_file_path,resume_file_name,resume_file_type,updated_at")
-      .eq("profile_id", userIdentifier)
+      .eq("profile_id", resumeProfileId)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -138,25 +138,50 @@ async function findResumeProfile(supabase: ReturnType<typeof createClient>, user
     if (byProfileId.data?.resume_file_path || byProfileId.error) return byProfileId;
   }
 
+  if (isUuid(senderIdentifier)) {
+    const bySenderUuid = await supabase
+      .from("resume_profiles")
+      .select("profile_id,email,resume_file_path,resume_file_name,resume_file_type,updated_at")
+      .eq("profile_id", senderIdentifier)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (bySenderUuid.data?.resume_file_path || bySenderUuid.error) return bySenderUuid;
+  }
+
+  const byEmail = await supabase
+    .from("resume_profiles")
+    .select("profile_id,email,resume_file_path,resume_file_name,resume_file_type,updated_at")
+    .eq("email", senderIdentifier)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (byEmail.data?.resume_file_path || byEmail.error) return byEmail;
+
   return await supabase
     .from("resume_profiles")
     .select("profile_id,email,resume_file_path,resume_file_name,resume_file_type,updated_at")
-    .eq("email", userIdentifier)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 }
 
-async function getResumeAttachment(supabase: ReturnType<typeof createClient>, userIdentifier: string): Promise<{ attachment: ResumeAttachment | null; error: string | null }> {
-  const profileResult = await findResumeProfile(supabase, userIdentifier);
-  if (profileResult.error) return { attachment: null, error: profileResult.error.message };
+async function getResumeAttachment(
+  supabase: ReturnType<typeof createClient>,
+  resumeProfileId: string,
+  senderIdentifier: string,
+): Promise<{ attachment: ResumeAttachment | null; error: string | null; profile_id: string | null; file_path: string | null }> {
+  const profileResult = await findResumeProfile(supabase, resumeProfileId, senderIdentifier);
+  if (profileResult.error) return { attachment: null, error: profileResult.error.message, profile_id: null, file_path: null };
 
   const profile = profileResult.data as Row | null;
   const filePath = txt(profile?.resume_file_path);
-  if (!filePath) return { attachment: null, error: "No saved resume file path found for this sender." };
+  if (!filePath) return { attachment: null, error: "No saved resume file path found.", profile_id: txt(profile?.profile_id) || null, file_path: null };
 
   const downloadResult = await supabase.storage.from("resumes").download(filePath);
-  if (downloadResult.error) return { attachment: null, error: downloadResult.error.message };
+  if (downloadResult.error) return { attachment: null, error: downloadResult.error.message, profile_id: txt(profile?.profile_id) || null, file_path: filePath };
 
   const blob = downloadResult.data;
   const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -170,6 +195,8 @@ async function getResumeAttachment(supabase: ReturnType<typeof createClient>, us
       base64: bytesToBase64(bytes),
     },
     error: null,
+    profile_id: txt(profile?.profile_id) || null,
+    file_path: filePath,
   };
 }
 
@@ -182,7 +209,8 @@ Deno.serve(async (req) => {
     }
 
     const input = await req.json().catch(() => ({}));
-    const userIdentifier = txt(input.user_identifier || input.user_id || input.sender_user_identifier);
+    const senderIdentifier = txt(input.user_identifier || input.sender_user_identifier || input.sender_email);
+    const resumeProfileId = txt(input.resume_profile_id || input.profile_id || input.user_id || input.candidate_user_id);
     const to = txt(input.to || input.recipient_email, TEST_RECIPIENT_EMAIL).toLowerCase();
     const subject = txt(input.subject || input.email_subject, "Applix test email");
     const body = txt(
@@ -190,7 +218,7 @@ Deno.serve(async (req) => {
       "Hi,\n\nI hope you are well. I am reaching out through Applix with interest in this opportunity. I have attached my resume for your review and would appreciate the chance to be considered.\n\nKind regards,\nApplix Candidate"
     );
 
-    if (!userIdentifier) return json({ ok: false, error: "user_identifier is required" }, 400);
+    if (!senderIdentifier) return json({ ok: false, error: "user_identifier is required" }, 400);
     if (to !== TEST_RECIPIENT_EMAIL) {
       return json({ ok: false, error: "Test sender is locked to hostsajan@gmail.com only", requested_to: to }, 403);
     }
@@ -199,14 +227,14 @@ Deno.serve(async (req) => {
     const authResult = await supabase
       .from("user_email_authorizations")
       .select("user_identifier,provider,provider_email,access_token_encrypted,refresh_token_encrypted,expires_at,status")
-      .eq("user_identifier", userIdentifier)
+      .eq("user_identifier", senderIdentifier)
       .eq("provider", "google")
       .eq("status", "connected")
       .maybeSingle();
 
     if (authResult.error) return json({ ok: false, error: authResult.error.message }, 500);
     const auth = authResult.data as Row | null;
-    if (!auth) return json({ ok: false, error: "No connected Gmail authorization found for this user_identifier", user_identifier: userIdentifier }, 404);
+    if (!auth) return json({ ok: false, error: "No connected Gmail authorization found for this user_identifier", user_identifier: senderIdentifier }, 404);
 
     let accessToken = txt(auth.access_token_encrypted);
     const refreshToken = txt(auth.refresh_token_encrypted);
@@ -220,7 +248,7 @@ Deno.serve(async (req) => {
         await supabase
           .from("user_email_authorizations")
           .update({ status: "error", last_error: JSON.stringify(refreshed.data).slice(0, 500) })
-          .eq("user_identifier", userIdentifier)
+          .eq("user_identifier", senderIdentifier)
           .eq("provider", "google");
         return json({ ok: false, error: "Could not refresh Gmail access token", details: refreshed.data }, 401);
       }
@@ -235,13 +263,13 @@ Deno.serve(async (req) => {
           status: "connected",
           last_error: null,
         })
-        .eq("user_identifier", userIdentifier)
+        .eq("user_identifier", senderIdentifier)
         .eq("provider", "google");
     }
 
     if (!accessToken) return json({ ok: false, error: "Missing Gmail access token. Reconnect Gmail." }, 401);
 
-    const resumeResult = await getResumeAttachment(supabase, userIdentifier);
+    const resumeResult = await getResumeAttachment(supabase, resumeProfileId, senderIdentifier);
     const fromEmail = txt(auth.provider_email, TEST_RECIPIENT_EMAIL);
     const raw = makeRawEmail(fromEmail, TEST_RECIPIENT_EMAIL, subject, body, resumeResult.attachment);
 
@@ -269,6 +297,8 @@ Deno.serve(async (req) => {
       attachment_added: Boolean(resumeResult.attachment),
       attachment_name: resumeResult.attachment?.fileName || null,
       attachment_error: resumeResult.error,
+      resume_profile_id: resumeResult.profile_id,
+      resume_file_path: resumeResult.file_path,
       gmail_message_id: sendData.id || null,
       gmail_thread_id: sendData.threadId || null,
     });
