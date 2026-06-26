@@ -71,7 +71,7 @@ export default function HomePage() {
 
   return (
     <main className="applix-setup-shell">
-      <button className="applix-setup-back" type="button" aria-label="Back">←</button>
+      <button className="applix-setup-back" type="button" aria-label="Back">Back</button>
       <div className="applix-setup-info" aria-hidden="true">i</div>
 
       <section className="applix-setup-center">
@@ -104,10 +104,10 @@ export default function HomePage() {
           </h2>
         </div>
 
-        <p className="applix-setup-kicker">AI job automation</p>
-        <h1>{signedInEmail ? "You're all set up!" : "Welcome to Applix"}</h1>
+        <p className="applix-setup-kicker">Persistence at Scale</p>
+        <h1>{signedInEmail ? "You are all set up!" : "Welcome to Applix"}</h1>
         <p className="applix-setup-copy">
-          Find relevant jobs, write tailored emails, attach your resume, and track everything automatically.
+          Signup, Setup, Start, and Sleep; While Applix does it.
         </p>
       </section>
 
