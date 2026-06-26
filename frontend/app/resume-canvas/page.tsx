@@ -293,6 +293,10 @@ export default function ResumeCanvasPage() {
           {resumeReady ? "Resume is connected" : "Upload your resume"}
         </h1>
 
+        <div style={{ width: "min(680px, 100%)", marginTop: "18px", padding: "18px 22px", border: "1px solid rgba(255,255,255,.22)", borderRadius: "24px", background: "rgba(255,255,255,.1)", color: "rgba(255,255,255,.86)", lineHeight: 1.45, fontWeight: 800, textAlign: "center", backdropFilter: "blur(18px)" }}>
+          Your resume will be attached to the mail. Please use the current and best resume.<br />Only DOC or DOCX files are accepted.
+        </div>
+
         <p className="applix-home-copy" style={{ marginTop: "16px" }}>{loading ? "Checking resume..." : status}</p>
 
         <form onSubmit={save} style={{ width: "min(680px, 100%)", display: "grid", gap: "14px", marginTop: "32px" }}>
@@ -306,10 +310,10 @@ export default function ResumeCanvasPage() {
             }}
           >
             <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "54px", height: "54px", objectFit: "contain" }} />
-            {parsing ? "Processing..." : resumeReady ? "Upload new resume" : "Upload resume"}
+            {parsing ? "Processing..." : resumeReady ? "Upload / Change Resume" : "Upload Resume"}
             <input
               type="file"
-              accept=".pdf,.doc,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={uploadResume}
               style={{ display: "none" }}
               disabled={parsing || loading}
