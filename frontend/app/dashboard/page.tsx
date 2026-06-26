@@ -244,15 +244,15 @@ export default function DashboardPage() {
         {message && <p className="applix-setup-status success">{message}</p>}
         {errorMessage && <p className="error-text" style={{ textAlign: "center" }}>{errorMessage}</p>}
 
-        <div className="home-campaign-card" style={{ textAlign: "left", padding: "22px" }}>
-          <strong style={{ fontSize: 22 }}>I am Applix.</strong>
-          <p style={{ marginTop: 8 }}>
+        <div className="home-campaign-card" style={{ textAlign: "center", padding: "26px 28px", display: "grid", justifyItems: "center", gap: "12px" }}>
+          <strong style={{ fontSize: 22, display: "block", textAlign: "center" }}>I am Applix.</strong>
+          <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>
             I am here to help you get the opportunity. Set me up once and I will automate your task.
           </p>
-          <p style={{ marginTop: 10 }}>
+          <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>
             My skill is simple: give me your resume and tell me what opportunities you want. I will knock every door for you.
           </p>
-          <p style={{ marginTop: 10 }}>
+          <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>
             I will knock 100 doors a day for 10 days.
           </p>
         </div>
