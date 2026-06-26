@@ -205,38 +205,16 @@ export default function DashboardPage() {
 
   return (
     <main className="applix-home-shell" style={{ overflowY: "auto" }}>
-      <button className="applix-setup-back" type="button" onClick={() => router.back()} aria-label="Go back">
-        ←
-      </button>
+      <button className="applix-setup-back" type="button" onClick={() => router.back()} aria-label="Go back">←</button>
       <button className="home-signout" type="button" onClick={signOut} style={{ right: "clamp(96px, 11vw, 140px)" }}>Sign out</button>
       <div className="applix-setup-info" title={email || "Applix dashboard"}>i</div>
 
       <section className="applix-home-center" style={{ paddingTop: "clamp(70px, 8vh, 100px)" }}>
-        <img
-          src="/applix-logo.svg"
-          alt="Applix logo"
-          style={{
-            width: "clamp(120px, 18vw, 190px)",
-            height: "auto",
-            display: "block",
-            objectFit: "contain",
-            marginBottom: "-4px",
-            filter: "drop-shadow(0 18px 25px rgba(0,0,0,.32))",
-          }}
-        />
-        <p style={{ margin: "10px 0 12px", color: "#ff7bad", fontSize: "clamp(46px, 8vw, 74px)", fontWeight: 950, letterSpacing: ".18em" }}>
-          APPLIX
-        </p>
+        <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "clamp(120px, 18vw, 190px)", height: "auto", display: "block", objectFit: "contain", marginBottom: "-4px", filter: "drop-shadow(0 18px 25px rgba(0,0,0,.32))" }} />
+        <p style={{ margin: "10px 0 12px", color: "#ff7bad", fontSize: "clamp(46px, 8vw, 74px)", fontWeight: 950, letterSpacing: ".18em" }}>APPLIX</p>
         <p className="applix-setup-kicker">Persistence at Scale</p>
         <h1>Welcome back</h1>
-        <p className="applix-home-copy">
-          Signup, setup, start, and sleep while Applix works in the background.
-        </p>
-        {email && (
-          <p className="applix-setup-status" style={{ marginTop: 26, width: "100%", textAlign: "center" }}>
-            Signed in as {email}
-          </p>
-        )}
+        <p className="applix-home-copy">Signup, setup, start, and sleep while Applix works in the background.</p>
       </section>
 
       <section className="applix-home-bottom">
@@ -246,25 +224,23 @@ export default function DashboardPage() {
 
         <div className="home-campaign-card" style={{ textAlign: "center", padding: "26px 28px", display: "grid", justifyItems: "center", gap: "12px" }}>
           <strong style={{ fontSize: 22, display: "block", textAlign: "center" }}>I am Applix.</strong>
-          <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>
-            I am here to help you get the opportunity. Set me up once and I will automate your task.
-          </p>
-          <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>
-            My skill is simple: give me your resume and tell me what opportunities you want. I will knock every door for you.
-          </p>
-          <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>
-            I will knock 100 doors a day for 10 days.
-          </p>
+          <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>I am here to help you get the opportunity. Set me up once and I will automate your task.</p>
+          <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>My skill is simple: give me your resume and tell me what opportunities you want. I will knock every door for you.</p>
+          <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>I will knock 100 doors a day for 10 days.</p>
         </div>
 
-        <div className="home-check-grid">
-          <Link className={`home-check ${resumeReady ? "ready" : ""}`} href="/resume-canvas">
+        <div className="home-campaign-card" style={{ textAlign: "center", padding: "20px 24px", display: "grid", gap: "16px" }}>
+          <p style={{ margin: 0, color: "rgba(255,255,255,.86)", fontWeight: 900, lineHeight: 1.45 }}>Your Resume Will Be Attached to the Email, Please Use The Current And Best Resume</p>
+          <Link className={`home-check ${resumeReady ? "ready" : ""}`} href="/resume-canvas" style={{ textAlign: "left" }}>
             <span>{resumeReady ? "✓" : "1"}</span>
             <div>
               <strong>Upload / Change Resume</strong>
               <p>{resumeReady ? "Resume data is saved." : "Drag and drop your DOC or DOCX resume."}</p>
             </div>
           </Link>
+        </div>
+
+        <div className="home-check-grid" style={{ gridTemplateColumns: "1fr" }}>
           <div className={`home-check ${gmailReady ? "ready" : ""}`}>
             <span>{gmailReady ? "✓" : "2"}</span>
             <div>
@@ -283,9 +259,7 @@ export default function DashboardPage() {
               {latestCampaign.status === "launched" && <p>Agent runs in the background for {latestCampaign.outreach?.agent_days || 10} days.</p>}
               <div className="home-action-row" style={{ marginTop: 16 }}>
                 <Link className="ghost-link" href="/campaign/new">New campaign</Link>
-                <button className="ghost-button" type="button" onClick={() => deleteCampaign(latestCampaign)} disabled={busy} style={{ borderColor: "rgba(248,113,113,.55)", background: "rgba(127,29,29,.34)", color: "#fecaca" }}>
-                  {busy ? "Deleting..." : "Delete campaign"}
-                </button>
+                <button className="ghost-button" type="button" onClick={() => deleteCampaign(latestCampaign)} disabled={busy} style={{ borderColor: "rgba(248,113,113,.55)", background: "rgba(127,29,29,.34)", color: "#fecaca" }}>{busy ? "Deleting..." : "Delete campaign"}</button>
               </div>
             </>
           ) : (
@@ -300,9 +274,7 @@ export default function DashboardPage() {
           {!resumeReady && <Link className="applix-setup-outline" href="/resume-canvas">Upload Resume</Link>}
           {!gmailReady && <button className="applix-setup-outline" type="button" onClick={connectGmail} disabled={busy || !email}>{busy ? "Opening..." : "Connect Gmail"}</button>}
           {!latestCampaign && <Link className="applix-setup-outline" href="/campaign/new">Create Campaign</Link>}
-          <button className="applix-setup-primary" type="button" onClick={startCampaign} disabled={!canStartCampaign}>
-            {campaignRunning ? "Agent running" : canStartCampaign ? "Start Campaign" : "Complete setup first"}
-          </button>
+          <button className="applix-setup-primary" type="button" onClick={startCampaign} disabled={!canStartCampaign}>{campaignRunning ? "Agent running" : canStartCampaign ? "Start Campaign" : "Complete setup first"}</button>
           <Link className="applix-setup-outline" href="/tracker">Open Job Tracker</Link>
         </div>
       </section>
