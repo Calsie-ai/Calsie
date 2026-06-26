@@ -208,7 +208,7 @@ export default function DashboardPage() {
       <button className="applix-setup-back" type="button" onClick={() => router.back()} aria-label="Go back">
         ←
       </button>
-      <button className="home-signout" type="button" onClick={signOut}>Sign out</button>
+      <button className="home-signout" type="button" onClick={signOut} style={{ right: "clamp(96px, 11vw, 140px)" }}>Sign out</button>
       <div className="applix-setup-info" title={email || "Applix dashboard"}>i</div>
 
       <section className="applix-home-center" style={{ paddingTop: "clamp(70px, 8vh, 100px)" }}>
@@ -232,7 +232,11 @@ export default function DashboardPage() {
         <p className="applix-home-copy">
           Signup, setup, start, and sleep while Applix works in the background.
         </p>
-        {email && <p className="applix-setup-status" style={{ marginTop: 14 }}>Signed in as {email}</p>}
+        {email && (
+          <p className="applix-setup-status" style={{ marginTop: 26, width: "100%", textAlign: "center" }}>
+            Signed in as {email}
+          </p>
+        )}
       </section>
 
       <section className="applix-home-bottom">
@@ -254,13 +258,13 @@ export default function DashboardPage() {
         </div>
 
         <div className="home-check-grid">
-          <div className={`home-check ${resumeReady ? "ready" : ""}`}>
+          <Link className={`home-check ${resumeReady ? "ready" : ""}`} href="/resume-canvas">
             <span>{resumeReady ? "✓" : "1"}</span>
             <div>
-              <strong>Master Resume</strong>
-              <p>{resumeReady ? "Resume data is saved." : "Upload your resume first."}</p>
+              <strong>Upload / Change Resume</strong>
+              <p>{resumeReady ? "Resume data is saved." : "Drag and drop your DOC or DOCX resume."}</p>
             </div>
-          </div>
+          </Link>
           <div className={`home-check ${gmailReady ? "ready" : ""}`}>
             <span>{gmailReady ? "✓" : "2"}</span>
             <div>
