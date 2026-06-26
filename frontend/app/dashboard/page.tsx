@@ -204,7 +204,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="applix-home-shell">
+    <main className="applix-home-shell" style={{ overflowY: "auto" }}>
       <button className="applix-setup-back" type="button" onClick={() => router.back()} aria-label="Go back">
         ←
       </button>
@@ -212,16 +212,25 @@ export default function DashboardPage() {
       <div className="applix-setup-info" title={email || "Applix dashboard"}>i</div>
 
       <section className="applix-home-center" style={{ paddingTop: "clamp(70px, 8vh, 100px)" }}>
-        <div style={{ fontSize: "clamp(88px, 15vw, 150px)", lineHeight: 0.85, filter: "drop-shadow(0 18px 25px rgba(0,0,0,.32))" }}>
-          📨
-        </div>
+        <img
+          src="/applix-logo.svg"
+          alt="Applix logo"
+          style={{
+            width: "clamp(120px, 18vw, 190px)",
+            height: "auto",
+            display: "block",
+            objectFit: "contain",
+            marginBottom: "-4px",
+            filter: "drop-shadow(0 18px 25px rgba(0,0,0,.32))",
+          }}
+        />
         <p style={{ margin: "10px 0 12px", color: "#ff7bad", fontSize: "clamp(46px, 8vw, 74px)", fontWeight: 950, letterSpacing: ".18em" }}>
           APPLIX
         </p>
-        <p className="applix-setup-kicker">AI Job Automation</p>
+        <p className="applix-setup-kicker">Persistence at Scale</p>
         <h1>Welcome back</h1>
         <p className="applix-home-copy">
-          Find relevant jobs, prepare tailored outreach, and track everything automatically.
+          Signup, setup, start, and sleep while Applix works in the background.
         </p>
         {email && <p className="applix-setup-status" style={{ marginTop: 14 }}>Signed in as {email}</p>}
       </section>
@@ -230,6 +239,19 @@ export default function DashboardPage() {
         {loading && <p className="applix-setup-status success">Loading your Applix workspace...</p>}
         {message && <p className="applix-setup-status success">{message}</p>}
         {errorMessage && <p className="error-text" style={{ textAlign: "center" }}>{errorMessage}</p>}
+
+        <div className="home-campaign-card" style={{ textAlign: "left", padding: "22px" }}>
+          <strong style={{ fontSize: 22 }}>I am Applix.</strong>
+          <p style={{ marginTop: 8 }}>
+            I am here to help you get the opportunity. Set me up once and I will automate your task.
+          </p>
+          <p style={{ marginTop: 10 }}>
+            My skill is simple: give me your resume and tell me what opportunities you want. I will knock every door for you.
+          </p>
+          <p style={{ marginTop: 10 }}>
+            I will knock 100 doors a day for 10 days.
+          </p>
+        </div>
 
         <div className="home-check-grid">
           <div className={`home-check ${resumeReady ? "ready" : ""}`}>
