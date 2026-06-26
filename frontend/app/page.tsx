@@ -71,8 +71,16 @@ export default function HomePage() {
 
   return (
     <main className="applix-setup-shell">
-      <button className="applix-setup-back" type="button" aria-label="Back">Back</button>
-      <div className="applix-setup-info" aria-hidden="true">i</div>
+      <a
+        className="applix-setup-info"
+        href="https://www.linkedin.com/in/sajan-giri-bb1a01221/"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Open Sajan Giri LinkedIn profile"
+        title="LinkedIn"
+      >
+        i
+      </a>
 
       <section className="applix-setup-center">
         <div style={{ display: "grid", placeItems: "center", marginBottom: "18px" }}>
