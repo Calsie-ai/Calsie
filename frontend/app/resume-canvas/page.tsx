@@ -50,8 +50,12 @@ function toText(value: any): string {
 function safeExt(file: File) {
   const ext = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
   if (ext) return ext;
-  if (file.type === "application/pdf") return "pdf";
-  return "bin";
+  return "docx";
+}
+
+function isDocResume(file: File) {
+  const name = file.name.toLowerCase();
+  return name.endsWith(".doc") || name.endsWith(".docx");
 }
 
 export default function ResumeCanvasPage() {
@@ -108,10 +112,10 @@ export default function ResumeCanvasPage() {
             education: toText(data.education_locked),
             certifications: toText(data.certifications_locked),
           });
-          setStatus("Resume is connected. Upload a new file anytime to update it.");
+          setStatus("Resume is connected. Upload a new DOC or DOCX file anytime to update it.");
         } else {
           setParsed((current) => ({ ...current, email: userData.user.email || "" }));
-          setStatus("No resume connected yet. Upload your resume to activate Applix.");
+          setStatus("No resume connected yet. Upload your DOC or DOCX resume to activate Applix.");
         }
       } catch (error) {
         setStatus(error instanceof Error ? error.message : "Could not load resume.");
@@ -126,6 +130,12 @@ export default function ResumeCanvasPage() {
   async function uploadResume(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (!isDocResume(file)) {
+      setStatus("Only DOC or DOCX resume files are accepted.");
+      event.target.value = "";
+      return;
+    }
 
     setFileName(file.name);
     setFileType(file.type || file.name.split(".").pop() || "");
@@ -294,7 +304,7 @@ export default function ResumeCanvasPage() {
         </h1>
 
         <div style={{ width: "min(680px, 100%)", marginTop: "18px", padding: "18px 22px", border: "1px solid rgba(255,255,255,.22)", borderRadius: "24px", background: "rgba(255,255,255,.1)", color: "rgba(255,255,255,.86)", lineHeight: 1.45, fontWeight: 800, textAlign: "center", backdropFilter: "blur(18px)" }}>
-          Your resume will be attached to the mail. Please use the current and best resume.<br />Only DOC or DOCX files are accepted.
+          Your Resume Will Be Attached to the Mail. Please use the current and best resume.<br />Only DOC or DOCX files are accepted.
         </div>
 
         <p className="applix-home-copy" style={{ marginTop: "16px" }}>{loading ? "Checking resume..." : status}</p>
