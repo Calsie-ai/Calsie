@@ -293,9 +293,7 @@ export default function DashboardPage() {
             linear-gradient(180deg, #120b2d 0%, #070711 56%, #030306 100%) !important;
         }
 
-        .dashboard-cockpit-shell::before {
-          display: none !important;
-        }
+        .dashboard-cockpit-shell::before { display: none !important; }
 
         .dashboard-hero {
           width: min(760px, 92vw) !important;
@@ -305,10 +303,7 @@ export default function DashboardPage() {
           justify-items: center !important;
         }
 
-        .dashboard-hero h1 {
-          font-size: clamp(50px, 10vw, 92px) !important;
-          line-height: .95 !important;
-        }
+        .dashboard-hero h1 { font-size: clamp(50px, 10vw, 92px) !important; line-height: .95 !important; }
 
         .dashboard-subtitle {
           display: block !important;
@@ -328,9 +323,7 @@ export default function DashboardPage() {
 
         .dashboard-card-clean,
         .dashboard-single-row,
-        .dashboard-actions {
-          width: 100% !important;
-        }
+        .dashboard-actions { width: 100% !important; }
 
         .dashboard-card-clean {
           text-align: center !important;
@@ -340,22 +333,12 @@ export default function DashboardPage() {
           gap: 14px !important;
         }
 
-        .dashboard-card-clean strong {
-          font-size: clamp(21px, 4.5vw, 32px) !important;
-          line-height: 1.15 !important;
-          margin-bottom: 0 !important;
-        }
+        .dashboard-card-clean strong { font-size: clamp(21px, 4.5vw, 32px) !important; line-height: 1.15 !important; margin-bottom: 0 !important; }
 
         .dashboard-card-clean p,
-        .home-check p {
-          font-size: clamp(14px, 3.2vw, 17px) !important;
-          line-height: 1.45 !important;
-        }
+        .home-check p { font-size: clamp(14px, 3.2vw, 17px) !important; line-height: 1.45 !important; }
 
-        .applix-intro-card p {
-          max-width: 600px !important;
-          text-align: center !important;
-        }
+        .applix-intro-card p { max-width: 600px !important; text-align: center !important; }
 
         .resume-warning {
           max-width: 650px !important;
@@ -367,12 +350,19 @@ export default function DashboardPage() {
         .resume-action,
         .dashboard-app-connect {
           width: 100% !important;
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          place-items: center !important;
+          justify-items: center !important;
           align-items: center !important;
           padding: clamp(18px, 3.8vw, 26px) !important;
           min-height: clamp(82px, 15vw, 112px) !important;
-          gap: clamp(14px, 3vw, 22px) !important;
-          text-align: left !important;
+          gap: 10px !important;
+          text-align: center !important;
         }
+
+        .resume-action div,
+        .dashboard-app-connect div { text-align: center !important; display: grid !important; justify-items: center !important; }
 
         .resume-action span,
         .dashboard-app-connect span {
@@ -382,50 +372,20 @@ export default function DashboardPage() {
         }
 
         .resume-action strong,
-        .dashboard-app-connect strong {
-          font-size: clamp(18px, 4.2vw, 26px) !important;
-          line-height: 1.2 !important;
-        }
+        .dashboard-app-connect strong { font-size: clamp(18px, 4.2vw, 26px) !important; line-height: 1.2 !important; text-align: center !important; }
 
-        .dashboard-single-row {
-          grid-template-columns: 1fr !important;
-        }
-
-        .campaign-summary-card p {
-          text-align: center !important;
-        }
+        .dashboard-single-row { grid-template-columns: 1fr !important; }
+        .campaign-summary-card p { text-align: center !important; }
 
         @media (max-width: 640px) {
-          .dashboard-cockpit-shell {
-            padding-left: 14px !important;
-            padding-right: 14px !important;
-          }
-
-          .dashboard-hero {
-            padding-top: 82px !important;
-            margin-bottom: 34px !important;
-          }
-
-          .dashboard-stack {
-            width: min(100%, 430px) !important;
-          }
-
-          .dashboard-card-clean {
-            border-radius: 22px !important;
-            padding: 20px !important;
-          }
-
+          .dashboard-cockpit-shell { padding-left: 14px !important; padding-right: 14px !important; }
+          .dashboard-hero { padding-top: 82px !important; margin-bottom: 34px !important; }
+          .dashboard-stack { width: min(100%, 430px) !important; }
+          .dashboard-card-clean { border-radius: 22px !important; padding: 20px !important; }
           .resume-action,
-          .dashboard-app-connect {
-            grid-template-columns: auto 1fr !important;
-            border-radius: 22px !important;
-          }
-
+          .dashboard-app-connect { grid-template-columns: 1fr !important; border-radius: 22px !important; }
           .dashboard-actions .applix-setup-primary,
-          .dashboard-actions .applix-setup-outline {
-            min-height: 64px !important;
-            font-size: clamp(20px, 6vw, 28px) !important;
-          }
+          .dashboard-actions .applix-setup-outline { min-height: 64px !important; font-size: clamp(20px, 6vw, 28px) !important; }
         }
       `}</style>
     </>
