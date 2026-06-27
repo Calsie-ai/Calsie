@@ -280,11 +280,10 @@ export default function DashboardPage() {
             {!gmailReady && <button className="applix-setup-outline" type="button" onClick={connectGmail} disabled={busy || !email}>{busy ? "Opening..." : "Connect Applix"}</button>}
             {!latestCampaign && <Link className="applix-setup-outline" href="/campaign/new">Create Campaign</Link>}
             {campaignRunning ? (
-              <Link className="applix-setup-primary" href="/tracker">Track Agent Logs</Link>
+              <Link className="applix-setup-primary" href="/tracker">Track Applix Log</Link>
             ) : (
               <button className="applix-setup-primary" type="button" onClick={startCampaign} disabled={!canStartCampaign}>{canStartCampaign ? "Start Campaign" : "Complete setup first"}</button>
             )}
-            <Link className="applix-setup-outline" href="/tracker">Open Agent Logs</Link>
           </div>
         </section>
       </main>
