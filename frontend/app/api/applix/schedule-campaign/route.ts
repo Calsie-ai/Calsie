@@ -5,6 +5,7 @@ export const runtime = "nodejs";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bnshgtrqbfuphhhdgccs.supabase.co";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const AGENT_FUNCTION_NAME = process.env.APPLIX_AGENT_FUNCTION || "applix-agent-orchestrator";
+const REQUIRE_PAYMENT = process.env.APPLIX_REQUIRE_PAYMENT !== "false";
 
 type ScheduleBody = {
   access_token?: string;
@@ -23,6 +24,27 @@ async function getCurrentUser(accessToken: string) {
 
   if (!response.ok) return null;
   return response.json().catch(() => null) as Promise<{ id?: string; email?: string } | null>;
+}
+
+function isActiveSubscription(status?: string | null) {
+  return status === "active" || status === "trialing";
+}
+
+async function hasActivePayment(accessToken: string, userId: string) {
+  if (!REQUIRE_PAYMENT) return true;
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/applix_subscriptions?user_id=eq.${encodeURIComponent(userId)}&select=status`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) return false;
+  const rows = await response.json().catch(() => []);
+  const subscription = Array.isArray(rows) ? rows[0] : null;
+  return isActiveSubscription(subscription?.status);
 }
 
 export async function POST(req: Request) {
@@ -46,6 +68,17 @@ export async function POST(req: Request) {
     const currentUser = await getCurrentUser(accessToken);
     const senderUserIdentifier = currentUser?.email || currentUser?.id || null;
     const enabled = body.enabled !== false;
+
+    if (enabled && REQUIRE_PAYMENT) {
+      if (!currentUser?.id || !(await hasActivePayment(accessToken, currentUser.id))) {
+        return NextResponse.json({
+          ok: false,
+          code: "payment_required",
+          error: "Payment required. Please activate Applix Pro before starting the agent.",
+        }, { status: 402 });
+      }
+    }
+
     const now = new Date().toISOString();
 
     const outreach = {
