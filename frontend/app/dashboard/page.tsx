@@ -204,12 +204,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="applix-home-shell" style={{ overflowY: "auto" }}>
+    <main className="applix-home-shell" style={{ overflowY: "auto", display: "grid", justifyItems: "center" }}>
       <button className="applix-setup-back" type="button" onClick={() => router.back()} aria-label="Go back">←</button>
       <button className="home-signout" type="button" onClick={signOut} style={{ right: "clamp(96px, 11vw, 140px)" }}>Sign out</button>
       <div className="applix-setup-info" title={email || "Applix dashboard"}>i</div>
 
-      <section className="applix-home-center" style={{ paddingTop: "clamp(70px, 8vh, 100px)" }}>
+      <section className="applix-home-center" style={{ paddingTop: "clamp(70px, 8vh, 100px)", width: "min(760px, 92vw)", justifyItems: "center", textAlign: "center" }}>
         <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "clamp(120px, 18vw, 190px)", height: "auto", display: "block", objectFit: "contain", marginBottom: "-4px", filter: "drop-shadow(0 18px 25px rgba(0,0,0,.32))" }} />
         <p style={{ margin: "10px 0 12px", color: "#ff7bad", fontSize: "clamp(46px, 8vw, 74px)", fontWeight: 950, letterSpacing: ".18em" }}>APPLIX</p>
         <p className="applix-setup-kicker">Persistence at Scale</p>
@@ -217,21 +217,21 @@ export default function DashboardPage() {
         <p className="applix-home-copy">Signup, setup, start, and sleep while Applix works in the background.</p>
       </section>
 
-      <section className="applix-home-bottom">
+      <section className="applix-home-bottom" style={{ width: "min(760px, 92vw)", margin: "0 auto", display: "grid", justifyItems: "center", gap: "18px" }}>
         {loading && <p className="applix-setup-status success">Loading your Applix workspace...</p>}
         {message && <p className="applix-setup-status success">{message}</p>}
         {errorMessage && <p className="error-text" style={{ textAlign: "center" }}>{errorMessage}</p>}
 
-        <div className="home-campaign-card" style={{ textAlign: "center", padding: "26px 28px", display: "grid", justifyItems: "center", gap: "12px" }}>
+        <div className="home-campaign-card" style={{ width: "100%", textAlign: "center", padding: "26px 28px", display: "grid", justifyItems: "center", gap: "12px" }}>
           <strong style={{ fontSize: 22, display: "block", textAlign: "center" }}>I am Applix.</strong>
           <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>I am here to help you get the opportunity. Set me up once and I will automate your task.</p>
           <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>My skill is simple: give me your resume and tell me what opportunities you want. I will knock every door for you.</p>
           <p style={{ margin: 0, maxWidth: "560px", textAlign: "center" }}>I will knock 100 doors a day for 10 days.</p>
         </div>
 
-        <div className="home-campaign-card" style={{ textAlign: "center", padding: "20px 24px", display: "grid", gap: "16px" }}>
-          <p style={{ margin: 0, color: "rgba(255,255,255,.86)", fontWeight: 900, lineHeight: 1.45 }}>Your Resume Will Be Attached to the Email, Please Use The Current And Best Resume</p>
-          <Link className={`home-check ${resumeReady ? "ready" : ""}`} href="/resume-canvas" style={{ textAlign: "left" }}>
+        <div className="home-campaign-card" style={{ width: "100%", textAlign: "center", padding: "20px 24px", display: "grid", gap: "16px", justifyItems: "center" }}>
+          <p style={{ margin: 0, color: "rgba(255,255,255,.86)", fontWeight: 900, lineHeight: 1.45, textAlign: "center" }}>Your Resume Will Be Attached to the Email, Please Use The Current And Best Resume</p>
+          <Link className={`home-check ${resumeReady ? "ready" : ""}`} href="/resume-canvas" style={{ width: "100%", textAlign: "left" }}>
             <span>{resumeReady ? "✓" : "1"}</span>
             <div>
               <strong>Upload / Change Resume</strong>
@@ -240,17 +240,17 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="home-check-grid" style={{ gridTemplateColumns: "1fr" }}>
+        <div className="home-check-grid" style={{ width: "100%", gridTemplateColumns: "1fr" }}>
           <div className={`home-check ${gmailReady ? "ready" : ""}`}>
             <span>{gmailReady ? "✓" : "2"}</span>
             <div>
-              <strong>Gmail Consent</strong>
-              <p>{gmailReady ? "Gmail is connected." : "Connect Gmail to prepare outreach."}</p>
+              <strong>Connect Applix to my app</strong>
+              <p>{gmailReady ? "Applix is connected." : "Connect your app to prepare outreach."}</p>
             </div>
           </div>
         </div>
 
-        <div className="home-campaign-card">
+        <div className="home-campaign-card" style={{ width: "100%", textAlign: "center" }}>
           {latestCampaign ? (
             <>
               <strong>{latestCampaign.name}</strong>
@@ -270,9 +270,9 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="applix-home-actions">
+        <div className="applix-home-actions" style={{ width: "100%" }}>
           {!resumeReady && <Link className="applix-setup-outline" href="/resume-canvas">Upload Resume</Link>}
-          {!gmailReady && <button className="applix-setup-outline" type="button" onClick={connectGmail} disabled={busy || !email}>{busy ? "Opening..." : "Connect Gmail"}</button>}
+          {!gmailReady && <button className="applix-setup-outline" type="button" onClick={connectGmail} disabled={busy || !email}>{busy ? "Opening..." : "Connect Applix"}</button>}
           {!latestCampaign && <Link className="applix-setup-outline" href="/campaign/new">Create Campaign</Link>}
           <button className="applix-setup-primary" type="button" onClick={startCampaign} disabled={!canStartCampaign}>{campaignRunning ? "Agent running" : canStartCampaign ? "Start Campaign" : "Complete setup first"}</button>
           <Link className="applix-setup-outline" href="/tracker">Open Job Tracker</Link>
