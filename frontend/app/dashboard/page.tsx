@@ -279,8 +279,12 @@ export default function DashboardPage() {
             {!resumeReady && <Link className="applix-setup-outline" href="/resume-canvas">Upload Resume</Link>}
             {!gmailReady && <button className="applix-setup-outline" type="button" onClick={connectGmail} disabled={busy || !email}>{busy ? "Opening..." : "Connect Applix"}</button>}
             {!latestCampaign && <Link className="applix-setup-outline" href="/campaign/new">Create Campaign</Link>}
-            <button className="applix-setup-primary" type="button" onClick={startCampaign} disabled={!canStartCampaign}>{campaignRunning ? "Agent running" : canStartCampaign ? "Start Campaign" : "Complete setup first"}</button>
-            <Link className="applix-setup-outline" href="/tracker">Open Job Tracker</Link>
+            {campaignRunning ? (
+              <Link className="applix-setup-primary" href="/tracker">Track Agent Logs</Link>
+            ) : (
+              <button className="applix-setup-primary" type="button" onClick={startCampaign} disabled={!canStartCampaign}>{canStartCampaign ? "Start Campaign" : "Complete setup first"}</button>
+            )}
+            <Link className="applix-setup-outline" href="/tracker">Open Agent Logs</Link>
           </div>
         </section>
       </main>
