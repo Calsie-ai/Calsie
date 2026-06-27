@@ -104,6 +104,20 @@ function formatDate(value: string) {
   return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+function formatShortDate(value: string) {
+  if (!value || value === "unknown") return "No date";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function dayKey(value: string) {
+  if (!value) return "unknown";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  return date.toISOString().slice(0, 10);
+}
+
 function statusLabel(status: AgentLog["status"]) {
   if (status === "found") return "Found";
   if (status === "prepared") return "Prepared";
@@ -119,6 +133,7 @@ export default function TrackerPage() {
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [role, setRole] = useState("target opportunities");
   const [location, setLocation] = useState("your selected location");
+  const [selectedDayKey, setSelectedDayKey] = useState("all");
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -132,6 +147,33 @@ export default function TrackerPage() {
       skipped: logs.filter((log) => log.status === "skipped").length,
     };
   }, [logs]);
+
+  const dayGroups = useMemo(() => {
+    const groups = new Map<string, AgentLog[]>();
+    logs.forEach((log) => {
+      const key = dayKey(log.actionTime);
+      groups.set(key, [...(groups.get(key) || []), log]);
+    });
+
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, dayLogs], index) => ({
+        key,
+        label: `Day ${index + 1}`,
+        dateLabel: formatShortDate(key),
+        total: dayLogs.length,
+        applied: dayLogs.filter((log) => log.status === "applied").length,
+      }));
+  }, [logs]);
+
+  const visibleLogs = useMemo(() => {
+    if (selectedDayKey === "all") return logs;
+    return logs.filter((log) => dayKey(log.actionTime) === selectedDayKey);
+  }, [logs, selectedDayKey]);
+
+  const visibleDayLabel = selectedDayKey === "all"
+    ? "All days"
+    : dayGroups.find((group) => group.key === selectedDayKey)?.label || "Selected day";
 
   const csvHref = useMemo(() => {
     const header = ["Company", "Job Title", "Company Website", "Job Post URL", "Source", "Location", "Status", "Action Time"];
@@ -243,9 +285,9 @@ export default function TrackerPage() {
 
     try {
       await loadTracker();
-      setActionMessage("Agent logs reloaded from Supabase.");
+      setActionMessage("Applix logs reloaded from Supabase.");
     } catch (error) {
-      setActionMessage(getErrorMessage(error, "Could not reload agent logs."));
+      setActionMessage(getErrorMessage(error, "Could not reload Applix logs."));
     } finally {
       setReloading(false);
     }
@@ -258,16 +300,16 @@ export default function TrackerPage() {
           <img src="/applix-logo.svg" alt="Applix logo" />
           <div>
             <strong>APPLIX</strong>
-            <span>Agent Logs</span>
+            <span>Applix Logs</span>
           </div>
         </Link>
         <Link className="agent-home-link" href="/dashboard">Home</Link>
       </header>
 
       <section className="agent-log-hero">
-        <p className="agent-kicker">Track Agent Logs</p>
+        <p className="agent-kicker">Track Applix Log</p>
         <h1>See what Applix is doing.</h1>
-        <p>Found, prepared, applied, skipped, and tracked opportunities for your campaign.</p>
+        <p>Click a day dot to see which jobs Applix found, prepared, applied, or skipped that day.</p>
       </section>
 
       <section className="agent-log-card campaign-overview">
@@ -283,20 +325,49 @@ export default function TrackerPage() {
         <div className="summary-card skipped"><span>Skipped</span><strong>{summary.skipped}</strong></div>
       </section>
 
+      {logs.length > 0 && (
+        <section className="agent-log-card agent-day-timeline">
+          <div className="day-line-header">
+            <div>
+              <p className="agent-kicker">Daily timeline</p>
+              <h2>Choose the day you want to inspect</h2>
+            </div>
+            <span>{visibleDayLabel} · {visibleLogs.length} jobs</span>
+          </div>
+
+          <div className="day-dot-row">
+            <button className={selectedDayKey === "all" ? "active" : ""} type="button" onClick={() => setSelectedDayKey("all")}>
+              <span className="day-dot" />
+              <strong>All</strong>
+              <small>{logs.length} jobs</small>
+            </button>
+
+            {dayGroups.map((group) => (
+              <button key={group.key} className={selectedDayKey === group.key ? "active" : ""} type="button" onClick={() => setSelectedDayKey(group.key)}>
+                <span className="day-dot" />
+                <strong>{group.label}</strong>
+                <small>{group.applied} applied · {group.total} total</small>
+                <em>{group.dateLabel}</em>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="agent-action-row">
         <button type="button" onClick={reloadLogs} disabled={loading || reloading}>{reloading ? "Reloading..." : "Reload logs"}</button>
-        <a href={csvHref} download={`${filePrefix}-agent-logs.csv`} aria-disabled={loading || logs.length === 0}>Download Excel</a>
-        <a href={jsonHref} download={`${filePrefix}-agent-logs.json`} aria-disabled={loading || logs.length === 0}>Download JSON</a>
+        <a href={csvHref} download={`${filePrefix}-applix-logs.csv`} aria-disabled={loading || logs.length === 0}>Download Excel</a>
+        <a href={jsonHref} download={`${filePrefix}-applix-logs.json`} aria-disabled={loading || logs.length === 0}>Download JSON</a>
       </section>
 
       {actionMessage && <p className="agent-message">{actionMessage}</p>}
       {errorMessage && <p className="agent-error">{errorMessage}</p>}
-      {loading && <p className="agent-message">Loading agent logs...</p>}
+      {loading && <p className="agent-message">Loading Applix logs...</p>}
 
       {!loading && !errorMessage && logs.length === 0 && (
         <section className="agent-log-card empty-agent-card">
           <img src="/applix-logo.svg" alt="" aria-hidden="true" />
-          <h2>No agent logs yet</h2>
+          <h2>No Applix logs yet</h2>
           <p>When Applix starts finding and preparing opportunities, the company, website, job post URL, status, and action time will appear here.</p>
         </section>
       )}
@@ -305,10 +376,10 @@ export default function TrackerPage() {
         <section className="agent-log-card table-card">
           <div className="table-title-row">
             <div>
-              <p className="agent-kicker">Recent activity</p>
-              <h2>Agent log history</h2>
+              <p className="agent-kicker">{visibleDayLabel}</p>
+              <h2>Jobs Applix touched</h2>
             </div>
-            <span>{logs.length} records</span>
+            <span>{visibleLogs.length} records</span>
           </div>
 
           <div className="agent-table-wrap">
@@ -324,7 +395,7 @@ export default function TrackerPage() {
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
+                {visibleLogs.map((log) => (
                   <tr key={log.id}>
                     <td data-label="Company"><strong>{log.company}</strong><span>{log.location}</span></td>
                     <td data-label="Opportunity">{log.jobTitle}</td>
@@ -361,20 +432,8 @@ export default function TrackerPage() {
           margin-right: auto;
         }
 
-        .agent-log-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 14px;
-          margin-bottom: clamp(26px, 5vw, 46px);
-        }
-
-        .agent-log-brand {
-          display: inline-flex;
-          align-items: center;
-          gap: 12px;
-        }
-
+        .agent-log-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: clamp(26px, 5vw, 46px); }
+        .agent-log-brand { display: inline-flex; align-items: center; gap: 12px; }
         .agent-log-brand img { width: 54px; height: 54px; object-fit: contain; }
         .agent-log-brand strong { display: block; color: #ff7fa8; letter-spacing: .18em; font-size: 16px; }
         .agent-log-brand span { color: rgba(255,255,255,.62); font-size: 12px; font-weight: 850; }
@@ -422,6 +481,19 @@ export default function TrackerPage() {
         .summary-card.applied { box-shadow: inset 0 0 0 1px rgba(52,211,153,.22); }
         .summary-card.skipped { box-shadow: inset 0 0 0 1px rgba(251,191,36,.18); }
 
+        .agent-day-timeline { padding: clamp(18px, 3vw, 28px); margin-bottom: 18px; }
+        .day-line-header { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+        .day-line-header h2 { margin: 0; font-size: clamp(22px, 3.8vw, 36px); }
+        .day-line-header > span { color: rgba(255,255,255,.68); font-weight: 900; }
+        .day-dot-row { position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+        .day-dot-row::before { content: ""; position: absolute; left: 6%; right: 6%; top: 22px; height: 2px; background: linear-gradient(90deg, rgba(34,211,238,.15), rgba(255,106,181,.5), rgba(34,211,238,.15)); }
+        .day-dot-row button { position: relative; display: grid; justify-items: center; gap: 6px; padding: 8px 12px 14px; border: 0; border-radius: 20px; background: transparent; color: white; cursor: pointer; }
+        .day-dot { width: 42px; height: 42px; border-radius: 999px; display: block; border: 2px solid rgba(255,255,255,.24); background: linear-gradient(180deg, rgba(18,25,43,.96), rgba(7,12,24,.96)); box-shadow: 0 0 0 5px rgba(255,255,255,.04); }
+        .day-dot-row button.active .day-dot { border-color: rgba(255,106,181,.98); box-shadow: 0 0 0 5px rgba(255,106,181,.15), 0 0 22px rgba(255,106,181,.38); }
+        .day-dot-row strong { font-size: 16px; font-weight: 950; }
+        .day-dot-row small { color: rgba(255,255,255,.7); font-weight: 850; text-align: center; }
+        .day-dot-row em { color: rgba(255,255,255,.45); font-style: normal; font-size: 12px; font-weight: 850; }
+
         .agent-action-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 18px; }
         .agent-action-row a:nth-child(2) { background: rgba(34,211,238,.12); border-color: rgba(34,211,238,.28); }
         .agent-action-row a:nth-child(3) { background: rgba(255,106,181,.12); border-color: rgba(255,106,181,.34); }
@@ -461,6 +533,9 @@ export default function TrackerPage() {
         @media (max-width: 760px) {
           .agent-log-header { align-items: flex-start; }
           .agent-summary-grid { grid-template-columns: repeat(2, 1fr); }
+          .day-line-header { display: grid; align-items: start; text-align: center; }
+          .day-dot-row { grid-template-columns: repeat(2, 1fr); }
+          .day-dot-row::before { display: none; }
           .agent-action-row { display: grid; grid-template-columns: 1fr; }
           .agent-action-row a, .agent-action-row button { width: 100%; }
           .table-title-row { display: grid; align-items: start; }
