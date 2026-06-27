@@ -25,7 +25,7 @@ function locationFor(campaign: Campaign) {
 }
 
 function statusLabel(status: string) {
-  if (status === "launched") return "Agent launched";
+  if (status === "launched") return "Agent running";
   if (status === "active") return "Agent active";
   if (status === "scheduled") return "Scheduled";
   if (status === "paused") return "Paused";
@@ -254,11 +254,15 @@ export default function DashboardPage() {
           <div className="home-campaign-card dashboard-card-clean campaign-summary-card">
             {latestCampaign ? (
               <>
+                <span className="campaign-pill">Active campaign</span>
                 <strong>{latestCampaign.name}</strong>
-                <p>{roleFor(latestCampaign)}{locationFor(latestCampaign) ? ` in ${locationFor(latestCampaign)}` : ""}</p>
-                <p>Status: {statusLabel(latestCampaign.status)}</p>
-                {latestCampaign.status === "launched" && <p>Agent runs in the background for {latestCampaign.outreach?.agent_days || 10} days.</p>}
-                <div className="home-action-row" style={{ marginTop: 16 }}>
+                <p className="campaign-target">{roleFor(latestCampaign)}{locationFor(latestCampaign) ? ` in ${locationFor(latestCampaign)}` : ""}</p>
+                <div className="campaign-status-box">
+                  <span className="pulse-dot" />
+                  <span>{statusLabel(latestCampaign.status)}</span>
+                </div>
+                {latestCampaign.status === "launched" && <p>Applix is working in the background for {latestCampaign.outreach?.agent_days || 10} days.</p>}
+                <div className="home-action-row campaign-buttons" style={{ marginTop: 16 }}>
                   <Link className="ghost-link" href="/campaign/new">New campaign</Link>
                   <button className="ghost-button" type="button" onClick={() => deleteCampaign(latestCampaign)} disabled={busy} style={{ borderColor: "rgba(248,113,113,.55)", background: "rgba(127,29,29,.34)", color: "#fecaca" }}>{busy ? "Deleting..." : "Delete campaign"}</button>
                 </div>
@@ -288,9 +292,9 @@ export default function DashboardPage() {
           justify-items: center !important;
           padding: clamp(28px, 5vw, 58px) 18px 48px !important;
           background:
-            radial-gradient(circle at 20% 0%, rgba(168, 85, 247, .35), transparent 28%),
-            radial-gradient(circle at 85% 20%, rgba(34, 211, 238, .18), transparent 24%),
-            linear-gradient(180deg, #120b2d 0%, #070711 56%, #030306 100%) !important;
+            radial-gradient(circle at 20% 0%, rgba(168, 85, 247, .22), transparent 28%),
+            radial-gradient(circle at 85% 20%, rgba(34, 211, 238, .16), transparent 24%),
+            linear-gradient(180deg, #100b26 0%, #070b18 56%, #030306 100%) !important;
         }
 
         .dashboard-cockpit-shell::before { display: none !important; }
@@ -324,6 +328,15 @@ export default function DashboardPage() {
         .dashboard-card-clean,
         .dashboard-single-row,
         .dashboard-actions { width: 100% !important; }
+
+        .dashboard-card-clean,
+        .resume-action,
+        .dashboard-app-connect {
+          background: linear-gradient(180deg, rgba(255,255,255,.115), rgba(255,255,255,.055)) !important;
+          border: 1px solid rgba(200, 230, 255, .26) !important;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 24px 80px rgba(0,0,0,.34) !important;
+          backdrop-filter: blur(22px) saturate(1.12) !important;
+        }
 
         .dashboard-card-clean {
           text-align: center !important;
@@ -375,7 +388,60 @@ export default function DashboardPage() {
         .dashboard-app-connect strong { font-size: clamp(18px, 4.2vw, 26px) !important; line-height: 1.2 !important; text-align: center !important; }
 
         .dashboard-single-row { grid-template-columns: 1fr !important; }
+
+        .campaign-summary-card {
+          gap: 12px !important;
+          padding-top: clamp(26px, 4.5vw, 38px) !important;
+          padding-bottom: clamp(26px, 4.5vw, 38px) !important;
+        }
+
         .campaign-summary-card p { text-align: center !important; }
+
+        .campaign-pill {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 7px 14px;
+          border-radius: 999px;
+          background: rgba(34, 211, 238, .12);
+          border: 1px solid rgba(34, 211, 238, .26);
+          color: #bff7ff;
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: .08em;
+          text-transform: uppercase;
+        }
+
+        .campaign-target {
+          color: rgba(255,255,255,.78) !important;
+          max-width: 560px !important;
+        }
+
+        .campaign-status-box {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          margin-top: 2px;
+          padding: 12px 18px;
+          border-radius: 999px;
+          background: rgba(167, 243, 208, .1);
+          border: 1px solid rgba(167, 243, 208, .24);
+          color: #d6fff1;
+          font-weight: 950;
+        }
+
+        .pulse-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          background: #8fffd2;
+          box-shadow: 0 0 18px rgba(143,255,210,.75);
+        }
+
+        .campaign-buttons {
+          width: 100% !important;
+        }
 
         @media (max-width: 640px) {
           .dashboard-cockpit-shell { padding-left: 14px !important; padding-right: 14px !important; }
