@@ -233,7 +233,7 @@ export default function DashboardPage() {
           <div className="home-campaign-card dashboard-card-clean resume-card-wrap">
             <p className="resume-warning">Your Resume Will Be Attached to the Email, Please Use The Current And Best Resume</p>
             <Link className={`home-check resume-action ${resumeReady ? "ready" : ""}`} href="/resume-canvas">
-              <span>{resumeReady ? "✓" : "1"}</span>
+              {!resumeReady && <span>1</span>}
               <div>
                 <strong>Upload / Change Resume</strong>
                 <p>{resumeReady ? "Resume data is saved." : "Drag and drop your DOC or DOCX resume."}</p>
@@ -243,7 +243,7 @@ export default function DashboardPage() {
 
           <div className="home-check-grid dashboard-single-row">
             <div className={`home-check dashboard-app-connect ${gmailReady ? "ready" : ""}`}>
-              <span>{gmailReady ? "✓" : "2"}</span>
+              {!gmailReady && <span>2</span>}
               <div>
                 <strong>Connect Applix to my app</strong>
                 <p>{gmailReady ? "Applix is connected." : "Connect your app to prepare outreach."}</p>
@@ -332,9 +332,9 @@ export default function DashboardPage() {
         .dashboard-card-clean,
         .resume-action,
         .dashboard-app-connect {
-          background: linear-gradient(180deg, rgba(255,255,255,.115), rgba(255,255,255,.055)) !important;
-          border: 1px solid rgba(200, 230, 255, .26) !important;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 24px 80px rgba(0,0,0,.34) !important;
+          background: linear-gradient(180deg, rgba(18, 25, 43, .72), rgba(7, 12, 24, .86)) !important;
+          border: 1px solid rgba(190, 220, 255, .18) !important;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 18px 54px rgba(0,0,0,.26) !important;
           backdrop-filter: blur(22px) saturate(1.12) !important;
         }
 
@@ -370,18 +370,35 @@ export default function DashboardPage() {
           align-items: center !important;
           padding: clamp(18px, 3.8vw, 26px) !important;
           min-height: clamp(82px, 15vw, 112px) !important;
-          gap: 10px !important;
+          gap: 8px !important;
           text-align: center !important;
+          border-radius: 22px !important;
+        }
+
+        .resume-action.ready,
+        .dashboard-app-connect.ready {
+          border: 1.8px solid rgba(255, 106, 181, .96) !important;
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,.12),
+            0 0 0 1px rgba(255, 106, 181, .18),
+            0 0 26px rgba(255, 106, 181, .2),
+            0 18px 54px rgba(0,0,0,.25) !important;
         }
 
         .resume-action div,
-        .dashboard-app-connect div { text-align: center !important; display: grid !important; justify-items: center !important; }
+        .dashboard-app-connect div { text-align: center !important; display: grid !important; justify-items: center !important; gap: 4px !important; }
 
         .resume-action span,
         .dashboard-app-connect span {
-          width: clamp(42px, 9vw, 58px) !important;
-          height: clamp(42px, 9vw, 58px) !important;
-          font-size: clamp(20px, 5vw, 34px) !important;
+          width: clamp(38px, 8vw, 50px) !important;
+          height: clamp(38px, 8vw, 50px) !important;
+          font-size: clamp(16px, 4vw, 24px) !important;
+          border-radius: 999px !important;
+          display: grid !important;
+          place-items: center !important;
+          background: rgba(255,255,255,.08) !important;
+          color: rgba(255,255,255,.9) !important;
+          border: 1px solid rgba(255,255,255,.12) !important;
         }
 
         .resume-action strong,
@@ -439,9 +456,7 @@ export default function DashboardPage() {
           box-shadow: 0 0 18px rgba(143,255,210,.75);
         }
 
-        .campaign-buttons {
-          width: 100% !important;
-        }
+        .campaign-buttons { width: 100% !important; }
 
         @media (max-width: 640px) {
           .dashboard-cockpit-shell { padding-left: 14px !important; padding-right: 14px !important; }
