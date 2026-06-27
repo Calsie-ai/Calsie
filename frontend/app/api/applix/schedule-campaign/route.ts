@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bnshgtrqbfuphhhdgccs.supabase.co";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const AGENT_FUNCTION_NAME = process.env.APPLIX_AGENT_FUNCTION || "applix-agent-orchestrator";
-const REQUIRE_PAYMENT = process.env.APPLIX_REQUIRE_PAYMENT !== "false";
+const REQUIRE_PAYMENT = process.env.APPLIX_REQUIRE_PAYMENT === "true";
 
 type ScheduleBody = {
   access_token?: string;
