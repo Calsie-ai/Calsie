@@ -3,11 +3,30 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 type Row = Record<string, any>;
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://bnshgtrqbfuphhhdgccs.supabase.co";
-const SUPABASE_SERVICE_ROLE_KEY =
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
-  Deno.env.get("SERVICE_ROLE_KEY") ||
-  Deno.env.get("APPLIX_SERVICE_ROLE_KEY") ||
-  "";
+
+function env(name: string) {
+  return Deno.env.get(name) || "";
+}
+
+function firstSecretKey() {
+  const direct = env("SUPABASE_SERVICE_ROLE_KEY") || env("SERVICE_ROLE_KEY") || env("APPLIX_SERVICE_ROLE_KEY");
+  if (direct) return direct;
+
+  const modern = env("SUPABASE_SECRET_KEYS");
+  if (!modern) return "";
+
+  try {
+    const parsed = JSON.parse(modern);
+    if (Array.isArray(parsed)) return parsed[0]?.secret_key || parsed[0]?.key || parsed[0] || "";
+    if (typeof parsed === "object" && parsed !== null) return parsed.secret_key || parsed.key || String(Object.values(parsed)[0] || "");
+  } catch {
+    return modern;
+  }
+
+  return "";
+}
+
+const SUPABASE_SERVICE_ROLE_KEY = firstSecretKey();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -81,7 +100,10 @@ Deno.serve(async (req) => {
   try {
     if (req.method !== "POST") return reply({ ok: false, error: "Use POST" }, 405);
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return reply({ ok: false, error: "Missing Supabase service role configuration" }, 500);
+      return reply({
+        ok: false,
+        error: "Missing Supabase service role configuration. Add SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEYS in Edge Function secrets.",
+      }, 500);
     }
 
     const input = (await req.json().catch(() => ({}))) as Row;
@@ -193,7 +215,7 @@ Deno.serve(async (req) => {
           last_production_launch: {
             launched_at: new Date().toISOString(),
             function: "launch-applix-campaign",
-            version: "production_launcher_v1",
+            version: "production_launcher_v2_secret_keys",
             scraper_ok: scraper.ok,
             scraper_status: scraper.status,
             generator_ok: generator.ok,
@@ -219,7 +241,7 @@ Deno.serve(async (req) => {
     return reply({
       ok: errors.length === 0,
       function: "launch-applix-campaign",
-      version: "production_launcher_v1",
+      version: "production_launcher_v2_secret_keys",
       production_mode: true,
       test_mode: false,
       sends_emails_now: false,
@@ -254,7 +276,7 @@ Deno.serve(async (req) => {
     return reply({
       ok: false,
       function: "launch-applix-campaign",
-      version: "production_launcher_v1",
+      version: "production_launcher_v2_secret_keys",
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : null,
     }, 500);
