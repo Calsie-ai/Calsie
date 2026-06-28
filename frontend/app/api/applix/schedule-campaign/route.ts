@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bnshgtrqbfuphhhdgccs.supabase.co";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const AGENT_FUNCTION_NAME = process.env.APPLIX_AGENT_FUNCTION || "applix-agent-orchestrator";
+const LAUNCH_FUNCTION_NAME = process.env.APPLIX_LAUNCH_FUNCTION || "launch-applix-campaign";
 const REQUIRE_PAYMENT = process.env.APPLIX_REQUIRE_PAYMENT === "true";
 
 type ScheduleBody = {
@@ -66,93 +66,77 @@ export async function POST(req: Request) {
     }
 
     const currentUser = await getCurrentUser(accessToken);
-    const senderUserIdentifier = currentUser?.email || currentUser?.id || null;
-    const enabled = body.enabled !== false;
 
-    if (enabled && REQUIRE_PAYMENT) {
-      if (!currentUser?.id || !(await hasActivePayment(accessToken, currentUser.id))) {
-        return NextResponse.json({
-          ok: false,
-          code: "payment_required",
-          error: "Payment required. Please activate Applix Pro before starting the agent.",
-        }, { status: 402 });
-      }
+    if (!currentUser?.id) {
+      return NextResponse.json({ ok: false, error: "Could not verify the signed-in user." }, { status: 401 });
     }
 
-    const now = new Date().toISOString();
-
-    const outreach = {
-      enabled,
-      mode: "applix_agent",
-      starts_at: now,
-      launched_at: enabled ? now : null,
-      timezone: "Australia/Sydney",
-      agent_days: 10,
-      daily_job_limit: 100,
-      hourly_limit: 4,
-      test_mode: true,
-      sender_user_identifier: senderUserIdentifier,
-      first_agent_triggered_at: enabled ? now : null,
-      updated_at: now,
-    };
-
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/campaigns?id=eq.${encodeURIComponent(campaignId)}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessToken}`,
-        "apikey": SUPABASE_ANON_KEY,
-        "Prefer": "return=representation",
-      },
-      body: JSON.stringify({
-        status: enabled ? "launched" : "paused",
-        outreach,
-      }),
-    });
-
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      return NextResponse.json({ ok: false, error: "Could not start campaign.", details: data }, { status: response.status });
-    }
-
-    let agentRun = null;
-
-    if (enabled) {
-      const edgeResponse = await fetch(`${SUPABASE_URL}/functions/v1/${AGENT_FUNCTION_NAME}`, {
-        method: "POST",
+    if (body.enabled === false) {
+      const pauseResponse = await fetch(`${SUPABASE_URL}/rest/v1/campaigns?id=eq.${encodeURIComponent(campaignId)}&user_id=eq.${encodeURIComponent(currentUser.id)}`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken}`,
-          "apikey": SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+          apikey: SUPABASE_ANON_KEY,
+          Prefer: "return=representation",
         },
-        body: JSON.stringify({
-          campaign_id: campaignId,
-          test_mode: true,
-          agent_days: 10,
-          daily_job_limit: 100,
-          hourly_email_limit: 4,
-          sender_user_identifier: senderUserIdentifier,
-          max_campaigns: 1,
-          trigger: "start_campaign_ui",
-        }),
-        cache: "no-store",
+        body: JSON.stringify({ status: "paused" }),
       });
 
-      agentRun = await edgeResponse.json().catch(() => null);
-
-      if (!edgeResponse.ok || agentRun?.ok === false) {
-        return NextResponse.json({
-          ok: false,
-          error: agentRun?.error || "Campaign was launched, but the first agent run failed.",
-          campaign: Array.isArray(data) ? data[0] : data,
-          outreach,
-          agent_run: agentRun,
-        }, { status: 502 });
+      const pauseData = await pauseResponse.json().catch(() => null);
+      if (!pauseResponse.ok) {
+        return NextResponse.json({ ok: false, error: "Could not pause campaign.", details: pauseData }, { status: pauseResponse.status });
       }
+
+      return NextResponse.json({ ok: true, campaign: Array.isArray(pauseData) ? pauseData[0] : pauseData, agent_run: null });
     }
 
-    return NextResponse.json({ ok: true, outreach, campaign: Array.isArray(data) ? data[0] : data, agent_run: agentRun });
+    if (REQUIRE_PAYMENT && !(await hasActivePayment(accessToken, currentUser.id))) {
+      return NextResponse.json({
+        ok: false,
+        code: "payment_required",
+        error: "Payment required. Please activate Applix Pro before starting the agent.",
+      }, { status: 402 });
+    }
+
+    const launchResponse = await fetch(`${SUPABASE_URL}/functions/v1/${LAUNCH_FUNCTION_NAME}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        campaign_id: campaignId,
+        results_limit: 100,
+        queue_limit: 100,
+        min_lead_score: 70,
+        exact_private_company_only: true,
+      }),
+      cache: "no-store",
+    });
+
+    const launchData = await launchResponse.json().catch(() => null);
+
+    if (!launchResponse.ok || launchData?.ok === false) {
+      return NextResponse.json({
+        ok: false,
+        error: launchData?.error || "Could not start Applix production launcher.",
+        details: launchData,
+      }, { status: launchResponse.status || 502 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      outreach: {
+        enabled: true,
+        mode: "production",
+        test_mode: false,
+        agent_status: "ready_for_review",
+      },
+      campaign: null,
+      agent_run: launchData,
+    });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Could not start campaign." }, { status: 500 });
   }
