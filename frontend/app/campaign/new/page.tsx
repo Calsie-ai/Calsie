@@ -60,6 +60,28 @@ const dailyLimitOptions = [10, 25, 50, 100];
 const tailoringOptions = ["Tailor message only", "Tailor resume and message", "Use my resume only"];
 const approvalModeOptions = ["Ask me before applying", "Auto-apply to strong matches", "Save matches only"];
 
+const checkboxListStyle = { display: "grid", gap: "10px", marginTop: "10px" };
+const checkboxRowStyle = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "flex-start",
+  gap: "10px",
+  width: "100%",
+  textAlign: "left" as const,
+  lineHeight: 1.35,
+  fontWeight: 600,
+};
+const checkboxInputStyle = {
+  width: "18px",
+  minWidth: "18px",
+  maxWidth: "18px",
+  height: "18px",
+  margin: "2px 0 0",
+  padding: 0,
+  flex: "0 0 18px",
+  display: "inline-block",
+};
+
 function toggleSelection(values: string[], option: string) {
   return values.includes(option) ? values.filter((value) => value !== option) : [...values, option];
 }
@@ -239,15 +261,16 @@ export default function NewCampaignPage() {
 
               <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
                 <legend>Job type</legend>
-                <div style={{ display: "grid", gap: "8px", marginTop: "8px" }}>
+                <div style={checkboxListStyle}>
                   {jobTypeOptions.map((option) => (
-                    <label key={option} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <label key={option} style={checkboxRowStyle}>
                       <input
                         type="checkbox"
                         checked={jobTypes.includes(option)}
                         onChange={() => setJobTypes((current) => toggleSelection(current, option))}
+                        style={checkboxInputStyle}
                       />
-                      {option}
+                      <span>{option}</span>
                     </label>
                   ))}
                 </div>
@@ -255,15 +278,16 @@ export default function NewCampaignPage() {
 
               <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
                 <legend>Work mode</legend>
-                <div style={{ display: "grid", gap: "8px", marginTop: "8px" }}>
+                <div style={checkboxListStyle}>
                   {workModeOptions.map((option) => (
-                    <label key={option} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <label key={option} style={checkboxRowStyle}>
                       <input
                         type="checkbox"
                         checked={workModes.includes(option)}
                         onChange={() => setWorkModes((current) => toggleSelection(current, option))}
+                        style={checkboxInputStyle}
                       />
-                      {option}
+                      <span>{option}</span>
                     </label>
                   ))}
                 </div>
@@ -280,15 +304,16 @@ export default function NewCampaignPage() {
             <div style={{ display: "grid", gap: "14px" }}>
               <h2 style={{ margin: 0 }}>Requirements</h2>
               <p className="muted" style={{ margin: 0 }}>Select anything important. Leave blank if you do not want to filter too much.</p>
-              <div style={{ display: "grid", gap: "8px" }}>
+              <div style={checkboxListStyle}>
                 {requirementOptions.map((option) => (
-                  <label key={option} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <label key={option} style={checkboxRowStyle}>
                     <input
                       type="checkbox"
                       checked={requirements.includes(option)}
                       onChange={() => setRequirements((current) => toggleSelection(current, option))}
+                      style={checkboxInputStyle}
                     />
-                    {option}
+                    <span>{option}</span>
                   </label>
                 ))}
               </div>
