@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getSupabaseClient } from "../../../lib/supabaseClient";
 
-const roleOptions = [
+const roleSuggestions = [
   "Support Worker",
   "Disability Support Worker",
+  "Community Support Worker",
   "Retail Assistant",
   "Kitchen Hand",
   "Cleaner",
@@ -17,10 +18,9 @@ const roleOptions = [
   "Security Guard",
   "Barista",
   "Driver",
-  "Other",
 ];
 
-const locationOptions = [
+const locationSuggestions = [
   "Sydney NSW",
   "Berala NSW",
   "Parramatta NSW",
@@ -28,12 +28,16 @@ const locationOptions = [
   "Blacktown NSW",
   "Liverpool NSW",
   "Chatswood NSW",
-  "Remote",
+  "Burwood NSW",
+  "Strathfield NSW",
+  "Auburn NSW",
+  "Granville NSW",
+  "Remote Australia",
   "Anywhere in Australia",
-  "Other",
 ];
 
-const jobTypeOptions = ["Casual", "Part-time", "Full-time", "Contract", "Internship", "Remote", "Hybrid", "On-site"];
+const jobTypeOptions = ["Casual", "Part-time", "Full-time", "Contract", "Internship"];
+const workModeOptions = ["On-site", "Hybrid", "Remote"];
 const postedWithinOptions = ["Last 24 hours", "Last 3 days", "Last 7 days", "Last 14 days", "Last 30 days"];
 const requirementOptions = [
   "No experience required",
@@ -64,11 +68,12 @@ export default function NewCampaignPage() {
   const router = useRouter();
   const [userId, setUserId] = useState("");
   const [name, setName] = useState("");
-  const [targetRole, setTargetRole] = useState("Support Worker");
-  const [targetLocation, setTargetLocation] = useState("Sydney NSW");
+  const [targetRole, setTargetRole] = useState("");
+  const [targetLocation, setTargetLocation] = useState("");
   const [jobTypes, setJobTypes] = useState<string[]>(["Casual", "Part-time"]);
+  const [workModes, setWorkModes] = useState<string[]>(["On-site"]);
   const [postedWithin, setPostedWithin] = useState("Last 30 days");
-  const [requirements, setRequirements] = useState<string[]>(["Student friendly", "No driver licence needed"]);
+  const [requirements, setRequirements] = useState<string[]>([]);
   const [dailyCap, setDailyCap] = useState(100);
   const hourlyCap = 5;
   const campaignDays = 10;
@@ -80,10 +85,13 @@ export default function NewCampaignPage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const campaignSummary = useMemo(() => {
-    const selectedTypes = jobTypes.length ? jobTypes.join(", ") : "any";
+    const role = targetRole.trim() || "your selected role";
+    const area = targetLocation.trim() || "your target area";
+    const selectedTypes = jobTypes.length ? jobTypes.join(", ") : "any job type";
+    const selectedModes = workModes.length ? workModes.join(", ") : "any work mode";
     const selectedRequirements = requirements.length ? requirements.join(", ") : "no extra requirements";
-    return `Find ${selectedTypes} ${targetRole || "jobs"} around ${targetLocation || "my area"}, posted ${postedWithin.toLowerCase()}, with ${selectedRequirements}.`;
-  }, [jobTypes, postedWithin, requirements, targetLocation, targetRole]);
+    return `Applix will look for ${selectedTypes} ${role} opportunities around ${area}, ${selectedModes.toLowerCase()}, posted ${postedWithin.toLowerCase()}, with ${selectedRequirements}.`;
+  }, [jobTypes, postedWithin, requirements, targetLocation, targetRole, workModes]);
 
   useEffect(() => {
     async function checkUser() {
@@ -128,6 +136,7 @@ export default function NewCampaignPage() {
           target_role: targetRole.trim(),
           target_location: targetLocation.trim() || null,
           job_types: jobTypes,
+          work_modes: workModes,
           posted_within: postedWithin,
           fetch_frequency: "daily",
           campaign_days: campaignDays,
@@ -136,6 +145,7 @@ export default function NewCampaignPage() {
         filters: {
           location: targetLocation.trim() || null,
           job_types: jobTypes,
+          work_modes: workModes,
           posted_within: postedWithin,
           requirements,
           notes: notes.trim() || null,
@@ -168,111 +178,161 @@ export default function NewCampaignPage() {
 
   return (
     <main className="app-shell">
-      <section className="dashboard-card narrow-card" style={{ textAlign: "center", display: "grid", justifyItems: "center" }}>
-        <p className="eyebrow" style={{ textAlign: "center" }}>Create campaign</p>
-        <h1 style={{ textAlign: "center" }}>Create your Applix campaign</h1>
-        <p className="muted" style={{ textAlign: "center", maxWidth: "560px" }}>
-          Tell Applix what kind of opportunities you want. Setup takes around 2 minutes.
-        </p>
+      <section className="dashboard-card narrow-card" style={{ display: "grid", gap: "18px" }}>
+        <div style={{ textAlign: "left" }}>
+          <p className="eyebrow">Create campaign</p>
+          <h1>Let&apos;s start with your job search</h1>
+          <p className="muted" style={{ maxWidth: "620px" }}>
+            Build one Applix campaign. Type your role and target area, then choose the filters that matter.
+          </p>
+        </div>
 
         {checkingUser ? (
           <p className="muted">Checking your login...</p>
         ) : (
-          <form className="campaign-form" onSubmit={createCampaign} style={{ width: "100%", display: "grid", gap: "18px", justifyItems: "center", textAlign: "center" }}>
-            <div className="empty-state" style={{ width: "100%", textAlign: "left", lineHeight: 1.9 }}>
-              <p style={{ margin: 0 }}>
-                Hi Applix, I want to create a campaign called
+          <form className="campaign-form" onSubmit={createCampaign} style={{ display: "grid", gap: "22px" }}>
+            <div style={{ display: "grid", gap: "14px" }}>
+              <h2 style={{ margin: 0 }}>Campaign details</h2>
+
+              <label>
+                Campaign name <span aria-hidden="true">*</span>
                 <input
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="Sydney Support Worker Campaign"
+                  placeholder="E.g. Sydney Support Worker Campaign"
                   required
-                  style={{ textAlign: "center", margin: "0 8px", maxWidth: "320px" }}
                 />
-                .
-              </p>
+              </label>
 
-              <p style={{ margin: "14px 0 0" }}>
-                I want to find opportunities as a
-                <select value={targetRole} onChange={(event) => setTargetRole(event.target.value)} required style={{ margin: "0 8px", maxWidth: "260px" }}>
-                  {roleOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
-                around
-                <select value={targetLocation} onChange={(event) => setTargetLocation(event.target.value)} style={{ margin: "0 8px", maxWidth: "260px" }}>
-                  {locationOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
-                .
-              </p>
+              <label>
+                What role are you targeting? <span aria-hidden="true">*</span>
+                <input
+                  value={targetRole}
+                  onChange={(event) => setTargetRole(event.target.value)}
+                  placeholder="Start typing, e.g. Support Worker"
+                  list="applix-role-suggestions"
+                  required
+                />
+                <datalist id="applix-role-suggestions">
+                  {roleSuggestions.map((option) => <option key={option} value={option} />)}
+                </datalist>
+              </label>
 
-              <p style={{ margin: "14px 0 0" }}>
-                I am looking for
-                <select
-                  multiple
-                  value={jobTypes}
-                  onChange={(event) => setJobTypes(Array.from(event.target.selectedOptions, (option) => option.value))}
-                  style={{ margin: "0 8px", minHeight: "112px", verticalAlign: "middle" }}
-                >
-                  {jobTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
-                jobs posted within
-                <select value={postedWithin} onChange={(event) => setPostedWithin(event.target.value)} style={{ margin: "0 8px", maxWidth: "220px" }}>
-                  {postedWithinOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
-                .
-              </p>
-
-              <div style={{ marginTop: "16px" }}>
-                <p style={{ margin: "0 0 8px" }}>My important requirements are</p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                  {requirementOptions.map((option) => {
-                    const selected = requirements.includes(option);
-                    return (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => setRequirements((current) => toggleSelection(current, option))}
-                        className={selected ? "primary-button" : "ghost-link"}
-                        style={{ padding: "8px 12px", borderRadius: "999px" }}
-                      >
-                        {option}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <p style={{ margin: "18px 0 0" }}>
-                I want Applix to prepare
-                <select value={dailyCap} onChange={(event) => setDailyCap(Number(event.target.value))} style={{ margin: "0 8px", maxWidth: "180px" }}>
-                  {dailyLimitOptions.map((option) => <option key={option} value={option}>{option} per day</option>)}
-                </select>
-                applications per day.
-              </p>
+              <label>
+                Target area / location <span aria-hidden="true">*</span>
+                <input
+                  value={targetLocation}
+                  onChange={(event) => setTargetLocation(event.target.value)}
+                  placeholder="Start typing, e.g. Sydney NSW"
+                  list="applix-location-suggestions"
+                  required
+                />
+                <datalist id="applix-location-suggestions">
+                  {locationSuggestions.map((option) => <option key={option} value={option} />)}
+                </datalist>
+                <small className="muted">Suggestions appear while typing. Users can still write any suburb, city, or remote area.</small>
+              </label>
             </div>
 
-            <label style={{ width: "100%", textAlign: "center" }}>
-              AI tailoring
-              <select value={tailoringMode} onChange={(event) => setTailoringMode(event.target.value)}>
-                {tailoringOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
+            <div style={{ display: "grid", gap: "14px" }}>
+              <h2 style={{ margin: 0 }}>Job filters</h2>
+
+              <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+                <legend>Job type</legend>
+                <div style={{ display: "grid", gap: "8px", marginTop: "8px" }}>
+                  {jobTypeOptions.map((option) => (
+                    <label key={option} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <input
+                        type="checkbox"
+                        checked={jobTypes.includes(option)}
+                        onChange={() => setJobTypes((current) => toggleSelection(current, option))}
+                      />
+                      {option}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+                <legend>Work mode</legend>
+                <div style={{ display: "grid", gap: "8px", marginTop: "8px" }}>
+                  {workModeOptions.map((option) => (
+                    <label key={option} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <input
+                        type="checkbox"
+                        checked={workModes.includes(option)}
+                        onChange={() => setWorkModes((current) => toggleSelection(current, option))}
+                      />
+                      {option}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <label>
+                Jobs posted within
+                <select value={postedWithin} onChange={(event) => setPostedWithin(event.target.value)}>
+                  {postedWithinOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </label>
+            </div>
+
+            <div style={{ display: "grid", gap: "14px" }}>
+              <h2 style={{ margin: 0 }}>Requirements</h2>
+              <p className="muted" style={{ margin: 0 }}>Select anything important. Leave blank if you do not want to filter too much.</p>
+              <div style={{ display: "grid", gap: "8px" }}>
+                {requirementOptions.map((option) => (
+                  <label key={option} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <input
+                      type="checkbox"
+                      checked={requirements.includes(option)}
+                      onChange={() => setRequirements((current) => toggleSelection(current, option))}
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: "14px" }}>
+              <h2 style={{ margin: 0 }}>Automation settings</h2>
+
+              <label>
+                Applications per day
+                <select value={dailyCap} onChange={(event) => setDailyCap(Number(event.target.value))}>
+                  {dailyLimitOptions.map((option) => <option key={option} value={option}>{option} per day</option>)}
+                </select>
+              </label>
+
+              <label>
+                AI tailoring
+                <select value={tailoringMode} onChange={(event) => setTailoringMode(event.target.value)}>
+                  {tailoringOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </label>
+
+              <label>
+                Before applying
+                <select value={approvalMode} onChange={(event) => setApprovalMode(event.target.value)}>
+                  {approvalModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </label>
+            </div>
+
+            <label>
+              Extra instructions
+              <textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="E.g. student friendly, no driver licence, night shift, exclude agencies, apply only within 30 minutes from home..."
+                rows={5}
+              />
             </label>
 
-            <label style={{ width: "100%", textAlign: "center" }}>
-              Before applying
-              <select value={approvalMode} onChange={(event) => setApprovalMode(event.target.value)}>
-                {approvalModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
-
-            <div className="empty-state" style={{ textAlign: "center", width: "100%" }}>
+            <div className="empty-state" style={{ textAlign: "left", width: "100%" }}>
               <h2>Campaign preview</h2>
               <p>{campaignSummary}</p>
             </div>
-
-            <label style={{ width: "100%", textAlign: "center" }}>
-              Extra instructions
-              <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Part-time only, no driver licence, student friendly, night shift, exclude agencies..." rows={5} style={{ textAlign: "center" }} />
-            </label>
 
             {errorMessage && <p className="error-text">{errorMessage}</p>}
 
