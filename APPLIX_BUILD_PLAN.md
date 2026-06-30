@@ -1,83 +1,61 @@
-# Applix Build Plan
-
+Applix Build Plan
 This roadmap defines the next product flow for Applix after the editable resume test.
 
-## Product vision
-
+Product vision
 Applix should become a job-hunting assistant that can:
 
-1. Show swipe-style job cards.
-2. Let the user skip, save, or apply to jobs.
-3. Generate a tailored resume and cover email.
-4. Let the user edit the resume before applying.
-5. Open a Gmail draft or email app during the early test stage.
-6. Track prepared and sent applications.
-7. Keep searching for new jobs when the user reaches the end of matches.
-8. Later integrate Google OAuth/Gmail API for draft creation and one-button send.
-
----
-
-## Current milestone
-
-### Milestone 0 — Editable resume self-test
-
+Show swipe-style job cards.
+Let the user skip, save, or apply to jobs.
+Generate a tailored resume and cover email.
+Let the user edit the resume before applying.
+Open a Gmail draft or email app during the early test stage.
+Track prepared and sent applications.
+Keep searching for new jobs when the user reaches the end of matches.
+Later integrate Google OAuth/Gmail API for draft creation and one-button send.
+Current milestone
+Milestone 0 — Editable resume self-test
 Status: in progress.
 
 Current flow:
 
-```txt
 Create resume
 -> Edit resume directly inside preview
 -> Save edits
 -> Download PDF
 -> Open email/Gmail manually
-```
-
 Success criteria:
 
-- User can create an AI resume draft.
-- User can edit visible resume fields.
-- Edited resume appears correctly in PDF/download flow.
-- User can prepare an email manually.
-
----
-
-## Milestone 1 — Swipe card job flow
-
+User can create an AI resume draft.
+User can edit visible resume fields.
+Edited resume appears correctly in PDF/download flow.
+User can prepare an email manually.
+Milestone 1 — Swipe card job flow
 Goal: Make the matching page feel like a simple job-card swiping experience.
 
 User actions:
 
-```txt
 Swipe left / Skip
 Swipe right / Save
 Apply / Create Resume
 Next job
 Previous job
-```
-
 Job card should show:
 
-- Job title
-- Company
-- Location
-- Match percentage
-- Application method badge
-- Hiring email badge if available
-- Key hints
-- Apply URL if available
-
+Job title
+Company
+Location
+Match percentage
+Application method badge
+Hiring email badge if available
+Key hints
+Apply URL if available
 Recommended UI buttons:
 
-```txt
 [Skip]
 [Save]
 [Apply]
-```
-
 Database table:
 
-```sql
 create table if not exists job_interactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid,
@@ -85,11 +63,8 @@ create table if not exists job_interactions (
   action text,
   created_at timestamptz default now()
 );
-```
-
 Action values:
 
-```txt
 viewed
 skipped
 saved
@@ -97,41 +72,28 @@ resume_created
 application_prepared
 sent
 failed
-```
-
 Success criteria:
 
-- User can move through jobs with card actions.
-- Actions can be saved to Supabase.
-- Saved/skipped jobs are remembered.
-
----
-
-## Milestone 2 — End-of-jobs search state
-
+User can move through jobs with card actions.
+Actions can be saved to Supabase.
+Saved/skipped jobs are remembered.
+Milestone 2 — End-of-jobs search state
 Goal: When the user reaches the last job, Applix should not feel empty. It should become an active hunter.
 
 End screen copy:
 
-```txt
 Applix is hunting for more jobs.
 
 We are checking public job gateways, company career pages, hiring emails, and application links.
 
 You can come back in a few minutes, refresh now, or ask Applix to email you when jobs are ready.
-```
-
 Buttons:
 
-```txt
 [Refresh jobs now]
 [Find jobs with emails]
 [Notify me by email]
-```
-
 Database table:
 
-```sql
 create table if not exists job_search_requests (
   id uuid primary key default gen_random_uuid(),
   user_id uuid,
@@ -144,55 +106,38 @@ create table if not exists job_search_requests (
   created_at timestamptz default now(),
   completed_at timestamptz
 );
-```
-
 Status values:
 
-```txt
 pending
 scraping
 completed
 failed
-```
-
 Success criteria:
 
-- Last-card state appears cleanly.
-- User can request a refresh.
-- User can request email notification later.
-- Search requests are saved.
-
----
-
-## Milestone 3 — Render Python scraper
-
+Last-card state appears cleanly.
+User can request a refresh.
+User can request email notification later.
+Search requests are saved.
+Milestone 3 — Render Python scraper
 Goal: Create a lightweight Render-hosted scraper/gateway service.
 
 Important Render free-tier behaviour:
 
-- Free web services may sleep after inactivity.
-- First request after sleep can be slow.
-- Scraper should run on request, not constantly.
-- Store results in Supabase, not Render local storage.
-
+Free web services may sleep after inactivity.
+First request after sleep can be slow.
+Scraper should run on request, not constantly.
+Store results in Supabase, not Render local storage.
 Render service structure:
 
-```txt
 applix-scraper/
   main.py
   requirements.txt
   render.yaml
-```
-
 Scraper endpoint:
 
-```txt
 GET /scrape?role=support%20worker&location=Sydney&limit=10&preferEmail=true
-```
-
 Response shape:
 
-```json
 {
   "ok": true,
   "role": "support worker",
@@ -214,23 +159,16 @@ Response shape:
     }
   ]
 }
-```
-
 Success criteria:
 
-- Render scraper returns job gateway data.
-- Errors do not break Applix.
-- Scraper favours public company career pages and direct hiring emails.
-
----
-
-## Milestone 4 — Supabase job gateway storage
-
+Render scraper returns job gateway data.
+Errors do not break Applix.
+Scraper favours public company career pages and direct hiring emails.
+Milestone 4 — Supabase job gateway storage
 Goal: Store scraped/refreshed jobs in Supabase so the user can come back later.
 
 Database table:
 
-```sql
 create table if not exists jobs_gateway (
   id uuid primary key default gen_random_uuid(),
   user_id uuid,
@@ -251,74 +189,53 @@ create table if not exists jobs_gateway (
   refreshed_at timestamptz default now(),
   created_at timestamptz default now()
 );
-```
-
 Application methods:
 
-```txt
 email
 apply_link
 career_page
 job_board
 unknown
-```
-
 Ranking order:
 
-```txt
 1. Email found
 2. Direct company apply link
 3. Career page
 4. Job board only
 5. Unknown source
-```
-
 Success criteria:
 
-- Refreshed jobs save to Supabase.
-- Jobs with hiring emails appear first.
-- Applix can reload stored results.
-
----
-
-## Milestone 5 — Application kit
-
+Refreshed jobs save to Supabase.
+Jobs with hiring emails appear first.
+Applix can reload stored results.
+Milestone 5 — Application kit
 Goal: Turn a job into a prepared application.
 
 Application kit includes:
 
-- Tailored resume
-- Cover email
-- Subject line
-- Employer email
-- Apply link
-- Job hints used
-- Manual send/checklist buttons
-
+Tailored resume
+Cover email
+Subject line
+Employer email
+Apply link
+Job hints used
+Manual send/checklist buttons
 Early test buttons:
 
-```txt
 [Download Resume PDF]
 [Open Gmail Draft]
 [Copy Email]
 [Mark as Applied]
-```
-
 Success criteria:
 
-- User can create a complete application package.
-- User can manually apply without Gmail API.
-- User can mark job as applied.
-
----
-
-## Milestone 6 — Application tracker
-
+User can create a complete application package.
+User can manually apply without Gmail API.
+User can mark job as applied.
+Milestone 6 — Application tracker
 Goal: Remember every prepared/sent application.
 
 Database table:
 
-```sql
 create table if not exists applications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid,
@@ -331,11 +248,8 @@ create table if not exists applications (
   sent_at timestamptz,
   created_at timestamptz default now()
 );
-```
-
 Statuses:
 
-```txt
 prepared
 draft_created
 sent
@@ -344,37 +258,27 @@ follow_up_needed
 rejected
 interview
 hired
-```
-
 Success criteria:
 
-- User can see prepared and sent applications.
-- Manual applications can be marked as applied.
-- Later Gmail sends can update this table automatically.
-
----
-
-## Milestone 7 — Google OAuth and Gmail draft integration
-
+User can see prepared and sent applications.
+Manual applications can be marked as applied.
+Later Gmail sends can update this table automatically.
+Milestone 7 — Google OAuth and Gmail draft integration
 Goal: Integrate with Google after the manual self-test works.
 
 Recommended order:
 
-```txt
 1. Gmail web/mailto manual flow
 2. Google OAuth connection
 3. Create Gmail draft
 4. Send saved Gmail draft
 5. One-button send after confirmation
-```
-
 Important rule:
 
 Do not send blindly. Always preview or confirm before sending.
 
 One-button apply confirmation screen:
 
-```txt
 Ready to apply?
 
 Job: Disability Support Worker
@@ -385,21 +289,14 @@ Attached: Tailored resume PDF
 [Edit]
 [Save Draft]
 [Send Application]
-```
-
 Success criteria:
 
-- User can connect Google.
-- Applix can create a Gmail draft.
-- Later, Applix can send after explicit confirmation.
-
----
-
-## Immediate build order
-
+User can connect Google.
+Applix can create a Gmail draft.
+Later, Applix can send after explicit confirmation.
+Immediate build order
 Implement in this order:
 
-```txt
 1. Test editable resume.
 2. Add swipe-style buttons and interaction tracking.
 3. Add end-of-jobs screen.
@@ -414,17 +311,12 @@ Implement in this order:
 12. Add application tracker.
 13. Start Google OAuth/Gmail draft work.
 14. Add one-button send after Google approval.
-```
-
-## Next coding step
-
+Next coding step
 Start with Milestone 1:
 
-```txt
 Add card action states:
 - skipped
 - saved
 - apply/resume_created
 
 Then add an end-of-list state that launches the refresh flow.
-```
