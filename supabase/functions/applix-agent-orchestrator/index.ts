@@ -41,8 +41,13 @@ function safeNumber(value: unknown, fallback: number, min: number, max: number) 
 }
 
 function isAuthorized(req: Request) {
-  if (!CRON_SECRET) return true;
-  return (req.headers.get("authorization") || "") === `Bearer ${CRON_SECRET}`;
+  if (!CRON_SECRET) {
+    throw new Error("CRON_SECRET is not configured. Refusing to run.");
+  }
+
+  const authHeader = req.headers.get("authorization") || "";
+  const cronHeader = req.headers.get("x-applix-cron-secret") || "";
+  return authHeader === `Bearer ${CRON_SECRET}` || cronHeader === CRON_SECRET;
 }
 
 async function callFunction(name: string, body: Row) {
