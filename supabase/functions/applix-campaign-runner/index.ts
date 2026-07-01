@@ -31,7 +31,10 @@ function json(body: unknown, status = 200) {
 }
 
 function isAuthorized(req: Request) {
-  if (!CRON_SECRET) return true;
+  if (!CRON_SECRET) {
+    throw new Error("CRON_SECRET is not configured. Refusing to run.");
+  }
+
   const authHeader = req.headers.get("authorization") || "";
   const cronHeader = req.headers.get("x-applix-cron-secret") || "";
   return authHeader === `Bearer ${CRON_SECRET}` || cronHeader === CRON_SECRET;
