@@ -79,6 +79,7 @@ async function callFunction(name: string, body: Row) {
     headers: {
       "content-type": "application/json",
       Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
     },
     body: JSON.stringify(body),
   });
