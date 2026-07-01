@@ -35,7 +35,15 @@ function safeLimit(v: unknown, fallback = 100) {
   return Math.max(1, Math.min(100, Number.isFinite(n) ? n : fallback));
 }
 async function callFunction(name: string, body: Row) {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+    },
+    body: JSON.stringify(body),
+  });
   const payload = await response.json().catch(() => ({}));
   return { ok: response.ok && !payload.error, status: response.status, payload };
 }
