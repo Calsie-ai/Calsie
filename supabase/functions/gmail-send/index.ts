@@ -1,58 +1,31 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
-/**
- * Flexible object type for database rows and JSON input.
- */
 type Row = Record<string, any>;
 
-/**
- * Resume attachment format for Gmail MIME email.
- */
 type ResumeAttachment = {
   fileName: string;
   contentType: string;
   base64: string;
 };
 
-/**
- * Gmail has a 25MB total message limit.
- * Base64 increases size, so keep attachment below 15MB.
- */
 const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
-
-/**
- * Default sender display name.
- */
 const DEFAULT_FROM_NAME = "Applix Candidate";
 
-/**
- * Read environment variable from Supabase Edge Function secrets.
- */
 function env(name: string) {
   return Deno.env.get(name) ?? "";
 }
 
-/**
- * Clean text helper.
- */
 function txt(value: unknown, fallback = "") {
   if (value === undefined || value === null) return fallback;
   const text = String(value).trim();
   return text || fallback;
 }
 
-/**
- * Normalize email text.
- */
 function normalizeEmail(value: unknown) {
   return txt(value).toLowerCase();
 }
 
-/**
- * Required backend secrets.
- */
 const SUPABASE_URL = env("SUPABASE_URL");
-
 const SUPABASE_SERVICE_ROLE_KEY =
   env("SUPABASE_SERVICE_ROLE_KEY") ||
   env("SERVICE_ROLE_KEY") ||
@@ -60,25 +33,15 @@ const SUPABASE_SERVICE_ROLE_KEY =
 
 const GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID");
 const GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET");
-
-/**
- * Internal secret for backend/cron calls.
- */
 const CRON_SECRET = env("CRON_SECRET") || env("APPLIX_CRON_SECRET");
 
-/**
- * CORS headers.
- */
 const corsHeaders = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "POST, OPTIONS",
   "access-control-allow-headers":
-    "authorization, x-client-info, apikey, content-type, x-applix-cron-secret",
+    "authorization, x-client-info, apikey, content-type, x-applix-cron-secret, x-cron-secret",
 };
 
-/**
- * Standard JSON response.
- */
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
     status,
@@ -89,40 +52,23 @@ function json(body: unknown, status = 200) {
   });
 }
 
-/**
- * UUID checker.
- */
 function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(
-    value
-  );
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value);
 }
 
-/**
- * Email validator.
- */
 function looksLikeEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-/**
- * Prevent email header injection.
- */
 function safeHeader(value: string, fallback: string) {
   return txt(value, fallback).replace(/[\r\n]+/g, " ").trim() || fallback;
 }
 
-/**
- * Clean attachment filename.
- */
 function safeFileName(value: string, fallback = "resume.pdf") {
   const cleaned = txt(value, fallback).replace(/[\r\n\\/]+/g, " ").trim();
   return cleaned || fallback;
 }
 
-/**
- * Convert bytes to base64.
- */
 function bytesToBase64(bytes: Uint8Array) {
   let binary = "";
   const chunkSize = 0x8000;
@@ -135,64 +81,34 @@ function bytesToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-/**
- * Gmail API requires raw email encoded as base64url.
- */
 function base64Url(input: string) {
   const bytes = new TextEncoder().encode(input);
-
   return bytesToBase64(bytes)
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
 }
 
-/**
- * MIME attachment wrapping.
- */
 function wrapBase64(value: string) {
   return value.replace(/.{1,76}/g, "$&\r\n").trim();
 }
 
-/**
- * Extract token from Authorization header.
- */
 function bearerToken(req: Request) {
   const authHeader = req.headers.get("authorization") || "";
   return authHeader.replace(/^Bearer\s+/i, "").trim();
 }
 
-/**
- * This function sends real email.
- *
- * It should only be called internally by:
- * - applix-agent-email-scheduler
- * - backend cron
- * - trusted backend
- *
- * Allowed:
- * - Authorization: Bearer SUPABASE_SERVICE_ROLE_KEY
- * - Authorization: Bearer CRON_SECRET
- * - x-applix-cron-secret: CRON_SECRET
- */
 function isInternalAuthorized(req: Request) {
   const token = bearerToken(req);
-  const cronHeader = req.headers.get("x-applix-cron-secret") || "";
+  const applixCronHeader = req.headers.get("x-applix-cron-secret") || "";
+  const cronHeader = req.headers.get("x-cron-secret") || "";
 
-  if (SUPABASE_SERVICE_ROLE_KEY && token === SUPABASE_SERVICE_ROLE_KEY) {
-    return true;
-  }
-
-  if (CRON_SECRET && (token === CRON_SECRET || cronHeader === CRON_SECRET)) {
-    return true;
-  }
+  if (SUPABASE_SERVICE_ROLE_KEY && token === SUPABASE_SERVICE_ROLE_KEY) return true;
+  if (CRON_SECRET && (token === CRON_SECRET || applixCronHeader === CRON_SECRET || cronHeader === CRON_SECRET)) return true;
 
   return false;
 }
 
-/**
- * Build Gmail raw MIME email.
- */
 function makeRawEmail(
   fromEmail: string,
   to: string,
@@ -205,7 +121,6 @@ function makeRawEmail(
   const safeFromEmail = safeHeader(fromEmail, fromEmail);
   const safeFromName = safeHeader(fromName, DEFAULT_FROM_NAME);
   const safeTo = safeHeader(to, to);
-
   const fromHeader = `${safeFromName} <${safeFromEmail}>`;
 
   if (!attachment) {
@@ -224,10 +139,7 @@ function makeRawEmail(
 
   const boundary = `applix_${crypto.randomUUID()}`;
   const fileName = safeFileName(attachment.fileName);
-  const contentType = safeHeader(
-    attachment.contentType,
-    "application/octet-stream"
-  );
+  const contentType = safeHeader(attachment.contentType, "application/octet-stream");
 
   const message = [
     `From: ${fromHeader}`,
@@ -256,15 +168,10 @@ function makeRawEmail(
   return base64Url(message);
 }
 
-/**
- * Refresh Gmail OAuth access token.
- */
 async function refreshAccessToken(refreshToken: string) {
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
-    headers: {
-      "content-type": "application/x-www-form-urlencoded",
-    },
+    headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
       client_secret: GOOGLE_CLIENT_SECRET,
@@ -274,86 +181,121 @@ async function refreshAccessToken(refreshToken: string) {
   });
 
   const data = await response.json().catch(() => ({}));
-
-  return {
-    ok: response.ok,
-    status: response.status,
-    data,
-  };
+  return { ok: response.ok, status: response.status, data };
 }
 
-/**
- * Find resume profile safely.
- *
- * No unsafe latest-profile fallback.
- * It only matches the user's profile/email.
- */
+async function findResumeByProfileId(supabase: ReturnType<typeof createClient>, profileId: string) {
+  if (!isUuid(profileId)) return { data: null, error: null };
+
+  return await supabase
+    .from("resume_profiles")
+    .select("profile_id,email,resume_file_path,resume_file_name,resume_file_type,updated_at")
+    .eq("profile_id", profileId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+}
+
+async function findResumeFromCampaignSource(
+  supabase: ReturnType<typeof createClient>,
+  campaignId: string,
+  senderIdentifier: string,
+  resumeProfileId: string
+) {
+  if (!isUuid(campaignId)) return { data: null, error: null };
+
+  let query = supabase
+    .from("campaign_resume_sources")
+    .select("id,campaign_id,user_identifier,resume_profile_id,profile_id,created_at,updated_at")
+    .eq("campaign_id", campaignId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  const sourceResult = await query;
+  if (sourceResult.error) return { data: null, error: sourceResult.error };
+
+  const rows = (sourceResult.data || []) as Row[];
+  const preferred = rows.find((row) => {
+    const rowUser = txt(row.user_identifier).toLowerCase();
+    return !senderIdentifier || rowUser === senderIdentifier.toLowerCase();
+  }) || rows[0];
+
+  if (!preferred) return { data: null, error: null };
+
+  const candidateIds = [
+    txt(preferred.profile_id),
+    txt(preferred.resume_profile_id),
+    resumeProfileId,
+  ].filter(Boolean);
+
+  for (const candidateId of candidateIds) {
+    const result = await findResumeByProfileId(supabase, candidateId);
+    if (result.error || result.data?.resume_file_path) return result;
+  }
+
+  return { data: null, error: null };
+}
+
 async function findResumeProfile(
   supabase: ReturnType<typeof createClient>,
   resumeProfileId: string,
-  senderIdentifier: string
+  senderIdentifier: string,
+  campaignId: string
 ) {
+  const byCampaign = await findResumeFromCampaignSource(
+    supabase,
+    campaignId,
+    senderIdentifier,
+    resumeProfileId
+  );
+  if (byCampaign.error || byCampaign.data?.resume_file_path) return byCampaign;
+
   if (isUuid(resumeProfileId)) {
-    const byProfileId = await supabase
-      .from("resume_profiles")
-      .select(
-        "profile_id,email,resume_file_path,resume_file_name,resume_file_type,updated_at"
-      )
-      .eq("profile_id", resumeProfileId)
-      .order("updated_at", { ascending: false })
+    const byResumeProfileId = await findResumeByProfileId(supabase, resumeProfileId);
+    if (byResumeProfileId.error || byResumeProfileId.data?.resume_file_path) return byResumeProfileId;
+
+    const sourceByResumeId = await supabase
+      .from("campaign_resume_sources")
+      .select("profile_id,resume_profile_id,created_at")
+      .eq("resume_profile_id", resumeProfileId)
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (byProfileId.data?.resume_file_path || byProfileId.error) {
-      return byProfileId;
+    if (sourceByResumeId.error) return { data: null, error: sourceByResumeId.error };
+
+    const linkedProfileId = txt((sourceByResumeId.data as Row | null)?.profile_id);
+    if (linkedProfileId) {
+      const linked = await findResumeByProfileId(supabase, linkedProfileId);
+      if (linked.error || linked.data?.resume_file_path) return linked;
     }
   }
 
   if (isUuid(senderIdentifier)) {
-    const bySenderUuid = await supabase
-      .from("resume_profiles")
-      .select(
-        "profile_id,email,resume_file_path,resume_file_name,resume_file_type,updated_at"
-      )
-      .eq("profile_id", senderIdentifier)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (bySenderUuid.data?.resume_file_path || bySenderUuid.error) {
-      return bySenderUuid;
-    }
+    const bySenderUuid = await findResumeByProfileId(supabase, senderIdentifier);
+    if (bySenderUuid.error || bySenderUuid.data?.resume_file_path) return bySenderUuid;
   }
 
   if (looksLikeEmail(senderIdentifier)) {
     const byEmail = await supabase
       .from("resume_profiles")
-      .select(
-        "profile_id,email,resume_file_path,resume_file_name,resume_file_type,updated_at"
-      )
-      .eq("email", senderIdentifier)
+      .select("profile_id,email,resume_file_path,resume_file_name,resume_file_type,updated_at")
+      .ilike("email", senderIdentifier)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (byEmail.data?.resume_file_path || byEmail.error) {
-      return byEmail;
-    }
+    if (byEmail.error || byEmail.data?.resume_file_path) return byEmail;
   }
 
-  return {
-    data: null,
-    error: null,
-  };
+  return { data: null, error: null };
 }
 
-/**
- * Download resume from Supabase Storage.
- */
 async function getResumeAttachment(
   supabase: ReturnType<typeof createClient>,
   resumeProfileId: string,
-  senderIdentifier: string
+  senderIdentifier: string,
+  campaignId: string
 ): Promise<{
   attachment: ResumeAttachment | null;
   error: string | null;
@@ -363,7 +305,8 @@ async function getResumeAttachment(
   const profileResult = await findResumeProfile(
     supabase,
     resumeProfileId,
-    senderIdentifier
+    senderIdentifier,
+    campaignId
   );
 
   if (profileResult.error) {
@@ -429,65 +372,54 @@ async function getResumeAttachment(
   };
 }
 
-/**
- * Main real Gmail send function.
- */
+async function loadQueueContext(supabase: ReturnType<typeof createClient>, queueId: string) {
+  if (!isUuid(queueId)) return { data: null, error: null };
+
+  return await supabase
+    .from("outreach_queue")
+    .select("id,campaign_id,user_identifier,recipient_email,subject,email_body,send_attempts")
+    .eq("id", queueId)
+    .maybeSingle();
+}
+
 Deno.serve(async (req) => {
   try {
     if (req.method === "OPTIONS") {
-      return new Response("ok", {
-        status: 200,
-        headers: corsHeaders,
-      });
+      return new Response("ok", { status: 200, headers: corsHeaders });
     }
 
     if (req.method !== "POST") {
-      return json(
-        {
-          ok: false,
-          error: "Use POST.",
-        },
-        405
-      );
+      return json({ ok: false, error: "Use POST." }, 405);
     }
 
-    if (
-      !SUPABASE_URL ||
-      !SUPABASE_SERVICE_ROLE_KEY ||
-      !GOOGLE_CLIENT_ID ||
-      !GOOGLE_CLIENT_SECRET
-    ) {
-      return json(
-        {
-          ok: false,
-          error: "Missing Gmail server configuration.",
-          required_env: [
-            "SUPABASE_URL",
-            "SUPABASE_SERVICE_ROLE_KEY",
-            "GOOGLE_CLIENT_ID",
-            "GOOGLE_CLIENT_SECRET",
-          ],
-        },
-        500
-      );
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      return json({
+        ok: false,
+        error: "Missing Gmail server configuration.",
+        required_env: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+      }, 500);
     }
 
     if (!isInternalAuthorized(req)) {
-      return json(
-        {
-          ok: false,
-          error: "Unauthorized Gmail send request.",
-        },
-        401
-      );
+      return json({ ok: false, error: "Unauthorized Gmail send request." }, 401);
     }
 
     const input = await req.json().catch(() => ({}));
+    const queueId = txt(input.queue_id || input.outreach_queue_id || input.id);
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false },
+    });
+
+    const queueResult = await loadQueueContext(supabase, queueId);
+    if (queueResult.error) return json({ ok: false, error: queueResult.error.message }, 500);
+    const queue = queueResult.data as Row | null;
 
     const senderIdentifier = txt(
       input.user_identifier ||
         input.sender_user_identifier ||
-        input.sender_email
+        input.sender_email ||
+        queue?.user_identifier
     );
 
     const resumeProfileId = txt(
@@ -497,260 +429,157 @@ Deno.serve(async (req) => {
         input.candidate_user_id
     );
 
-    const to = normalizeEmail(input.to || input.recipient_email);
+    const campaignId = txt(input.campaign_id || queue?.campaign_id);
+    const to = normalizeEmail(input.to || input.recipient_email || queue?.recipient_email);
+    const subject = txt(input.subject || input.email_subject || queue?.subject, "Application");
+    const body = txt(input.body || input.text || input.email_body || queue?.email_body, "");
+    const fromName = txt(input.from_name || input.sender_name || input.candidate_name, DEFAULT_FROM_NAME);
 
-    const subject = txt(
-      input.subject ||
-        input.email_subject,
-      "Application"
-    );
-
-    const body = txt(
-      input.body ||
-        input.text ||
-        input.email_body,
-      ""
-    );
-
-    const fromName = txt(
-      input.from_name ||
-        input.sender_name ||
-        input.candidate_name,
-      DEFAULT_FROM_NAME
-    );
-
-    /**
-     * Required checks.
-     */
     if (!senderIdentifier) {
-      return json(
-        {
-          ok: false,
-          error: "user_identifier is required.",
-        },
-        400
-      );
+      return json({ ok: false, error: "user_identifier is required." }, 400);
     }
 
     if (!to || !looksLikeEmail(to)) {
-      return json(
-        {
-          ok: false,
-          error: "Valid recipient email is required.",
-          requested_to: to,
-        },
-        400
-      );
+      return json({ ok: false, error: "Valid recipient email is required.", requested_to: to }, 400);
     }
 
     if (!subject) {
-      return json(
-        {
-          ok: false,
-          error: "Email subject is required.",
-        },
-        400
-      );
+      return json({ ok: false, error: "Email subject is required." }, 400);
     }
 
     if (!body) {
-      return json(
-        {
-          ok: false,
-          error: "Email body is required.",
-        },
-        400
-      );
+      return json({ ok: false, error: "Email body is required." }, 400);
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      auth: {
-        persistSession: false,
-      },
-    });
-
-    /**
-     * Find connected Gmail account for sender.
-     */
     const authResult = await supabase
       .from("user_email_authorizations")
-      .select(
-        "user_identifier,provider,provider_email,access_token_encrypted,refresh_token_encrypted,expires_at,status"
-      )
+      .select("user_identifier,provider,provider_email,access_token_encrypted,refresh_token_encrypted,expires_at,status")
       .eq("user_identifier", senderIdentifier)
       .eq("provider", "google")
       .eq("status", "connected")
       .maybeSingle();
 
-    if (authResult.error) {
-      return json(
-        {
-          ok: false,
-          error: authResult.error.message,
-        },
-        500
-      );
-    }
+    if (authResult.error) return json({ ok: false, error: authResult.error.message }, 500);
 
     const auth = authResult.data as Row | null;
-
     if (!auth) {
-      return json(
-        {
-          ok: false,
-          error: "No connected Gmail authorization found for this user_identifier.",
-          user_identifier: senderIdentifier,
-        },
-        404
-      );
+      return json({
+        ok: false,
+        error: "No connected Gmail authorization found for this user_identifier.",
+        user_identifier: senderIdentifier,
+      }, 404);
     }
 
     let accessToken = txt(auth.access_token_encrypted);
     const refreshToken = txt(auth.refresh_token_encrypted);
+    const expiresAt = auth.expires_at ? new Date(String(auth.expires_at)) : null;
+    const expiresSoon = !expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() - Date.now() < 120000;
 
-    const expiresAt = auth.expires_at
-      ? new Date(String(auth.expires_at))
-      : null;
-
-    const expiresSoon =
-      !expiresAt ||
-      Number.isNaN(expiresAt.getTime()) ||
-      expiresAt.getTime() - Date.now() < 120000;
-
-    /**
-     * Refresh Gmail token if needed.
-     */
     if (expiresSoon) {
       if (!refreshToken) {
-        return json(
-          {
-            ok: false,
-            error: "Missing Gmail refresh token. Reconnect Gmail.",
-          },
-          401
-        );
+        return json({ ok: false, error: "Missing Gmail refresh token. Reconnect Gmail." }, 401);
       }
 
       const refreshed = await refreshAccessToken(refreshToken);
-
       if (!refreshed.ok) {
         await supabase
           .from("user_email_authorizations")
-          .update({
-            status: "error",
-            last_error: JSON.stringify(refreshed.data).slice(0, 500),
-          })
+          .update({ status: "error", last_error: JSON.stringify(refreshed.data).slice(0, 500) })
           .eq("user_identifier", senderIdentifier)
           .eq("provider", "google");
 
-        return json(
-          {
-            ok: false,
-            error: "Could not refresh Gmail access token.",
-            status: refreshed.status,
-            details: refreshed.data,
-          },
-          401
-        );
+        return json({
+          ok: false,
+          error: "Could not refresh Gmail access token.",
+          status: refreshed.status,
+          details: refreshed.data,
+        }, 401);
       }
 
       accessToken = txt(refreshed.data.access_token);
-
       const newExpiresAt = refreshed.data.expires_in
-        ? new Date(
-            Date.now() + Number(refreshed.data.expires_in) * 1000
-          ).toISOString()
+        ? new Date(Date.now() + Number(refreshed.data.expires_in) * 1000).toISOString()
         : null;
 
       await supabase
         .from("user_email_authorizations")
-        .update({
-          access_token_encrypted: accessToken,
-          expires_at: newExpiresAt,
-          status: "connected",
-          last_error: null,
-        })
+        .update({ access_token_encrypted: accessToken, expires_at: newExpiresAt, status: "connected", last_error: null })
         .eq("user_identifier", senderIdentifier)
         .eq("provider", "google");
     }
 
     if (!accessToken) {
-      return json(
-        {
-          ok: false,
-          error: "Missing Gmail access token. Reconnect Gmail.",
-        },
-        401
-      );
+      return json({ ok: false, error: "Missing Gmail access token. Reconnect Gmail." }, 401);
     }
 
-    /**
-     * Attach resume if available.
-     * If missing, email still sends but returns attachment_error.
-     */
     const resumeResult = await getResumeAttachment(
       supabase,
       resumeProfileId,
-      senderIdentifier
+      senderIdentifier,
+      campaignId
     );
 
     const fromEmail = normalizeEmail(auth.provider_email);
-
     if (!fromEmail || !looksLikeEmail(fromEmail)) {
-      return json(
-        {
-          ok: false,
-          error: "Connected Gmail account does not have a valid provider_email.",
-        },
-        400
-      );
+      return json({ ok: false, error: "Connected Gmail account does not have a valid provider_email." }, 400);
     }
 
-    const raw = makeRawEmail(
-      fromEmail,
-      to,
-      subject,
-      body,
-      resumeResult.attachment,
-      fromName
-    );
+    const raw = makeRawEmail(fromEmail, to, subject, body, resumeResult.attachment, fromName);
 
-    /**
-     * Send through Gmail API.
-     */
-    const sendResponse = await fetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-      {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${accessToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          raw,
-        }),
-      }
-    );
+    const sendResponse = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ raw }),
+    });
 
     const sendData = await sendResponse.json().catch(() => ({}));
 
     if (!sendResponse.ok) {
-      return json(
-        {
-          ok: false,
-          error: "Gmail send failed.",
-          status: sendResponse.status,
-          details: sendData,
-          attachment_error: resumeResult.error,
-        },
-        sendResponse.status
-      );
+      if (queueId) {
+        await supabase
+          .from("outreach_queue")
+          .update({
+            status: "send_failed",
+            last_error: JSON.stringify(sendData).slice(0, 500),
+            send_attempts: Number(queue?.send_attempts || 0) + 1,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", queueId);
+      }
+
+      return json({
+        ok: false,
+        error: "Gmail send failed.",
+        status: sendResponse.status,
+        details: sendData,
+        attachment_error: resumeResult.error,
+      }, sendResponse.status);
+    }
+
+    if (queueId) {
+      await supabase
+        .from("outreach_queue")
+        .update({
+          status: "sent",
+          review_status: "approved",
+          provider_message_id: sendData.id || null,
+          sent_from: fromEmail,
+          send_attempts: Number(queue?.send_attempts || 0) + 1,
+          last_error: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", queueId);
     }
 
     return json({
       ok: true,
       function: "gmail-send",
       test_mode: false,
+      queue_id: queueId || null,
+      campaign_id: campaignId || null,
       from: fromEmail,
       from_name: fromName,
       to,
@@ -764,13 +593,10 @@ Deno.serve(async (req) => {
       gmail_thread_id: sendData.threadId || null,
     });
   } catch (error) {
-    return json(
-      {
-        ok: false,
-        function: "gmail-send",
-        error: error instanceof Error ? error.message : String(error),
-      },
-      500
-    );
+    return json({
+      ok: false,
+      function: "gmail-send",
+      error: error instanceof Error ? error.message : String(error),
+    }, 500);
   }
 });
