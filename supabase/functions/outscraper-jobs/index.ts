@@ -12,7 +12,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || SUPABASE_SERVICE_ROLE_KEY;
 const OUTSCRAPER_API_KEY = Deno.env.get("OUTSCRAPER_API_KEY") || "";
-const OUTSCRAPER_JOBS_API_URL = Deno.env.get("OUTSCRAPER_JOBS_API_URL") || "https://api.app.outscraper.com/jobs-search-v3";
+const OUTSCRAPER_JOBS_API_URL = Deno.env.get("OUTSCRAPER_JOBS_API_URL") || "https://api.outscraper.cloud/indeed-search";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -79,8 +79,19 @@ function cleanUrl(value: unknown) {
 }
 
 function parsePostedAt(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
   const raw = text(value);
   if (!raw) return null;
+
+  const maybeNumber = Number(raw);
+  if (Number.isFinite(maybeNumber) && maybeNumber > 1000000000) {
+    const date = new Date(maybeNumber);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
 
   const direct = new Date(raw);
   if (!Number.isNaN(direct.getTime())) return direct.toISOString();
@@ -154,17 +165,21 @@ function collectCompanies(campaign: Row, input: Row) {
   ]);
 }
 
+function flattenRows(value: unknown): Row[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => Array.isArray(item) ? flattenRows(item) : [item as Row]);
+}
+
 function extractJobRows(payload: unknown): Row[] {
-  if (Array.isArray(payload)) return payload as Row[];
+  if (Array.isArray(payload)) return flattenRows(payload);
 
   const body = payload as Row;
-  if (Array.isArray(body?.data)) return body.data as Row[];
-  if (Array.isArray(body?.results)) return body.results as Row[];
-  if (Array.isArray(body?.items)) return body.items as Row[];
-  if (Array.isArray(body?.jobs)) return body.jobs as Row[];
-  if (Array.isArray(body?.response?.jobs)) return body.response.jobs as Row[];
-  if (Array.isArray(body?.response?.results)) return body.response.results as Row[];
-  if (Array.isArray(body?.[0])) return body[0] as Row[];
+  if (Array.isArray(body?.data)) return flattenRows(body.data);
+  if (Array.isArray(body?.results)) return flattenRows(body.results);
+  if (Array.isArray(body?.items)) return flattenRows(body.items);
+  if (Array.isArray(body?.jobs)) return flattenRows(body.jobs);
+  if (Array.isArray(body?.response?.jobs)) return flattenRows(body.response.jobs);
+  if (Array.isArray(body?.response?.results)) return flattenRows(body.response.results);
 
   return [];
 }
@@ -175,7 +190,8 @@ function normalizeJob(raw: Row, campaignId: string | null, userId: string) {
     raw.job_url ||
     raw.url ||
     raw.link ||
-    raw.job_link,
+    raw.job_link ||
+    raw.viewJobLink,
   );
   const company = normalizeWhitespace(
     raw.company ||
@@ -185,23 +201,32 @@ function normalizeJob(raw: Row, campaignId: string | null, userId: string) {
   );
   const title = normalizeWhitespace(
     raw.title ||
+    raw.displayTitle ||
+    raw.normTitle ||
     raw.job_title ||
     raw.position ||
     raw.role,
   );
   const location = normalizeWhitespace(
     raw.location ||
+    raw.formattedLocation ||
+    raw.formatted_location ||
+    raw.jobLocationCity ||
+    raw.jobLocationState ||
     raw.city ||
-    raw.region ||
-    raw.formatted_location,
+    raw.region,
   );
   const postedAt = parsePostedAt(
     raw.posted_at ||
     raw.posted_date ||
     raw.date_posted ||
     raw.publication_date ||
-    raw.published_at,
+    raw.published_at ||
+    raw.pubDate ||
+    raw.createDate,
   );
+
+  const salaryText = raw.salarySnippet?.text || raw.salary || null;
 
   const job: Row = {
     user_id: userId,
@@ -209,9 +234,10 @@ function normalizeJob(raw: Row, campaignId: string | null, userId: string) {
     title,
     company,
     location,
-    description: text(raw.description || raw.summary || raw.job_description),
+    salary: text(salaryText),
+    description: text(raw.description || raw.summary || raw.job_description || raw.snippet),
     apply_url: applyUrl,
-    source: text(raw.source || raw.site || "outscraper"),
+    source: "outscraper_indeed",
     posted_at: postedAt,
     job_type: text(raw.job_type || raw.type || raw.employment_type),
     raw_payload: raw,
@@ -220,6 +246,33 @@ function normalizeJob(raw: Row, campaignId: string | null, userId: string) {
 
   job.job_dedupe_key = buildJobDedupeKey(job);
   return job;
+}
+
+function buildIndeedSearchUrl(query: string, location: string) {
+  const url = new URL("https://www.indeed.com/jobs");
+  url.searchParams.set("q", query);
+  url.searchParams.set("l", location);
+  return url.toString();
+}
+
+function buildOutscraperUrl(campaign: Row, input: Row, limit: number) {
+  const endpoint = OUTSCRAPER_JOBS_API_URL || "https://api.outscraper.cloud/indeed-search";
+  const url = new URL(endpoint);
+
+  const queryTerms = collectQueryTerms(campaign, input);
+  const locations = collectLocations(campaign, input);
+  const terms = queryTerms.length ? queryTerms : ["Entry Level IT Support"];
+  const places = locations.length ? locations : ["Sydney NSW"];
+
+  for (const term of terms) {
+    for (const place of places) {
+      url.searchParams.append("query", buildIndeedSearchUrl(term, place));
+    }
+  }
+
+  url.searchParams.set("limit", String(limit));
+  url.searchParams.set("async", "false");
+  return url;
 }
 
 async function getSignedInUserId(authHeader: string) {
@@ -321,31 +374,21 @@ async function insertJobs(supabase: ReturnType<typeof createClient>, jobs: Row[]
   return { insertedCount, duplicateCount, insertedIds };
 }
 
-async function fetchOutscraperJobs(campaign: Row, input: Row, postedWithinHours: number) {
+async function fetchOutscraperJobs(campaign: Row, input: Row) {
   if (Array.isArray(input.jobs)) return input.jobs as Row[];
 
   if (!OUTSCRAPER_API_KEY) {
     throw new Error("Missing OUTSCRAPER_API_KEY");
   }
 
-  const requestBody = {
-    source: text(input.source) || "indeed",
-    query: collectQueryTerms(campaign, input),
-    location: collectLocations(campaign, input),
-    company: collectCompanies(campaign, input),
-    limit: Math.max(1, Math.min(100, numberValue(input.results_limit, 100))),
-    posted_within_hours: postedWithinHours,
-    campaign_id: campaign.id,
-  };
+  const limit = Math.max(1, Math.min(100, numberValue(input.results_limit, 24)));
+  const url = buildOutscraperUrl(campaign, input, limit);
 
-  const response = await fetch(OUTSCRAPER_JOBS_API_URL, {
-    method: "POST",
+  const response = await fetch(url.toString(), {
+    method: "GET",
     headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${OUTSCRAPER_API_KEY}`,
-      "x-api-key": OUTSCRAPER_API_KEY,
+      "X-API-KEY": OUTSCRAPER_API_KEY,
     },
-    body: JSON.stringify(requestBody),
   });
 
   const responseText = await response.text().catch(() => "");
@@ -358,7 +401,7 @@ async function fetchOutscraperJobs(campaign: Row, input: Row, postedWithinHours:
   }
 
   if (!response.ok) {
-    throw new Error(`Outscraper jobs request failed ${response.status}: ${JSON.stringify(payload).slice(0, 500)}`);
+    throw new Error(`Outscraper indeed-search failed ${response.status}: ${JSON.stringify(payload).slice(0, 500)}`);
   }
 
   return extractJobRows(payload);
@@ -432,7 +475,7 @@ serve(async (req) => {
     }
 
     const existingKeys = await loadExistingDedupeKeys(supabase, campaignId, userId);
-    const rawJobs = await fetchOutscraperJobs(campaign, input, postedWithinHours);
+    const rawJobs = await fetchOutscraperJobs(campaign, input);
 
     const normalized = rawJobs
       .map((raw) => normalizeJob(raw, campaignId, userId))
@@ -468,6 +511,8 @@ serve(async (req) => {
       user_id: userId,
       scheduled_run: scheduledRun,
       used_cached_jobs: false,
+      provider: "outscraper_indeed_search",
+      provider_url: OUTSCRAPER_JOBS_API_URL,
       fetched_count: rawJobs.length,
       normalized_count: normalized.length,
       filtered_count: withinPostedWindow.length,
