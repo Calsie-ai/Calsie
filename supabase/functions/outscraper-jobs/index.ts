@@ -154,7 +154,7 @@ function normalizeJob(raw: Row, campaignId: string, userId: string) {
     salary: text(salaryText),
     description: text(raw.snippet || raw.description || raw.summary || raw.job_description),
     apply_url: applyUrl,
-    source: "outscraper_indeed",
+    source: "outscraper_indeed_au",
     posted_at: postedAt,
     job_type: text(raw.job_type || raw.type || raw.employment_type),
     raw_payload: raw,
@@ -165,7 +165,7 @@ function normalizeJob(raw: Row, campaignId: string, userId: string) {
 }
 
 function buildIndeedSearchUrl(query: string, location: string) {
-  const url = new URL("https://www.indeed.com/jobs");
+  const url = new URL("https://au.indeed.com/jobs");
   url.searchParams.set("q", query);
   url.searchParams.set("l", location);
   return url.toString();
@@ -175,7 +175,7 @@ function buildOutscraperUrl(campaign: Row, input: Row, limit: number) {
   const url = new URL(OUTSCRAPER_JOBS_API_URL);
   const terms = collectQueryTerms(campaign, input);
   const places = collectLocations(campaign, input);
-  const queryTerms = terms.length ? terms : ["Entry Level IT Support"];
+  const queryTerms = terms.length ? terms : ["IT Support"];
   const locations = places.length ? places : ["Sydney NSW"];
 
   for (const term of queryTerms) {
@@ -334,7 +334,7 @@ serve(async (req) => {
       campaign_id: campaignId,
       user_id: userId,
       scheduled_run: scheduledRun,
-      provider: "outscraper_indeed_search",
+      provider: "outscraper_indeed_search_au",
       provider_url: OUTSCRAPER_JOBS_API_URL,
       fetched_count: rawJobs.length,
       normalized_count: normalized.length,
