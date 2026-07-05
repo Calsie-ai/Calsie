@@ -1,299 +1,485 @@
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { serve } from "std/http/server.ts";
+import { createClient } from "supabase";
+
+type Row = Record<string, any>;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const outscraperKey = Deno.env.get("OUTSCRAPER_API_KEY") || "";
-const outscraperJobsUrl = Deno.env.get("OUTSCRAPER_JOBS_URL") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || SUPABASE_SERVICE_ROLE_KEY;
+const OUTSCRAPER_API_KEY = Deno.env.get("OUTSCRAPER_API_KEY") || "";
+const OUTSCRAPER_JOBS_API_URL = Deno.env.get("OUTSCRAPER_JOBS_API_URL") || "https://api.app.outscraper.com/jobs-search-v3";
 
-type OutscraperJob = Record<string, unknown>;
-
-type RequestBody = {
-  role?: string;
-  location?: string;
-  campaign_id?: string;
-  trigger?: string;
-  force_refresh?: boolean;
-  demo_jobs?: boolean;
-};
-
-type CampaignRow = {
-  id: string;
-  user_id: string;
-  name?: string | null;
-  location?: string | null;
-  target_business_type?: string | null;
-  search?: { target_role?: string | null; target_location?: string | null } | null;
-};
-
-type NormalizedJob = {
-  title: string;
-  company: string;
-  location: string;
-  source: string;
-  apply_url: string;
-  description: string;
-  posted_at: string;
-  status: string;
-};
-
-function cleanText(value: unknown, fallback = "") {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body, null, 2), {
+    status,
+    headers: { ...corsHeaders, "content-type": "application/json" },
+  });
 }
 
-function pickText(job: OutscraperJob, keys: string[], fallback = "") {
-  for (const key of keys) {
-    const value = cleanText(job[key]);
-    if (value) return value;
+function text(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  const clean = String(value).trim();
+  return clean ? clean : null;
+}
+
+function bool(value: unknown, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    if (["true", "1", "yes"].includes(value.toLowerCase())) return true;
+    if (["false", "0", "no"].includes(value.toLowerCase())) return false;
   }
   return fallback;
 }
 
-function jobKey(job: { title?: string | null; company?: string | null; apply_url?: string | null }) {
-  const applyUrl = cleanText(job.apply_url).toLowerCase();
-  if (applyUrl) return `url:${applyUrl}`;
-  return `text:${cleanText(job.title).toLowerCase()}::${cleanText(job.company).toLowerCase()}`;
+function numberValue(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function uniqueJobs(jobs: NormalizedJob[]) {
-  const seen = new Set<string>();
-  return jobs.filter((job) => {
-    const key = jobKey(job);
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+function uniqueStrings(values: unknown[]) {
+  return [...new Set(values.map(text).filter(Boolean) as string[])];
 }
 
-function normalizeJobs(payload: unknown, fallbackLocation: string) {
-  const raw = Array.isArray(payload)
-    ? payload
-    : Array.isArray((payload as Record<string, unknown>)?.data)
-      ? (payload as Record<string, unknown>).data
-      : Array.isArray((payload as Record<string, unknown>)?.results)
-        ? (payload as Record<string, unknown>).results
-        : [];
-
-  const flattened = raw.flatMap((item) => Array.isArray(item) ? item : [item]) as OutscraperJob[];
-
-  const jobs = flattened.map((job) => ({
-    title: pickText(job, ["title", "job_title", "name"], "Untitled job"),
-    company: pickText(job, ["company", "company_name", "employer_name", "organization", "organization_name"], "Unknown company"),
-    location: pickText(job, ["location", "address", "city"], fallbackLocation),
-    source: "Outscraper",
-    apply_url: pickText(job, ["apply_link", "apply_url", "url", "job_url", "link"]),
-    description: pickText(job, ["description", "snippet", "summary", "job_description"]),
-    posted_at: pickText(job, ["posted_at", "date", "created_at", "published_at"]),
-    status: "new",
-  })).filter((job) => job.title !== "Untitled job" || job.company !== "Unknown company");
-
-  return uniqueJobs(jobs);
+function toArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null) return [];
+  return [value];
 }
 
-function demoJobs(role: string, location: string): NormalizedJob[] {
-  const safeRole = cleanText(role, "IT support");
-  const safeLocation = cleanText(location, "Sydney NSW");
+function parseJsonIfNeeded(value: unknown): Row {
+  if (!value) return {};
+  if (typeof value === "object") return value as Row;
+  if (typeof value !== "string") return {};
+
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" && parsed ? parsed as Row : {};
+  } catch {
+    return {};
+  }
+}
+
+function normalizeWhitespace(value: unknown) {
+  return text(value)?.replace(/\s+/g, " ") || null;
+}
+
+function safeLower(value: unknown) {
+  return normalizeWhitespace(value)?.toLowerCase() || "";
+}
+
+function cleanUrl(value: unknown) {
+  const raw = text(value);
+  if (!raw) return null;
+  return raw.trim();
+}
+
+function parsePostedAt(value: unknown): string | null {
+  const raw = text(value);
+  if (!raw) return null;
+
+  const direct = new Date(raw);
+  if (!Number.isNaN(direct.getTime())) return direct.toISOString();
+
+  const relative = raw.toLowerCase();
+  const match = relative.match(/(\d+)\s+(minute|minutes|hour|hours|day|days)\s+ago/);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  const unit = match[2];
+  const now = Date.now();
+  const ms =
+    unit.startsWith("minute") ? amount * 60 * 1000 :
+    unit.startsWith("hour") ? amount * 60 * 60 * 1000 :
+    amount * 24 * 60 * 60 * 1000;
+
+  return new Date(now - ms).toISOString();
+}
+
+function hoursAgoIso(hours: number) {
+  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+}
+
+function daysAgoIso(days: number) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function isRecentEnough(postedAt: string | null, postedWithinHours: number) {
+  if (!postedAt) return true;
+  const parsed = new Date(postedAt);
+  if (Number.isNaN(parsed.getTime())) return true;
+  return parsed.getTime() >= Date.now() - postedWithinHours * 60 * 60 * 1000;
+}
+
+function buildJobDedupeKey(job: Row) {
   return [
-    {
-      title: `Demo ${safeRole} Assistant`,
-      company: "Applix Demo Company",
-      location: safeLocation,
-      source: "Demo Cache",
-      apply_url: "https://example.com/applix-demo-job-1",
-      description: "Demo job used to test the Applix tracker table without spending OutScraper credit.",
-      posted_at: new Date().toISOString(),
-      status: "new",
-    },
-    {
-      title: `Demo Junior ${safeRole}`,
-      company: "Sample Technology Group",
-      location: safeLocation,
-      source: "Demo Cache",
-      apply_url: "https://example.com/applix-demo-job-2",
-      description: "Sample campaign job for validating review, matching, and apply buttons before running a paid scrape.",
-      posted_at: new Date().toISOString(),
-      status: "new",
-    },
-    {
-      title: "Demo Service Desk Officer",
-      company: "Sydney Support Services",
-      location: safeLocation,
-      source: "Demo Cache",
-      apply_url: "https://example.com/applix-demo-job-3",
-      description: "Test row saved to Supabase so the tracker can be checked without calling OutScraper.",
-      posted_at: new Date().toISOString(),
-      status: "new",
-    },
-  ];
+    safeLower(job.apply_url),
+    safeLower(job.company),
+    safeLower(job.title),
+    safeLower(job.location),
+  ].join("|");
 }
 
-async function loadCachedJobs(supabase: ReturnType<typeof createClient>, userId: string, campaignId: string | null) {
+function collectQueryTerms(campaign: Row, input: Row) {
+  const outreach = parseJsonIfNeeded(campaign.outreach);
+  return uniqueStrings([
+    input.query,
+    outreach.query,
+    ...(toArray(outreach.queries)),
+    ...(toArray(outreach.keywords)),
+    ...(toArray(outreach.job_titles)),
+    ...(toArray(outreach.roles)),
+  ]);
+}
+
+function collectLocations(campaign: Row, input: Row) {
+  const outreach = parseJsonIfNeeded(campaign.outreach);
+  return uniqueStrings([
+    input.location,
+    outreach.location,
+    ...(toArray(outreach.locations)),
+  ]);
+}
+
+function collectCompanies(campaign: Row, input: Row) {
+  const outreach = parseJsonIfNeeded(campaign.outreach);
+  return uniqueStrings([
+    input.company,
+    ...(toArray(outreach.company_names)),
+    ...(toArray(outreach.companies)),
+  ]);
+}
+
+function extractJobRows(payload: unknown): Row[] {
+  if (Array.isArray(payload)) return payload as Row[];
+
+  const body = payload as Row;
+  if (Array.isArray(body?.data)) return body.data as Row[];
+  if (Array.isArray(body?.results)) return body.results as Row[];
+  if (Array.isArray(body?.items)) return body.items as Row[];
+  if (Array.isArray(body?.jobs)) return body.jobs as Row[];
+  if (Array.isArray(body?.response?.jobs)) return body.response.jobs as Row[];
+  if (Array.isArray(body?.response?.results)) return body.response.results as Row[];
+  if (Array.isArray(body?.[0])) return body[0] as Row[];
+
+  return [];
+}
+
+function normalizeJob(raw: Row, campaignId: string | null, userId: string) {
+  const applyUrl = cleanUrl(
+    raw.apply_url ||
+    raw.job_url ||
+    raw.url ||
+    raw.link ||
+    raw.job_link,
+  );
+  const company = normalizeWhitespace(
+    raw.company ||
+    raw.company_name ||
+    raw.employer ||
+    raw.organization,
+  );
+  const title = normalizeWhitespace(
+    raw.title ||
+    raw.job_title ||
+    raw.position ||
+    raw.role,
+  );
+  const location = normalizeWhitespace(
+    raw.location ||
+    raw.city ||
+    raw.region ||
+    raw.formatted_location,
+  );
+  const postedAt = parsePostedAt(
+    raw.posted_at ||
+    raw.posted_date ||
+    raw.date_posted ||
+    raw.publication_date ||
+    raw.published_at,
+  );
+
+  const job: Row = {
+    user_id: userId,
+    campaign_id: campaignId,
+    title,
+    company,
+    location,
+    description: text(raw.description || raw.summary || raw.job_description),
+    apply_url: applyUrl,
+    source: text(raw.source || raw.site || "outscraper"),
+    posted_at: postedAt,
+    job_type: text(raw.job_type || raw.type || raw.employment_type),
+    raw_payload: raw,
+    job_dedupe_key: "",
+  };
+
+  job.job_dedupe_key = buildJobDedupeKey(job);
+  return job;
+}
+
+async function getSignedInUserId(authHeader: string) {
+  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  const { data, error } = await authClient.auth.getUser();
+  if (error || !data.user) {
+    throw new Error("Unauthorized: signed-in user token is required");
+  }
+
+  return data.user.id;
+}
+
+async function loadCampaign(supabase: ReturnType<typeof createClient>, campaignId: string) {
+  const { data, error } = await supabase
+    .from("campaigns")
+    .select("id,user_id,outreach,status,created_at")
+    .eq("id", campaignId)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as Row;
+}
+
+async function loadRecentCachedJobs(
+  supabase: ReturnType<typeof createClient>,
+  campaignId: string | null,
+  userId: string,
+  limit: number,
+) {
   let query = supabase
     .from("jobs")
     .select("*")
     .eq("user_id", userId)
+    .gte("created_at", hoursAgoIso(24))
     .order("created_at", { ascending: false })
-    .limit(80);
+    .limit(limit);
 
-  query = campaignId ? query.eq("campaign_id", campaignId) : query.is("campaign_id", null);
+  if (campaignId) query = query.eq("campaign_id", campaignId);
+  else query = query.is("campaign_id", null);
 
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data || [];
 }
 
-async function loadExistingJobKeys(supabase: ReturnType<typeof createClient>, userId: string, campaignId: string | null) {
-  const data = await loadCachedJobs(supabase, userId, campaignId);
-  return new Set((data || []).map((job) => jobKey(job)).filter(Boolean));
+async function loadExistingDedupeKeys(
+  supabase: ReturnType<typeof createClient>,
+  campaignId: string | null,
+  userId: string,
+) {
+  let query = supabase
+    .from("jobs")
+    .select("job_dedupe_key")
+    .eq("user_id", userId)
+    .gte("created_at", daysAgoIso(30));
+
+  if (campaignId) query = query.eq("campaign_id", campaignId);
+  else query = query.is("campaign_id", null);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return new Set(
+    (data || [])
+      .map((row: Row) => text(row.job_dedupe_key))
+      .filter(Boolean) as string[],
+  );
+}
+
+async function insertJobs(supabase: ReturnType<typeof createClient>, jobs: Row[]) {
+  let insertedCount = 0;
+  let duplicateCount = 0;
+  const insertedIds: string[] = [];
+
+  for (const job of jobs) {
+    const result = await supabase
+      .from("jobs")
+      .insert(job)
+      .select("id")
+      .single();
+
+    if (result.error) {
+      if (result.error.code === "23505") {
+        duplicateCount += 1;
+        continue;
+      }
+
+      throw new Error(result.error.message);
+    }
+
+    insertedCount += 1;
+    insertedIds.push(result.data.id as string);
+  }
+
+  return { insertedCount, duplicateCount, insertedIds };
+}
+
+async function fetchOutscraperJobs(campaign: Row, input: Row, postedWithinHours: number) {
+  if (Array.isArray(input.jobs)) return input.jobs as Row[];
+
+  if (!OUTSCRAPER_API_KEY) {
+    throw new Error("Missing OUTSCRAPER_API_KEY");
+  }
+
+  const requestBody = {
+    source: text(input.source) || "indeed",
+    query: collectQueryTerms(campaign, input),
+    location: collectLocations(campaign, input),
+    company: collectCompanies(campaign, input),
+    limit: Math.max(1, Math.min(100, numberValue(input.results_limit, 100))),
+    posted_within_hours: postedWithinHours,
+    campaign_id: campaign.id,
+  };
+
+  const response = await fetch(OUTSCRAPER_JOBS_API_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${OUTSCRAPER_API_KEY}`,
+      "x-api-key": OUTSCRAPER_API_KEY,
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  const responseText = await response.text().catch(() => "");
+  let payload: unknown = responseText;
+
+  try {
+    payload = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    payload = { raw: responseText };
+  }
+
+  if (!response.ok) {
+    throw new Error(`Outscraper jobs request failed ${response.status}: ${JSON.stringify(payload).slice(0, 500)}`);
+  }
+
+  return extractJobRows(payload);
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    if (!supabaseUrl || !serviceRoleKey) {
-      throw new Error("Missing Supabase Edge Function database secrets.");
+    if (req.method !== "POST") return json({ ok: false, error: "Use POST" }, 405);
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return json({ ok: false, error: "Missing Supabase service role configuration" }, 500);
     }
 
+    const input = await req.json().catch(() => ({}));
     const authHeader = req.headers.get("authorization") || "";
-    const body = (await req.json().catch(() => ({}))) as RequestBody;
+    const isServiceRoleCall = authHeader === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`;
+    const forceRefresh = bool(input.force_refresh, false);
+    const scheduledRun = bool(input.scheduled_run, false);
+    const postedWithinHours = Math.max(1, Math.min(168, numberValue(input.posted_within_hours, 24)));
+    const requestedLimit = numberValue(input.results_limit, 100);
+    const resultsLimit = Math.max(1, Math.min(100, requestedLimit));
+    const campaignId = text(input.campaign_id);
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const userClient = createClient(supabaseUrl, serviceRoleKey, {
-      global: { headers: { Authorization: authHeader } },
+    if (!campaignId) {
+      return json({ ok: false, error: "campaign_id is required" }, 400);
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false },
     });
-    const { data: userData, error: userError } = await userClient.auth.getUser();
 
-    if (userError || !userData.user) {
-      return new Response(JSON.stringify({ ok: false, error: "Please sign in again." }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const campaign = await loadCampaign(supabase, campaignId);
 
-    let campaign: CampaignRow | null = null;
-
-    if (body.campaign_id) {
-      const { data, error } = await supabase
-        .from("campaigns")
-        .select("id,user_id,name,location,target_business_type,search")
-        .eq("id", body.campaign_id)
-        .eq("user_id", userData.user.id)
-        .maybeSingle();
-
-      if (error) throw new Error(error.message);
-      if (!data) throw new Error("Campaign was not found for this user.");
-      campaign = data as CampaignRow;
-    }
-
-    const role = cleanText(campaign?.search?.target_role || campaign?.target_business_type || campaign?.name || body.role, "support worker");
-    const location = cleanText(campaign?.search?.target_location || campaign?.location || body.location, "Sydney NSW");
-    const campaignId = campaign?.id || cleanText(body.campaign_id) || null;
-    const cachedJobs = await loadCachedJobs(supabase, userData.user.id, campaignId);
-
-    if (!body.force_refresh && cachedJobs.length > 0) {
-      return new Response(JSON.stringify({ ok: true, count: cachedJobs.length, inserted_count: 0, duplicate_count: 0, saved: true, cached: true, scraped: false, campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: cachedJobs }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (body.demo_jobs) {
-      const existingKeys = await loadExistingJobKeys(supabase, userData.user.id, campaignId);
-      const rows = demoJobs(role, location)
-        .filter((job) => !existingKeys.has(jobKey(job)))
-        .map((job) => ({ ...job, user_id: userData.user.id, campaign_id: campaignId }));
-
-      if (rows.length === 0) {
-        return new Response(JSON.stringify({ ok: true, count: cachedJobs.length, inserted_count: 0, duplicate_count: cachedJobs.length, saved: true, cached: true, scraped: false, demo: true, campaign_id: campaignId, role, location, jobs: cachedJobs }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    let userId = text(campaign.user_id);
+    if (isServiceRoleCall) {
+      userId = text(input.user_id) || userId;
+    } else {
+      const signedInUserId = await getSignedInUserId(authHeader);
+      if (text(input.user_id) && text(input.user_id) !== signedInUserId) {
+        return json({ ok: false, error: "user_id is only accepted on service role calls" }, 403);
       }
 
-      const { data, error } = await supabase.from("jobs").insert(rows).select();
-      if (error) throw new Error(error.message);
+      if (userId && signedInUserId !== userId) {
+        return json({ ok: false, error: "Campaign does not belong to the signed-in user" }, 403);
+      }
 
-      return new Response(JSON.stringify({ ok: true, count: rows.length, inserted_count: data?.length || rows.length, duplicate_count: 0, saved: true, cached: false, scraped: false, demo: true, campaign_id: campaignId, role, location, jobs: data || rows }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      userId = signedInUserId;
     }
 
-    if (!outscraperKey) {
-      throw new Error("Missing OUTSCRAPER_API_KEY Edge Function secret.");
+    if (!userId) {
+      return json({ ok: false, error: "Unable to resolve user_id for campaign" }, 400);
     }
 
-    if (!outscraperJobsUrl) {
-      throw new Error("Missing OUTSCRAPER_JOBS_URL Edge Function secret. Add the real OutScraper jobs API endpoint; the old default endpoint returned HTTP 404.");
+    if (!isServiceRoleCall && !forceRefresh) {
+      const cachedJobs = await loadRecentCachedJobs(supabase, campaignId, userId, resultsLimit);
+      if (cachedJobs.length > 0) {
+        return json({
+          ok: true,
+          function: "outscraper-jobs",
+          campaign_id: campaignId,
+          user_id: userId,
+          scheduled_run: scheduledRun,
+          used_cached_jobs: true,
+          inserted_count: 0,
+          duplicate_count: 0,
+          cached_job_count: cachedJobs.length,
+          jobs: cachedJobs,
+        });
+      }
     }
 
-    const query = `${role} ${location}`;
-    const url = new URL(outscraperJobsUrl);
-    url.searchParams.set("query", query);
-    url.searchParams.set("async", "false");
+    const existingKeys = await loadExistingDedupeKeys(supabase, campaignId, userId);
+    const rawJobs = await fetchOutscraperJobs(campaign, input, postedWithinHours);
 
-    const providerResponse = await fetch(url.toString(), {
-      headers: { "X-API-KEY": outscraperKey },
-    });
+    const normalized = rawJobs
+      .map((raw) => normalizeJob(raw, campaignId, userId))
+      .filter((job) => job.apply_url || job.company || job.title);
 
-    const providerText = await providerResponse.text().catch(() => "");
-    let providerPayload: unknown = providerText;
-    try {
-      providerPayload = providerText ? JSON.parse(providerText) : null;
-    } catch {
-      providerPayload = providerText;
+    const withinPostedWindow = normalized.filter((job) => isRecentEnough(job.posted_at, postedWithinHours));
+    const seenIncomingKeys = new Set<string>();
+    const jobsToInsert: Row[] = [];
+    let duplicateCount = 0;
+
+    for (const job of withinPostedWindow) {
+      const key = text(job.job_dedupe_key);
+      if (!key) {
+        jobsToInsert.push(job);
+        continue;
+      }
+
+      if (existingKeys.has(key) || seenIncomingKeys.has(key)) {
+        duplicateCount += 1;
+        continue;
+      }
+
+      seenIncomingKeys.add(key);
+      jobsToInsert.push(job);
     }
 
-    if (!providerResponse.ok) {
-      return new Response(JSON.stringify({ ok: false, error: `Outscraper rejected the job search with HTTP ${providerResponse.status}.`, provider_status: providerResponse.status, provider_status_text: providerResponse.statusText, requested_url: url.toString(), query, role, location, campaign_id: campaignId, details: providerPayload }), {
-        status: providerResponse.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const insertResult = await insertJobs(supabase, jobsToInsert);
 
-    const normalizedJobs = normalizeJobs(providerPayload, location).slice(0, 50);
-
-    if (normalizedJobs.length === 0) {
-      return new Response(JSON.stringify({ ok: true, count: 0, inserted_count: 0, duplicate_count: 0, saved: true, cached: false, scraped: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: [] }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const existingKeys = await loadExistingJobKeys(supabase, userData.user.id, campaignId);
-    const rows = normalizedJobs
-      .filter((job) => !existingKeys.has(jobKey(job)))
-      .map((job) => ({
-        ...job,
-        user_id: userData.user.id,
-        campaign_id: campaignId,
-      }));
-
-    if (rows.length === 0) {
-      return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: 0, duplicate_count: normalizedJobs.length, saved: true, cached: true, scraped: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: cachedJobs }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { data, error } = await supabase.from("jobs").insert(rows).select();
-
-    if (error) {
-      return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: 0, duplicate_count: normalizedJobs.length - rows.length, saved: false, error: error.message, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: rows }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    return new Response(JSON.stringify({ ok: true, count: normalizedJobs.length, inserted_count: data?.length || rows.length, duplicate_count: normalizedJobs.length - rows.length, saved: true, cached: false, scraped: true, requested_url: url.toString(), campaign_id: campaignId, role, location, trigger: body.trigger || "manual", jobs: data || rows }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return json({
+      ok: true,
+      function: "outscraper-jobs",
+      campaign_id: campaignId,
+      user_id: userId,
+      scheduled_run: scheduledRun,
+      used_cached_jobs: false,
+      fetched_count: rawJobs.length,
+      normalized_count: normalized.length,
+      filtered_count: withinPostedWindow.length,
+      inserted_count: insertResult.insertedCount,
+      duplicate_count: duplicateCount + insertResult.duplicateCount,
+      inserted_job_ids: insertResult.insertedIds,
     });
   } catch (error) {
-    return new Response(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : "Could not fetch jobs." }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({
+      ok: false,
+      function: "outscraper-jobs",
+      error: error instanceof Error ? error.message : String(error),
+    }, 500);
   }
 });
