@@ -13,6 +13,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || SUPABASE_SERVICE_ROLE_KEY;
 const OUTSCRAPER_API_KEY = Deno.env.get("OUTSCRAPER_API_KEY") || "";
 const OUTSCRAPER_JOBS_API_URL = Deno.env.get("OUTSCRAPER_JOBS_API_URL") || "https://api.outscraper.cloud/indeed-search";
+const OUTSCRAPER_INDEED_BASE_URL = Deno.env.get("OUTSCRAPER_INDEED_BASE_URL") || "https://www.indeed.com/jobs";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -104,23 +105,59 @@ function uniqueStrings(values: unknown[]) {
 
 function collectQueryTerms(campaign: Row, input: Row) {
   const outreach = parseJsonIfNeeded(campaign.outreach);
+  const search = parseJsonIfNeeded(campaign.search);
+  const filters = parseJsonIfNeeded(campaign.filters);
   return uniqueStrings([
     input.query,
     outreach.query,
+    search.query,
+    search.job_title,
+    search.role,
+    filters.job_title,
+    campaign.target_business_type,
     ...(toArray(outreach.queries)),
     ...(toArray(outreach.keywords)),
     ...(toArray(outreach.job_titles)),
     ...(toArray(outreach.roles)),
+    ...(toArray(search.job_titles)),
+    ...(toArray(search.roles)),
   ]);
 }
 
 function collectLocations(campaign: Row, input: Row) {
   const outreach = parseJsonIfNeeded(campaign.outreach);
+  const search = parseJsonIfNeeded(campaign.search);
+  const filters = parseJsonIfNeeded(campaign.filters);
   return uniqueStrings([
     input.location,
     outreach.location,
+    search.location,
+    filters.location,
+    campaign.location,
     ...(toArray(outreach.locations)),
+    ...(toArray(search.locations)),
   ]);
+}
+
+function resolveIndeedBaseUrl(campaign: Row, input: Row) {
+  const outreach = parseJsonIfNeeded(campaign.outreach);
+  const search = parseJsonIfNeeded(campaign.search);
+  const filters = parseJsonIfNeeded(campaign.filters);
+  const candidate = text(input.indeed_base_url) ||
+    text(input.indeed_search_base_url) ||
+    text(outreach.indeed_base_url) ||
+    text(outreach.indeed_search_base_url) ||
+    text(search.indeed_base_url) ||
+    text(filters.indeed_base_url) ||
+    OUTSCRAPER_INDEED_BASE_URL;
+
+  try {
+    const url = new URL(candidate);
+    if (!url.pathname || url.pathname === "/") url.pathname = "/jobs";
+    return url.toString();
+  } catch {
+    return "https://www.indeed.com/jobs";
+  }
 }
 
 function flattenRows(value: unknown): Row[] {
@@ -154,7 +191,7 @@ function normalizeJob(raw: Row, campaignId: string, userId: string) {
     salary: text(salaryText),
     description: text(raw.snippet || raw.description || raw.summary || raw.job_description),
     apply_url: applyUrl,
-    source: "outscraper_indeed_au",
+    source: "outscraper_indeed",
     posted_at: postedAt,
     job_type: text(raw.job_type || raw.type || raw.employment_type),
     raw_payload: raw,
@@ -164,8 +201,8 @@ function normalizeJob(raw: Row, campaignId: string, userId: string) {
   return job;
 }
 
-function buildIndeedSearchUrl(query: string, location: string) {
-  const url = new URL("https://au.indeed.com/jobs");
+function buildIndeedSearchUrl(baseUrl: string, query: string, location: string) {
+  const url = new URL(baseUrl);
   url.searchParams.set("q", query);
   url.searchParams.set("l", location);
   return url.toString();
@@ -173,20 +210,21 @@ function buildIndeedSearchUrl(query: string, location: string) {
 
 function buildOutscraperUrl(campaign: Row, input: Row, limit: number) {
   const url = new URL(OUTSCRAPER_JOBS_API_URL);
+  const indeedBaseUrl = resolveIndeedBaseUrl(campaign, input);
   const terms = collectQueryTerms(campaign, input);
   const places = collectLocations(campaign, input);
   const queryTerms = terms.length ? terms : ["IT Support"];
-  const locations = places.length ? places : ["Sydney NSW"];
+  const locations = places.length ? places : [""];
 
   for (const term of queryTerms) {
     for (const place of locations) {
-      url.searchParams.append("query", buildIndeedSearchUrl(term, place));
+      url.searchParams.append("query", buildIndeedSearchUrl(indeedBaseUrl, term, place));
     }
   }
 
   url.searchParams.set("limit", String(limit));
   url.searchParams.set("async", "false");
-  return url;
+  return { url, indeedBaseUrl, queryCount: queryTerms.length * locations.length };
 }
 
 async function getSignedInUserId(authHeader: string) {
@@ -202,7 +240,7 @@ async function getSignedInUserId(authHeader: string) {
 async function loadCampaign(supabase: ReturnType<typeof createClient>, campaignId: string) {
   const { data, error } = await supabase
     .from("campaigns")
-    .select("id,user_id,outreach,status,created_at")
+    .select("id,user_id,outreach,status,created_at,location,target_business_type,search,filters")
     .eq("id", campaignId)
     .single();
   if (error) throw new Error(error.message);
@@ -241,13 +279,15 @@ async function insertJobs(supabase: ReturnType<typeof createClient>, jobs: Row[]
 }
 
 async function fetchOutscraperJobs(campaign: Row, input: Row) {
-  if (Array.isArray(input.jobs)) return input.jobs as Row[];
+  if (Array.isArray(input.jobs)) {
+    return { rawJobs: input.jobs as Row[], indeedBaseUrl: null, queryCount: 0 };
+  }
   if (!OUTSCRAPER_API_KEY) throw new Error("Missing OUTSCRAPER_API_KEY");
 
   const limit = Math.max(1, Math.min(100, numberValue(input.results_limit, 24)));
-  const url = buildOutscraperUrl(campaign, input, limit);
+  const request = buildOutscraperUrl(campaign, input, limit);
 
-  const response = await fetch(url.toString(), {
+  const response = await fetch(request.url.toString(), {
     method: "GET",
     headers: { "X-API-KEY": OUTSCRAPER_API_KEY },
   });
@@ -263,7 +303,7 @@ async function fetchOutscraperJobs(campaign: Row, input: Row) {
   if (!response.ok) {
     throw new Error(`Outscraper indeed-search failed ${response.status}: ${JSON.stringify(payload).slice(0, 500)}`);
   }
-  return extractJobRows(payload);
+  return { rawJobs: extractJobRows(payload), indeedBaseUrl: request.indeedBaseUrl, queryCount: request.queryCount };
 }
 
 serve(async (req) => {
@@ -305,7 +345,8 @@ serve(async (req) => {
     if (!userId) return json({ ok: false, error: "Unable to resolve user_id for campaign" }, 400);
 
     const existingKeys = await loadExistingDedupeKeys(supabase, campaignId, userId);
-    const rawJobs = await fetchOutscraperJobs(campaign, { ...input, results_limit: resultsLimit });
+    const outscraperResult = await fetchOutscraperJobs(campaign, { ...input, results_limit: resultsLimit });
+    const rawJobs = outscraperResult.rawJobs;
 
     const normalized = rawJobs
       .map((raw) => normalizeJob(raw, campaignId, userId))
@@ -334,8 +375,10 @@ serve(async (req) => {
       campaign_id: campaignId,
       user_id: userId,
       scheduled_run: scheduledRun,
-      provider: "outscraper_indeed_search_au",
+      provider: "outscraper_indeed_search",
       provider_url: OUTSCRAPER_JOBS_API_URL,
+      indeed_base_url: outscraperResult.indeedBaseUrl,
+      query_count: outscraperResult.queryCount,
       fetched_count: rawJobs.length,
       normalized_count: normalized.length,
       filtered_count: withinPostedWindow.length,
