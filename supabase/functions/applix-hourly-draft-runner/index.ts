@@ -5,12 +5,13 @@ type Row = Record<string, any>;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-cron-secret, x-applix-cron-secret, cron-secret",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
+const CRON_SECRET = Deno.env.get("CRON_SECRET") || Deno.env.get("APPLIX_CRON_SECRET") || "";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -53,6 +54,28 @@ function minutesBetween(dateIso: string | null, now = new Date()) {
   return (now.getTime() - parsed.getTime()) / (60 * 1000);
 }
 
+function bearerToken(req: Request) {
+  const authHeader = req.headers.get("authorization") || "";
+  return authHeader.replace(/^Bearer\s+/i, "").trim();
+}
+
+function isInternalAuthorized(req: Request) {
+  const token = bearerToken(req);
+  const xCronSecret = req.headers.get("x-cron-secret") || "";
+  const xApplixCronSecret = req.headers.get("x-applix-cron-secret") || "";
+  const plainCronSecret = req.headers.get("cron-secret") || "";
+
+  return Boolean(
+    CRON_SECRET &&
+      (
+        token === CRON_SECRET ||
+        xCronSecret === CRON_SECRET ||
+        xApplixCronSecret === CRON_SECRET ||
+        plainCronSecret === CRON_SECRET
+      )
+  );
+}
+
 function isScheduledAndActive(campaign: Row) {
   const outreach = parseJsonIfNeeded(campaign.outreach);
   const campaignStatus = text(campaign.status)?.toLowerCase() || "";
@@ -62,7 +85,8 @@ function isScheduledAndActive(campaign: Row) {
     bool(outreach.cron_enabled, false) ||
     bool(outreach.schedule_enabled, false) ||
     outreachStatus === "scheduled" ||
-    campaignStatus === "scheduled";
+    campaignStatus === "scheduled" ||
+    campaignStatus === "active";
 
   const active = bool(outreach.active, true) &&
     !["paused", "inactive", "archived", "disabled", "completed"].includes(campaignStatus) &&
@@ -140,10 +164,7 @@ serve(async (req) => {
       return json({ ok: false, error: "Missing hourly runner configuration" }, 500);
     }
 
-    const authHeader = req.headers.get("authorization") || "";
-    const cronHeader = req.headers.get("x-cron-secret") || "";
-    const bearerSecret = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    if (cronHeader !== CRON_SECRET && bearerSecret !== CRON_SECRET) {
+    if (!isInternalAuthorized(req)) {
       return json({ ok: false, error: "Unauthorized" }, 401);
     }
 
