@@ -168,28 +168,6 @@ export default function HomePage() {
           overflow: "hidden",
         }}
       >
-        <div
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            top: "clamp(72px, 18vh, 160px)",
-            left: "50%",
-            width: "min(380px, 82vw)",
-            height: "min(260px, 46vw)",
-            transform: "translateX(-50%) perspective(760px) rotateX(22deg) scale(1.08)",
-            transformOrigin: "top center",
-            backgroundImage:
-              "linear-gradient(rgba(20, 16, 22, .32) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .32) 1px, transparent 1px)",
-            backgroundSize: "28px 28px",
-            opacity: 0.46,
-            pointerEvents: "none",
-            WebkitMaskImage:
-              "radial-gradient(circle at 50% 34%, rgba(0,0,0,.95) 0 70px, rgba(0,0,0,.65) 115px, transparent 185px)",
-            maskImage:
-              "radial-gradient(circle at 50% 34%, rgba(0,0,0,.95) 0 70px, rgba(0,0,0,.65) 115px, transparent 185px)",
-          }}
-        />
-
         <img
           src="/applix-logo.svg"
           alt="Applix logo"
