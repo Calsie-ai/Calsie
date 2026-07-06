@@ -211,8 +211,8 @@ export default function DashboardPage() {
         <div className="applix-setup-info" title={email || "Applix dashboard"}>i</div>
 
         <section className="applix-home-center dashboard-hero">
-          <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "clamp(120px, 18vw, 190px)", height: "auto", display: "block", objectFit: "contain", marginBottom: "-4px", filter: "drop-shadow(0 18px 25px rgba(0,0,0,.32))" }} />
-          <p style={{ margin: "10px 0 12px", color: "#ff7bad", fontSize: "clamp(46px, 8vw, 74px)", fontWeight: 950, letterSpacing: ".18em" }}>APPLIX</p>
+          <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "clamp(120px, 18vw, 190px)", height: "auto", display: "block", objectFit: "contain", marginBottom: "-4px", filter: "drop-shadow(0 18px 25px rgba(0,0,0,.18))" }} />
+          <p style={{ margin: "10px 0 12px", color: "#ff5ca8", fontSize: "clamp(46px, 8vw, 74px)", fontWeight: 950, letterSpacing: ".18em" }}>APPLIX</p>
           <p className="applix-setup-kicker">Persistence at Scale</p>
           <h1>Welcome back</h1>
           <p className="applix-home-copy dashboard-subtitle">Signup, setup, start, and sleep while Applix works in the background.</p>
@@ -264,7 +264,7 @@ export default function DashboardPage() {
                 {latestCampaign.status === "launched" && <p>Applix is working in the background for {latestCampaign.outreach?.agent_days || 10} days.</p>}
                 <div className="home-action-row campaign-buttons" style={{ marginTop: 16 }}>
                   <Link className="ghost-link" href="/campaign/new">New campaign</Link>
-                  <button className="ghost-button" type="button" onClick={() => deleteCampaign(latestCampaign)} disabled={busy} style={{ borderColor: "rgba(248,113,113,.55)", background: "rgba(127,29,29,.34)", color: "#fecaca" }}>{busy ? "Deleting..." : "Delete campaign"}</button>
+                  <button className="ghost-button" type="button" onClick={() => deleteCampaign(latestCampaign)} disabled={busy} style={{ borderColor: "rgba(248,113,113,.55)", background: "rgba(254,226,226,.72)", color: "#991b1b" }}>{busy ? "Deleting..." : "Delete campaign"}</button>
                 </div>
               </>
             ) : (
@@ -294,13 +294,52 @@ export default function DashboardPage() {
           overflow-y: auto !important;
           justify-items: center !important;
           padding: clamp(28px, 5vw, 58px) 18px 48px !important;
-          background:
-            radial-gradient(circle at 20% 0%, rgba(168, 85, 247, .22), transparent 28%),
-            radial-gradient(circle at 85% 20%, rgba(34, 211, 238, .16), transparent 24%),
-            linear-gradient(180deg, #100b26 0%, #070b18 56%, #030306 100%) !important;
+          background-color: #fff7fb !important;
+          background-image:
+            linear-gradient(rgba(255, 70, 190, .24) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 70, 190, .24) 1px, transparent 1px) !important;
+          background-size: 28px 28px !important;
+          color: #16131a !important;
         }
 
-        .dashboard-cockpit-shell::before { display: none !important; }
+        .dashboard-cockpit-shell::before {
+          content: "" !important;
+          display: block !important;
+          position: fixed !important;
+          inset: -12% -35% -20% !important;
+          background-image:
+            linear-gradient(rgba(20, 16, 22, .34) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(20, 16, 22, .34) 1px, transparent 1px) !important;
+          background-size: 28px 28px !important;
+          transform: perspective(760px) rotateX(22deg) scale(1.08) !important;
+          transform-origin: top center !important;
+          opacity: .28 !important;
+          pointer-events: none !important;
+          z-index: 0 !important;
+          -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%) !important;
+          mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%) !important;
+        }
+
+        .dashboard-cockpit-shell::after {
+          content: "" !important;
+          position: fixed !important;
+          inset: 0 !important;
+          background: radial-gradient(circle at 50% 18%, rgba(255,255,255,.95), rgba(255,255,255,.72) 34%, transparent 68%) !important;
+          pointer-events: none !important;
+          z-index: 0 !important;
+        }
+
+        .dashboard-cockpit-shell > * { position: relative !important; z-index: 1 !important; }
+
+        .applix-setup-back,
+        .home-signout,
+        .applix-setup-info {
+          background: rgba(255,255,255,.66) !important;
+          color: #16131a !important;
+          border: 1px solid rgba(22, 19, 26, .16) !important;
+          box-shadow: 0 12px 28px rgba(0,0,0,.08) !important;
+          backdrop-filter: blur(12px) !important;
+        }
 
         .dashboard-hero {
           width: min(760px, 92vw) !important;
@@ -308,16 +347,25 @@ export default function DashboardPage() {
           margin-bottom: clamp(30px, 5vw, 52px) !important;
           text-align: center !important;
           justify-items: center !important;
+          color: #16131a !important;
         }
 
-        .dashboard-hero h1 { font-size: clamp(50px, 10vw, 92px) !important; line-height: .95 !important; }
+        .dashboard-hero h1 {
+          font-size: clamp(50px, 10vw, 92px) !important;
+          line-height: .95 !important;
+          color: #16131a !important;
+        }
+
+        .dashboard-hero .applix-setup-kicker {
+          color: #16131a !important;
+        }
 
         .dashboard-subtitle {
           display: block !important;
           margin-top: 20px !important;
           font-size: clamp(16px, 3vw, 22px) !important;
           line-height: 1.45 !important;
-          color: rgba(255,255,255,.86) !important;
+          color: rgba(22, 19, 26, .82) !important;
         }
 
         .dashboard-stack {
@@ -335,10 +383,11 @@ export default function DashboardPage() {
         .dashboard-card-clean,
         .resume-action,
         .dashboard-app-connect {
-          background: linear-gradient(180deg, rgba(18, 25, 43, .72), rgba(7, 12, 24, .86)) !important;
-          border: 1px solid rgba(190, 220, 255, .18) !important;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 18px 54px rgba(0,0,0,.26) !important;
-          backdrop-filter: blur(22px) saturate(1.12) !important;
+          background: rgba(255,255,255,.58) !important;
+          border: 1px solid rgba(255, 92, 168, .22) !important;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.65), 0 18px 44px rgba(255, 92, 168, .08), 0 14px 34px rgba(0,0,0,.06) !important;
+          backdrop-filter: blur(16px) saturate(1.08) !important;
+          color: #16131a !important;
         }
 
         .dashboard-card-clean {
@@ -349,16 +398,18 @@ export default function DashboardPage() {
           gap: 14px !important;
         }
 
-        .dashboard-card-clean strong { font-size: clamp(21px, 4.5vw, 32px) !important; line-height: 1.15 !important; margin-bottom: 0 !important; }
+        .dashboard-card-clean strong { font-size: clamp(21px, 4.5vw, 32px) !important; line-height: 1.15 !important; margin-bottom: 0 !important; color: #16131a !important; }
 
         .dashboard-card-clean p,
-        .home-check p { font-size: clamp(14px, 3.2vw, 17px) !important; line-height: 1.45 !important; }
+        .home-check p { font-size: clamp(14px, 3.2vw, 17px) !important; line-height: 1.45 !important; color: rgba(22, 19, 26, .78) !important; }
+
+        .home-check strong { color: #16131a !important; }
 
         .applix-intro-card p { max-width: 600px !important; text-align: center !important; }
 
         .resume-warning {
           max-width: 650px !important;
-          color: rgba(255,255,255,.9) !important;
+          color: #16131a !important;
           font-weight: 950 !important;
           text-align: center !important;
         }
@@ -380,12 +431,12 @@ export default function DashboardPage() {
 
         .resume-action.ready,
         .dashboard-app-connect.ready {
-          border: 1.8px solid rgba(255, 106, 181, .96) !important;
+          border: 1.8px solid rgba(255, 92, 168, .96) !important;
           box-shadow:
-            inset 0 1px 0 rgba(255,255,255,.12),
-            0 0 0 1px rgba(255, 106, 181, .18),
-            0 0 26px rgba(255, 106, 181, .2),
-            0 18px 54px rgba(0,0,0,.25) !important;
+            inset 0 1px 0 rgba(255,255,255,.8),
+            0 0 0 1px rgba(255, 92, 168, .18),
+            0 0 26px rgba(255, 92, 168, .2),
+            0 18px 44px rgba(0,0,0,.07) !important;
         }
 
         .resume-action div,
@@ -399,9 +450,9 @@ export default function DashboardPage() {
           border-radius: 999px !important;
           display: grid !important;
           place-items: center !important;
-          background: rgba(255,255,255,.08) !important;
-          color: rgba(255,255,255,.9) !important;
-          border: 1px solid rgba(255,255,255,.12) !important;
+          background: rgba(22, 19, 26, .08) !important;
+          color: #16131a !important;
+          border: 1px solid rgba(22, 19, 26, .12) !important;
         }
 
         .resume-action strong,
@@ -423,9 +474,9 @@ export default function DashboardPage() {
           justify-content: center;
           padding: 7px 14px;
           border-radius: 999px;
-          background: rgba(34, 211, 238, .12);
-          border: 1px solid rgba(34, 211, 238, .26);
-          color: #bff7ff;
+          background: rgba(255, 92, 168, .12);
+          border: 1px solid rgba(255, 92, 168, .28);
+          color: #b91c65;
           font-size: 12px;
           font-weight: 950;
           letter-spacing: .08em;
@@ -433,7 +484,7 @@ export default function DashboardPage() {
         }
 
         .campaign-target {
-          color: rgba(255,255,255,.78) !important;
+          color: rgba(22, 19, 26, .78) !important;
           max-width: 560px !important;
         }
 
@@ -445,9 +496,9 @@ export default function DashboardPage() {
           margin-top: 2px;
           padding: 12px 18px;
           border-radius: 999px;
-          background: rgba(167, 243, 208, .1);
-          border: 1px solid rgba(167, 243, 208, .24);
-          color: #d6fff1;
+          background: rgba(16, 185, 129, .1);
+          border: 1px solid rgba(16, 185, 129, .24);
+          color: #065f46;
           font-weight: 950;
         }
 
@@ -455,11 +506,43 @@ export default function DashboardPage() {
           width: 10px;
           height: 10px;
           border-radius: 999px;
-          background: #8fffd2;
-          box-shadow: 0 0 18px rgba(143,255,210,.75);
+          background: #10b981;
+          box-shadow: 0 0 18px rgba(16,185,129,.55);
         }
 
         .campaign-buttons { width: 100% !important; }
+
+        .dashboard-actions .applix-setup-outline,
+        .dashboard-actions .applix-setup-primary {
+          color: #16131a !important;
+          border-color: rgba(22, 19, 26, .78) !important;
+          background: rgba(255,255,255,.5) !important;
+          box-shadow: 0 12px 28px rgba(0,0,0,.08) !important;
+        }
+
+        .dashboard-actions .applix-setup-primary {
+          background: #ff5ca8 !important;
+          border-color: #ff5ca8 !important;
+        }
+
+        .dashboard-actions .applix-setup-primary:disabled {
+          background: rgba(22, 19, 26, .36) !important;
+          border-color: transparent !important;
+          color: rgba(255,255,255,.72) !important;
+        }
+
+        .applix-setup-status.success {
+          background: rgba(255,255,255,.62) !important;
+          color: #065f46 !important;
+          border: 1px solid rgba(16,185,129,.22) !important;
+        }
+
+        .ghost-link,
+        .ghost-button {
+          color: #16131a !important;
+          border-color: rgba(22, 19, 26, .2) !important;
+          background: rgba(255,255,255,.55) !important;
+        }
 
         @media (max-width: 640px) {
           .dashboard-cockpit-shell { padding-left: 14px !important; padding-right: 14px !important; }
