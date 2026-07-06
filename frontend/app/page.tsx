@@ -90,7 +90,7 @@ export default function HomePage() {
 
     try {
       const supabase = getSupabaseClient();
-      const redirectTo = `${window.location.origin}/dashboard`;
+      const redirectTo = `${window.location.origin}/auth/callback?next=/dashboard`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
