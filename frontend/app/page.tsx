@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { getSupabaseClient } from "../lib/supabaseClient";
 
 const pink = "#ff5ca8";
@@ -36,16 +36,12 @@ const onboardingSlides = [
 ];
 
 export default function HomePage() {
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [signedInEmail, setSignedInEmail] = useState("");
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [carouselComplete, setCarouselComplete] = useState(false);
-  const [showMagicForm, setShowMagicForm] = useState(false);
 
   useEffect(() => {
     async function checkSession() {
@@ -57,7 +53,7 @@ export default function HomePage() {
           setSignedInEmail(data.user.email || "");
         }
       } catch {
-        // Keep the magic-link form visible if Supabase is not configured yet.
+        // Keep Google login available if Supabase is not configured yet.
       } finally {
         setCheckingSession(false);
       }
@@ -71,7 +67,6 @@ export default function HomePage() {
       const supabase = getSupabaseClient();
       await supabase.auth.signOut();
       setSignedInEmail("");
-      setMagicLinkSent(false);
       setStatus("");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not log out.");
@@ -87,10 +82,8 @@ export default function HomePage() {
     setCarouselComplete(true);
   }
 
-  async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (magicLinkSent || !carouselComplete) return;
+  async function loginWithGoogle() {
+    if (!carouselComplete || loading) return;
 
     setStatus("");
     setLoading(true);
@@ -99,28 +92,19 @@ export default function HomePage() {
       const supabase = getSupabaseClient();
       const redirectTo = `${window.location.origin}/dashboard`;
 
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
         options: {
-          emailRedirectTo: redirectTo,
-          shouldCreateUser: true,
+          redirectTo,
         },
       });
 
       if (error) {
-        const message = error.message.toLowerCase().includes("rate")
-          ? "Email rate limit reached. Wait a moment and request another magic link."
-          : error.message;
-
-        setStatus(message);
-        return;
+        setStatus(error.message);
+        setLoading(false);
       }
-
-      setMagicLinkSent(true);
-      setStatus("Magic link sent. Check your email to continue into Applix.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not send magic link.");
-    } finally {
+      setStatus(error instanceof Error ? error.message : "Could not continue with Google.");
       setLoading(false);
     }
   }
@@ -206,21 +190,6 @@ export default function HomePage() {
     fontWeight: 900,
     letterSpacing: ".1em",
     textTransform: "uppercase" as const,
-  };
-
-  const inputStyle = {
-    minHeight: 40,
-    width: "100%",
-    border: "1px solid transparent",
-    borderRadius: 999,
-    padding: "10px 14px",
-    background: "#4c4c4f",
-    color: "white",
-    outline: 0,
-    textAlign: "center" as const,
-    fontSize: "clamp(11px, 3vw, 13px)",
-    fontWeight: 800,
-    boxShadow: "0 10px 24px rgba(0,0,0,.16)",
   };
 
   const primaryButtonStyle = {
@@ -489,66 +458,21 @@ export default function HomePage() {
           </div>
         )}
 
-        {carouselComplete && !showMagicForm && !signedInEmail && (
+        {carouselComplete && !signedInEmail && (
           <div style={{ display: "grid", gap: 12, justifyItems: "center" }}>
             <p style={{ ...copyStyle, marginBottom: 0 }}>
-              ALL START CHECKS COMPLETED. YOU CAN NOW REQUEST YOUR MAGIC LINK.
+              ALL START CHECKS COMPLETED. CONTINUE WITH GOOGLE TO ENTER APPLIX.
             </p>
-            <button type="button" onClick={() => setShowMagicForm(true)} style={primaryButtonStyle}>
-              Get magic link
+            <button type="button" onClick={loginWithGoogle} disabled={loading} style={primaryButtonStyle}>
+              {loading ? "Connecting..." : "Continue with Google"}
             </button>
           </div>
         )}
 
         {!carouselComplete && !signedInEmail && (
           <button type="button" disabled style={lockedButtonStyle}>
-            Magic link locked
+            Google login locked
           </button>
-        )}
-
-        {showMagicForm && !signedInEmail && (
-          <form
-            onSubmit={sendMagicLink}
-            style={{
-              width: "min(260px, calc(100vw - 20px))",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            <label style={{ display: "grid", gap: 7 }}>
-              <span style={labelStyle}>Enter your email</span>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="Enter your email"
-                autoComplete="email"
-                disabled={loading || magicLinkSent}
-                required
-                style={inputStyle}
-              />
-            </label>
-
-            <label style={{ display: "grid", gap: 7 }}>
-              <span style={labelStyle}>Your Name</span>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Your Name"
-                autoComplete="name"
-                disabled={loading || magicLinkSent}
-                style={inputStyle}
-              />
-            </label>
-
-            <button type="submit" disabled={loading || magicLinkSent} style={primaryButtonStyle}>
-              {magicLinkSent ? "Magic link sent" : loading ? "Sending..." : "Get magic link"}
-            </button>
-          </form>
         )}
 
         {checkingSession && (
@@ -582,7 +506,7 @@ export default function HomePage() {
             style={{
               width: "min(320px, calc(100vw - 20px))",
               margin: "4px 0 0",
-              color: magicLinkSent ? "#22543d" : "#7f1d1d",
+              color: "#7f1d1d",
               fontSize: "clamp(10px, 3vw, 12px)",
               fontWeight: 800,
               lineHeight: 1.45,
