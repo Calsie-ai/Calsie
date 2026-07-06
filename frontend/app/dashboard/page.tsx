@@ -293,7 +293,7 @@ export default function DashboardPage() {
           grid-template-rows: auto 1fr !important;
           overflow-y: auto !important;
           justify-items: center !important;
-          padding: clamp(28px, 5vw, 58px) 18px 48px !important;
+          padding: clamp(12px, 3vw, 26px) 14px 42px !important;
           background-color: #fff7fb !important;
           background-image:
             linear-gradient(rgba(255, 70, 190, .24) 1px, transparent 1px),
@@ -324,7 +324,7 @@ export default function DashboardPage() {
           content: "" !important;
           position: fixed !important;
           inset: 0 !important;
-          background: radial-gradient(circle at 50% 18%, rgba(255,255,255,.95), rgba(255,255,255,.72) 34%, transparent 68%) !important;
+          background: radial-gradient(circle at 50% 18%, rgba(255,255,255,.94), rgba(255,255,255,.7) 34%, transparent 68%) !important;
           pointer-events: none !important;
           z-index: 0 !important;
         }
@@ -334,37 +334,73 @@ export default function DashboardPage() {
         .applix-setup-back,
         .home-signout,
         .applix-setup-info {
-          background: rgba(255,255,255,.66) !important;
+          position: fixed !important;
+          top: max(14px, env(safe-area-inset-top)) !important;
+          background: rgba(255,255,255,.72) !important;
           color: #16131a !important;
           border: 1px solid rgba(22, 19, 26, .16) !important;
-          box-shadow: 0 12px 28px rgba(0,0,0,.08) !important;
+          box-shadow: 0 10px 26px rgba(0,0,0,.09) !important;
           backdrop-filter: blur(12px) !important;
+          z-index: 20 !important;
+        }
+
+        .applix-setup-back {
+          left: 14px !important;
+          width: 50px !important;
+          height: 50px !important;
+        }
+
+        .home-signout {
+          left: 50% !important;
+          right: auto !important;
+          transform: translateX(-50%) !important;
+          min-width: 96px !important;
+          height: 44px !important;
+          padding: 0 18px !important;
+        }
+
+        .applix-setup-info {
+          right: 14px !important;
+          width: 50px !important;
+          height: 50px !important;
         }
 
         .dashboard-hero {
           width: min(760px, 92vw) !important;
-          padding-top: clamp(92px, 10vh, 128px) !important;
-          margin-bottom: clamp(30px, 5vw, 52px) !important;
+          padding-top: clamp(86px, 14vh, 112px) !important;
+          margin-bottom: clamp(18px, 4vw, 34px) !important;
           text-align: center !important;
           justify-items: center !important;
           color: #16131a !important;
         }
 
+        .dashboard-hero img {
+          width: clamp(84px, 22vw, 126px) !important;
+          margin-bottom: 2px !important;
+        }
+
+        .dashboard-hero > p:first-of-type {
+          font-size: clamp(38px, 12vw, 68px) !important;
+          margin: 6px 0 8px !important;
+        }
+
         .dashboard-hero h1 {
-          font-size: clamp(50px, 10vw, 92px) !important;
+          font-size: clamp(38px, 10vw, 72px) !important;
           line-height: .95 !important;
           color: #16131a !important;
+          margin-top: 18px !important;
         }
 
         .dashboard-hero .applix-setup-kicker {
           color: #16131a !important;
+          letter-spacing: .18em !important;
         }
 
         .dashboard-subtitle {
           display: block !important;
-          margin-top: 20px !important;
-          font-size: clamp(16px, 3vw, 22px) !important;
-          line-height: 1.45 !important;
+          margin-top: 14px !important;
+          font-size: clamp(15px, 3.7vw, 20px) !important;
+          line-height: 1.42 !important;
           color: rgba(22, 19, 26, .82) !important;
         }
 
@@ -373,7 +409,7 @@ export default function DashboardPage() {
           margin: 0 auto !important;
           display: grid !important;
           justify-items: center !important;
-          gap: clamp(18px, 3.5vw, 28px) !important;
+          gap: clamp(16px, 3.5vw, 26px) !important;
         }
 
         .dashboard-card-clean,
@@ -383,19 +419,20 @@ export default function DashboardPage() {
         .dashboard-card-clean,
         .resume-action,
         .dashboard-app-connect {
-          background: rgba(255,255,255,.58) !important;
-          border: 1px solid rgba(255, 92, 168, .22) !important;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.65), 0 18px 44px rgba(255, 92, 168, .08), 0 14px 34px rgba(0,0,0,.06) !important;
+          background: rgba(255,255,255,.68) !important;
+          border: 1px solid rgba(255, 92, 168, .28) !important;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 18px 44px rgba(255, 92, 168, .1), 0 14px 34px rgba(0,0,0,.06) !important;
           backdrop-filter: blur(16px) saturate(1.08) !important;
           color: #16131a !important;
         }
 
         .dashboard-card-clean {
           text-align: center !important;
-          padding: clamp(22px, 4vw, 32px) !important;
+          padding: clamp(20px, 4vw, 30px) !important;
           display: grid !important;
           justify-items: center !important;
-          gap: 14px !important;
+          gap: 12px !important;
+          border-radius: 26px !important;
         }
 
         .dashboard-card-clean strong { font-size: clamp(21px, 4.5vw, 32px) !important; line-height: 1.15 !important; margin-bottom: 0 !important; color: #16131a !important; }
@@ -516,7 +553,7 @@ export default function DashboardPage() {
         .dashboard-actions .applix-setup-primary {
           color: #16131a !important;
           border-color: rgba(22, 19, 26, .78) !important;
-          background: rgba(255,255,255,.5) !important;
+          background: rgba(255,255,255,.58) !important;
           box-shadow: 0 12px 28px rgba(0,0,0,.08) !important;
         }
 
@@ -546,13 +583,14 @@ export default function DashboardPage() {
 
         @media (max-width: 640px) {
           .dashboard-cockpit-shell { padding-left: 14px !important; padding-right: 14px !important; }
-          .dashboard-hero { padding-top: 82px !important; margin-bottom: 34px !important; }
+          .dashboard-hero { padding-top: 78px !important; margin-bottom: 24px !important; }
+          .dashboard-hero h1 { font-size: clamp(38px, 11vw, 58px) !important; }
           .dashboard-stack { width: min(100%, 430px) !important; }
           .dashboard-card-clean { border-radius: 22px !important; padding: 20px !important; }
           .resume-action,
           .dashboard-app-connect { grid-template-columns: 1fr !important; border-radius: 22px !important; }
           .dashboard-actions .applix-setup-primary,
-          .dashboard-actions .applix-setup-outline { min-height: 64px !important; font-size: clamp(20px, 6vw, 28px) !important; }
+          .dashboard-actions .applix-setup-outline { min-height: 58px !important; font-size: clamp(18px, 5.4vw, 24px) !important; }
         }
       `}</style>
     </>
