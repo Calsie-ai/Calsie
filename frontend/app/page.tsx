@@ -127,7 +127,7 @@ export default function HomePage() {
     justifyContent: "center",
     textAlign: "center" as const,
     width: "100%",
-    padding: "clamp(24px, 5vw, 42px) clamp(18px, 6vw, 42px)",
+    padding: "clamp(16px, 3vw, 28px) clamp(18px, 6vw, 42px)",
   };
 
   const labelStyle = {
@@ -141,7 +141,7 @@ export default function HomePage() {
 
   const copyStyle = {
     width: "min(280px, 100%)",
-    margin: "0 auto 16px",
+    margin: "0 auto 14px",
     color: ink,
     fontSize: "clamp(8px, 2.15vw, 10px)",
     lineHeight: 1.25,
@@ -195,9 +195,28 @@ export default function HomePage() {
         aria-hidden="true"
         style={{
           position: "fixed",
+          inset: "-12% -35% -20%",
+          backgroundImage:
+            "linear-gradient(rgba(20, 16, 22, .34) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .34) 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+          transform: "perspective(760px) rotateX(22deg) scale(1.08)",
+          transformOrigin: "top center",
+          opacity: 0.34,
+          pointerEvents: "none",
+          WebkitMaskImage:
+            "linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%)",
+          maskImage:
+            "linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%)",
+        }}
+      />
+
+      <div
+        aria-hidden="true"
+        style={{
+          position: "fixed",
           inset: 0,
           background:
-            "radial-gradient(circle at 50% 24%, rgba(255,255,255,.94), rgba(255,255,255,.72) 31%, transparent 62%)",
+            "radial-gradient(circle at 50% 24%, rgba(255,255,255,.9), rgba(255,255,255,.66) 31%, transparent 62%)",
           pointerEvents: "none",
         }}
       />
@@ -208,33 +227,11 @@ export default function HomePage() {
         style={{
           ...sectionStyle,
           minHeight: "auto",
-          paddingTop: "clamp(40px, 7vw, 70px)",
-          paddingBottom: "clamp(42px, 7vw, 72px)",
+          paddingTop: "clamp(8px, 2vw, 18px)",
+          paddingBottom: "clamp(10px, 2vw, 22px)",
           overflow: "hidden",
         }}
       >
-        <div
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            top: "clamp(34px, 8vw, 72px)",
-            left: "50%",
-            width: "min(760px, 104vw)",
-            height: "clamp(250px, 42vw, 390px)",
-            transform: "translateX(-50%) perspective(760px) rotateX(22deg) scale(1.08)",
-            transformOrigin: "top center",
-            backgroundImage:
-              "linear-gradient(rgba(20, 16, 22, .46) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .46) 1px, transparent 1px)",
-            backgroundSize: "28px 28px",
-            opacity: 0.72,
-            pointerEvents: "none",
-            WebkitMaskImage:
-              "radial-gradient(ellipse at 50% 43%, rgba(0,0,0,.96) 0 38%, rgba(0,0,0,.74) 48%, transparent 70%)",
-            maskImage:
-              "radial-gradient(ellipse at 50% 43%, rgba(0,0,0,.96) 0 38%, rgba(0,0,0,.74) 48%, transparent 70%)",
-          }}
-        />
-
         <img
           src="/applix-logo.svg"
           alt="Applix logo"
@@ -272,7 +269,7 @@ export default function HomePage() {
             position: "relative",
             zIndex: 1,
             maxWidth: "100%",
-            margin: "clamp(6px, 2vw, 8px) 0 clamp(18px, 5vw, 28px)",
+            margin: "clamp(6px, 2vw, 8px) 0 clamp(14px, 3vw, 22px)",
             color: ink,
             fontSize: "clamp(8px, 2.8vw, 10px)",
             lineHeight: 1.2,
@@ -284,12 +281,12 @@ export default function HomePage() {
           Persistence at Scale
         </p>
 
-        <p style={{ ...copyStyle, position: "relative", zIndex: 1 }}>
+        <p style={{ ...copyStyle, position: "relative", zIndex: 1, marginBottom: 0 }}>
           APPLIX IS FIRST SYMBIOTIC INTELLIGENCE AI, APPLIX IS EMAIL AUTOMATION SYMBIOTE THAT HAS 20 LAYERS OF COGNITIVE CAPACITY, FOR STRAIGHT FORWARD USE PLEASE FOLLOW THE GUARD RAILS.
         </p>
       </section>
 
-      <section style={sectionStyle}>
+      <section style={{ ...sectionStyle, paddingTop: 8 }}>
         <p style={labelStyle}>WELCOME</p>
         <h2
           style={{
