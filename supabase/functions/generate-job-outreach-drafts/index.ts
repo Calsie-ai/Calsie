@@ -1,7 +1,9 @@
-import { serve } from "std/http/server.ts";
-import { createClient } from "supabase";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 type Row = Record<string, any>;
+
+const VERSION = "hourly_scheduled_drafts_v1";
+const HOUR_MS = 60 * 60 * 1000;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +65,10 @@ function draftBody(job: Row): string {
   ].join("\n");
 }
 
+function scheduledSendAtIso(baseTime: Date, offset: number, intervalHours: number): string {
+  return new Date(baseTime.getTime() + offset * intervalHours * HOUR_MS).toISOString();
+}
+
 async function existingDraftJobIds(
   supabase: ReturnType<typeof createClient>,
   jobIds: string[],
@@ -94,7 +100,22 @@ async function existingCampaignIds(
   return new Set((data || []).map((row: Row) => row.id).filter(Boolean));
 }
 
-serve(async (req) => {
+async function existingScheduledUnsentDraftCount(
+  supabase: ReturnType<typeof createClient>,
+  campaignId: string,
+) {
+  const { count, error } = await supabase
+    .from("outreach_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("campaign_id", campaignId)
+    .in("status", ["draft", "pending_user_approval", "queued"])
+    .not("scheduled_send_at", "is", null);
+
+  if (error) throw new Error(error.message);
+  return Number(count || 0);
+}
+
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
@@ -104,7 +125,20 @@ serve(async (req) => {
     }
 
     const input = await req.json().catch(() => ({}));
-    const limit = Math.max(1, Math.min(24, Number(input.limit || 1)));
+    const requestedLimit = Number(input.limit ?? 1);
+    const limit = Math.max(
+      1,
+      Math.min(24, Math.floor(Number.isFinite(requestedLimit) ? requestedLimit : 1)),
+    );
+    const requestedStartDelayHours = Number(input.start_delay_hours ?? 0);
+    const startDelayHours = Number.isFinite(requestedStartDelayHours)
+      ? Math.max(0, requestedStartDelayHours)
+      : 0;
+    const requestedIntervalHours = Number(input.interval_hours ?? 1);
+    const intervalHours = Number.isFinite(requestedIntervalHours) && requestedIntervalHours > 0
+      ? requestedIntervalHours
+      : 1;
+    const baseTime = new Date(Date.now() + startDelayHours * HOUR_MS);
     const campaignId = text(input.campaign_id);
     const userId = text(input.user_id);
 
@@ -143,6 +177,7 @@ serve(async (req) => {
     let draftCreatedCount = 0;
     let skippedCount = 0;
     let duplicateCount = 0;
+    const scheduledOffsetsByCampaign = new Map<string, number>();
 
     for (const job of candidates) {
       if (duplicateJobIds.has(job.id)) {
@@ -168,6 +203,16 @@ serve(async (req) => {
 
       eligibleCount += 1;
 
+      if (!scheduledOffsetsByCampaign.has(campaignIdForDraft)) {
+        scheduledOffsetsByCampaign.set(
+          campaignIdForDraft,
+          await existingScheduledUnsentDraftCount(supabase, campaignIdForDraft),
+        );
+      }
+
+      const scheduleOffset = scheduledOffsetsByCampaign.get(campaignIdForDraft) || 0;
+      const scheduledSendAt = scheduledSendAtIso(baseTime, scheduleOffset, intervalHours);
+
       const insert = await supabase
         .from("outreach_queue")
         .insert({
@@ -180,8 +225,9 @@ serve(async (req) => {
           email_body: draftBody(job),
           status: "draft",
           review_status: "ready_for_review",
-          send_window: "manual_review",
-          user_identifier: text(job.user_id),
+          send_window: "hourly_scheduled",
+          scheduled_send_at: scheduledSendAt,
+          user_identifier: job.user_id,
         });
 
       if (insert.error) {
@@ -194,12 +240,17 @@ serve(async (req) => {
       }
 
       draftCreatedCount += 1;
+      duplicateJobIds.add(job.id);
+      scheduledOffsetsByCampaign.set(campaignIdForDraft, scheduleOffset + 1);
     }
 
     return json({
       ok: true,
       function: "generate-job-outreach-drafts",
+      version: VERSION,
       limit,
+      start_delay_hours: startDelayHours,
+      interval_hours: intervalHours,
       eligible_count: eligibleCount,
       draft_created_count: draftCreatedCount,
       skipped_count: skippedCount,
@@ -209,6 +260,7 @@ serve(async (req) => {
     return json({
       ok: false,
       function: "generate-job-outreach-drafts",
+      version: VERSION,
       error: error instanceof Error ? error.message : String(error),
     }, 500);
   }
