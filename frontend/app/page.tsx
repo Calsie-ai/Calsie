@@ -191,6 +191,12 @@ export default function HomePage() {
     textTransform: "uppercase" as const,
   };
 
+  const sectionHeadingStyle = {
+    ...labelStyle,
+    color: pink,
+    fontSize: "clamp(10px, 3.3vw, 14px)",
+  };
+
   const copyStyle = {
     width: "min(280px, 100%)",
     margin: "0 auto 14px",
@@ -411,7 +417,7 @@ export default function HomePage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2 style={{ ...labelStyle, marginBottom: 20 }}>HOW TO USE APPLIX</h2>
+        <h2 style={{ ...sectionHeadingStyle, marginBottom: 20 }}>HOW TO USE APPLIX</h2>
         <p style={copyStyle}>
           DONT USE YOUR PERSONAL EMAIL, CREATE NEW GMAIL ONLY FOR APPLIX, SO APPLIX CAN USE IT ON YOUR BEHALF.
         </p>
@@ -421,14 +427,14 @@ export default function HomePage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2 style={{ ...labelStyle, color: pink, marginBottom: 18 }}>Upload Your CV</h2>
+        <h2 style={{ ...sectionHeadingStyle, marginBottom: 18 }}>Upload Your CV</h2>
         <p style={copyStyle}>
           UPLOAD YOUR RESUME/CV, APPLIX WILL ATTACH YOUR DOCUMENTSTO EVERY COMPANY IT CONTACTS PLEASE NO PERSONAL INFORMATION / CREDITS ON YOUR DOCUMENTS KEEP IT GENRAL AS MUCH AS YOU CAN
         </p>
       </section>
 
       <section style={sectionStyle}>
-        <h2 style={{ ...labelStyle, color: pink, marginBottom: 18 }}>Fill Up Template</h2>
+        <h2 style={{ ...sectionHeadingStyle, marginBottom: 18 }}>Fill Up Template</h2>
         <p style={copyStyle}>
           Browse Template :
           <br />
@@ -443,19 +449,19 @@ export default function HomePage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2 style={{ ...labelStyle, marginBottom: 24 }}>HOW TO SET UP GUARD RAILS</h2>
-        <h3 style={{ ...labelStyle, color: pink }}>Authorize Applix</h3>
+        <h2 style={{ ...sectionHeadingStyle, marginBottom: 24 }}>HOW TO SET UP GUARD RAILS</h2>
+        <h3 style={sectionHeadingStyle}>Authorize Applix</h3>
         <p style={copyStyle}>
           CONNECT YOUR APPLIX TO YOUR GMAIL ACCOUNT CREATED FOR APPLIX USE ONLY. ALLOW TO SEND ON EMAIL ON BEHALF
         </p>
-        <h3 style={{ ...labelStyle, color: pink }}>Run Applix</h3>
+        <h3 style={sectionHeadingStyle}>Run Applix</h3>
         <p style={copyStyle}>
           APPLIX WILL BE ACTIVATED FOR 30 DAYS, EXECUTE TASK 1/HR. KEEP YOUR ACCOUNT LOGGED IN, YOU CAN CLOSE THE BROWSER
         </p>
       </section>
 
       <section style={{ ...sectionStyle, gap: 14, paddingBottom: "clamp(38px, 8vw, 76px)" }}>
-        <h2 style={{ ...labelStyle, marginBottom: 2 }}>APPLIX START CHECK</h2>
+        <h2 style={{ ...sectionHeadingStyle, marginBottom: 2 }}>APPLIX START CHECK</h2>
 
         {!carouselComplete && (
           <div
@@ -472,10 +478,10 @@ export default function HomePage() {
               backdropFilter: "blur(8px)",
             }}
           >
-            <p style={{ ...labelStyle, color: pink, marginBottom: 0 }}>
+            <p style={{ ...sectionHeadingStyle, marginBottom: 0 }}>
               {carouselIndex + 1}/{onboardingSlides.length}
             </p>
-            <h3 style={{ ...labelStyle, marginBottom: 0 }}>{activeSlide.title}</h3>
+            <h3 style={{ ...sectionHeadingStyle, marginBottom: 0 }}>{activeSlide.title}</h3>
             <p style={{ ...copyStyle, marginBottom: 0 }}>{activeSlide.body}</p>
             <button type="button" onClick={confirmSlide} style={primaryButtonStyle}>
               Yes, I understood
