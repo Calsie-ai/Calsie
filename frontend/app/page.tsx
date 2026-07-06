@@ -4,8 +4,12 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { getSupabaseClient } from "../lib/supabaseClient";
 
+const pink = "#ff5ca8";
+const ink = "#16131a";
+
 export default function HomePage() {
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
@@ -114,6 +118,54 @@ export default function HomePage() {
     </header>
   );
 
+  const sectionStyle = {
+    position: "relative" as const,
+    zIndex: 2,
+    minHeight: "100svh",
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center" as const,
+    width: "100%",
+    padding: "clamp(34px, 9vw, 78px) clamp(18px, 6vw, 42px)",
+  };
+
+  const labelStyle = {
+    margin: "0 0 10px",
+    color: ink,
+    fontSize: "clamp(8px, 2.4vw, 10px)",
+    fontWeight: 900,
+    letterSpacing: ".18em",
+    textTransform: "uppercase" as const,
+  };
+
+  const copyStyle = {
+    width: "min(280px, 100%)",
+    margin: "0 auto 24px",
+    color: ink,
+    fontSize: "clamp(8px, 2.15vw, 10px)",
+    lineHeight: 1.25,
+    fontWeight: 900,
+    letterSpacing: ".1em",
+    textTransform: "uppercase" as const,
+  };
+
+  const inputStyle = {
+    minHeight: 40,
+    width: "100%",
+    border: "1px solid transparent",
+    borderRadius: 999,
+    padding: "10px 14px",
+    background: "#4c4c4f",
+    color: "white",
+    outline: 0,
+    textAlign: "center" as const,
+    fontSize: "clamp(11px, 3vw, 13px)",
+    fontWeight: 800,
+    boxShadow: "0 10px 24px rgba(0,0,0,.16)",
+  };
+
   return (
     <main
       style={{
@@ -121,7 +173,7 @@ export default function HomePage() {
         minHeight: "100svh",
         overflowX: "hidden",
         backgroundColor: "#fff7fb",
-        color: "#16131a",
+        color: ink,
         fontFamily: "Arial, Helvetica, sans-serif",
       }}
     >
@@ -155,25 +207,15 @@ export default function HomePage() {
 
       <section
         style={{
-          position: "relative",
-          zIndex: 2,
+          ...sectionStyle,
           minHeight: "calc(100svh - 54px)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
-          width: "100%",
-          padding: "clamp(6px, 2vw, 12px) clamp(8px, 4vw, 24px) clamp(18px, 6vw, 54px)",
-          overflow: "hidden",
+          paddingTop: "clamp(8px, 3vw, 18px)",
         }}
       >
         <img
           src="/applix-logo.svg"
           alt="Applix logo"
           style={{
-            position: "relative",
-            zIndex: 1,
             width: "clamp(58px, 28vw, 156px)",
             height: "auto",
             display: "block",
@@ -185,11 +227,9 @@ export default function HomePage() {
         <h1
           aria-label="APPLIX"
           style={{
-            position: "relative",
-            zIndex: 1,
             width: "100%",
             margin: 0,
-            color: "#ff5ca8",
+            color: pink,
             fontSize: "clamp(24px, 13.5vw, 72px)",
             lineHeight: 0.92,
             fontWeight: 950,
@@ -202,11 +242,9 @@ export default function HomePage() {
 
         <p
           style={{
-            position: "relative",
-            zIndex: 1,
             maxWidth: "100%",
-            margin: "clamp(6px, 2vw, 8px) 0 clamp(18px, 5vw, 34px)",
-            color: "#222026",
+            margin: "clamp(6px, 2vw, 8px) 0 clamp(18px, 5vw, 28px)",
+            color: ink,
             fontSize: "clamp(8px, 2.8vw, 10px)",
             lineHeight: 1.2,
             fontWeight: 900,
@@ -217,99 +255,102 @@ export default function HomePage() {
           Persistence at Scale
         </p>
 
+        <p style={copyStyle}>
+          APPLIX IS FIRST SYMBIOTIC INTELLIGENCE AI, APPLIX IS EMAIL AUTOMATION SYMBIOTE THAT HAS 20 LAYERS OF COGNITIVE CAPACITY, FOR STRAIGHT FORWARD USE PLEASE FOLLOW THE GUARD RAILS.
+        </p>
+      </section>
+
+      <section style={sectionStyle}>
+        <p style={labelStyle}>WELCOME</p>
+        <h2
+          style={{
+            margin: "0 0 8px",
+            color: ink,
+            fontSize: "clamp(17px, 5.6vw, 25px)",
+            lineHeight: 1,
+            fontWeight: 950,
+            letterSpacing: ".08em",
+            textTransform: "uppercase",
+          }}
+        >
+          CALSIE | APPLIX
+        </h2>
+        <h3
+          style={{
+            margin: "0 0 18px",
+            color: pink,
+            fontSize: "clamp(22px, 8vw, 36px)",
+            lineHeight: .92,
+            fontWeight: 950,
+            letterSpacing: ".14em",
+            textTransform: "uppercase",
+          }}
+        >
+          ABOUT APPLIX
+        </h3>
+
+        <div
+          style={{
+            display: "grid",
+            gap: 10,
+            justifyItems: "center",
+            color: ink,
+            fontSize: "clamp(10px, 3.3vw, 14px)",
+            lineHeight: 1.05,
+            fontWeight: 950,
+            letterSpacing: ".08em",
+            textTransform: "uppercase",
+          }}
+        >
+          <p style={{ margin: 0 }}>HOST <span style={{ color: pink }}>| GMAIL</span></p>
+          <p style={{ margin: 0 }}>SPAN <span style={{ color: pink }}>| 30 DAYS</span></p>
+          <p style={{ margin: 0 }}>DATA <span style={{ color: "#58b7ee" }}>| INDEED</span></p>
+          <p style={{ margin: 0 }}>TASK <span>| 25/DAY</span></p>
+        </div>
+      </section>
+
+      <section style={{ ...sectionStyle, gap: 12 }}>
         {checkingSession && (
-          <p style={{ position: "relative", zIndex: 1, margin: 0, fontSize: "clamp(10px, 3vw, 13px)", fontWeight: 800 }}>
+          <p style={{ margin: 0, fontSize: "clamp(10px, 3vw, 13px)", fontWeight: 800 }}>
             Checking your login...
           </p>
         )}
 
         {!checkingSession && signedInEmail && (
-          <div
+          <Link
+            href="/dashboard"
             style={{
-              position: "relative",
-              zIndex: 1,
+              minHeight: 40,
               width: "min(260px, calc(100vw - 20px))",
-              display: "grid",
-              justifyItems: "center",
-              gap: 12,
+              borderRadius: 999,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "9px 12px",
+              background: pink,
+              color: ink,
+              fontSize: "clamp(10px, 3.2vw, 13px)",
+              lineHeight: 1.1,
+              fontWeight: 900,
+              boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
             }}
           >
-            <p
-              style={{
-                margin: 0,
-                fontSize: "clamp(10px, 3.2vw, 13px)",
-                lineHeight: 1.25,
-                fontWeight: 800,
-              }}
-            >
-              You are already signed in.
-            </p>
-            <Link
-              href="/dashboard"
-              style={{
-                minHeight: 38,
-                width: "100%",
-                borderRadius: 999,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "9px 12px",
-                background: "#ff5ca8",
-                color: "#16131a",
-                fontSize: "clamp(10px, 3.2vw, 13px)",
-                lineHeight: 1.1,
-                fontWeight: 900,
-                boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
-              }}
-            >
-              Go to dashboard
-            </Link>
-          </div>
+            Go to dashboard
+          </Link>
         )}
 
         {!checkingSession && !signedInEmail && (
           <form
             onSubmit={sendMagicLink}
             style={{
-              position: "relative",
-              zIndex: 1,
               width: "min(260px, calc(100vw - 20px))",
               display: "flex",
               flexDirection: "column",
               gap: 12,
             }}
           >
-            <label
-              style={{
-                height: 40,
-                borderRadius: 999,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "0 12px",
-                background: "#4c4c4f",
-                border: "1px solid transparent",
-                boxShadow: "0 10px 24px rgba(0,0,0,.16)",
-              }}
-            >
-              <span
-                aria-hidden="true"
-                style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 999,
-                  display: "grid",
-                  placeItems: "center",
-                  flexShrink: 0,
-                  background: "#ff5ca8",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 900,
-                  lineHeight: 1,
-                }}
-              >
-                →
-              </span>
+            <label style={{ display: "grid", gap: 7 }}>
+              <span style={labelStyle}>Enter your email</span>
               <input
                 id="email"
                 type="email"
@@ -319,16 +360,21 @@ export default function HomePage() {
                 autoComplete="email"
                 disabled={loading || magicLinkSent}
                 required
-                style={{
-                  minWidth: 0,
-                  width: "100%",
-                  border: 0,
-                  outline: 0,
-                  background: "transparent",
-                  color: "white",
-                  fontSize: "clamp(11px, 3vw, 13px)",
-                  fontWeight: 700,
-                }}
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: 7 }}>
+              <span style={labelStyle}>Your Name</span>
+              <input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Your Name"
+                autoComplete="name"
+                disabled={loading || magicLinkSent}
+                style={inputStyle}
               />
             </label>
 
@@ -336,12 +382,12 @@ export default function HomePage() {
               type="submit"
               disabled={loading || magicLinkSent}
               style={{
-                minHeight: 38,
+                minHeight: 40,
                 border: 0,
                 borderRadius: 999,
                 padding: "9px 12px",
-                background: "#ff5ca8",
-                color: "#16131a",
+                background: pink,
+                color: ink,
                 fontSize: "clamp(10px, 3.2vw, 13px)",
                 lineHeight: 1.1,
                 fontWeight: 900,
@@ -356,10 +402,8 @@ export default function HomePage() {
         {status && (
           <p
             style={{
-              position: "relative",
-              zIndex: 1,
               width: "min(320px, calc(100vw - 20px))",
-              margin: "16px 0 0",
+              margin: "4px 0 0",
               color: magicLinkSent ? "#22543d" : "#7f1d1d",
               fontSize: "clamp(10px, 3vw, 12px)",
               fontWeight: 800,
@@ -371,115 +415,71 @@ export default function HomePage() {
         )}
       </section>
 
-      <section
-        style={{
-          position: "relative",
-          zIndex: 2,
-          minHeight: "100svh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "flex-start",
-          textAlign: "center",
-          width: "100%",
-          padding: "clamp(10px, 3vw, 18px) clamp(18px, 6vw, 42px) clamp(34px, 9vw, 78px)",
-          background: "rgba(255, 255, 255, .72)",
-          backdropFilter: "blur(2px)",
-        }}
-      >
-        <div
+      <section style={sectionStyle}>
+        <h2 style={{ ...labelStyle, marginBottom: 20 }}>HOW TO USE APPLIX</h2>
+        <p style={copyStyle}>
+          DONT USE YOUR PERSONAL EMAIL, CREATE NEW GMAIL ONLY FOR APPLIX, SO APPLIX CAN USE IT ON YOUR BEHALF.
+        </p>
+        <h3 style={{ ...labelStyle, color: pink }}>EXPLAIN THIS</h3>
+        <p style={copyStyle}>
+          ENTER YOUR NAME, THIS WILL BE USED BY APPLIX TO ADRESS YOU WHEN APPLIX IS EXECUTING TASK
+        </p>
+        <h3 style={{ ...labelStyle, color: pink }}>EXPLAIN THIS</h3>
+      </section>
+
+      <section style={sectionStyle}>
+        <h2 style={{ ...labelStyle, color: pink, marginBottom: 18 }}>Upload Your CV</h2>
+        <p style={copyStyle}>
+          UPLOAD YOUR RESUME/CV, APPLIX WILL ATTACH YOUR DOCUMENTSTO EVERY COMPANY IT CONTACTS PLEASE NO PERSONAL INFORMATION / CREDITS ON YOUR DOCUMENTS KEEP IT GENRAL AS MUCH AS YOU CAN
+        </p>
+      </section>
+
+      <section style={sectionStyle}>
+        <h2 style={{ ...labelStyle, color: pink, marginBottom: 18 }}>Fill Up Template</h2>
+        <p style={copyStyle}>
+          Browse Template :
+          <br />
+          Example:
+          <br />
+          Business Analyst
+          <br />
+          Support Worker,AIN, AgeCare, IT Support, Internship.
+          <br />
+          or Start With Standard Form By Applix
+        </p>
+      </section>
+
+      <section style={sectionStyle}>
+        <h2 style={{ ...labelStyle, marginBottom: 24 }}>HOW TO SET UP GUARD RAILS</h2>
+        <h3 style={{ ...labelStyle, color: pink }}>Authorize Applix</h3>
+        <p style={copyStyle}>
+          CONNECT YOUR APPLIX TO YOUR GMAIL ACCOUNT CREATED FOR APPLIX USE ONLY. ALLOW TO SEND ON EMAIL ON BEHALF
+        </p>
+        <h3 style={{ ...labelStyle, color: pink }}>Run Applix</h3>
+        <p style={copyStyle}>
+          APPLIX WILL BE ACTIVATED FOR 30 DAYS, EXECUTE TASK 1/HR. KEEP YOUR ACCOUNT LOGGED IN, YOU CAN CLOSE THE BROWSER
+        </p>
+        <button
+          type="button"
           style={{
-            width: "min(420px, 100%)",
-            minHeight: "100svh",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
+            minHeight: 44,
+            minWidth: 170,
+            border: 0,
+            borderRadius: 999,
+            padding: "11px 18px",
+            background: pink,
+            color: "white",
+            fontSize: "clamp(11px, 3.2vw, 14px)",
+            lineHeight: 1.1,
+            fontWeight: 950,
+            boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
           }}
         >
-          <p
-            style={{
-              margin: "0 0 12px",
-              color: "#17131c",
-              fontSize: "clamp(8px, 2.4vw, 10px)",
-              fontWeight: 900,
-              letterSpacing: ".18em",
-              textTransform: "uppercase",
-            }}
-          >
-            Welcome
-          </p>
-
-          <h2
-            style={{
-              margin: "0 0 8px",
-              color: "#17131c",
-              fontSize: "clamp(17px, 5.6vw, 25px)",
-              lineHeight: 1,
-              fontWeight: 950,
-              letterSpacing: ".08em",
-              textTransform: "uppercase",
-            }}
-          >
-            CALSIE | APPLIX
-          </h2>
-
-          <h3
-            style={{
-              margin: "0 0 18px",
-              color: "#ff5ca8",
-              fontSize: "clamp(22px, 8vw, 36px)",
-              lineHeight: .92,
-              fontWeight: 950,
-              letterSpacing: ".14em",
-              textTransform: "uppercase",
-            }}
-          >
-            About Applix
-          </h3>
-
-          <p
-            style={{
-              width: "min(260px, 100%)",
-              margin: "0 0 26px",
-              color: "#17131c",
-              fontSize: "clamp(7px, 2.1vw, 9px)",
-              lineHeight: 1.25,
-              fontWeight: 900,
-              letterSpacing: ".1em",
-              textTransform: "uppercase",
-            }}
-          >
-            Applix is fast symbiotic intelligence for applying to jobs. Automation supports you that has capacity to contact hundreds of employers straight forward; please follow the guardrails.
-          </p>
-
-          <div
-            style={{
-              display: "grid",
-              gap: 10,
-              justifyItems: "center",
-              color: "#17131c",
-              fontSize: "clamp(10px, 3.3vw, 14px)",
-              lineHeight: 1.05,
-              fontWeight: 950,
-              letterSpacing: ".08em",
-              textTransform: "uppercase",
-            }}
-          >
-            <p style={{ margin: 0 }}>
-              HOST <span style={{ color: "#ff5ca8" }}>| GMAIL</span>
-            </p>
-            <p style={{ margin: 0 }}>
-              SPAN <span style={{ color: "#ff5ca8" }}>| 30 DAYS</span>
-            </p>
-            <p style={{ margin: 0 }}>
-              DATA <span style={{ color: "#58b7ee" }}>| INDEED</span>
-            </p>
-            <p style={{ margin: 0 }}>
-              TASK <span>| 25/DAY</span>
-            </p>
-          </div>
-        </div>
+          Get magic link
+        </button>
+        <p style={{ ...copyStyle, marginTop: 18, marginBottom: 0 }}>
+          WATCH THE VIDEO TO GET ACESS
+        </p>
       </section>
     </main>
   );
