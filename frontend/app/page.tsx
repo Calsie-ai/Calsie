@@ -75,7 +75,7 @@ export default function HomePage() {
     <main
       style={{
         position: "relative",
-        minHeight: "100vh",
+        minHeight: "100svh",
         overflow: "hidden",
         backgroundColor: "#fff7fb",
         color: "#16131a",
@@ -130,17 +130,23 @@ export default function HomePage() {
           position: "relative",
           zIndex: 2,
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start",
           justifyContent: "space-between",
-          padding: "18px 20px",
+          gap: 8,
+          width: "100%",
+          padding: "clamp(10px, 3vw, 18px) clamp(10px, 3.5vw, 20px)",
         }}
       >
         <div
           style={{
-            fontSize: 11,
+            maxWidth: "calc(100vw - 54px)",
+            fontSize: "clamp(8px, 2.6vw, 11px)",
+            lineHeight: 1.15,
             fontWeight: 900,
-            letterSpacing: ".08em",
+            letterSpacing: "clamp(.02em, .55vw, .08em)",
             textTransform: "uppercase",
+            whiteSpace: "normal",
+            overflowWrap: "anywhere",
           }}
         >
           CALSIE | APPLIX
@@ -149,12 +155,13 @@ export default function HomePage() {
         <button
           aria-label="Open menu"
           style={{
+            flexShrink: 0,
             border: 0,
             background: "transparent",
             color: "#1d1824",
-            fontSize: 22,
+            fontSize: "clamp(18px, 5vw, 22px)",
             lineHeight: 1,
-            padding: 6,
+            padding: 2,
           }}
         >
           ☰
@@ -165,23 +172,24 @@ export default function HomePage() {
         style={{
           position: "relative",
           zIndex: 2,
-          minHeight: "calc(100vh - 70px)",
+          minHeight: "calc(100svh - 54px)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           textAlign: "center",
-          padding: "12px 24px 54px",
+          width: "100%",
+          padding: "clamp(6px, 2vw, 12px) clamp(8px, 4vw, 24px) clamp(18px, 6vw, 54px)",
         }}
       >
         <img
           src="/applix-logo.svg"
           alt="Applix logo"
           style={{
-            width: "clamp(112px, 34vw, 156px)",
+            width: "clamp(58px, 28vw, 156px)",
             height: "auto",
             display: "block",
-            marginBottom: 12,
+            marginBottom: "clamp(8px, 2vw, 12px)",
             filter: "drop-shadow(0 12px 20px rgba(255, 92, 168, .18))",
           }}
         />
@@ -189,12 +197,14 @@ export default function HomePage() {
         <h1
           aria-label="APPLIX"
           style={{
+            width: "100%",
             margin: 0,
             color: "#ff5ca8",
-            fontSize: "clamp(40px, 13vw, 72px)",
+            fontSize: "clamp(24px, 13.5vw, 72px)",
             lineHeight: 0.92,
             fontWeight: 950,
-            letterSpacing: ".1em",
+            letterSpacing: "clamp(.02em, 1vw, .1em)",
+            whiteSpace: "nowrap",
           }}
         >
           APPLIX
@@ -202,11 +212,13 @@ export default function HomePage() {
 
         <p
           style={{
-            margin: "8px 0 34px",
+            maxWidth: "100%",
+            margin: "clamp(6px, 2vw, 8px) 0 clamp(18px, 5vw, 34px)",
             color: "#222026",
-            fontSize: 10,
+            fontSize: "clamp(8px, 2.8vw, 10px)",
+            lineHeight: 1.2,
             fontWeight: 900,
-            letterSpacing: ".18em",
+            letterSpacing: "clamp(.08em, 1vw, .18em)",
             textTransform: "uppercase",
           }}
         >
@@ -214,23 +226,44 @@ export default function HomePage() {
         </p>
 
         {checkingSession && (
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 800 }}>Checking your login...</p>
+          <p style={{ margin: 0, fontSize: "clamp(10px, 3vw, 13px)", fontWeight: 800 }}>
+            Checking your login...
+          </p>
         )}
 
         {!checkingSession && signedInEmail && (
-          <div style={{ width: "min(260px, 100%)", display: "grid", gap: 12 }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 800 }}>You are already signed in.</p>
+          <div
+            style={{
+              width: "min(260px, calc(100vw - 20px))",
+              display: "grid",
+              justifyItems: "center",
+              gap: 12,
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: "clamp(10px, 3.2vw, 13px)",
+                lineHeight: 1.25,
+                fontWeight: 800,
+              }}
+            >
+              You are already signed in.
+            </p>
             <Link
               href="/dashboard"
               style={{
                 minHeight: 38,
+                width: "100%",
                 borderRadius: 999,
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
+                padding: "9px 12px",
                 background: "#ff5ca8",
                 color: "#16131a",
-                fontSize: 13,
+                fontSize: "clamp(10px, 3.2vw, 13px)",
+                lineHeight: 1.1,
                 fontWeight: 900,
                 boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
               }}
@@ -244,7 +277,7 @@ export default function HomePage() {
           <form
             onSubmit={sendMagicLink}
             style={{
-              width: "min(260px, 100%)",
+              width: "min(260px, calc(100vw - 20px))",
               display: "flex",
               flexDirection: "column",
               gap: 12,
@@ -297,12 +330,13 @@ export default function HomePage() {
                 disabled={loading || magicLinkSent}
                 required
                 style={{
+                  minWidth: 0,
                   width: "100%",
                   border: 0,
                   outline: 0,
                   background: "transparent",
                   color: "white",
-                  fontSize: 13,
+                  fontSize: "clamp(11px, 3vw, 13px)",
                   fontWeight: 700,
                 }}
               />
@@ -312,12 +346,14 @@ export default function HomePage() {
               type="submit"
               disabled={loading || magicLinkSent}
               style={{
-                height: 38,
+                minHeight: 38,
                 border: 0,
                 borderRadius: 999,
+                padding: "9px 12px",
                 background: "#ff5ca8",
                 color: "#16131a",
-                fontSize: 13,
+                fontSize: "clamp(10px, 3.2vw, 13px)",
+                lineHeight: 1.1,
                 fontWeight: 900,
                 boxShadow: emailActive
                   ? "0 0 30px rgba(255, 92, 168, .55), 0 10px 22px rgba(255, 92, 168, .35)"
@@ -333,10 +369,10 @@ export default function HomePage() {
         {status && (
           <p
             style={{
-              width: "min(320px, 100%)",
+              width: "min(320px, calc(100vw - 20px))",
               margin: "16px 0 0",
               color: magicLinkSent ? "#22543d" : "#7f1d1d",
-              fontSize: 12,
+              fontSize: "clamp(10px, 3vw, 12px)",
               fontWeight: 800,
               lineHeight: 1.45,
             }}
