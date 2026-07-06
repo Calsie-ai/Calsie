@@ -71,12 +71,57 @@ export default function HomePage() {
     }
   }
 
+  const header = (
+    <header
+      style={{
+        position: "relative",
+        zIndex: 2,
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 8,
+        width: "100%",
+        padding: "clamp(10px, 3vw, 18px) clamp(10px, 3.5vw, 20px)",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: "calc(100vw - 54px)",
+          fontSize: "clamp(8px, 2.6vw, 11px)",
+          lineHeight: 1.15,
+          fontWeight: 900,
+          letterSpacing: "clamp(.02em, .55vw, .08em)",
+          textTransform: "uppercase",
+          whiteSpace: "normal",
+          overflowWrap: "anywhere",
+        }}
+      >
+        CALSIE | APPLIX
+      </div>
+
+      <button
+        aria-label="Open menu"
+        style={{
+          flexShrink: 0,
+          border: 0,
+          background: "transparent",
+          color: "#1d1824",
+          fontSize: "clamp(18px, 5vw, 22px)",
+          lineHeight: 1,
+          padding: 2,
+        }}
+      >
+        ☰
+      </button>
+    </header>
+  );
+
   return (
     <main
       style={{
         position: "relative",
         minHeight: "100svh",
-        overflow: "hidden",
+        overflowX: "hidden",
         backgroundColor: "#fff7fb",
         color: "#16131a",
         fontFamily: "Arial, Helvetica, sans-serif",
@@ -85,7 +130,7 @@ export default function HomePage() {
       <div
         aria-hidden="true"
         style={{
-          position: "absolute",
+          position: "fixed",
           inset: "-12% -35% -20%",
           backgroundImage:
             "linear-gradient(rgba(255, 70, 190, .24) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 70, 190, .24) 1px, transparent 1px)",
@@ -93,13 +138,14 @@ export default function HomePage() {
           transform: "perspective(760px) rotateX(22deg) scale(1.08)",
           transformOrigin: "top center",
           opacity: 0.96,
+          pointerEvents: "none",
         }}
       />
 
       <div
         aria-hidden="true"
         style={{
-          position: "absolute",
+          position: "fixed",
           inset: "-12% -35% -20%",
           backgroundImage:
             "linear-gradient(rgba(20, 16, 22, .34) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .34) 1px, transparent 1px)",
@@ -107,6 +153,7 @@ export default function HomePage() {
           transform: "perspective(760px) rotateX(22deg) scale(1.08)",
           transformOrigin: "top center",
           opacity: 0.5,
+          pointerEvents: "none",
           WebkitMaskImage:
             "radial-gradient(circle at 50% 31%, rgba(0,0,0,.95) 0 120px, rgba(0,0,0,.72) 150px, transparent 270px)",
           maskImage:
@@ -117,7 +164,7 @@ export default function HomePage() {
       <div
         aria-hidden="true"
         style={{
-          position: "absolute",
+          position: "fixed",
           inset: 0,
           background:
             "radial-gradient(circle at 50% 24%, rgba(255,255,255,.94), rgba(255,255,255,.72) 31%, transparent 62%)",
@@ -125,48 +172,7 @@ export default function HomePage() {
         }}
       />
 
-      <header
-        style={{
-          position: "relative",
-          zIndex: 2,
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 8,
-          width: "100%",
-          padding: "clamp(10px, 3vw, 18px) clamp(10px, 3.5vw, 20px)",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "calc(100vw - 54px)",
-            fontSize: "clamp(8px, 2.6vw, 11px)",
-            lineHeight: 1.15,
-            fontWeight: 900,
-            letterSpacing: "clamp(.02em, .55vw, .08em)",
-            textTransform: "uppercase",
-            whiteSpace: "normal",
-            overflowWrap: "anywhere",
-          }}
-        >
-          CALSIE | APPLIX
-        </div>
-
-        <button
-          aria-label="Open menu"
-          style={{
-            flexShrink: 0,
-            border: 0,
-            background: "transparent",
-            color: "#1d1824",
-            fontSize: "clamp(18px, 5vw, 22px)",
-            lineHeight: 1,
-            padding: 2,
-          }}
-        >
-          ☰
-        </button>
-      </header>
+      {header}
 
       <section
         style={{
@@ -380,6 +386,117 @@ export default function HomePage() {
             {status}
           </p>
         )}
+      </section>
+
+      <section
+        style={{
+          position: "relative",
+          zIndex: 2,
+          minHeight: "100svh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          textAlign: "center",
+          width: "100%",
+          padding: "clamp(10px, 3vw, 18px) clamp(18px, 6vw, 42px) clamp(34px, 9vw, 78px)",
+          background: "rgba(255, 255, 255, .72)",
+          backdropFilter: "blur(2px)",
+        }}
+      >
+        <div
+          style={{
+            width: "min(420px, 100%)",
+            minHeight: "100svh",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <p
+            style={{
+              margin: "0 0 12px",
+              color: "#17131c",
+              fontSize: "clamp(8px, 2.4vw, 10px)",
+              fontWeight: 900,
+              letterSpacing: ".18em",
+              textTransform: "uppercase",
+            }}
+          >
+            Welcome
+          </p>
+
+          <h2
+            style={{
+              margin: "0 0 8px",
+              color: "#17131c",
+              fontSize: "clamp(17px, 5.6vw, 25px)",
+              lineHeight: 1,
+              fontWeight: 950,
+              letterSpacing: ".08em",
+              textTransform: "uppercase",
+            }}
+          >
+            CALSIE | APPLIX
+          </h2>
+
+          <h3
+            style={{
+              margin: "0 0 18px",
+              color: "#ff5ca8",
+              fontSize: "clamp(22px, 8vw, 36px)",
+              lineHeight: .92,
+              fontWeight: 950,
+              letterSpacing: ".14em",
+              textTransform: "uppercase",
+            }}
+          >
+            About Applix
+          </h3>
+
+          <p
+            style={{
+              width: "min(260px, 100%)",
+              margin: "0 0 26px",
+              color: "#17131c",
+              fontSize: "clamp(7px, 2.1vw, 9px)",
+              lineHeight: 1.25,
+              fontWeight: 900,
+              letterSpacing: ".1em",
+              textTransform: "uppercase",
+            }}
+          >
+            Applix is fast symbiotic intelligence for applying to jobs. Automation supports you that has capacity to contact hundreds of employers straight forward; please follow the guardrails.
+          </p>
+
+          <div
+            style={{
+              display: "grid",
+              gap: 10,
+              justifyItems: "center",
+              color: "#17131c",
+              fontSize: "clamp(10px, 3.3vw, 14px)",
+              lineHeight: 1.05,
+              fontWeight: 950,
+              letterSpacing: ".08em",
+              textTransform: "uppercase",
+            }}
+          >
+            <p style={{ margin: 0 }}>
+              HOST <span style={{ color: "#ff5ca8" }}>| GMAIL</span>
+            </p>
+            <p style={{ margin: 0 }}>
+              SPAN <span style={{ color: "#ff5ca8" }}>| 30 DAYS</span>
+            </p>
+            <p style={{ margin: 0 }}>
+              DATA <span style={{ color: "#58b7ee" }}>| INDEED</span>
+            </p>
+            <p style={{ margin: 0 }}>
+              TASK <span>| 25/DAY</span>
+            </p>
+          </div>
+        </div>
       </section>
     </main>
   );
