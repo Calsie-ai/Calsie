@@ -216,21 +216,21 @@ export default function HomePage() {
           aria-hidden="true"
           style={{
             position: "absolute",
-            top: "clamp(70px, 18vh, 150px)",
+            top: "clamp(88px, 21vh, 175px)",
             left: "50%",
-            width: "min(360px, 82vw)",
-            height: "min(240px, 44vw)",
+            width: "min(760px, 100vw)",
+            height: "clamp(210px, 36vw, 330px)",
             transform: "translateX(-50%) perspective(760px) rotateX(22deg) scale(1.08)",
             transformOrigin: "top center",
             backgroundImage:
-              "linear-gradient(rgba(20, 16, 22, .28) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .28) 1px, transparent 1px)",
+              "linear-gradient(rgba(20, 16, 22, .32) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .32) 1px, transparent 1px)",
             backgroundSize: "28px 28px",
-            opacity: 0.44,
+            opacity: 0.5,
             pointerEvents: "none",
             WebkitMaskImage:
-              "radial-gradient(circle at 50% 34%, rgba(0,0,0,.9) 0 68px, rgba(0,0,0,.55) 112px, transparent 180px)",
+              "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.9) 18%, rgba(0,0,0,.9) 70%, transparent 100%)",
             maskImage:
-              "radial-gradient(circle at 50% 34%, rgba(0,0,0,.9) 0 68px, rgba(0,0,0,.55) 112px, transparent 180px)",
+              "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.9) 18%, rgba(0,0,0,.9) 70%, transparent 100%)",
           }}
         />
 
