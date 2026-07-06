@@ -11,8 +11,6 @@ export default function HomePage() {
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [signedInEmail, setSignedInEmail] = useState("");
-  const [emailFocused, setEmailFocused] = useState(false);
-  const emailActive = emailFocused || email.trim().length > 0 || magicLinkSent;
 
   useEffect(() => {
     async function checkSession() {
@@ -146,25 +144,6 @@ export default function HomePage() {
         aria-hidden="true"
         style={{
           position: "fixed",
-          inset: "-12% -35% -20%",
-          backgroundImage:
-            "linear-gradient(rgba(20, 16, 22, .34) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .34) 1px, transparent 1px)",
-          backgroundSize: "28px 28px",
-          transform: "perspective(760px) rotateX(22deg) scale(1.08)",
-          transformOrigin: "top center",
-          opacity: 0.5,
-          pointerEvents: "none",
-          WebkitMaskImage:
-            "radial-gradient(circle at 50% 31%, rgba(0,0,0,.95) 0 120px, rgba(0,0,0,.72) 150px, transparent 270px)",
-          maskImage:
-            "radial-gradient(circle at 50% 31%, rgba(0,0,0,.95) 0 120px, rgba(0,0,0,.72) 150px, transparent 270px)",
-        }}
-      />
-
-      <div
-        aria-hidden="true"
-        style={{
-          position: "fixed",
           inset: 0,
           background:
             "radial-gradient(circle at 50% 24%, rgba(255,255,255,.94), rgba(255,255,255,.72) 31%, transparent 62%)",
@@ -186,12 +165,37 @@ export default function HomePage() {
           textAlign: "center",
           width: "100%",
           padding: "clamp(6px, 2vw, 12px) clamp(8px, 4vw, 24px) clamp(18px, 6vw, 54px)",
+          overflow: "hidden",
         }}
       >
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: "clamp(72px, 18vh, 160px)",
+            left: "50%",
+            width: "min(380px, 82vw)",
+            height: "min(260px, 46vw)",
+            transform: "translateX(-50%) perspective(760px) rotateX(22deg) scale(1.08)",
+            transformOrigin: "top center",
+            backgroundImage:
+              "linear-gradient(rgba(20, 16, 22, .32) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .32) 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+            opacity: 0.46,
+            pointerEvents: "none",
+            WebkitMaskImage:
+              "radial-gradient(circle at 50% 34%, rgba(0,0,0,.95) 0 70px, rgba(0,0,0,.65) 115px, transparent 185px)",
+            maskImage:
+              "radial-gradient(circle at 50% 34%, rgba(0,0,0,.95) 0 70px, rgba(0,0,0,.65) 115px, transparent 185px)",
+          }}
+        />
+
         <img
           src="/applix-logo.svg"
           alt="Applix logo"
           style={{
+            position: "relative",
+            zIndex: 1,
             width: "clamp(58px, 28vw, 156px)",
             height: "auto",
             display: "block",
@@ -203,6 +207,8 @@ export default function HomePage() {
         <h1
           aria-label="APPLIX"
           style={{
+            position: "relative",
+            zIndex: 1,
             width: "100%",
             margin: 0,
             color: "#ff5ca8",
@@ -218,6 +224,8 @@ export default function HomePage() {
 
         <p
           style={{
+            position: "relative",
+            zIndex: 1,
             maxWidth: "100%",
             margin: "clamp(6px, 2vw, 8px) 0 clamp(18px, 5vw, 34px)",
             color: "#222026",
@@ -232,7 +240,7 @@ export default function HomePage() {
         </p>
 
         {checkingSession && (
-          <p style={{ margin: 0, fontSize: "clamp(10px, 3vw, 13px)", fontWeight: 800 }}>
+          <p style={{ position: "relative", zIndex: 1, margin: 0, fontSize: "clamp(10px, 3vw, 13px)", fontWeight: 800 }}>
             Checking your login...
           </p>
         )}
@@ -240,6 +248,8 @@ export default function HomePage() {
         {!checkingSession && signedInEmail && (
           <div
             style={{
+              position: "relative",
+              zIndex: 1,
               width: "min(260px, calc(100vw - 20px))",
               display: "grid",
               justifyItems: "center",
@@ -283,6 +293,8 @@ export default function HomePage() {
           <form
             onSubmit={sendMagicLink}
             style={{
+              position: "relative",
+              zIndex: 1,
               width: "min(260px, calc(100vw - 20px))",
               display: "flex",
               flexDirection: "column",
@@ -297,12 +309,9 @@ export default function HomePage() {
                 alignItems: "center",
                 gap: 8,
                 padding: "0 12px",
-                background: emailActive ? "#3f3f43" : "#4c4c4f",
-                border: emailActive ? "1px solid rgba(255, 92, 168, .55)" : "1px solid transparent",
-                boxShadow: emailActive
-                  ? "0 0 0 4px rgba(255, 92, 168, .14), 0 0 28px rgba(255, 92, 168, .52), 0 12px 28px rgba(0,0,0,.18)"
-                  : "0 10px 24px rgba(0,0,0,.16)",
-                transition: "box-shadow .18s ease, border-color .18s ease, background .18s ease",
+                background: "#4c4c4f",
+                border: "1px solid transparent",
+                boxShadow: "0 10px 24px rgba(0,0,0,.16)",
               }}
             >
               <span
@@ -319,7 +328,6 @@ export default function HomePage() {
                   fontSize: 13,
                   fontWeight: 900,
                   lineHeight: 1,
-                  boxShadow: emailActive ? "0 0 16px rgba(255, 92, 168, .8)" : "none",
                 }}
               >
                 →
@@ -329,8 +337,6 @@ export default function HomePage() {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
                 placeholder="Enter your email"
                 autoComplete="email"
                 disabled={loading || magicLinkSent}
@@ -361,10 +367,7 @@ export default function HomePage() {
                 fontSize: "clamp(10px, 3.2vw, 13px)",
                 lineHeight: 1.1,
                 fontWeight: 900,
-                boxShadow: emailActive
-                  ? "0 0 30px rgba(255, 92, 168, .55), 0 10px 22px rgba(255, 92, 168, .35)"
-                  : "0 10px 22px rgba(255, 92, 168, .35)",
-                transition: "box-shadow .18s ease, transform .18s ease",
+                boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
               }}
             >
               {magicLinkSent ? "Magic link sent" : loading ? "Sending..." : "Get magic link"}
@@ -375,6 +378,8 @@ export default function HomePage() {
         {status && (
           <p
             style={{
+              position: "relative",
+              zIndex: 1,
               width: "min(320px, calc(100vw - 20px))",
               margin: "16px 0 0",
               color: magicLinkSent ? "#22543d" : "#7f1d1d",
