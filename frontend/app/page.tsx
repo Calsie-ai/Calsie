@@ -127,7 +127,7 @@ export default function HomePage() {
     justifyContent: "center",
     textAlign: "center" as const,
     width: "100%",
-    padding: "clamp(28px, 6vw, 48px) clamp(18px, 6vw, 42px)",
+    padding: "clamp(24px, 5vw, 42px) clamp(18px, 6vw, 42px)",
   };
 
   const labelStyle = {
@@ -141,7 +141,7 @@ export default function HomePage() {
 
   const copyStyle = {
     width: "min(280px, 100%)",
-    margin: "0 auto 18px",
+    margin: "0 auto 16px",
     color: ink,
     fontSize: "clamp(8px, 2.15vw, 10px)",
     lineHeight: 1.25,
@@ -207,8 +207,9 @@ export default function HomePage() {
       <section
         style={{
           ...sectionStyle,
-          minHeight: "calc(100svh - 54px)",
-          paddingTop: "clamp(8px, 3vw, 18px)",
+          minHeight: "auto",
+          paddingTop: "clamp(40px, 7vw, 70px)",
+          paddingBottom: "clamp(42px, 7vw, 72px)",
           overflow: "hidden",
         }}
       >
@@ -216,21 +217,21 @@ export default function HomePage() {
           aria-hidden="true"
           style={{
             position: "absolute",
-            top: "clamp(88px, 21vh, 175px)",
+            top: "clamp(34px, 8vw, 72px)",
             left: "50%",
-            width: "min(760px, 100vw)",
-            height: "clamp(210px, 36vw, 330px)",
+            width: "min(760px, 104vw)",
+            height: "clamp(250px, 42vw, 390px)",
             transform: "translateX(-50%) perspective(760px) rotateX(22deg) scale(1.08)",
             transformOrigin: "top center",
             backgroundImage:
-              "linear-gradient(rgba(20, 16, 22, .32) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .32) 1px, transparent 1px)",
+              "linear-gradient(rgba(20, 16, 22, .46) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .46) 1px, transparent 1px)",
             backgroundSize: "28px 28px",
-            opacity: 0.5,
+            opacity: 0.72,
             pointerEvents: "none",
             WebkitMaskImage:
-              "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.9) 18%, rgba(0,0,0,.9) 70%, transparent 100%)",
+              "radial-gradient(ellipse at 50% 43%, rgba(0,0,0,.96) 0 38%, rgba(0,0,0,.74) 48%, transparent 70%)",
             maskImage:
-              "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.9) 18%, rgba(0,0,0,.9) 70%, transparent 100%)",
+              "radial-gradient(ellipse at 50% 43%, rgba(0,0,0,.96) 0 38%, rgba(0,0,0,.74) 48%, transparent 70%)",
           }}
         />
 
@@ -240,7 +241,7 @@ export default function HomePage() {
           style={{
             position: "relative",
             zIndex: 1,
-            width: "clamp(58px, 28vw, 156px)",
+            width: "clamp(58px, 18vw, 126px)",
             height: "auto",
             display: "block",
             marginBottom: "clamp(8px, 2vw, 12px)",
@@ -256,7 +257,7 @@ export default function HomePage() {
             width: "100%",
             margin: 0,
             color: pink,
-            fontSize: "clamp(24px, 13.5vw, 72px)",
+            fontSize: "clamp(52px, 10vw, 82px)",
             lineHeight: 0.92,
             fontWeight: 950,
             letterSpacing: "clamp(.02em, 1vw, .1em)",
