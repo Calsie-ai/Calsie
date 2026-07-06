@@ -11,6 +11,8 @@ export default function HomePage() {
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [signedInEmail, setSignedInEmail] = useState("");
+  const [emailFocused, setEmailFocused] = useState(false);
+  const emailActive = emailFocused || email.trim().length > 0 || magicLinkSent;
 
   useEffect(() => {
     async function checkSession() {
@@ -86,11 +88,29 @@ export default function HomePage() {
           position: "absolute",
           inset: "-12% -35% -20%",
           backgroundImage:
-            "linear-gradient(rgba(255, 70, 190, .22) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 70, 190, .22) 1px, transparent 1px)",
+            "linear-gradient(rgba(255, 70, 190, .24) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 70, 190, .24) 1px, transparent 1px)",
           backgroundSize: "28px 28px",
           transform: "perspective(760px) rotateX(22deg) scale(1.08)",
           transformOrigin: "top center",
-          opacity: 0.95,
+          opacity: 0.96,
+        }}
+      />
+
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: "-12% -35% -20%",
+          backgroundImage:
+            "linear-gradient(rgba(20, 16, 22, .34) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .34) 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+          transform: "perspective(760px) rotateX(22deg) scale(1.08)",
+          transformOrigin: "top center",
+          opacity: 0.5,
+          WebkitMaskImage:
+            "radial-gradient(circle at 50% 31%, rgba(0,0,0,.95) 0 120px, rgba(0,0,0,.72) 150px, transparent 270px)",
+          maskImage:
+            "radial-gradient(circle at 50% 31%, rgba(0,0,0,.95) 0 120px, rgba(0,0,0,.72) 150px, transparent 270px)",
         }}
       />
 
@@ -100,7 +120,7 @@ export default function HomePage() {
           position: "absolute",
           inset: 0,
           background:
-            "radial-gradient(circle at 50% 24%, rgba(255,255,255,.96), rgba(255,255,255,.7) 34%, transparent 66%)",
+            "radial-gradient(circle at 50% 24%, rgba(255,255,255,.94), rgba(255,255,255,.72) 31%, transparent 62%)",
           pointerEvents: "none",
         }}
       />
@@ -238,8 +258,12 @@ export default function HomePage() {
                 alignItems: "center",
                 gap: 8,
                 padding: "0 12px",
-                background: "#4c4c4f",
-                boxShadow: "0 10px 24px rgba(0,0,0,.16)",
+                background: emailActive ? "#3f3f43" : "#4c4c4f",
+                border: emailActive ? "1px solid rgba(255, 92, 168, .55)" : "1px solid transparent",
+                boxShadow: emailActive
+                  ? "0 0 0 4px rgba(255, 92, 168, .14), 0 0 28px rgba(255, 92, 168, .52), 0 12px 28px rgba(0,0,0,.18)"
+                  : "0 10px 24px rgba(0,0,0,.16)",
+                transition: "box-shadow .18s ease, border-color .18s ease, background .18s ease",
               }}
             >
               <span
@@ -255,15 +279,19 @@ export default function HomePage() {
                   color: "#fff",
                   fontSize: 13,
                   fontWeight: 900,
+                  lineHeight: 1,
+                  boxShadow: emailActive ? "0 0 16px rgba(255, 92, 168, .8)" : "none",
                 }}
               >
-                +
+                →
               </span>
               <input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
                 placeholder="Enter your email"
                 autoComplete="email"
                 disabled={loading || magicLinkSent}
@@ -291,7 +319,10 @@ export default function HomePage() {
                 color: "#16131a",
                 fontSize: 13,
                 fontWeight: 900,
-                boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
+                boxShadow: emailActive
+                  ? "0 0 30px rgba(255, 92, 168, .55), 0 10px 22px rgba(255, 92, 168, .35)"
+                  : "0 10px 22px rgba(255, 92, 168, .35)",
+                transition: "box-shadow .18s ease, transform .18s ease",
               }}
             >
               {magicLinkSent ? "Magic link sent" : loading ? "Sending..." : "Get magic link"}
