@@ -121,14 +121,13 @@ export default function HomePage() {
   const sectionStyle = {
     position: "relative" as const,
     zIndex: 2,
-    minHeight: "100svh",
     display: "flex",
     flexDirection: "column" as const,
     alignItems: "center",
     justifyContent: "center",
     textAlign: "center" as const,
     width: "100%",
-    padding: "clamp(34px, 9vw, 78px) clamp(18px, 6vw, 42px)",
+    padding: "clamp(28px, 6vw, 48px) clamp(18px, 6vw, 42px)",
   };
 
   const labelStyle = {
@@ -142,7 +141,7 @@ export default function HomePage() {
 
   const copyStyle = {
     width: "min(280px, 100%)",
-    margin: "0 auto 24px",
+    margin: "0 auto 18px",
     color: ink,
     fontSize: "clamp(8px, 2.15vw, 10px)",
     lineHeight: 1.25,
@@ -210,12 +209,37 @@ export default function HomePage() {
           ...sectionStyle,
           minHeight: "calc(100svh - 54px)",
           paddingTop: "clamp(8px, 3vw, 18px)",
+          overflow: "hidden",
         }}
       >
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: "clamp(70px, 18vh, 150px)",
+            left: "50%",
+            width: "min(360px, 82vw)",
+            height: "min(240px, 44vw)",
+            transform: "translateX(-50%) perspective(760px) rotateX(22deg) scale(1.08)",
+            transformOrigin: "top center",
+            backgroundImage:
+              "linear-gradient(rgba(20, 16, 22, .28) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .28) 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+            opacity: 0.44,
+            pointerEvents: "none",
+            WebkitMaskImage:
+              "radial-gradient(circle at 50% 34%, rgba(0,0,0,.9) 0 68px, rgba(0,0,0,.55) 112px, transparent 180px)",
+            maskImage:
+              "radial-gradient(circle at 50% 34%, rgba(0,0,0,.9) 0 68px, rgba(0,0,0,.55) 112px, transparent 180px)",
+          }}
+        />
+
         <img
           src="/applix-logo.svg"
           alt="Applix logo"
           style={{
+            position: "relative",
+            zIndex: 1,
             width: "clamp(58px, 28vw, 156px)",
             height: "auto",
             display: "block",
@@ -227,6 +251,8 @@ export default function HomePage() {
         <h1
           aria-label="APPLIX"
           style={{
+            position: "relative",
+            zIndex: 1,
             width: "100%",
             margin: 0,
             color: pink,
@@ -242,6 +268,8 @@ export default function HomePage() {
 
         <p
           style={{
+            position: "relative",
+            zIndex: 1,
             maxWidth: "100%",
             margin: "clamp(6px, 2vw, 8px) 0 clamp(18px, 5vw, 28px)",
             color: ink,
@@ -255,7 +283,7 @@ export default function HomePage() {
           Persistence at Scale
         </p>
 
-        <p style={copyStyle}>
+        <p style={{ ...copyStyle, position: "relative", zIndex: 1 }}>
           APPLIX IS FIRST SYMBIOTIC INTELLIGENCE AI, APPLIX IS EMAIL AUTOMATION SYMBIOTE THAT HAS 20 LAYERS OF COGNITIVE CAPACITY, FOR STRAIGHT FORWARD USE PLEASE FOLLOW THE GUARD RAILS.
         </p>
       </section>
@@ -459,25 +487,7 @@ export default function HomePage() {
         <p style={copyStyle}>
           APPLIX WILL BE ACTIVATED FOR 30 DAYS, EXECUTE TASK 1/HR. KEEP YOUR ACCOUNT LOGGED IN, YOU CAN CLOSE THE BROWSER
         </p>
-        <button
-          type="button"
-          style={{
-            minHeight: 44,
-            minWidth: 170,
-            border: 0,
-            borderRadius: 999,
-            padding: "11px 18px",
-            background: pink,
-            color: "white",
-            fontSize: "clamp(11px, 3.2vw, 14px)",
-            lineHeight: 1.1,
-            fontWeight: 950,
-            boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
-          }}
-        >
-          Get magic link
-        </button>
-        <p style={{ ...copyStyle, marginTop: 18, marginBottom: 0 }}>
+        <p style={{ ...copyStyle, marginTop: 6, marginBottom: 0 }}>
           WATCH THE VIDEO TO GET ACESS
         </p>
       </section>
