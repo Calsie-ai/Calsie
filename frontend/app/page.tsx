@@ -35,6 +35,18 @@ export default function HomePage() {
     checkSession();
   }, []);
 
+  async function signOut() {
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.auth.signOut();
+      setSignedInEmail("");
+      setMagicLinkSent(false);
+      setStatus("");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not log out.");
+    }
+  }
+
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -163,6 +175,20 @@ export default function HomePage() {
     fontSize: "clamp(11px, 3vw, 13px)",
     fontWeight: 800,
     boxShadow: "0 10px 24px rgba(0,0,0,.16)",
+  };
+
+  const primaryButtonStyle = {
+    minHeight: 40,
+    minWidth: 170,
+    border: 0,
+    borderRadius: 999,
+    padding: "9px 18px",
+    background: pink,
+    color: ink,
+    fontSize: "clamp(10px, 3.2vw, 13px)",
+    lineHeight: 1.1,
+    fontWeight: 900,
+    boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
   };
 
   return (
@@ -343,30 +369,28 @@ export default function HomePage() {
         )}
 
         {!checkingSession && signedInEmail && (
-          <Link
-            href="/dashboard"
-            style={{
-              minHeight: 40,
-              width: "min(260px, calc(100vw - 20px))",
-              borderRadius: 999,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "9px 12px",
-              background: pink,
-              color: ink,
-              fontSize: "clamp(10px, 3.2vw, 13px)",
-              lineHeight: 1.1,
-              fontWeight: 900,
-              boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
-            }}
-          >
-            Go to dashboard
-          </Link>
+          <div style={{ display: "grid", gap: 10, justifyItems: "center" }}>
+            <Link
+              href="/dashboard"
+              style={{
+                ...primaryButtonStyle,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textDecoration: "none",
+              }}
+            >
+              Go to dashboard
+            </Link>
+            <button type="button" onClick={signOut} style={primaryButtonStyle}>
+              Logout
+            </button>
+          </div>
         )}
 
         {!checkingSession && !signedInEmail && (
           <form
+            id="magic-link-form"
             onSubmit={sendMagicLink}
             style={{
               width: "min(260px, calc(100vw - 20px))",
@@ -403,25 +427,6 @@ export default function HomePage() {
                 style={inputStyle}
               />
             </label>
-
-            <button
-              type="submit"
-              disabled={loading || magicLinkSent}
-              style={{
-                minHeight: 40,
-                border: 0,
-                borderRadius: 999,
-                padding: "9px 12px",
-                background: pink,
-                color: ink,
-                fontSize: "clamp(10px, 3.2vw, 13px)",
-                lineHeight: 1.1,
-                fontWeight: 900,
-                boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
-              }}
-            >
-              {magicLinkSent ? "Magic link sent" : loading ? "Sending..." : "Get magic link"}
-            </button>
           </form>
         )}
 
@@ -446,11 +451,9 @@ export default function HomePage() {
         <p style={copyStyle}>
           DONT USE YOUR PERSONAL EMAIL, CREATE NEW GMAIL ONLY FOR APPLIX, SO APPLIX CAN USE IT ON YOUR BEHALF.
         </p>
-        <h3 style={{ ...labelStyle, color: pink }}>EXPLAIN THIS</h3>
-        <p style={copyStyle}>
+        <p style={{ ...copyStyle, marginBottom: 0 }}>
           ENTER YOUR NAME, THIS WILL BE USED BY APPLIX TO ADRESS YOU WHEN APPLIX IS EXECUTING TASK
         </p>
-        <h3 style={{ ...labelStyle, color: pink }}>EXPLAIN THIS</h3>
       </section>
 
       <section style={sectionStyle}>
@@ -485,9 +488,19 @@ export default function HomePage() {
         <p style={copyStyle}>
           APPLIX WILL BE ACTIVATED FOR 30 DAYS, EXECUTE TASK 1/HR. KEEP YOUR ACCOUNT LOGGED IN, YOU CAN CLOSE THE BROWSER
         </p>
-        <p style={{ ...copyStyle, marginTop: 6, marginBottom: 0 }}>
+        <p style={{ ...copyStyle, marginTop: 6, marginBottom: 14 }}>
           WATCH THE VIDEO TO GET ACESS
         </p>
+        {!signedInEmail && (
+          <button
+            type="submit"
+            form="magic-link-form"
+            disabled={checkingSession || loading || magicLinkSent}
+            style={primaryButtonStyle}
+          >
+            {magicLinkSent ? "Magic link sent" : loading ? "Sending..." : "Get magic link"}
+          </button>
+        )}
       </section>
     </main>
   );
