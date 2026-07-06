@@ -7,6 +7,34 @@ import { getSupabaseClient } from "../lib/supabaseClient";
 const pink = "#ff5ca8";
 const ink = "#16131a";
 
+const onboardingSlides = [
+  {
+    title: "WHAT IS APPLIX",
+    body:
+      "APPLIX IS FIRST SYMBIOTIC INTELLIGENCE AI. IT IS AN EMAIL AUTOMATION SYMBIOTE BUILT TO HELP YOU CONTACT EMPLOYERS IN A CONTROLLED WAY.",
+  },
+  {
+    title: "WHAT DOES IT DO",
+    body:
+      "APPLIX CAN USE YOUR DETAILS, YOUR CV, AND YOUR SELECTED TEMPLATE TO PREPARE AND SEND JOB CONTACT EMAILS ON YOUR BEHALF.",
+  },
+  {
+    title: "HOW TO CONNECT THE APP",
+    body:
+      "CREATE A NEW GMAIL ONLY FOR APPLIX. DO NOT USE YOUR PERSONAL EMAIL. AUTHORIZE APPLIX WITH THAT GMAIL ACCOUNT ONLY.",
+  },
+  {
+    title: "HOW IT WORKS",
+    body:
+      "APPLIX RUNS WITH GUARD RAILS. IT CAN EXECUTE TASKS OVER 30 DAYS, CONTACT COMPANIES, AND USE YOUR DOCUMENTS AND TEMPLATE AS INSTRUCTIONS.",
+  },
+  {
+    title: "TERMS AND CONDITIONS",
+    body:
+      "BY CONTINUING, YOU UNDERSTAND THIS IS A DRAFT TEST FLOW. YOU ARE RESPONSIBLE FOR YOUR EMAIL ACCOUNT, YOUR CV, YOUR DETAILS, AND THE INSTRUCTIONS YOU GIVE APPLIX.",
+  },
+];
+
 export default function HomePage() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -15,6 +43,9 @@ export default function HomePage() {
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [signedInEmail, setSignedInEmail] = useState("");
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [carouselComplete, setCarouselComplete] = useState(false);
+  const [showMagicForm, setShowMagicForm] = useState(false);
 
   useEffect(() => {
     async function checkSession() {
@@ -47,10 +78,19 @@ export default function HomePage() {
     }
   }
 
+  function confirmSlide() {
+    if (carouselIndex < onboardingSlides.length - 1) {
+      setCarouselIndex((current) => current + 1);
+      return;
+    }
+
+    setCarouselComplete(true);
+  }
+
   async function sendMagicLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (magicLinkSent) return;
+    if (magicLinkSent || !carouselComplete) return;
 
     setStatus("");
     setLoading(true);
@@ -190,6 +230,15 @@ export default function HomePage() {
     fontWeight: 900,
     boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
   };
+
+  const lockedButtonStyle = {
+    ...primaryButtonStyle,
+    background: "#4c4c4f",
+    color: "rgba(255,255,255,.7)",
+    boxShadow: "0 10px 22px rgba(0,0,0,.14)",
+  };
+
+  const activeSlide = onboardingSlides[carouselIndex];
 
   return (
     <main
@@ -361,91 +410,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section style={{ ...sectionStyle, gap: 12 }}>
-        {checkingSession && (
-          <p style={{ margin: 0, fontSize: "clamp(10px, 3vw, 13px)", fontWeight: 800 }}>
-            Checking your login...
-          </p>
-        )}
-
-        {!checkingSession && signedInEmail && (
-          <div style={{ display: "grid", gap: 10, justifyItems: "center" }}>
-            <Link
-              href="/dashboard"
-              style={{
-                ...primaryButtonStyle,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                textDecoration: "none",
-              }}
-            >
-              Go to dashboard
-            </Link>
-            <button type="button" onClick={signOut} style={primaryButtonStyle}>
-              Logout
-            </button>
-          </div>
-        )}
-
-        {!checkingSession && !signedInEmail && (
-          <form
-            id="magic-link-form"
-            onSubmit={sendMagicLink}
-            style={{
-              width: "min(260px, calc(100vw - 20px))",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            <label style={{ display: "grid", gap: 7 }}>
-              <span style={labelStyle}>Enter your email</span>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="Enter your email"
-                autoComplete="email"
-                disabled={loading || magicLinkSent}
-                required
-                style={inputStyle}
-              />
-            </label>
-
-            <label style={{ display: "grid", gap: 7 }}>
-              <span style={labelStyle}>Your Name</span>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Your Name"
-                autoComplete="name"
-                disabled={loading || magicLinkSent}
-                style={inputStyle}
-              />
-            </label>
-          </form>
-        )}
-
-        {status && (
-          <p
-            style={{
-              width: "min(320px, calc(100vw - 20px))",
-              margin: "4px 0 0",
-              color: magicLinkSent ? "#22543d" : "#7f1d1d",
-              fontSize: "clamp(10px, 3vw, 12px)",
-              fontWeight: 800,
-              lineHeight: 1.45,
-            }}
-          >
-            {status}
-          </p>
-        )}
-      </section>
-
       <section style={sectionStyle}>
         <h2 style={{ ...labelStyle, marginBottom: 20 }}>HOW TO USE APPLIX</h2>
         <p style={copyStyle}>
@@ -488,18 +452,138 @@ export default function HomePage() {
         <p style={copyStyle}>
           APPLIX WILL BE ACTIVATED FOR 30 DAYS, EXECUTE TASK 1/HR. KEEP YOUR ACCOUNT LOGGED IN, YOU CAN CLOSE THE BROWSER
         </p>
-        <p style={{ ...copyStyle, marginTop: 6, marginBottom: 14 }}>
-          WATCH THE VIDEO TO GET ACESS
-        </p>
-        {!signedInEmail && (
-          <button
-            type="submit"
-            form="magic-link-form"
-            disabled={checkingSession || loading || magicLinkSent}
-            style={primaryButtonStyle}
+      </section>
+
+      <section style={{ ...sectionStyle, gap: 14, paddingBottom: "clamp(38px, 8vw, 76px)" }}>
+        <h2 style={{ ...labelStyle, marginBottom: 2 }}>APPLIX START CHECK</h2>
+
+        {!carouselComplete && (
+          <div
+            style={{
+              width: "min(360px, calc(100vw - 28px))",
+              display: "grid",
+              gap: 12,
+              justifyItems: "center",
+              padding: "18px 16px",
+              borderRadius: 26,
+              background: "rgba(255,255,255,.42)",
+              border: "1px solid rgba(22, 19, 26, .08)",
+              boxShadow: "0 14px 30px rgba(0,0,0,.08)",
+              backdropFilter: "blur(8px)",
+            }}
           >
-            {magicLinkSent ? "Magic link sent" : loading ? "Sending..." : "Get magic link"}
+            <p style={{ ...labelStyle, color: pink, marginBottom: 0 }}>
+              {carouselIndex + 1}/{onboardingSlides.length}
+            </p>
+            <h3 style={{ ...labelStyle, marginBottom: 0 }}>{activeSlide.title}</h3>
+            <p style={{ ...copyStyle, marginBottom: 0 }}>{activeSlide.body}</p>
+            <button type="button" onClick={confirmSlide} style={primaryButtonStyle}>
+              Yes, I understood
+            </button>
+          </div>
+        )}
+
+        {carouselComplete && !showMagicForm && !signedInEmail && (
+          <div style={{ display: "grid", gap: 12, justifyItems: "center" }}>
+            <p style={{ ...copyStyle, marginBottom: 0 }}>
+              ALL START CHECKS COMPLETED. YOU CAN NOW REQUEST YOUR MAGIC LINK.
+            </p>
+            <button type="button" onClick={() => setShowMagicForm(true)} style={primaryButtonStyle}>
+              Get magic link
+            </button>
+          </div>
+        )}
+
+        {!carouselComplete && !signedInEmail && (
+          <button type="button" disabled style={lockedButtonStyle}>
+            Magic link locked
           </button>
+        )}
+
+        {showMagicForm && !signedInEmail && (
+          <form
+            onSubmit={sendMagicLink}
+            style={{
+              width: "min(260px, calc(100vw - 20px))",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <label style={{ display: "grid", gap: 7 }}>
+              <span style={labelStyle}>Enter your email</span>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Enter your email"
+                autoComplete="email"
+                disabled={loading || magicLinkSent}
+                required
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: 7 }}>
+              <span style={labelStyle}>Your Name</span>
+              <input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Your Name"
+                autoComplete="name"
+                disabled={loading || magicLinkSent}
+                style={inputStyle}
+              />
+            </label>
+
+            <button type="submit" disabled={loading || magicLinkSent} style={primaryButtonStyle}>
+              {magicLinkSent ? "Magic link sent" : loading ? "Sending..." : "Get magic link"}
+            </button>
+          </form>
+        )}
+
+        {checkingSession && (
+          <p style={{ margin: 0, fontSize: "clamp(10px, 3vw, 13px)", fontWeight: 800 }}>
+            Checking your login...
+          </p>
+        )}
+
+        {!checkingSession && signedInEmail && (
+          <div style={{ display: "grid", gap: 10, justifyItems: "center" }}>
+            <Link
+              href="/dashboard"
+              style={{
+                ...primaryButtonStyle,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textDecoration: "none",
+              }}
+            >
+              Go to dashboard
+            </Link>
+            <button type="button" onClick={signOut} style={primaryButtonStyle}>
+              Logout
+            </button>
+          </div>
+        )}
+
+        {status && (
+          <p
+            style={{
+              width: "min(320px, calc(100vw - 20px))",
+              margin: "4px 0 0",
+              color: magicLinkSent ? "#22543d" : "#7f1d1d",
+              fontSize: "clamp(10px, 3vw, 12px)",
+              fontWeight: 800,
+              lineHeight: 1.45,
+            }}
+          >
+            {status}
+          </p>
         )}
       </section>
     </main>
