@@ -70,83 +70,249 @@ export default function HomePage() {
   }
 
   return (
-    <main className="applix-setup-shell">
-      <a
-        className="applix-setup-info"
-        href="https://www.linkedin.com/in/sajan-giri-bb1a01221/"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Open Sajan Giri LinkedIn profile"
-        title="LinkedIn"
-      >
-        i
-      </a>
+    <main
+      style={{
+        position: "relative",
+        minHeight: "100vh",
+        overflow: "hidden",
+        backgroundColor: "#fff7fb",
+        color: "#16131a",
+        fontFamily: "Arial, Helvetica, sans-serif",
+      }}
+    >
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: "-12% -35% -20%",
+          backgroundImage:
+            "linear-gradient(rgba(255, 70, 190, .22) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 70, 190, .22) 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+          transform: "perspective(760px) rotateX(22deg) scale(1.08)",
+          transformOrigin: "top center",
+          opacity: 0.95,
+        }}
+      />
 
-      <section className="applix-setup-center">
-        <div style={{ display: "grid", placeItems: "center", marginBottom: "18px" }}>
-          <img
-            src="/applix-logo.svg"
-            alt="Applix logo"
-            style={{
-              width: "clamp(280px, 46vw, 430px)",
-              height: "auto",
-              display: "block",
-              objectFit: "contain",
-              marginBottom: "-18px",
-              filter: "drop-shadow(0 22px 45px rgba(0, 0, 0, .35))",
-            }}
-          />
-          <h2
-            aria-label="APPLIX"
-            style={{
-              margin: 0,
-              fontSize: "clamp(42px, 8vw, 76px)",
-              lineHeight: 0.9,
-              fontWeight: 950,
-              letterSpacing: "0.16em",
-              color: "#ff7fa8",
-              textShadow: "0 0 20px rgba(255, 80, 180, .24)",
-            }}
-          >
-            APPLIX
-          </h2>
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(circle at 50% 24%, rgba(255,255,255,.96), rgba(255,255,255,.7) 34%, transparent 66%)",
+          pointerEvents: "none",
+        }}
+      />
+
+      <header
+        style={{
+          position: "relative",
+          zIndex: 2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "18px 20px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 900,
+            letterSpacing: ".08em",
+            textTransform: "uppercase",
+          }}
+        >
+          CALSIE | APPLIX
         </div>
 
-        <p className="applix-setup-kicker">Persistence at Scale</p>
-        <h1>{signedInEmail ? "You are all set up!" : "Welcome to Applix"}</h1>
-        <p className="applix-setup-copy">
-          Signup, Setup, Start, and Sleep; While Applix does it.
-        </p>
-      </section>
+        <button
+          aria-label="Open menu"
+          style={{
+            border: 0,
+            background: "transparent",
+            color: "#1d1824",
+            fontSize: 22,
+            lineHeight: 1,
+            padding: 6,
+          }}
+        >
+          ☰
+        </button>
+      </header>
 
-      <section className="applix-setup-bottom">
-        {checkingSession && <p className="applix-setup-status">Checking your login...</p>}
+      <section
+        style={{
+          position: "relative",
+          zIndex: 2,
+          minHeight: "calc(100vh - 70px)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          padding: "12px 24px 54px",
+        }}
+      >
+        <img
+          src="/applix-logo.svg"
+          alt="Applix logo"
+          style={{
+            width: "clamp(112px, 34vw, 156px)",
+            height: "auto",
+            display: "block",
+            marginBottom: 12,
+            filter: "drop-shadow(0 12px 20px rgba(255, 92, 168, .18))",
+          }}
+        />
+
+        <h1
+          aria-label="APPLIX"
+          style={{
+            margin: 0,
+            color: "#ff5ca8",
+            fontSize: "clamp(40px, 13vw, 72px)",
+            lineHeight: 0.92,
+            fontWeight: 950,
+            letterSpacing: ".1em",
+          }}
+        >
+          APPLIX
+        </h1>
+
+        <p
+          style={{
+            margin: "8px 0 34px",
+            color: "#222026",
+            fontSize: 10,
+            fontWeight: 900,
+            letterSpacing: ".18em",
+            textTransform: "uppercase",
+          }}
+        >
+          Persistence at Scale
+        </p>
+
+        {checkingSession && (
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 800 }}>Checking your login...</p>
+        )}
 
         {!checkingSession && signedInEmail && (
-          <div className="applix-setup-actions">
-            <Link className="applix-setup-primary" href="/dashboard">Home</Link>
+          <div style={{ width: "min(260px, 100%)", display: "grid", gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 800 }}>You are already signed in.</p>
+            <Link
+              href="/dashboard"
+              style={{
+                minHeight: 38,
+                borderRadius: 999,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#ff5ca8",
+                color: "#16131a",
+                fontSize: 13,
+                fontWeight: 900,
+                boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
+              }}
+            >
+              Go to dashboard
+            </Link>
           </div>
         )}
 
         {!checkingSession && !signedInEmail && (
-          <form className="applix-setup-form" onSubmit={sendMagicLink}>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="Enter your email"
-              autoComplete="email"
+          <form
+            onSubmit={sendMagicLink}
+            style={{
+              width: "min(260px, 100%)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <label
+              style={{
+                height: 40,
+                borderRadius: 999,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "0 12px",
+                background: "#4c4c4f",
+                boxShadow: "0 10px 24px rgba(0,0,0,.16)",
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 999,
+                  display: "grid",
+                  placeItems: "center",
+                  flexShrink: 0,
+                  background: "#ff5ca8",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 900,
+                }}
+              >
+                +
+              </span>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Enter your email"
+                autoComplete="email"
+                disabled={loading || magicLinkSent}
+                required
+                style={{
+                  width: "100%",
+                  border: 0,
+                  outline: 0,
+                  background: "transparent",
+                  color: "white",
+                  fontSize: 13,
+                  fontWeight: 700,
+                }}
+              />
+            </label>
+
+            <button
+              type="submit"
               disabled={loading || magicLinkSent}
-              required
-            />
-            <button className="applix-setup-primary" type="submit" disabled={loading || magicLinkSent}>
+              style={{
+                height: 38,
+                border: 0,
+                borderRadius: 999,
+                background: "#ff5ca8",
+                color: "#16131a",
+                fontSize: 13,
+                fontWeight: 900,
+                boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
+              }}
+            >
               {magicLinkSent ? "Magic link sent" : loading ? "Sending..." : "Get magic link"}
             </button>
           </form>
         )}
 
-        {status && <p className={magicLinkSent ? "applix-setup-status success" : "applix-setup-status"}>{status}</p>}
+        {status && (
+          <p
+            style={{
+              width: "min(320px, 100%)",
+              margin: "16px 0 0",
+              color: magicLinkSent ? "#22543d" : "#7f1d1d",
+              fontSize: 12,
+              fontWeight: 800,
+              lineHeight: 1.45,
+            }}
+          >
+            {status}
+          </p>
+        )}
       </section>
     </main>
   );
