@@ -3,13 +3,17 @@ body .dashboard-cockpit-shell .resume-action.ready::before,
 body .dashboard-cockpit-shell .dashboard-app-connect::before,
 body .dashboard-cockpit-shell .dashboard-app-connect.status-connecting::before,
 body .dashboard-cockpit-shell .dashboard-app-connect.status-connected::before,
-body .dashboard-cockpit-shell .dashboard-app-connect.ready::before {
+body .dashboard-cockpit-shell .dashboard-app-connect.ready::before,
+body .dashboard-cockpit-shell .dashboard-actions .applix-setup-outline[href='/resume-canvas']::before,
+body .dashboard-cockpit-shell .dashboard-actions button.applix-setup-outline::before,
+body .dashboard-cockpit-shell .dashboard-actions button.applix-setup-outline.status-connecting::before {
   content: none !important;
   display: none !important;
   width: 0 !important;
   height: 0 !important;
   min-width: 0 !important;
   min-height: 0 !important;
+  margin: 0 !important;
   border: 0 !important;
   background: none !important;
   box-shadow: none !important;
