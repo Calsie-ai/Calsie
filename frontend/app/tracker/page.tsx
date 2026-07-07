@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 
 type Campaign = { id: string; name?: string | null; target_business_type?: string | null; location?: string | null; search?: { target_role?: string | null; target_location?: string | null } | null; created_at?: string | null };
-type AgentStatus = "found" | "prepared" | "approved" | "queued" | "applied" | "interviewing" | "saved" | "declined" | "skipped" | "rejected" | "failed" | "waiting";
+type AgentStatus = "found" | "prepared" | "approved" | "needs_email" | "queued" | "applied" | "interviewing" | "saved" | "declined" | "skipped" | "rejected" | "failed" | "waiting";
 type JobsRow = { id: string; title?: string | null; company?: string | null; location?: string | null; description?: string | null; apply_url?: string | null; source?: string | null; status?: string | null; created_at?: string | null; campaign_id?: string | null; user_decision?: string | null; reviewed_at?: string | null };
 type AgentLog = { id: string; campaignId?: string | null; company: string; jobTitle: string; location: string; website: string; jobUrl: string; source: string; status: AgentStatus; actionTime: string };
+type ApprovalResponse = { ok: boolean; job_id: string; approval_status: "approved"; email_status: "found" | "not_found" | "failed"; draft_status: "created" | "not_created"; queue_id?: string | null; error?: string };
 
 const PAGE_SIZE = 20;
-const STATUS_OPTIONS: AgentStatus[] = ["found", "prepared", "approved", "queued", "applied", "interviewing", "saved", "declined", "skipped", "rejected", "failed", "waiting"];
+const STATUS_OPTIONS: AgentStatus[] = ["found", "prepared", "approved", "needs_email", "queued", "applied", "interviewing", "saved", "declined", "skipped", "rejected", "failed", "waiting"];
 
 function cleanText(value: unknown, fallback = "") { return typeof value === "string" && value.trim() ? value.trim() : fallback; }
 function normalizeStatus(value: unknown): AgentStatus | null {
@@ -21,7 +22,8 @@ function normalizeStatus(value: unknown): AgentStatus | null {
   if (status === "approve") return "approved";
   if (status === "decline") return "declined";
   if (status === "progressing" || status === "interview") return "interviewing";
-  if (status === "ready_for_review") return "prepared";
+  if (status === "ready_for_review" || status === "pending_user_approval") return "prepared";
+  if (status === "email_not_found") return "needs_email";
   if (STATUS_OPTIONS.includes(status as AgentStatus)) return status as AgentStatus;
   return null;
 }
@@ -37,8 +39,9 @@ function getCampaignRole(campaign?: Campaign | null) { return cleanText(campaign
 function getCampaignLocation(campaign?: Campaign | null) { return cleanText(campaign?.search?.target_location) || cleanText(campaign?.location, "your selected location"); }
 function statusFor(row: JobsRow): AgentStatus {
   const decision = normalizeStatus(row.user_decision);
-  if (decision) return decision;
   const savedStatus = normalizeStatus(row.status);
+  if (decision === "approved" && savedStatus && !["approved", "found", "prepared"].includes(savedStatus)) return savedStatus;
+  if (decision) return decision;
   if (savedStatus) return savedStatus;
   const description = `${row.description || ""} ${row.source || ""}`.toLowerCase();
   if (description.includes("applied")) return "applied";
@@ -61,8 +64,13 @@ function formatDate(value: string) { if (!value) return "Not logged yet"; const 
 function formatShortDate(value: string) { if (!value || value === "unknown") return "No date"; const date = new Date(`${value}T00:00:00`); if (Number.isNaN(date.getTime())) return value; return date.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
 function dayKey(value: string) { if (!value) return "unknown"; const date = new Date(value); if (Number.isNaN(date.getTime())) return "unknown"; return date.toISOString().slice(0, 10); }
 function statusLabel(status: AgentStatus) {
-  const labels: Record<AgentStatus, string> = { found: "Found", prepared: "Prepared", approved: "Approved", queued: "Queued", applied: "Applied", interviewing: "Interviewing", saved: "Saved", declined: "Declined", skipped: "Skipped", rejected: "Rejected", failed: "Failed", waiting: "Waiting" };
+  const labels: Record<AgentStatus, string> = { found: "Found", prepared: "Prepared", approved: "Approved", needs_email: "Needs email", queued: "Queued", applied: "Applied", interviewing: "Interviewing", saved: "Saved", declined: "Declined", skipped: "Skipped", rejected: "Rejected", failed: "Failed", waiting: "Waiting" };
   return labels[status] || "Waiting";
+}
+function statusAfterApproval(result: ApprovalResponse): AgentStatus {
+  if (result.email_status === "found" && result.draft_status === "created") return "queued";
+  if (result.email_status === "not_found") return "needs_email";
+  return "failed";
 }
 
 export default function TrackerPage() {
@@ -81,7 +89,7 @@ export default function TrackerPage() {
 
   const summary = useMemo(() => ({
     found: logs.length,
-    prepared: logs.filter((log) => ["prepared", "approved", "queued", "applied", "interviewing"].includes(log.status)).length,
+    prepared: logs.filter((log) => ["prepared", "approved", "needs_email", "queued", "applied", "interviewing"].includes(log.status)).length,
     applied: logs.filter((log) => log.status === "applied" || log.status === "queued").length,
     skipped: logs.filter((log) => ["skipped", "declined", "rejected"].includes(log.status)).length,
   }), [logs]);
@@ -164,22 +172,48 @@ export default function TrackerPage() {
       const supabase = getSupabaseClient();
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData.user) throw new Error("Missing login session. Please sign in again.");
-      const now = new Date().toISOString();
-      const jobUpdate = await supabase.from("jobs").update({ status: nextStatus, user_decision: decision, reviewed_at: now }).eq("id", log.id).eq("user_id", userData.user.id);
-      if (jobUpdate.error) throw jobUpdate.error;
 
-      let queueCount = 0;
-      const activeCampaignId = log.campaignId || campaign?.id;
-      if (activeCampaignId && log.company && log.company !== "Company not saved") {
-        const queuePatch = decision === "approved"
-          ? { status: "queued", review_status: "approved", scheduled_send_at: now, send_window: "automatic", updated_at: now }
-          : { status: "declined", review_status: "declined", scheduled_send_at: null, send_window: "manual_review", updated_at: now };
-        const queueUpdate = await supabase.from("outreach_queue").update(queuePatch).eq("campaign_id", activeCampaignId).ilike("recipient_company", `%${log.company.replace(/[%_]/g, "")}%`).select("id");
-        if (!queueUpdate.error) queueCount = queueUpdate.data?.length || 0;
+      if (decision === "declined") {
+        const now = new Date().toISOString();
+        const jobUpdate = await supabase.from("jobs").update({ status: "declined", user_decision: "declined", reviewed_at: now }).eq("id", log.id).eq("user_id", userData.user.id);
+        if (jobUpdate.error) throw jobUpdate.error;
+        setActionMessage("Declined.");
+        return;
       }
 
-      if (decision === "approved") setActionMessage(queueCount > 0 ? "Approved. Applix queued this for automatic sending." : "Approved. No matching outreach draft was found yet, so it will send only after Applix creates a draft.");
-      else setActionMessage(queueCount > 0 ? "Declined. Removed from automatic sending." : "Declined.");
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (sessionError || !accessToken) throw new Error("Missing login session. Please sign in again.");
+      if (!supabaseUrl || !supabaseAnonKey) throw new Error("Missing Supabase environment variables.");
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/approve-job-for-outreach`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          apikey: supabaseAnonKey,
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ job_id: log.id }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(getErrorMessage(payload, "Could not approve this job."));
+      }
+
+      const result = payload as ApprovalResponse;
+      const finalStatus = statusAfterApproval(result);
+      setLogs((current) => current.map((row) => row.id === log.id ? { ...row, status: finalStatus } : row));
+
+      if (result.email_status === "found" && result.draft_status === "created") {
+        setActionMessage("Approved. Applix found an email and queued the outreach draft.");
+      } else if (result.email_status === "not_found") {
+        setActionMessage("Approved, but Applix could not find an email yet. This job needs email discovery.");
+      } else {
+        setActionMessage("Approved, but draft creation failed. Check Supabase function logs.");
+      }
     } catch (error) { setLogs(previousLogs); setActionMessage(getErrorMessage(error, "Could not review this job.")); } finally { setSavingStatusId(null); }
   }
 
@@ -207,7 +241,7 @@ export default function TrackerPage() {
         .agent-day-timeline{padding:clamp(18px,3vw,28px);margin-bottom:18px}.day-line-header{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:20px}.day-line-header h2{margin:0;font-size:clamp(22px,3.8vw,36px)}.day-line-header>span{color:rgba(255,255,255,.68);font-weight:900}.day-dot-row{position:relative;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}.day-dot-row::before{content:"";position:absolute;left:6%;right:6%;top:22px;height:2px;background:linear-gradient(90deg,rgba(34,211,238,.15),rgba(255,106,181,.5),rgba(34,211,238,.15))}.day-dot-row button{position:relative;display:grid;justify-items:center;gap:6px;padding:8px 12px 14px;border:0;border-radius:20px;background:transparent;color:white;cursor:pointer}.day-dot{width:42px;height:42px;border-radius:999px;display:block;border:2px solid rgba(255,255,255,.24);background:linear-gradient(180deg,rgba(18,25,43,.96),rgba(7,12,24,.96));box-shadow:0 0 0 5px rgba(255,255,255,.04)}.day-dot-row button.active .day-dot{border-color:rgba(255,106,181,.98);box-shadow:0 0 0 5px rgba(255,106,181,.15),0 0 22px rgba(255,106,181,.38)}.day-dot-row strong{font-size:16px;font-weight:950}.day-dot-row small{color:rgba(255,255,255,.7);font-weight:850;text-align:center}.day-dot-row em{color:rgba(255,255,255,.45);font-style:normal;font-size:12px;font-weight:850}
         .agent-action-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:18px}.agent-action-row a:nth-child(2){background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.28)}.agent-action-row a:nth-child(3){background:rgba(255,106,181,.12);border-color:rgba(255,106,181,.34)}.agent-action-row a[aria-disabled="true"]{opacity:.45;pointer-events:none}.agent-message,.agent-error{width:min(1180px,100%);margin:0 auto 18px;text-align:center;font-weight:850}.agent-message{color:#a7f3d0}.agent-error{color:#fca5a5}.empty-agent-card{padding:34px;text-align:center}.empty-agent-card img{width:110px;height:110px;object-fit:contain}.empty-agent-card h2{font-size:clamp(28px,5vw,44px);margin:0 0 10px}.empty-agent-card p{max-width:650px;margin:0 auto;color:rgba(255,255,255,.72);line-height:1.5}
         .table-card{padding:clamp(18px,3vw,30px)}.table-title-row{display:flex;justify-content:space-between;gap:16px;align-items:end;margin-bottom:18px}.table-title-row h2{margin:0;font-size:clamp(26px,4vw,42px)}.table-title-row span{color:rgba(255,255,255,.68);font-weight:850}.agent-table-wrap{overflow-x:auto;border-radius:22px;border:1px solid rgba(255,255,255,.1)}.editable-sheet-table{width:100%;border-collapse:collapse;min-width:1040px}.editable-sheet-table th,.editable-sheet-table td{padding:14px 16px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08)}.editable-sheet-table th{position:sticky;top:0;z-index:1;background:rgba(7,12,24,.95);color:rgba(255,255,255,.68);font-size:12px;text-transform:uppercase;letter-spacing:.08em}.editable-sheet-table tbody tr:hover{background:rgba(255,255,255,.045)}.editable-sheet-table td{color:rgba(255,255,255,.86);vertical-align:top}.editable-sheet-table td strong{display:block;color:white}.editable-sheet-table td span{display:block;color:rgba(255,255,255,.58);margin-top:4px}.editable-sheet-table td a{color:#bff7ff;font-weight:900}.muted-cell{color:rgba(255,255,255,.48)}
-        .status-select{width:155px;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:9px 12px;color:white;font-weight:950;background:rgba(15,23,42,.95);outline:none;cursor:pointer}.status-select option{color:#0f172a;background:white}.status-select.found{border-color:rgba(96,165,250,.38);box-shadow:inset 0 0 0 999px rgba(96,165,250,.12)}.status-select.prepared,.status-select.queued{border-color:rgba(34,211,238,.42);box-shadow:inset 0 0 0 999px rgba(34,211,238,.12)}.status-select.approved,.status-select.applied{border-color:rgba(52,211,153,.42);box-shadow:inset 0 0 0 999px rgba(52,211,153,.12)}.status-select.interviewing,.status-select.saved{border-color:rgba(168,85,247,.42);box-shadow:inset 0 0 0 999px rgba(168,85,247,.12)}.status-select.skipped{border-color:rgba(251,191,36,.42);box-shadow:inset 0 0 0 999px rgba(251,191,36,.12)}.status-select.declined,.status-select.rejected,.status-select.failed{border-color:rgba(248,113,113,.42);box-shadow:inset 0 0 0 999px rgba(248,113,113,.12)}
+        .status-select{width:155px;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:9px 12px;color:white;font-weight:950;background:rgba(15,23,42,.95);outline:none;cursor:pointer}.status-select option{color:#0f172a;background:white}.status-select.found{border-color:rgba(96,165,250,.38);box-shadow:inset 0 0 0 999px rgba(96,165,250,.12)}.status-select.prepared,.status-select.queued{border-color:rgba(34,211,238,.42);box-shadow:inset 0 0 0 999px rgba(34,211,238,.12)}.status-select.approved,.status-select.applied{border-color:rgba(52,211,153,.42);box-shadow:inset 0 0 0 999px rgba(52,211,153,.12)}.status-select.needs_email{border-color:rgba(251,191,36,.42);box-shadow:inset 0 0 0 999px rgba(251,191,36,.12)}.status-select.interviewing,.status-select.saved{border-color:rgba(168,85,247,.42);box-shadow:inset 0 0 0 999px rgba(168,85,247,.12)}.status-select.skipped{border-color:rgba(251,191,36,.42);box-shadow:inset 0 0 0 999px rgba(251,191,36,.12)}.status-select.declined,.status-select.rejected,.status-select.failed{border-color:rgba(248,113,113,.42);box-shadow:inset 0 0 0 999px rgba(248,113,113,.12)}
         .review-actions{display:flex;gap:8px;flex-wrap:wrap}.review-actions button{border:1px solid rgba(255,255,255,.16);border-radius:999px;color:white;font-weight:950;padding:9px 12px;cursor:pointer}.approve-button{background:rgba(52,211,153,.18);border-color:rgba(52,211,153,.38)!important}.decline-button{background:rgba(248,113,113,.16);border-color:rgba(248,113,113,.38)!important}.sheet-pagination{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:18px;color:rgba(255,255,255,.72);font-weight:900}.sheet-pagination span{text-align:center}
         @media(max-width:760px){.agent-log-header{align-items:flex-start}.agent-summary-grid{grid-template-columns:repeat(2,1fr)}.day-line-header{display:grid;align-items:start;text-align:center}.day-dot-row{grid-template-columns:repeat(2,1fr)}.day-dot-row::before{display:none}.agent-action-row,.sheet-pagination{display:grid;grid-template-columns:1fr}.agent-action-row a,.agent-action-row button,.sheet-pagination button{width:100%}.table-title-row{display:grid;align-items:start}.editable-sheet-table{min-width:0}.editable-sheet-table thead{display:none}.editable-sheet-table tbody,.editable-sheet-table tr,.editable-sheet-table td{display:block;width:100%}.editable-sheet-table tr{padding:16px;border-bottom:1px solid rgba(255,255,255,.1)}.editable-sheet-table td{padding:8px 0;border-bottom:0}.editable-sheet-table td::before{content:attr(data-label);display:block;margin-bottom:5px;color:rgba(255,255,255,.48);font-size:11px;font-weight:950;text-transform:uppercase;letter-spacing:.08em}.status-select{width:100%}.review-actions{display:grid;grid-template-columns:1fr 1fr}}
       `}</style>
