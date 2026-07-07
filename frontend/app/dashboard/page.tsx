@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getSupabaseClient } from "../../lib/supabaseClient";
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getSupabaseClient } from '../../lib/supabaseClient';
 
 type Campaign = {
   id: string;
@@ -17,34 +17,34 @@ type Campaign = {
 };
 
 function roleFor(campaign: Campaign) {
-  return campaign.search?.target_role || campaign.target_business_type || "Target not set";
+  return campaign.search?.target_role || campaign.target_business_type || 'Target not set';
 }
 
 function locationFor(campaign: Campaign) {
-  return campaign.search?.target_location || campaign.location || "";
+  return campaign.search?.target_location || campaign.location || '';
 }
 
 function statusLabel(status: string) {
-  if (status === "launched") return "Agent running";
-  if (status === "active") return "Agent active";
-  if (status === "scheduled") return "Scheduled";
-  if (status === "paused") return "Paused";
-  return status || "Draft";
+  if (status === 'launched') return 'Agent running';
+  if (status === 'active') return 'Agent active';
+  if (status === 'scheduled') return 'Scheduled';
+  if (status === 'paused') return 'Paused';
+  return status || 'Draft';
 }
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState('');
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [resumeReady, setResumeReady] = useState(false);
   const [gmailReady, setGmailReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [message, setMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const latestCampaign = campaigns[0] || null;
-  const campaignRunning = latestCampaign?.status === "scheduled" || latestCampaign?.status === "active" || latestCampaign?.status === "launched";
+  const campaignRunning = latestCampaign?.status === 'scheduled' || latestCampaign?.status === 'active' || latestCampaign?.status === 'launched';
   const canStartCampaign = Boolean(latestCampaign && resumeReady && gmailReady && !campaignRunning && !busy);
 
   useEffect(() => {
@@ -53,50 +53,50 @@ export default function DashboardPage() {
 
   async function loadDashboard() {
     setLoading(true);
-    setErrorMessage("");
-    setMessage("");
+    setErrorMessage('');
+    setMessage('');
 
     try {
       const supabase = getSupabaseClient();
       const { data: userData, error: userError } = await supabase.auth.getUser();
 
       if (userError || !userData.user) {
-        router.replace("/");
+        router.replace('/');
         return;
       }
 
-      const userEmail = userData.user.email || "";
+      const userEmail = userData.user.email || '';
       setEmail(userEmail);
 
       const { data: campaignData, error: campaignError } = await supabase
-        .from("campaigns")
-        .select("id,name,location,target_business_type,search,outreach,status,created_at")
-        .eq("user_id", userData.user.id)
-        .order("created_at", { ascending: false });
+        .from('campaigns')
+        .select('id,name,location,target_business_type,search,outreach,status,created_at')
+        .eq('user_id', userData.user.id)
+        .order('created_at', { ascending: false });
 
       if (campaignError) throw campaignError;
       setCampaigns((campaignData || []) as Campaign[]);
 
       const { data: resumeData } = await supabase
-        .from("resume_profiles")
-        .select("id,full_name,skills,work_experience")
-        .eq("profile_id", userData.user.id)
-        .order("updated_at", { ascending: false })
+        .from('resume_profiles')
+        .select('id,full_name,skills,work_experience')
+        .eq('profile_id', userData.user.id)
+        .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       setResumeReady(Boolean(resumeData?.id));
 
       const { data: authData } = await supabase
-        .from("user_email_authorizations")
-        .select("status")
-        .eq("user_identifier", userEmail || userData.user.id)
-        .eq("provider", "google")
+        .from('user_email_authorizations')
+        .select('status')
+        .eq('user_identifier', userEmail || userData.user.id)
+        .eq('provider', 'google')
         .maybeSingle();
 
-      setGmailReady(authData?.status === "connected");
+      setGmailReady(authData?.status === 'connected');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not load dashboard.");
+      setErrorMessage(error instanceof Error ? error.message : 'Could not load dashboard.');
     } finally {
       setLoading(false);
     }
@@ -105,99 +105,99 @@ export default function DashboardPage() {
   async function signOut() {
     const supabase = getSupabaseClient();
     await supabase.auth.signOut();
-    router.replace("/");
+    router.replace('/');
   }
 
   async function connectGmail() {
     setBusy(true);
-    setErrorMessage("");
-    setMessage("");
+    setErrorMessage('');
+    setMessage('');
 
     try {
       const supabase = getSupabaseClient();
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
-      if (!accessToken) throw new Error("Missing login session. Please sign in again.");
+      if (!accessToken) throw new Error('Missing login session. Please sign in again.');
 
-      const response = await fetch("/api/applix/connect-gmail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/applix/connect-gmail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ access_token: accessToken, return_to: `${window.location.origin}/dashboard` }),
       });
 
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.error || "Google authorization URL was not returned.");
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Google authorization URL was not returned.');
 
       window.location.href = data.authorization_url;
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not connect Gmail.");
+      setErrorMessage(error instanceof Error ? error.message : 'Could not connect Gmail.');
       setBusy(false);
     }
   }
 
   async function startCampaign() {
     if (!latestCampaign) {
-      router.push("/campaign/new");
+      router.push('/campaign/new');
       return;
     }
 
     setBusy(true);
-    setErrorMessage("");
-    setMessage("");
+    setErrorMessage('');
+    setMessage('');
 
     try {
       const supabase = getSupabaseClient();
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
-      if (!accessToken) throw new Error("Missing login session. Please sign in again.");
+      if (!accessToken) throw new Error('Missing login session. Please sign in again.');
 
-      const response = await fetch("/api/applix/schedule-campaign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/applix/schedule-campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ access_token: accessToken, campaign_id: latestCampaign.id, enabled: true }),
       });
 
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.error || "Could not start campaign.");
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Could not start campaign.');
 
       const agentSummary = data.agent_run?.active_agent_campaigns ?? data.agent_run?.checked_campaigns;
-      const summaryText = typeof agentSummary === "number" ? ` First agent run checked ${agentSummary} campaign${agentSummary === 1 ? "" : "s"}.` : " First agent run started.";
+      const summaryText = typeof agentSummary === 'number' ? ` First agent run checked ${agentSummary} campaign${agentSummary === 1 ? '' : 's'}.` : ' First agent run started.';
       setMessage(`Campaign launched.${summaryText} Opening the tracker...`);
-      router.push("/tracker");
+      router.push('/tracker');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not start campaign.");
+      setErrorMessage(error instanceof Error ? error.message : 'Could not start campaign.');
     } finally {
       setBusy(false);
     }
   }
 
   async function deleteCampaign(campaign: Campaign) {
-    const confirmed = window.confirm(`Delete campaign "${campaign.name}"? This will remove it from your Applix dashboard.`);
+    const confirmed = window.confirm(`Delete campaign '${campaign.name}'? This will remove it from your Applix dashboard.`);
     if (!confirmed) return;
 
     setBusy(true);
-    setErrorMessage("");
-    setMessage("");
+    setErrorMessage('');
+    setMessage('');
 
     try {
       const supabase = getSupabaseClient();
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
-      if (!accessToken) throw new Error("Missing login session. Please sign in again.");
+      if (!accessToken) throw new Error('Missing login session. Please sign in again.');
 
-      const response = await fetch("/api/applix/delete-campaign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/applix/delete-campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ access_token: accessToken, campaign_id: campaign.id }),
       });
 
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.error || "Could not delete campaign.");
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Could not delete campaign.');
 
-      setMessage("Campaign deleted.");
+      setMessage('Campaign deleted.');
       setCampaigns((current) => current.filter((item) => item.id !== campaign.id));
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not delete campaign.");
+      setErrorMessage(error instanceof Error ? error.message : 'Could not delete campaign.');
     } finally {
       setBusy(false);
     }
@@ -205,84 +205,86 @@ export default function DashboardPage() {
 
   return (
     <>
-      <main className="applix-home-shell dashboard-cockpit-shell">
-        <button className="applix-setup-back" type="button" onClick={() => router.back()} aria-label="Go back">←</button>
-        <button className="home-signout" type="button" onClick={signOut} style={{ right: "clamp(96px, 11vw, 140px)" }}>Sign out</button>
-        <div className="applix-setup-info" title={email || "Applix dashboard"}>i</div>
+      <main className='applix-home-shell dashboard-cockpit-shell'>
+        <button className='applix-setup-back' type='button' onClick={() => router.back()} aria-label='Go back'>←</button>
+        <button className='home-signout' type='button' onClick={signOut} style={{ right: 'clamp(96px, 11vw, 140px)' }}>Sign out</button>
+        <div className='applix-setup-info' title={email || 'Applix dashboard'}>i</div>
 
-        <section className="applix-home-center dashboard-hero">
-          <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "clamp(120px, 18vw, 190px)", height: "auto", display: "block", objectFit: "contain", marginBottom: "-4px", filter: "drop-shadow(0 18px 25px rgba(0,0,0,.18))" }} />
-          <p style={{ margin: "10px 0 12px", color: "#ff5ca8", fontSize: "clamp(46px, 8vw, 74px)", fontWeight: 950, letterSpacing: ".18em" }}>APPLIX</p>
-          <p className="applix-setup-kicker">Persistence at Scale</p>
+        <section className='applix-home-center dashboard-hero'>
+          <img src='/applix-logo.svg' alt='Applix logo' style={{ width: 'clamp(120px, 18vw, 190px)', height: 'auto', display: 'block', objectFit: 'contain', marginBottom: '-4px', filter: 'drop-shadow(0 18px 25px rgba(0,0,0,.18))' }} />
+          <p style={{ margin: '10px 0 12px', color: '#ff5ca8', fontSize: 'clamp(46px, 8vw, 74px)', fontWeight: 950, letterSpacing: '.18em' }}>APPLIX</p>
+          <p className='applix-setup-kicker'>Persistence at Scale</p>
           <h1>Welcome back</h1>
-          <p className="applix-home-copy dashboard-subtitle">Signup, setup, start, and sleep while Applix works in the background.</p>
+          <p className='applix-home-copy dashboard-subtitle'>Signup, setup, start, and sleep while Applix works in the background.</p>
         </section>
 
-        <section className="applix-home-bottom dashboard-stack">
-          {loading && <p className="applix-setup-status success">Loading your Applix workspace...</p>}
-          {message && <p className="applix-setup-status success">{message}</p>}
-          {errorMessage && <p className="error-text" style={{ textAlign: "center" }}>{errorMessage}</p>}
+        <section className='applix-home-bottom dashboard-stack'>
+          {loading && <p className='applix-setup-status success'>Loading your Applix workspace...</p>}
+          {message && <p className='applix-setup-status success'>{message}</p>}
+          {errorMessage && <p className='error-text' style={{ textAlign: 'center' }}>{errorMessage}</p>}
 
-          <div className="home-campaign-card dashboard-card-clean applix-intro-card">
+          <div className='home-campaign-card dashboard-card-clean applix-intro-card'>
             <strong>I am Applix.</strong>
             <p>I am here to help you get the opportunity. Set me up once and I will automate your task.</p>
             <p>My skill is simple: give me your resume and tell me what opportunities you want. I will knock every door for you.</p>
             <p>I will knock 100 doors a day for 10 days.</p>
           </div>
 
-          <div className="home-campaign-card dashboard-card-clean resume-card-wrap">
-            <p className="resume-warning">Your Resume Will Be Attached to the Email, Please Use The Current And Best Resume</p>
-            <Link className={`home-check resume-action ${resumeReady ? "ready" : ""}`} href="/resume-canvas">
+          <div className='home-campaign-card dashboard-card-clean resume-card-wrap'>
+            <p className='resume-warning'>Your Resume Will Be Attached to the Email, Please Use The Current And Best Resume</p>
+            <Link className={`home-check resume-action ${resumeReady ? 'ready' : ''}`} href='/resume-canvas'>
               {!resumeReady && <span>1</span>}
               <div>
                 <strong>Upload / Change Resume</strong>
-                <p>{resumeReady ? "Resume data is saved." : "Drag and drop your DOC or DOCX resume."}</p>
+                <p>{resumeReady ? 'Resume data is saved.' : 'Drag and drop your DOC or DOCX resume.'}</p>
               </div>
             </Link>
           </div>
 
-          <div className="home-check-grid dashboard-single-row">
-            <div className={`home-check dashboard-app-connect ${gmailReady ? "ready" : ""}`}>
+          <div className='home-check-grid dashboard-single-row'>
+            <div className={`home-check dashboard-app-connect ${gmailReady ? 'ready' : ''}`}>
               {!gmailReady && <span>2</span>}
               <div>
                 <strong>Connect Applix to my app</strong>
-                <p>{gmailReady ? "Applix is connected." : "Connect your app to prepare outreach."}</p>
+                <p>{gmailReady ? 'Applix is connected.' : 'Connect your app to prepare outreach.'}</p>
               </div>
             </div>
           </div>
 
-          <div className="home-campaign-card dashboard-card-clean campaign-summary-card">
+          <div className='home-campaign-card dashboard-card-clean campaign-summary-card'>
             {latestCampaign ? (
               <>
-                <span className="campaign-pill">Active campaign</span>
+                <span className='campaign-pill'>Active campaign</span>
                 <strong>{latestCampaign.name}</strong>
-                <p className="campaign-target">{roleFor(latestCampaign)}{locationFor(latestCampaign) ? ` in ${locationFor(latestCampaign)}` : ""}</p>
-                <div className="campaign-status-box">
-                  <span className="pulse-dot" />
+                <p className='campaign-target'>{roleFor(latestCampaign)}{locationFor(latestCampaign) ? ` in ${locationFor(latestCampaign)}` : ''}</p>
+                <div className='campaign-status-box'>
+                  <span className='pulse-dot' />
                   <span>{statusLabel(latestCampaign.status)}</span>
                 </div>
-                {latestCampaign.status === "launched" && <p>Applix is working in the background for {latestCampaign.outreach?.agent_days || 10} days.</p>}
-                <div className="home-action-row campaign-buttons" style={{ marginTop: 16 }}>
-                  <Link className="ghost-link" href="/campaign/new">New campaign</Link>
-                  <button className="ghost-button" type="button" onClick={() => deleteCampaign(latestCampaign)} disabled={busy} style={{ borderColor: "rgba(248,113,113,.55)", background: "rgba(254,226,226,.72)", color: "#991b1b" }}>{busy ? "Deleting..." : "Delete campaign"}</button>
+                {latestCampaign.status === 'launched' && <p>Applix is working in the background for {latestCampaign.outreach?.agent_days || 10} days.</p>}
+                <div className='home-action-row campaign-buttons' style={{ marginTop: 16 }}>
+                  <Link className='ghost-link' href='/campaign/new'>New campaign</Link>
+                  <button className='ghost-button' type='button' onClick={() => deleteCampaign(latestCampaign)} disabled={busy} style={{ borderColor: 'rgba(248,113,113,.55)', background: 'rgba(254,226,226,.72)', color: '#991b1b' }}>{busy ? 'Deleting...' : 'Delete campaign'}</button>
                 </div>
               </>
             ) : (
               <>
-                <strong>No campaign yet</strong>
-                <p>Create a campaign so Applix can fetch jobs and prepare outreach.</p>
+                <strong>Browse Template</strong>
+                <p>Choose or create a campaign template.</p>
+                <Link className='browse-template-button' href='/campaign/templates'>Browse Template</Link>
               </>
             )}
           </div>
 
-          <div className="applix-home-actions dashboard-actions">
-            {!resumeReady && <Link className="applix-setup-outline" href="/resume-canvas">Upload Resume</Link>}
-            {!gmailReady && <button className="applix-setup-outline" type="button" onClick={connectGmail} disabled={busy || !email}>{busy ? "Opening..." : "Connect Applix"}</button>}
-            {!latestCampaign && <Link className="applix-setup-outline" href="/campaign/new">Create Campaign</Link>}
+          <div className='applix-home-actions dashboard-actions'>
+            {!resumeReady && <Link className='applix-setup-outline' href='/resume-canvas'>Upload Resume</Link>}
+            {!gmailReady && <button className='applix-setup-outline' type='button' onClick={connectGmail} disabled={busy || !email}>{busy ? 'Opening...' : 'Connect Applix'}</button>}
+            {!latestCampaign && <Link className='applix-setup-outline recommended-template-action' href='/campaign/templates'>Browse Template</Link>}
+            {!latestCampaign && <Link className='applix-setup-outline' href='/campaign/new'>Create Campaign</Link>}
             {campaignRunning ? (
-              <Link className="applix-setup-primary" href="/tracker">Track Applix Log</Link>
+              <Link className='applix-setup-primary' href='/tracker'>Track Applix Log</Link>
             ) : (
-              <button className="applix-setup-primary" type="button" onClick={startCampaign} disabled={!canStartCampaign}>{canStartCampaign ? "Start Campaign" : "Complete setup first"}</button>
+              <button className='applix-setup-primary' type='button' onClick={startCampaign} disabled={!canStartCampaign}>{canStartCampaign ? 'Start Campaign' : 'Complete setup first'}</button>
             )}
           </div>
         </section>
@@ -303,7 +305,7 @@ export default function DashboardPage() {
         }
 
         .dashboard-cockpit-shell::before {
-          content: "" !important;
+          content: '' !important;
           display: block !important;
           position: fixed !important;
           inset: -12% -35% -20% !important;
@@ -321,7 +323,7 @@ export default function DashboardPage() {
         }
 
         .dashboard-cockpit-shell::after {
-          content: "" !important;
+          content: '' !important;
           position: fixed !important;
           inset: 0 !important;
           background: radial-gradient(circle at 50% 18%, rgba(255,255,255,.94), rgba(255,255,255,.7) 34%, transparent 68%) !important;
@@ -549,6 +551,22 @@ export default function DashboardPage() {
 
         .campaign-buttons { width: 100% !important; }
 
+        .browse-template-button {
+          width: min(100%, 330px);
+          min-height: 56px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 14px 20px;
+          background: #ff5ca8;
+          border: 1px solid #ff5ca8;
+          color: #16131a;
+          font-size: clamp(17px, 4.2vw, 22px);
+          font-weight: 950;
+          box-shadow: 0 12px 28px rgba(0,0,0,.08);
+        }
+
         .dashboard-actions .applix-setup-outline,
         .dashboard-actions .applix-setup-primary {
           color: #16131a !important;
@@ -558,6 +576,11 @@ export default function DashboardPage() {
         }
 
         .dashboard-actions .applix-setup-primary {
+          background: #ff5ca8 !important;
+          border-color: #ff5ca8 !important;
+        }
+
+        .dashboard-actions .recommended-template-action {
           background: #ff5ca8 !important;
           border-color: #ff5ca8 !important;
         }
