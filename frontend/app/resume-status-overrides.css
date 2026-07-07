@@ -134,6 +134,156 @@
   cursor: not-allowed;
 }
 
+html,
+body {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body .dashboard-cockpit-shell {
+  width: 100% !important;
+  min-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding-left: clamp(14px, 4vw, 32px) !important;
+  padding-right: clamp(14px, 4vw, 32px) !important;
+  margin: 0 auto !important;
+}
+
+body .dashboard-cockpit-shell .dashboard-hero,
+body .dashboard-cockpit-shell .dashboard-stack {
+  width: min(100%, 620px) !important;
+  max-width: 620px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  justify-self: center !important;
+  align-self: center !important;
+}
+
+body .dashboard-cockpit-shell .dashboard-hero {
+  padding-top: clamp(52px, 8vh, 88px) !important;
+}
+
+body .dashboard-cockpit-shell .dashboard-stack {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: clamp(18px, 4vw, 30px) !important;
+}
+
+body .dashboard-cockpit-shell .dashboard-stack > * {
+  width: 100% !important;
+}
+
+body .dashboard-cockpit-shell .dashboard-card-clean,
+body .dashboard-cockpit-shell .home-campaign-card,
+body .dashboard-cockpit-shell .home-check-grid,
+body .dashboard-cockpit-shell .dashboard-single-row,
+body .dashboard-cockpit-shell .resume-card-wrap,
+body .dashboard-cockpit-shell .campaign-summary-card,
+body .dashboard-cockpit-shell .applix-intro-card {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  border-radius: 0 !important;
+}
+
+body .dashboard-cockpit-shell .resume-action,
+body .dashboard-cockpit-shell .dashboard-app-connect {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  border-radius: 0 !important;
+  min-height: auto !important;
+}
+
+body .dashboard-cockpit-shell .applix-intro-card,
+body .dashboard-cockpit-shell .resume-card-wrap,
+body .dashboard-cockpit-shell .dashboard-single-row {
+  position: relative !important;
+  padding: clamp(18px, 4vw, 30px) 0 !important;
+}
+
+body .dashboard-cockpit-shell .applix-intro-card::after,
+body .dashboard-cockpit-shell .resume-card-wrap::after,
+body .dashboard-cockpit-shell .dashboard-single-row::after {
+  content: "" !important;
+  display: block !important;
+  width: min(72%, 360px) !important;
+  height: 4px !important;
+  border-radius: 999px !important;
+  background: #ff2f93 !important;
+  margin: clamp(22px, 4vw, 30px) auto 0 !important;
+}
+
+.resume-hidden-input {
+  display: none !important;
+}
+
+body .dashboard-cockpit-shell .resume-action {
+  cursor: pointer !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  gap: 6px !important;
+  width: 100% !important;
+}
+
+body .dashboard-cockpit-shell .resume-action:focus-visible {
+  outline: 3px solid rgba(255, 92, 168, .7);
+  outline-offset: 4px;
+}
+
+body .dashboard-cockpit-shell .resume-status-icon {
+  width: clamp(150px, 34vw, 220px) !important;
+  max-width: 100% !important;
+  height: auto !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  margin: 0 auto 12px !important;
+}
+
+body .dashboard-cockpit-shell .resume-file-row {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+  margin-top: 10px !important;
+}
+
+body .dashboard-cockpit-shell .resume-file-name {
+  margin: 0 !important;
+  font-size: clamp(12px, 2.7vw, 14px) !important;
+  color: rgba(22, 19, 26, .72) !important;
+  font-weight: 750 !important;
+  text-align: center !important;
+}
+
+body .dashboard-cockpit-shell .resume-delete-button {
+  border: 1px solid rgba(248, 113, 113, .55) !important;
+  background: rgba(254, 226, 226, .8) !important;
+  color: #991b1b !important;
+  border-radius: 999px !important;
+  padding: 7px 12px !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  cursor: pointer !important;
+}
+
+@media (min-width: 900px) {
+  body .dashboard-cockpit-shell .dashboard-hero,
+  body .dashboard-cockpit-shell .dashboard-stack {
+    transform: translateX(0) !important;
+  }
+}
+
 @media (max-width: 640px) {
   .resume-status-icon {
     width: clamp(150px, 48vw, 220px) !important;
