@@ -13,6 +13,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const VERSION = "approve_job_for_outreach_v4_emailStatus_fix";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -138,13 +139,13 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    if (req.method !== "POST") return json({ ok: false, error: "Use POST" }, 405);
+    if (req.method !== "POST") return json({ ok: false, function: "approve-job-for-outreach", version: VERSION, error: "Use POST" }, 405);
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return json({ ok: false, error: "Missing Supabase service role configuration" }, 500);
+      return json({ ok: false, function: "approve-job-for-outreach", version: VERSION, error: "Missing Supabase service role configuration" }, 500);
     }
 
     const token = readBearerToken(req);
-    if (!token) return json({ ok: false, error: "Missing bearer token" }, 401);
+    if (!token) return json({ ok: false, function: "approve-job-for-outreach", version: VERSION, error: "Missing bearer token" }, 401);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
@@ -152,15 +153,15 @@ serve(async (req) => {
 
     const { data: authData, error: authError } = await supabase.auth.getUser(token);
     if (authError || !authData.user) {
-      return json({ ok: false, error: "Invalid login session" }, 401);
+      return json({ ok: false, function: "approve-job-for-outreach", version: VERSION, error: "Invalid login session" }, 401);
     }
 
     const input = await req.json().catch(() => ({}));
     const jobId = text(input.job_id);
-    if (!jobId) return json({ ok: false, error: "job_id is required" }, 400);
+    if (!jobId) return json({ ok: false, function: "approve-job-for-outreach", version: VERSION, error: "job_id is required" }, 400);
 
     const ownedJob = await fetchOwnedJob(supabase, jobId, authData.user.id);
-    if (!ownedJob) return json({ ok: false, error: "Job not found" }, 404);
+    if (!ownedJob) return json({ ok: false, function: "approve-job-for-outreach", version: VERSION, error: "Job not found" }, 404);
 
     const reviewedAt = new Date().toISOString();
     const { error: approvalError } = await supabase
@@ -189,6 +190,8 @@ serve(async (req) => {
       await setJobStatus(supabase, jobId, authData.user.id, "failed");
       return json({
         ok: true,
+        function: "approve-job-for-outreach",
+        version: VERSION,
         job_id: jobId,
         approval_status: "approved",
         email_status: "failed",
@@ -211,6 +214,8 @@ serve(async (req) => {
       await setJobStatus(supabase, jobId, authData.user.id, "needs_email");
       return json({
         ok: true,
+        function: "approve-job-for-outreach",
+        version: VERSION,
         job_id: jobId,
         approval_status: "approved",
         email_status: "not_found",
@@ -223,6 +228,8 @@ serve(async (req) => {
       await setJobStatus(supabase, jobId, authData.user.id, "failed");
       return json({
         ok: true,
+        function: "approve-job-for-outreach",
+        version: VERSION,
         job_id: jobId,
         approval_status: "approved",
         email_status: "failed",
@@ -242,6 +249,8 @@ serve(async (req) => {
       await setJobStatus(supabase, jobId, authData.user.id, "failed");
       return json({
         ok: true,
+        function: "approve-job-for-outreach",
+        version: VERSION,
         job_id: jobId,
         approval_status: "approved",
         email_status: "found",
@@ -256,6 +265,8 @@ serve(async (req) => {
       await setJobStatus(supabase, jobId, authData.user.id, "failed");
       return json({
         ok: true,
+        function: "approve-job-for-outreach",
+        version: VERSION,
         job_id: jobId,
         approval_status: "approved",
         email_status: "found",
@@ -278,9 +289,11 @@ serve(async (req) => {
 
     return json({
       ok: true,
+      function: "approve-job-for-outreach",
+      version: VERSION,
       job_id: jobId,
       approval_status: "approved",
-      email_status,
+      email_status: emailStatus,
       draft_status: draftStatus,
       queue_id: queueId,
     });
@@ -288,6 +301,7 @@ serve(async (req) => {
     return json({
       ok: false,
       function: "approve-job-for-outreach",
+      version: VERSION,
       error: error instanceof Error ? error.message : String(error),
     }, 500);
   }
