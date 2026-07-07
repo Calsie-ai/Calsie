@@ -344,25 +344,28 @@ export default function CampaignTemplatesPage() {
         {message && <p className="templates-status success">{message}</p>}
         {errorMessage && <p className="templates-status error">{errorMessage}</p>}
 
-        <div className="templates-gallery" aria-label="Campaign templates">
-          {templates.map((template) => (
-            <button
-              className={`template-card ${selectedTemplateId === template.id ? "selected" : ""}`}
-              type="button"
-              key={template.id}
-              onClick={() => selectTemplate(template)}
-            >
-              <span>{template.accent}</span>
-              <strong>{template.title}</strong>
-              <p>{template.description}</p>
-            </button>
-          ))}
+        <div className="templates-carousel-wrap">
+          <p className="templates-carousel-hint">Swipe template</p>
+          <div className="templates-gallery" aria-label="Campaign templates">
+            {templates.map((template) => (
+              <button
+                className={`template-card ${selectedTemplateId === template.id ? "selected" : ""}`}
+                type="button"
+                key={template.id}
+                onClick={() => selectTemplate(template)}
+              >
+                <span>{template.accent}</span>
+                <strong>{template.title}</strong>
+                <p>{template.description}</p>
+              </button>
+            ))}
+          </div>
         </div>
 
         {!selectedTemplate ? (
           <div className="template-empty-card">
             <strong>Pick a template</strong>
-            <p>The guided fields will open below the gallery.</p>
+            <p>The guided fields will open below the carousel.</p>
           </div>
         ) : (
           <form className="template-form-card" onSubmit={saveTemplate}>
@@ -618,7 +621,7 @@ export default function CampaignTemplatesPage() {
         }
 
         .templates-stack {
-          width: min(760px, 100%);
+          width: min(980px, 100%);
           margin: 0 auto;
           display: grid;
           justify-items: center;
@@ -648,23 +651,52 @@ export default function CampaignTemplatesPage() {
         .templates-status.success { color: #065f46; border-color: rgba(16,185,129,.22); }
         .templates-status.error { color: #991b1b; border-color: rgba(248,113,113,.35); }
 
-        .templates-gallery {
+        .templates-carousel-wrap {
           width: 100%;
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
+          gap: 10px;
         }
 
-        .template-card {
+        .templates-carousel-hint {
+          margin: 0;
+          color: #ff4f9d;
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: .16em;
+          text-transform: uppercase;
+          text-align: center;
+        }
+
+        .templates-gallery {
           width: 100%;
-          min-height: 176px;
+          display: flex;
+          gap: 14px;
+          overflow-x: auto;
+          overflow-y: hidden;
+          scroll-snap-type: x mandatory;
+          scroll-padding: max(14px, calc((100vw - min(360px, calc(100vw - 42px))) / 2));
+          padding: 2px max(14px, calc((100vw - min(360px, calc(100vw - 42px))) / 2)) 18px;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+        }
+
+        .templates-gallery::-webkit-scrollbar { height: 8px; }
+        .templates-gallery::-webkit-scrollbar-track { background: rgba(255, 92, 168, .12); border-radius: 999px; }
+        .templates-gallery::-webkit-scrollbar-thumb { background: rgba(255, 92, 168, .72); border-radius: 999px; }
+
+        .template-card {
+          flex: 0 0 min(360px, calc(100vw - 42px));
+          width: min(360px, calc(100vw - 42px));
+          min-height: 224px;
           display: grid;
           justify-items: start;
           align-content: space-between;
           gap: 12px;
-          padding: clamp(18px, 4vw, 24px);
+          padding: clamp(22px, 5vw, 30px);
           border-radius: 24px;
           text-align: left;
+          scroll-snap-align: center;
+          scroll-snap-stop: always;
         }
 
         .template-card.selected {
@@ -685,11 +717,11 @@ export default function CampaignTemplatesPage() {
 
         .template-card strong {
           color: #ff4f9d;
-          font-size: clamp(21px, 4.8vw, 31px);
-          line-height: 1.08;
+          font-size: clamp(26px, 7vw, 42px);
+          line-height: 1.04;
           font-weight: 950;
           text-transform: uppercase;
-          letter-spacing: .03em;
+          letter-spacing: .04em;
         }
 
         .template-card p,
@@ -726,29 +758,9 @@ export default function CampaignTemplatesPage() {
           border-radius: 26px;
         }
 
-        .form-heading {
-          display: grid;
-          gap: 6px;
-          text-align: center;
-        }
-
-        .form-heading p {
-          margin: 0;
-          color: #b91c65;
-          font-size: 12px;
-          font-weight: 950;
-          letter-spacing: .1em;
-          text-transform: uppercase;
-        }
-
-        .form-heading h2 {
-          margin: 0;
-          color: #16131a;
-          font-size: clamp(24px, 7vw, 34px);
-          line-height: 1.05;
-          font-weight: 950;
-          text-transform: uppercase;
-        }
+        .form-heading { display: grid; gap: 6px; text-align: center; }
+        .form-heading p { margin: 0; color: #b91c65; font-size: 12px; font-weight: 950; letter-spacing: .1em; text-transform: uppercase; }
+        .form-heading h2 { margin: 0; color: #16131a; font-size: clamp(24px, 7vw, 34px); line-height: 1.05; font-weight: 950; text-transform: uppercase; }
 
         .template-form-card fieldset {
           min-width: 0;
@@ -761,25 +773,8 @@ export default function CampaignTemplatesPage() {
           background: rgba(255,255,255,.44);
         }
 
-        .template-form-card legend {
-          padding: 0 8px;
-          color: #ff4f9d;
-          font-size: 13px;
-          font-weight: 950;
-          letter-spacing: .1em;
-          text-transform: uppercase;
-        }
-
-        .template-form-card label {
-          min-width: 0;
-          display: grid;
-          gap: 7px;
-          color: #16131a;
-          font-size: 13px;
-          font-weight: 950;
-          letter-spacing: .04em;
-          text-transform: uppercase;
-        }
+        .template-form-card legend { padding: 0 8px; color: #ff4f9d; font-size: 13px; font-weight: 950; letter-spacing: .1em; text-transform: uppercase; }
+        .template-form-card label { min-width: 0; display: grid; gap: 7px; color: #16131a; font-size: 13px; font-weight: 950; letter-spacing: .04em; text-transform: uppercase; }
 
         .template-form-card input,
         .template-form-card textarea,
@@ -800,21 +795,12 @@ export default function CampaignTemplatesPage() {
           box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
         }
 
-        .template-form-card textarea {
-          resize: vertical;
-        }
-
+        .template-form-card textarea { resize: vertical; }
         .template-form-card input:focus,
         .template-form-card textarea:focus,
-        .template-form-card select:focus {
-          border-color: rgba(255, 92, 168, .92);
-          box-shadow: 0 0 0 4px rgba(255, 92, 168, .14);
-        }
+        .template-form-card select:focus { border-color: rgba(255, 92, 168, .92); box-shadow: 0 0 0 4px rgba(255, 92, 168, .14); }
 
-        .template-form-actions {
-          display: grid;
-          gap: 12px;
-        }
+        .template-form-actions { display: grid; gap: 12px; }
 
         .template-primary,
         .template-secondary {
@@ -833,30 +819,14 @@ export default function CampaignTemplatesPage() {
           box-shadow: 0 12px 28px rgba(0,0,0,.08);
         }
 
-        .template-primary {
-          background: #ff5ca8;
-          border-color: #ff5ca8;
-          color: #16131a;
-        }
-
-        .template-secondary {
-          background: rgba(255,255,255,.58);
-          color: #16131a;
-        }
-
-        .template-primary:disabled {
-          background: rgba(22, 19, 26, .34);
-          border-color: transparent;
-          color: rgba(255,255,255,.76);
-        }
+        .template-primary { background: #ff5ca8; border-color: #ff5ca8; color: #16131a; }
+        .template-secondary { background: rgba(255,255,255,.58); color: #16131a; }
+        .template-primary:disabled { background: rgba(22, 19, 26, .34); border-color: transparent; color: rgba(255,255,255,.76); }
 
         @media (max-width: 640px) {
           .templates-shell { padding-top: 72px; }
-          .templates-gallery {
-            width: min(100%, 420px);
-            grid-template-columns: 1fr;
-          }
-          .template-card { min-height: 150px; border-radius: 22px; }
+          .templates-stack { width: 100%; }
+          .template-card { min-height: 214px; border-radius: 22px; }
           .template-form-card,
           .template-empty-card { border-radius: 22px; }
         }
