@@ -81,6 +81,22 @@ async function setJobStatus(supabase: ReturnType<typeof createClient>, jobId: st
   if (error) throw new Error(error.message);
 }
 
+async function normalizeExistingEmail(supabase: ReturnType<typeof createClient>, jobId: string, userId: string) {
+  const { error } = await supabase
+    .from("jobs")
+    .update({
+      apply_method: "email",
+      email_extraction_status: "found",
+      email_extraction_source: "existing_extracted_email",
+      email_extraction_error: null,
+      email_extraction_attempted_at: new Date().toISOString(),
+    })
+    .eq("id", jobId)
+    .eq("user_id", userId);
+
+  if (error) throw new Error(error.message);
+}
+
 async function fetchQueueRow(supabase: ReturnType<typeof createClient>, jobId: string) {
   const { data, error } = await supabase
     .from("outreach_queue")
@@ -112,9 +128,10 @@ async function upsertQueueState(supabase: ReturnType<typeof createClient>, queue
 
 function emailStatusFor(job: Row): PipelineEmailStatus {
   const extractionStatus = text(job.email_extraction_status)?.toLowerCase();
-  if (text(job.extracted_email) && extractionStatus === "found") return "found";
+  if (text(job.extracted_email)) return "found";
   if (["not_found", "email_not_found", "needs_email"].includes(extractionStatus || "")) return "not_found";
-  return "failed";
+  if (extractionStatus === "failed") return "failed";
+  return "not_found";
 }
 
 serve(async (req) => {
@@ -185,6 +202,10 @@ serve(async (req) => {
     if (!enrichedJob) throw new Error("Approved job disappeared after enrichment");
 
     emailStatus = emailStatusFor(enrichedJob);
+
+    if (emailStatus === "found") {
+      await normalizeExistingEmail(supabase, jobId, authData.user.id);
+    }
 
     if (emailStatus === "not_found") {
       await setJobStatus(supabase, jobId, authData.user.id, "needs_email");
