@@ -39,6 +39,8 @@ export default function DashboardPage() {
   const [email, setEmail] = useState('');
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [resumeReady, setResumeReady] = useState(false);
+  const [resumeProfileId, setResumeProfileId] = useState('');
+  const [resumeFileName, setResumeFileName] = useState('');
   const [gmailReady, setGmailReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -50,7 +52,7 @@ export default function DashboardPage() {
   const canStartCampaign = Boolean(latestCampaign && resumeReady && gmailReady && !campaignRunning && !busy);
   const gmailConnectorStatus: ConnectorStatus = busy && !gmailReady ? 'connecting' : gmailReady ? 'connected' : 'not-connected';
 
-  useEffect(() => { loadDashboard(); }, []);
+  useEffect(() => { void loadDashboard(); }, []);
 
   async function loadDashboard() {
     setLoading(true);
@@ -78,15 +80,19 @@ export default function DashboardPage() {
       if (campaignError) throw campaignError;
       setCampaigns((campaignData || []) as Campaign[]);
 
-      const { data: resumeData } = await supabase
+      const { data: resumeData, error: resumeError } = await supabase
         .from('resume_profiles')
-        .select('id,full_name,skills,work_experience')
+        .select('id,resume_file_name')
         .eq('profile_id', userData.user.id)
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
+      if (resumeError) throw resumeError;
+
       setResumeReady(Boolean(resumeData?.id));
+      setResumeProfileId(resumeData?.id || '');
+      setResumeFileName(resumeData?.resume_file_name || '');
 
       const { data: authData } = await supabase
         .from('user_email_authorizations')
@@ -132,6 +138,44 @@ export default function DashboardPage() {
       window.location.href = data.authorization_url;
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Could not connect Gmail.');
+      setBusy(false);
+    }
+  }
+
+  async function deleteResume() {
+    if (!resumeReady || busy) return;
+
+    const confirmed = window.confirm('Delete this resume? Applix will not be able to attach your resume until you upload a new one.');
+    if (!confirmed) return;
+
+    setBusy(true);
+    setErrorMessage('');
+    setMessage('');
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !userData.user) {
+        router.replace('/');
+        return;
+      }
+
+      let deleteQuery = supabase.from('resume_profiles').delete().eq('profile_id', userData.user.id);
+      if (resumeProfileId) {
+        deleteQuery = deleteQuery.eq('id', resumeProfileId);
+      }
+
+      const { error } = await deleteQuery;
+      if (error) throw error;
+
+      setResumeReady(false);
+      setResumeProfileId('');
+      setResumeFileName('');
+      setMessage('Resume deleted. Upload a new resume to continue.');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Could not delete resume.');
+    } finally {
       setBusy(false);
     }
   }
@@ -250,15 +294,25 @@ export default function DashboardPage() {
             <p className='resume-warning'>Your Resume Will Be Attached to the Email, Please Use The Current And Best Resume</p>
             <Link className={`home-check resume-action ${resumeReady ? 'ready' : ''}`} href='/resume-canvas'>
               <img
-                className="dashboard-status-icon resume-status-icon"
-                src={resumeReady ? "/resume-status/resume-has-been-updated.gif" : "/resume-status/upload-resume.gif"}
-                alt={resumeReady ? "Resume has been uploaded" : "Upload resume"}
+                className='dashboard-status-icon resume-status-icon'
+                src={resumeReady ? '/resume-status/resume-has-been-updated.gif' : '/resume-status/upload-resume.gif'}
+                alt={resumeReady ? 'Resume has been uploaded' : 'Upload resume'}
               />
               <div>
                 <strong>Upload / Change Resume</strong>
-                <p>{resumeReady ? 'Resume data is saved.' : 'Drag and drop your DOC or DOCX resume.'}</p>
+                <p>{resumeReady ? 'Resume data is saved.' : 'Tap to upload your DOC or DOCX resume.'}</p>
               </div>
             </Link>
+            <div className='resume-file-row'>
+              <p className='resume-file-name'>
+                {resumeReady ? `Uploaded resume: ${resumeFileName || 'Resume saved'}` : 'No resume uploaded yet.'}
+              </p>
+              {resumeReady && (
+                <button className='resume-delete-button' type='button' onClick={deleteResume} disabled={busy}>
+                  Delete
+                </button>
+              )}
+            </div>
           </div>
 
           <div className='home-check-grid dashboard-single-row'>
@@ -270,7 +324,7 @@ export default function DashboardPage() {
               aria-label={gmailReady ? 'Applix connected' : busy ? 'Connecting Applix' : 'Connect Applix'}
             >
               <img
-                className="dashboard-status-icon connector-status-icon"
+                className='dashboard-status-icon connector-status-icon'
                 src={`/connector-status/${gmailConnectorStatus}.svg`}
                 alt={`Applix connector ${gmailConnectorStatus}`}
               />
@@ -332,32 +386,35 @@ export default function DashboardPage() {
         .dashboard-hero h1 { font-size: clamp(38px, 10vw, 72px) !important; line-height: .95 !important; color: #16131a !important; margin-top: 18px !important; }
         .dashboard-hero .applix-setup-kicker { color: #16131a !important; letter-spacing: .18em !important; }
         .dashboard-subtitle { display: block !important; margin-top: 14px !important; font-size: clamp(15px, 3.7vw, 20px) !important; line-height: 1.42 !important; color: rgba(22,19,26,.82) !important; }
-        .dashboard-stack { width: min(760px, 92vw) !important; margin: 0 auto !important; display: grid !important; justify-items: center !important; gap: clamp(16px, 3.5vw, 26px) !important; }
+        .dashboard-stack { width: min(760px, 92vw) !important; margin: 0 auto !important; display: grid !important; justify-items: center !important; gap: clamp(4px, 1vw, 10px) !important; }
         .dashboard-card-clean, .dashboard-single-row, .dashboard-actions { width: 100% !important; }
-        .dashboard-card-clean, .resume-action, .dashboard-app-connect { background: rgba(255,255,255,.68) !important; border: 1px solid rgba(255,92,168,.28) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 18px 44px rgba(255,92,168,.1), 0 14px 34px rgba(0,0,0,.06) !important; backdrop-filter: blur(16px) saturate(1.08) !important; color: #16131a !important; }
-        .dashboard-card-clean { text-align: center !important; padding: clamp(20px, 4vw, 30px) !important; display: grid !important; justify-items: center !important; gap: 12px !important; border-radius: 26px !important; }
+        .dashboard-card-clean, .resume-action, .dashboard-app-connect { background: transparent !important; border: 0 !important; box-shadow: none !important; backdrop-filter: none !important; color: #16131a !important; }
+        .dashboard-card-clean { text-align: center !important; padding: clamp(22px, 4vw, 34px) 0 !important; display: grid !important; justify-items: center !important; gap: 12px !important; border-radius: 0 !important; position: relative !important; }
         .dashboard-card-clean strong { font-size: clamp(21px, 4.5vw, 32px) !important; line-height: 1.15 !important; margin-bottom: 0 !important; color: #16131a !important; }
         .dashboard-card-clean p, .home-check p { font-size: clamp(14px, 3.2vw, 17px) !important; line-height: 1.45 !important; color: rgba(22,19,26,.78) !important; }
         .home-check strong { color: #16131a !important; }
         .applix-intro-card p { max-width: 600px !important; text-align: center !important; }
-        .resume-warning { max-width: 650px !important; color: #16131a !important; font-weight: 950 !important; text-align: center !important; }
-        .resume-action, .dashboard-app-connect { width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; padding: clamp(18px, 3.8vw, 26px) !important; min-height: clamp(168px, 30vw, 230px) !important; gap: 6px !important; text-align: center !important; border-radius: 22px !important; position: relative !important; }
-        .resume-action::before, .dashboard-app-connect::before { width: clamp(58px, 15vw, 76px); height: clamp(58px, 15vw, 76px); display: grid; place-items: center; border-radius: 999px; background: rgba(255,255,255,.82); border: 2px solid #082235; color: #082235; box-shadow: 0 8px 18px rgba(8,34,53,.16), inset 0 0 0 4px rgba(255,255,255,.7); font-size: clamp(30px, 8vw, 42px); line-height: 1; font-weight: 950; }
-        .resume-action::before { content: '⇩'; }
-        .dashboard-app-connect::before { content: '' !important; width: clamp(56px, 16vw, 78px); height: clamp(40px, 12vw, 58px); border: 0 !important; border-radius: 0 !important; background: url('/connector-status/not-connected.svg') center / contain no-repeat !important; box-shadow: none !important; }
-        .dashboard-app-connect.status-connecting::before { background-image: url('/connector-status/connecting.svg') !important; animation: connectorPulse 1s ease-in-out infinite; }
-        .dashboard-app-connect.status-connected::before, .dashboard-app-connect.ready::before { content: '' !important; background: url('/connector-status/connected.svg') center / contain no-repeat !important; border: 0 !important; box-shadow: none !important; }
-        .resume-action.ready::before { background: #082235; color: white; border-color: #082235; box-shadow: 0 10px 22px rgba(8,34,53,.24), 0 0 24px rgba(255,92,168,.28); }
-        .resume-action.ready, .dashboard-app-connect.ready { border: 1.8px solid rgba(255,92,168,.96) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 0 0 1px rgba(255,92,168,.18), 0 0 26px rgba(255,92,168,.2), 0 18px 44px rgba(0,0,0,.07) !important; }
-        .resume-action::before, .resume-action.ready::before, .dashboard-app-connect::before, .dashboard-app-connect.status-connecting::before, .dashboard-app-connect.status-connected::before, .dashboard-app-connect.ready::before { content: none !important; display: none !important; width: 0 !important; height: 0 !important; min-width: 0 !important; min-height: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; animation: none !important; }
+        .applix-intro-card::after, .resume-card-wrap::after, .dashboard-single-row::after { content: '' !important; display: block !important; width: min(78%, 420px) !important; height: 4px !important; border-radius: 999px !important; background: #ff2f93 !important; margin: clamp(22px, 4vw, 32px) auto 0 !important; }
+        .resume-card-wrap, .dashboard-single-row, .campaign-summary-card { position: relative !important; padding: clamp(22px, 4vw, 34px) 0 !important; }
+        .resume-warning { max-width: 650px !important; color: #16131a !important; font-weight: 950 !important; text-align: center !important; margin-bottom: 8px !important; }
+        .resume-action, .dashboard-app-connect { width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; padding: clamp(16px, 3vw, 24px) 0 !important; min-height: auto !important; gap: 8px !important; text-align: center !important; border-radius: 22px !important; position: relative !important; appearance: none !important; cursor: pointer !important; text-decoration: none !important; }
+        .resume-action.ready, .dashboard-app-connect.ready { border: 0 !important; box-shadow: none !important; }
+        .resume-action:hover, .dashboard-app-connect:hover { background: rgba(255,92,168,.05) !important; }
+        .dashboard-app-connect[aria-disabled='true'] { cursor: default !important; }
+        .resume-action::before, .dashboard-app-connect::before, .resume-action.ready::before, .dashboard-app-connect.status-connecting::before, .dashboard-app-connect.status-connected::before, .dashboard-app-connect.ready::before { content: none !important; display: none !important; width: 0 !important; height: 0 !important; min-width: 0 !important; min-height: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; animation: none !important; }
         .dashboard-status-icon { display: block !important; object-fit: contain !important; object-position: center !important; margin: 0 auto 16px !important; flex-shrink: 0 !important; }
-        .resume-status-icon { width: clamp(170px, 32vw, 230px) !important; max-width: 100% !important; height: auto !important; }
+        .resume-status-icon { width: clamp(180px, 38vw, 260px) !important; max-width: 100% !important; height: auto !important; transform: scale(1.18) !important; transform-origin: center !important; }
         .connector-status-icon { width: clamp(150px, 30vw, 210px) !important; max-width: 100% !important; height: auto !important; transform: scale(1.25) !important; transform-origin: center !important; }
         .resume-action div, .dashboard-app-connect div { display: grid !important; justify-items: center !important; text-align: center !important; gap: 4px !important; }
         .resume-action > span, .dashboard-app-connect > span { display: none !important; }
         .resume-action strong, .dashboard-app-connect strong { font-size: clamp(18px, 4.2vw, 26px) !important; line-height: 1.2 !important; text-align: center !important; }
-        .dashboard-single-row { grid-template-columns: 1fr !important; }
-        .campaign-summary-card { gap: 12px !important; padding-top: clamp(26px, 4.5vw, 38px) !important; padding-bottom: clamp(26px, 4.5vw, 38px) !important; }
+        .resume-file-row { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 10px !important; flex-wrap: wrap !important; margin-top: 8px !important; }
+        .resume-file-name { margin: 0 !important; font-size: clamp(13px, 3vw, 15px) !important; color: rgba(22,19,26,.72) !important; font-weight: 750 !important; }
+        .resume-delete-button { border: 1px solid rgba(248,113,113,.55) !important; background: rgba(254,226,226,.8) !important; color: #991b1b !important; border-radius: 999px !important; padding: 7px 12px !important; font-size: 12px !important; font-weight: 950 !important; cursor: pointer !important; }
+        .resume-delete-button:hover { background: rgba(254,202,202,.95) !important; }
+        .resume-delete-button:disabled { opacity: .65 !important; cursor: not-allowed !important; }
+        .dashboard-single-row { grid-template-columns: 1fr !important; background: transparent !important; border: 0 !important; box-shadow: none !important; backdrop-filter: none !important; border-radius: 0 !important; }
+        .campaign-summary-card { gap: 12px !important; padding-top: clamp(26px, 4.5vw, 38px) !important; padding-bottom: clamp(16px, 4vw, 24px) !important; }
         .campaign-summary-card p { text-align: center !important; }
         .campaign-pill { display: inline-flex; align-items: center; justify-content: center; padding: 7px 14px; border-radius: 999px; background: rgba(255,92,168,.12); border: 1px solid rgba(255,92,168,.28); color: #b91c65; font-size: 12px; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
         .campaign-target { color: rgba(22,19,26,.78) !important; max-width: 560px !important; }
@@ -375,7 +432,7 @@ export default function DashboardPage() {
         .applix-setup-status.success { background: rgba(255,255,255,.62) !important; color: #065f46 !important; border: 1px solid rgba(16,185,129,.22) !important; }
         .ghost-link, .ghost-button { color: #16131a !important; border-color: rgba(22,19,26,.2) !important; background: rgba(255,255,255,.55) !important; }
         @keyframes connectorPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.04); opacity: .78; } }
-        @media (max-width: 640px) { .dashboard-cockpit-shell { padding-left: 14px !important; padding-right: 14px !important; } .dashboard-hero { padding-top: 78px !important; margin-bottom: 24px !important; } .dashboard-hero h1 { font-size: clamp(38px, 11vw, 58px) !important; } .dashboard-stack { width: min(100%, 430px) !important; } .dashboard-card-clean { border-radius: 22px !important; padding: 20px !important; } .resume-action, .dashboard-app-connect { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; border-radius: 22px !important; } .resume-status-icon { width: clamp(145px, 42vw, 185px) !important; } .connector-status-icon { width: clamp(135px, 40vw, 175px) !important; transform: scale(1.3) !important; } .dashboard-status-icon { margin-bottom: 14px !important; } .dashboard-app-connect::before { display: none !important; } .dashboard-actions .applix-setup-primary, .dashboard-actions .applix-setup-outline { min-height: 58px !important; font-size: clamp(18px, 5.4vw, 24px) !important; } }
+        @media (max-width: 640px) { .dashboard-cockpit-shell { padding-left: 14px !important; padding-right: 14px !important; } .dashboard-hero { padding-top: 78px !important; margin-bottom: 24px !important; } .dashboard-hero h1 { font-size: clamp(38px, 11vw, 58px) !important; } .dashboard-stack { width: min(100%, 430px) !important; } .dashboard-card-clean { padding: 22px 0 !important; } .resume-action, .dashboard-app-connect { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; border-radius: 22px !important; } .resume-status-icon { width: clamp(150px, 48vw, 220px) !important; transform: scale(1.22) !important; } .connector-status-icon { width: clamp(135px, 40vw, 175px) !important; transform: scale(1.3) !important; } .dashboard-status-icon { margin-bottom: 14px !important; } .dashboard-actions .applix-setup-primary, .dashboard-actions .applix-setup-outline { min-height: 58px !important; font-size: clamp(18px, 5.4vw, 24px) !important; } }
       `}</style>
     </>
   );
