@@ -1,0 +1,36 @@
+body .dashboard-cockpit-shell .resume-action::before {
+  content: '' !important;
+  width: clamp(86px, 22vw, 122px) !important;
+  height: clamp(70px, 18vw, 100px) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url('/resume-status/upload-resume.svg') center / contain no-repeat !important;
+  box-shadow: none !important;
+  color: transparent !important;
+}
+
+body .dashboard-cockpit-shell .resume-action.ready::before {
+  content: '' !important;
+  background: url('/resume-status/resume-has-been-updated.svg') center / contain no-repeat !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: transparent !important;
+}
+
+body .dashboard-cockpit-shell .dashboard-actions .applix-setup-outline[href='/resume-canvas']::before {
+  content: '' !important;
+  width: 42px !important;
+  height: 36px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: url('/resume-status/upload-resume.svg') center / contain no-repeat !important;
+  box-shadow: none !important;
+  color: transparent !important;
+}
+
+@media (max-width: 640px) {
+  body .dashboard-cockpit-shell .resume-action::before {
+    width: 98px !important;
+    height: 82px !important;
+  }
+}
