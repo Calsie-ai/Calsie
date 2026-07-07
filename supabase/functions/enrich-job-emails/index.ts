@@ -236,6 +236,16 @@ function bestEmail(candidates: string[], website: string | null) {
     .sort((a, b) => b.score - a.score)[0] || null;
 }
 
+function isApprovedJob(job: Row) {
+  return text(job.status)?.toLowerCase() === "approved" || text(job.user_decision)?.toLowerCase() === "approved";
+}
+
+function canRetry(job: Row, maxAttempts: number) {
+  const status = text(job.email_extraction_status)?.toLowerCase();
+  if (status && !["not_started", "failed", "not_found"].includes(status)) return false;
+  return Number(job.email_extraction_attempt_count || 0) < maxAttempts;
+}
+
 async function fetchWithTimeout(url: string, timeoutMs = 8000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -518,8 +528,11 @@ serve(async (req) => {
     const limit = Math.max(1, Math.min(25, Number(input.limit || 10)));
     const campaignId = text(input.campaign_id);
     const userId = text(input.user_id);
+    const jobId = text(input.job_id);
     const forceRetry = input.force_retry === true;
     const maxAttempts = Math.max(1, Math.min(5, Number(input.max_attempts || 3)));
+    const onlyApproved = input.only_approved === false ? false : true;
+    const queryLimit = jobId ? 1 : Math.max(limit * 4, 50);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
@@ -529,16 +542,19 @@ serve(async (req) => {
       .is("extracted_email", null)
       .not("company", "is", null)
       .order("created_at", { ascending: true })
-      .limit(limit);
+      .limit(queryLimit);
 
-    if (!forceRetry) {
-      query = query.or("email_extraction_status.is.null,email_extraction_status.in.(not_started,failed,not_found)").lt("email_extraction_attempt_count", maxAttempts);
-    }
     if (campaignId) query = query.eq("campaign_id", campaignId);
     if (userId) query = query.eq("user_id", userId);
+    if (jobId) query = query.eq("id", jobId);
 
     const { data: jobs, error } = await query;
     if (error) throw new Error(error.message);
+
+    const eligibleJobs = (jobs || [])
+      .filter((job) => (onlyApproved ? isApprovedJob(job) : true))
+      .filter((job) => (forceRetry ? true : canRetry(job, maxAttempts)))
+      .slice(0, jobId ? 1 : limit);
 
     let reusedCount = 0;
     let apiCalledCount = 0;
@@ -547,7 +563,7 @@ serve(async (req) => {
     let notFoundCount = 0;
     let skippedCount = 0;
 
-    for (const job of jobs || []) {
+    for (const job of eligibleJobs) {
       const attemptCount = Number(job.email_extraction_attempt_count || 0);
       if (cleanEmail(job.extracted_email) || !text(job.company)) {
         skippedCount += 1;
@@ -583,7 +599,9 @@ serve(async (req) => {
       ok: true,
       function: "enrich-job-emails",
       limit,
-      selected_count: jobs?.length || 0,
+      requested_job_id: jobId,
+      only_approved: onlyApproved,
+      selected_count: eligibleJobs.length,
       reused_count: reusedCount,
       website_scrape_called_count: websiteScrapeCalledCount,
       api_called_count: apiCalledCount,
