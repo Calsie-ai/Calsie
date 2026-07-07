@@ -45,6 +45,10 @@ function cleanEmail(value: unknown): string | null {
   return blocked.some((part) => email.includes(part)) ? null : email;
 }
 
+function isApprovedJob(job: Row) {
+  return text(job.status)?.toLowerCase() === "approved" || text(job.user_decision)?.toLowerCase() === "approved";
+}
+
 function draftSubject(job: Row): string {
   return `Application for ${text(job.title) || "your open role"}`;
 }
@@ -138,9 +142,13 @@ Deno.serve(async (req) => {
     const intervalHours = Number.isFinite(requestedIntervalHours) && requestedIntervalHours > 0
       ? requestedIntervalHours
       : 1;
-    const baseTime = new Date(Date.now() + startDelayHours * HOUR_MS);
+    const jobId = text(input.job_id);
+    const onlyApproved = input.only_approved === false ? false : true;
+    const sendImmediately = input.send_immediately === true || Boolean(jobId);
+    const baseTime = sendImmediately ? new Date() : new Date(Date.now() + startDelayHours * HOUR_MS);
     const campaignId = text(input.campaign_id);
     const userId = text(input.user_id);
+    const queryLimit = jobId ? 1 : Math.max(limit * 4, 50);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
@@ -148,22 +156,26 @@ Deno.serve(async (req) => {
 
     let query = supabase
       .from("jobs")
-      .select("id,campaign_id,email_contact_id,extracted_email,company,title,user_id,apply_method,email_extraction_status")
+      .select("id,campaign_id,email_contact_id,extracted_email,company,title,user_id,apply_method,email_extraction_status,status,user_decision")
       .not("extracted_email", "is", null)
       .eq("apply_method", "email")
       .eq("email_extraction_status", "found")
       .not("company", "is", null)
       .not("title", "is", null)
       .order("created_at", { ascending: true })
-      .limit(limit);
+      .limit(queryLimit);
 
     if (campaignId) query = query.eq("campaign_id", campaignId);
     if (userId) query = query.eq("user_id", userId);
+    if (jobId) query = query.eq("id", jobId);
 
     const { data: jobs, error } = await query;
     if (error) throw new Error(error.message);
 
-    const candidates = jobs || [];
+    const candidates = (jobs || [])
+      .filter((job) => (onlyApproved ? isApprovedJob(job) : true))
+      .slice(0, jobId ? 1 : limit);
+
     const duplicateJobIds = await existingDraftJobIds(
       supabase,
       candidates.map((job: Row) => job.id).filter(Boolean),
@@ -211,7 +223,9 @@ Deno.serve(async (req) => {
       }
 
       const scheduleOffset = scheduledOffsetsByCampaign.get(campaignIdForDraft) || 0;
-      const scheduledSendAt = scheduledSendAtIso(baseTime, scheduleOffset, intervalHours);
+      const scheduledSendAt = sendImmediately
+        ? new Date().toISOString()
+        : scheduledSendAtIso(baseTime, scheduleOffset, intervalHours);
 
       const insert = await supabase
         .from("outreach_queue")
@@ -223,9 +237,9 @@ Deno.serve(async (req) => {
           recipient_company: company,
           subject: draftSubject(job),
           email_body: draftBody(job),
-          status: "draft",
-          review_status: "ready_for_review",
-          send_window: "hourly_scheduled",
+          status: sendImmediately ? "queued" : "draft",
+          review_status: sendImmediately ? "approved" : "ready_for_review",
+          send_window: sendImmediately ? "automatic" : "hourly_scheduled",
           scheduled_send_at: scheduledSendAt,
           user_identifier: job.user_id,
         });
@@ -249,6 +263,9 @@ Deno.serve(async (req) => {
       function: "generate-job-outreach-drafts",
       version: VERSION,
       limit,
+      requested_job_id: jobId,
+      only_approved: onlyApproved,
+      send_immediately: sendImmediately,
       start_delay_hours: startDelayHours,
       interval_hours: intervalHours,
       eligible_count: eligibleCount,
