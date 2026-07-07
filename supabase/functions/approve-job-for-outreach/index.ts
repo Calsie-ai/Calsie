@@ -270,6 +270,12 @@ serve(async (req) => {
     queueId = queueRow.id;
     draftStatus = "created";
 
+    try {
+      await invokeFunction("send-queued-outreach", { queue_id: queueId });
+    } catch {
+      // Keep approval and queue creation intact even when the sender needs to retry later.
+    }
+
     return json({
       ok: true,
       job_id: jobId,
