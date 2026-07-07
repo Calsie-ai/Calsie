@@ -136,6 +136,21 @@ export default function DashboardPage() {
     }
   }
 
+  function showDisconnectWarnings() {
+    window.alert('Applix is already connected.');
+    window.alert('To disconnect Applix, remove its access from your Google account permissions.');
+  }
+
+  function handleConnectorCardClick() {
+    if (gmailReady) {
+      showDisconnectWarnings();
+      return;
+    }
+
+    if (busy) return;
+    void connectGmail();
+  }
+
   async function startCampaign() {
     if (!latestCampaign) {
       router.push('/campaign/new');
@@ -247,17 +262,27 @@ export default function DashboardPage() {
           </div>
 
           <div className='home-check-grid dashboard-single-row'>
-            <div className={`home-check dashboard-app-connect ${gmailReady ? 'ready' : ''} status-${gmailConnectorStatus}`}>
+            <button
+              className={`home-check dashboard-app-connect ${gmailReady ? 'ready' : ''} status-${gmailConnectorStatus}`}
+              type='button'
+              onClick={handleConnectorCardClick}
+              aria-disabled={busy && !gmailReady}
+              aria-label={gmailReady ? 'Applix connected' : busy ? 'Connecting Applix' : 'Connect Applix'}
+            >
               <img
                 className="dashboard-status-icon connector-status-icon"
                 src={`/connector-status/${gmailConnectorStatus}.svg`}
                 alt={`Applix connector ${gmailConnectorStatus}`}
               />
               <div>
-                <strong>Connect Applix to my app</strong>
-                <p>{gmailReady ? 'Applix is connected.' : busy ? 'Connecting Applix...' : 'Connect your app to prepare outreach.'}</p>
+                <strong>
+                  {gmailReady ? 'Applix connected' : busy ? 'Connecting Applix...' : 'Applix disconnected'}
+                </strong>
+                <p>
+                  {gmailReady ? 'Applix is connected.' : busy ? 'Opening secure connection...' : 'Tap to connect Applix to my app.'}
+                </p>
               </div>
-            </div>
+            </button>
           </div>
 
           <div className='home-campaign-card dashboard-card-clean campaign-summary-card'>
