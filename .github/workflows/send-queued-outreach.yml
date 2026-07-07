@@ -15,13 +15,22 @@ jobs:
       - name: Call Supabase queued outreach sender
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
+
+          if [ -z "${SUPABASE_URL:-}" ]; then
+            echo "Missing SUPABASE_URL secret"
+            exit 1
+          fi
+
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "Missing CRON_SECRET secret"
+            exit 1
+          fi
 
           curl --fail-with-body --show-error --silent \
             --request POST "${SUPABASE_URL%/}/functions/v1/send-queued-outreach" \
             --header "content-type: application/json" \
-            --header "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-            --header "authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            --header "x-cron-secret: ${CRON_SECRET}" \
             --data '{"source":"github-actions-scheduler"}'
