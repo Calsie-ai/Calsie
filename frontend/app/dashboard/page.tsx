@@ -16,6 +16,8 @@ type Campaign = {
   created_at: string;
 };
 
+type ConnectorStatus = 'not-connected' | 'connecting' | 'connected';
+
 function roleFor(campaign: Campaign) {
   return campaign.search?.target_role || campaign.target_business_type || 'Target not set';
 }
@@ -46,6 +48,7 @@ export default function DashboardPage() {
   const latestCampaign = campaigns[0] || null;
   const campaignRunning = latestCampaign?.status === 'scheduled' || latestCampaign?.status === 'active' || latestCampaign?.status === 'launched';
   const canStartCampaign = Boolean(latestCampaign && resumeReady && gmailReady && !campaignRunning && !busy);
+  const gmailConnectorStatus: ConnectorStatus = busy && !gmailReady ? 'connecting' : gmailReady ? 'connected' : 'not-connected';
 
   useEffect(() => { loadDashboard(); }, []);
 
@@ -240,11 +243,11 @@ export default function DashboardPage() {
           </div>
 
           <div className='home-check-grid dashboard-single-row'>
-            <div className={`home-check dashboard-app-connect ${gmailReady ? 'ready' : ''}`}>
+            <div className={`home-check dashboard-app-connect ${gmailReady ? 'ready' : ''} status-${gmailConnectorStatus}`}>
               {!gmailReady && <span>2</span>}
               <div>
                 <strong>Connect Applix to my app</strong>
-                <p>{gmailReady ? 'Applix is connected.' : 'Connect your app to prepare outreach.'}</p>
+                <p>{gmailReady ? 'Applix is connected.' : busy ? 'Connecting Applix...' : 'Connect your app to prepare outreach.'}</p>
               </div>
             </div>
           </div>
@@ -273,7 +276,7 @@ export default function DashboardPage() {
 
           <div className='applix-home-actions dashboard-actions'>
             {!resumeReady && <Link className='applix-setup-outline' href='/resume-canvas'>Upload Resume</Link>}
-            {!gmailReady && <button className='applix-setup-outline' type='button' onClick={connectGmail} disabled={busy || !email}>{busy ? 'Opening...' : 'Connect Applix'}</button>}
+            {!gmailReady && <button className={`applix-setup-outline connector-button status-${gmailConnectorStatus}`} type='button' onClick={connectGmail} disabled={busy || !email}>{busy ? 'Opening...' : 'Connect Applix'}</button>}
             {!latestCampaign && <Link className='applix-setup-outline recommended-template-action' href='/campaign/templates'>Browse Template</Link>}
             {!latestCampaign && <Link className='applix-setup-outline' href='/campaign/new'>Create Campaign</Link>}
             {campaignRunning ? <Link className='applix-setup-primary' href='/tracker'>Track Applix Log</Link> : <button className='applix-setup-primary' type='button' onClick={startCampaign} disabled={!canStartCampaign}>{canStartCampaign ? 'Start Campaign' : 'Complete setup first'}</button>}
@@ -308,9 +311,10 @@ export default function DashboardPage() {
         .resume-action, .dashboard-app-connect { width: 100% !important; display: grid !important; grid-template-columns: 1fr !important; place-items: center !important; justify-items: center !important; align-items: center !important; padding: clamp(18px, 3.8vw, 26px) !important; min-height: clamp(128px, 24vw, 174px) !important; gap: 10px !important; text-align: center !important; border-radius: 22px !important; position: relative !important; }
         .resume-action::before, .dashboard-app-connect::before { width: clamp(58px, 15vw, 76px); height: clamp(58px, 15vw, 76px); display: grid; place-items: center; border-radius: 999px; background: rgba(255,255,255,.82); border: 2px solid #082235; color: #082235; box-shadow: 0 8px 18px rgba(8,34,53,.16), inset 0 0 0 4px rgba(255,255,255,.7); font-size: clamp(30px, 8vw, 42px); line-height: 1; font-weight: 950; }
         .resume-action::before { content: '⇩'; }
-        .dashboard-app-connect::before { content: '⇆'; width: clamp(74px, 20vw, 104px); border-radius: 28px; }
-        .resume-action.ready::before, .dashboard-app-connect.ready::before { background: #082235; color: white; border-color: #082235; box-shadow: 0 10px 22px rgba(8,34,53,.24), 0 0 24px rgba(255,92,168,.28); }
-        .dashboard-app-connect.ready::before { content: '⇄'; }
+        .dashboard-app-connect::before { content: '' !important; width: clamp(86px, 22vw, 116px); height: clamp(62px, 17vw, 88px); border: 0 !important; border-radius: 0 !important; background: url('/connector-status/not-connected.svg') center / contain no-repeat !important; box-shadow: none !important; }
+        .dashboard-app-connect.status-connecting::before { background-image: url('/connector-status/connecting.svg') !important; animation: connectorPulse 1s ease-in-out infinite; }
+        .dashboard-app-connect.status-connected::before, .dashboard-app-connect.ready::before { content: '' !important; background: url('/connector-status/connected.svg') center / contain no-repeat !important; border: 0 !important; box-shadow: none !important; }
+        .resume-action.ready::before { background: #082235; color: white; border-color: #082235; box-shadow: 0 10px 22px rgba(8,34,53,.24), 0 0 24px rgba(255,92,168,.28); }
         .resume-action.ready, .dashboard-app-connect.ready { border: 1.8px solid rgba(255,92,168,.96) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 0 0 1px rgba(255,92,168,.18), 0 0 26px rgba(255,92,168,.2), 0 18px 44px rgba(0,0,0,.07) !important; }
         .resume-action div, .dashboard-app-connect div { text-align: center !important; display: grid !important; justify-items: center !important; gap: 4px !important; }
         .resume-action > span, .dashboard-app-connect > span { width: clamp(32px, 7vw, 44px) !important; height: clamp(32px, 7vw, 44px) !important; font-size: clamp(14px, 3.4vw, 20px) !important; border-radius: 999px !important; display: grid !important; place-items: center !important; background: rgba(22,19,26,.08) !important; color: #16131a !important; border: 1px solid rgba(22,19,26,.12) !important; }
@@ -327,11 +331,13 @@ export default function DashboardPage() {
         .dashboard-actions .applix-setup-outline, .dashboard-actions .applix-setup-primary { color: #16131a !important; border-color: rgba(22,19,26,.78) !important; background: rgba(255,255,255,.58) !important; box-shadow: 0 12px 28px rgba(0,0,0,.08) !important; }
         .dashboard-actions .applix-setup-outline[href='/resume-canvas']::before, .dashboard-actions button.applix-setup-outline::before { display: inline-grid; place-items: center; width: 34px; height: 34px; margin-right: 10px; border-radius: 999px; border: 1.5px solid #082235; color: #082235; background: rgba(255,255,255,.78); font-size: 20px; font-weight: 950; }
         .dashboard-actions .applix-setup-outline[href='/resume-canvas']::before { content: '⇩'; }
-        .dashboard-actions button.applix-setup-outline::before { content: '⇆'; border-radius: 14px; width: 44px; }
+        .dashboard-actions button.applix-setup-outline::before { content: '' !important; border: 0 !important; border-radius: 0 !important; width: 48px !important; height: 36px !important; background: url('/connector-status/not-connected.svg') center / contain no-repeat !important; }
+        .dashboard-actions button.applix-setup-outline.status-connecting::before { background-image: url('/connector-status/connecting.svg') !important; animation: connectorPulse 1s ease-in-out infinite; }
         .dashboard-actions .applix-setup-primary, .dashboard-actions .recommended-template-action { background: #ff5ca8 !important; border-color: #ff5ca8 !important; }
         .dashboard-actions .applix-setup-primary:disabled { background: rgba(22,19,26,.36) !important; border-color: transparent !important; color: rgba(255,255,255,.72) !important; }
         .applix-setup-status.success { background: rgba(255,255,255,.62) !important; color: #065f46 !important; border: 1px solid rgba(16,185,129,.22) !important; }
         .ghost-link, .ghost-button { color: #16131a !important; border-color: rgba(22,19,26,.2) !important; background: rgba(255,255,255,.55) !important; }
+        @keyframes connectorPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.04); opacity: .78; } }
         @media (max-width: 640px) { .dashboard-cockpit-shell { padding-left: 14px !important; padding-right: 14px !important; } .dashboard-hero { padding-top: 78px !important; margin-bottom: 24px !important; } .dashboard-hero h1 { font-size: clamp(38px, 11vw, 58px) !important; } .dashboard-stack { width: min(100%, 430px) !important; } .dashboard-card-clean { border-radius: 22px !important; padding: 20px !important; } .resume-action, .dashboard-app-connect { grid-template-columns: 1fr !important; border-radius: 22px !important; } .dashboard-actions .applix-setup-primary, .dashboard-actions .applix-setup-outline { min-height: 58px !important; font-size: clamp(18px, 5.4vw, 24px) !important; } }
       `}</style>
     </>
