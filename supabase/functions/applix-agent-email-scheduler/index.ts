@@ -49,7 +49,7 @@ function firstSecretKey() {
 const SUPABASE_URL = env("SUPABASE_URL") || PROJECT_URL;
 const SUPABASE_SERVICE_ROLE_KEY = firstSecretKey();
 const CRON_SECRET = env("CRON_SECRET") || env("APPLIX_CRON_SECRET");
-const GMAIL_SEND_FUNCTION_NAME = env("GMAIL_SEND_FUNCTION_NAME") || "gmail-send-test";
+const GMAIL_SEND_FUNCTION_NAME = env("GMAIL_SEND_FUNCTION_NAME") || "gmail-send";
 const TEST_RECIPIENT_EMAIL = env("TEST_RECIPIENT_EMAIL") || "hostsajan@gmail.com";
 
 const corsHeaders = {
@@ -218,13 +218,14 @@ Deno.serve(async (req) => {
         : Object.fromEntries(new URL(req.url).searchParams.entries());
 
     const now = new Date();
+    const nowIso = now.toISOString();
     const campaignId = txt(input.campaign_id);
 
     if (auth.mode === "user" && !campaignId) {
       return reply({ ok: false, error: "campaign_id is required when a signed user runs the scheduler." }, 400);
     }
 
-    const requestedTestMode = bool(input.test_mode, true);
+    const requestedTestMode = bool(input.test_mode, false);
     const dryRun = bool(input.dry_run, false);
     const agentDays = num(input.agent_days, DEFAULT_AGENT_DAYS, 1, 30);
     const maxHourlyLimit = auth.mode === "cron" ? CRON_MAX_HOURLY_LIMIT : USER_MAX_HOURLY_LIMIT;
@@ -329,6 +330,8 @@ Deno.serve(async (req) => {
         .eq("campaign_id", campaign.id)
         .in("status", allowedQueueStatuses)
         .lt("send_attempts", maxAttempts)
+        .lte("scheduled_send_at", nowIso)
+        .order("scheduled_send_at", { ascending: true })
         .order("created_at", { ascending: true })
         .limit(remaining);
 
@@ -384,7 +387,7 @@ Deno.serve(async (req) => {
             .update({
               status: failedStatus(testMode),
               review_status: failedStatus(testMode),
-              updated_at: now.toISOString(),
+              updated_at: nowIso,
               send_attempts: sendAttempts,
               last_error: "Missing recipient email.",
               ai_notes: {
@@ -414,8 +417,7 @@ Deno.serve(async (req) => {
             recipient_email: recipient,
             status: sendingStatus(testMode),
             review_status: sendingStatus(testMode),
-            updated_at: now.toISOString(),
-            send_attempts: sendAttempts,
+            updated_at: nowIso,
             ai_notes: {
               ...(row.ai_notes || {}),
               scheduler: "applix-agent-email-scheduler",
@@ -428,7 +430,7 @@ Deno.serve(async (req) => {
               agent_days: agentDays,
               hourly_limit: hourlyLimit,
               daily_limit: dailyLimit,
-              claimed_at: now.toISOString(),
+              claimed_at: nowIso,
             },
           })
           .eq("id", row.id)
@@ -473,7 +475,7 @@ Deno.serve(async (req) => {
               recipient_email: recipient,
               status: sentStatus(testMode),
               review_status: sentStatus(testMode),
-              updated_at: now.toISOString(),
+              updated_at: nowIso,
               last_error: null,
               ai_notes: {
                 ...(row.ai_notes || {}),
@@ -484,10 +486,11 @@ Deno.serve(async (req) => {
                 sender_user_identifier: senderUserIdentifier,
                 gmail_send_function_name: GMAIL_SEND_FUNCTION_NAME,
                 gmail_result: gmailResult.data,
-                sent_at: now.toISOString(),
+                sent_at: nowIso,
               },
             })
-            .eq("id", row.id);
+            .eq("id", row.id)
+            .eq("status", sendingStatus(testMode));
         } else {
           failedCount += 1;
           await supabase
@@ -496,7 +499,7 @@ Deno.serve(async (req) => {
               recipient_email: recipient,
               status: failedStatus(testMode),
               review_status: failedStatus(testMode),
-              updated_at: now.toISOString(),
+              updated_at: nowIso,
               last_error: JSON.stringify(gmailResult.data || {}),
               ai_notes: {
                 ...(row.ai_notes || {}),
@@ -510,7 +513,8 @@ Deno.serve(async (req) => {
                 gmail_status: gmailResult.status,
               },
             })
-            .eq("id", row.id);
+            .eq("id", row.id)
+            .eq("status", sendingStatus(testMode));
         }
 
         results.push({
@@ -538,7 +542,7 @@ Deno.serve(async (req) => {
             agent_email_hourly_limit: hourlyLimit,
             agent_email_daily_limit: dailyLimit,
             max_attempts: maxAttempts,
-            last_email_scheduler_run_at: now.toISOString(),
+            last_email_scheduler_run_at: nowIso,
             last_email_scheduler_result: {
               mode: dryRun ? "dry_run" : testMode ? "test_send" : "production_send",
               auth_mode: auth.mode,
@@ -550,10 +554,10 @@ Deno.serve(async (req) => {
               gmail_send_function_name: GMAIL_SEND_FUNCTION_NAME,
               test_recipient_email: testMode ? testRecipient : null,
               sender_user_identifier: senderUserIdentifier,
-              ran_at: now.toISOString(),
+              ran_at: nowIso,
             },
           },
-          updated_at: now.toISOString(),
+          updated_at: nowIso,
         })
         .eq("id", campaign.id);
     }
@@ -578,7 +582,7 @@ Deno.serve(async (req) => {
       sent_count: sentCount,
       failed_count: failedCount,
       skipped_count: skippedCount,
-      ran_at: now.toISOString(),
+      ran_at: nowIso,
       results,
     });
   } catch (error) {
