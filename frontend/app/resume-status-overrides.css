@@ -1,69 +1,62 @@
-body .dashboard-cockpit-shell .resume-action::before,
-body .dashboard-cockpit-shell .resume-action.ready::before,
-body .dashboard-cockpit-shell .dashboard-app-connect::before,
-body .dashboard-cockpit-shell .dashboard-app-connect.status-connecting::before,
-body .dashboard-cockpit-shell .dashboard-app-connect.status-connected::before,
-body .dashboard-cockpit-shell .dashboard-app-connect.ready::before,
-body .dashboard-cockpit-shell .dashboard-actions .applix-setup-outline[href='/resume-canvas']::before,
-body .dashboard-cockpit-shell .dashboard-actions button.applix-setup-outline::before,
-body .dashboard-cockpit-shell .dashboard-actions button.applix-setup-outline.status-connecting::before {
+.dashboard-cockpit-shell .resume-action::before,
+.dashboard-cockpit-shell .dashboard-app-connect::before,
+.dashboard-cockpit-shell .dashboard-actions .applix-setup-outline[href="/resume-canvas"]::before,
+.dashboard-cockpit-shell .dashboard-actions button.applix-setup-outline::before {
   content: none !important;
   display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  border: 0 !important;
   background: none !important;
-  box-shadow: none !important;
-  color: transparent !important;
-  animation: none !important;
 }
 
-body .dashboard-cockpit-shell .resume-status-icon {
-  display: block !important;
-  width: clamp(110px, 18vw, 150px) !important;
-  max-width: 100% !important;
-  height: auto !important;
-  max-height: 150px !important;
-  object-fit: contain !important;
-  object-position: center !important;
-  margin: 0 auto 2px !important;
-  flex: 0 0 auto !important;
+.dashboard-status-icon {
+  display: block;
+  object-fit: contain;
+  object-position: center;
+  margin: 0 auto 16px;
+  flex-shrink: 0;
 }
 
-body .dashboard-cockpit-shell .connector-status-icon {
-  display: block !important;
-  width: clamp(90px, 16vw, 120px) !important;
-  max-width: 100% !important;
-  height: auto !important;
-  max-height: 120px !important;
-  object-fit: contain !important;
-  object-position: center !important;
-  margin: 0 auto 2px !important;
-  flex: 0 0 auto !important;
+.resume-status-icon {
+  width: clamp(170px, 32vw, 230px);
+  max-width: 100%;
+  height: auto;
 }
 
-body .dashboard-cockpit-shell .resume-action,
-body .dashboard-cockpit-shell .dashboard-app-connect {
-  align-content: center !important;
-  min-height: clamp(168px, 30vw, 230px) !important;
+.connector-status-icon {
+  width: clamp(150px, 30vw, 210px);
+  max-width: 100%;
+  height: auto;
+  transform: scale(1.25);
+  transform-origin: center;
+}
+
+.resume-action,
+.dashboard-app-connect {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  gap: 6px !important;
+}
+
+.resume-action div,
+.dashboard-app-connect div {
+  display: grid !important;
+  justify-items: center !important;
+  text-align: center !important;
 }
 
 @media (max-width: 640px) {
-  body .dashboard-cockpit-shell .resume-action,
-  body .dashboard-cockpit-shell .dashboard-app-connect {
-    min-height: 168px !important;
+  .resume-status-icon {
+    width: clamp(145px, 42vw, 185px);
   }
 
-  body .dashboard-cockpit-shell .resume-status-icon {
-    width: clamp(95px, 29vw, 120px) !important;
-    max-height: 120px !important;
+  .connector-status-icon {
+    width: clamp(135px, 40vw, 175px);
+    transform: scale(1.3);
   }
 
-  body .dashboard-cockpit-shell .connector-status-icon {
-    width: clamp(75px, 23vw, 95px) !important;
-    max-height: 95px !important;
+  .dashboard-status-icon {
+    margin-bottom: 14px;
   }
 }
