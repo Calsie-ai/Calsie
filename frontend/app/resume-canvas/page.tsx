@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 
@@ -137,16 +137,23 @@ export default function ResumeCanvasPage() {
       return;
     }
 
+    const detectedFileType = file.type || file.name.split(".").pop() || "";
     setFileName(file.name);
-    setFileType(file.type || file.name.split(".").pop() || "");
+    setFileType(detectedFileType);
+    setStatus("");
     setParsing(true);
-    setStatus(`Processing ${file.name}...`);
 
     try {
       const supabase = getSupabaseClient();
-      if (!userId) throw new Error("Missing user session. Please refresh and sign in again.");
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const activeUserId = userId || userData.user?.id || "";
+      const activeUserEmail = userData.user?.email || parsed.email || "";
 
-      const path = `${userId}/master-source.${safeExt(file)}`;
+      if (userError || !activeUserId) throw new Error("Missing user session. Please refresh and sign in again.");
+
+      if (!userId) setUserId(activeUserId);
+
+      const path = `${activeUserId}/master-source.${safeExt(file)}`;
       const { error: storageError } = await supabase.storage
         .from("resumes")
         .upload(path, file, {
@@ -155,6 +162,7 @@ export default function ResumeCanvasPage() {
         });
 
       if (storageError) throw storageError;
+
       setFilePath(path);
 
       const formData = new FormData();
@@ -164,79 +172,74 @@ export default function ResumeCanvasPage() {
       if (!response.ok || !data?.ok) throw new Error(data?.error || "Could not parse resume.");
 
       const p = data.parsed || {};
-      setParsed((current) => ({
-        ...current,
-        fullName: p.fullName || current.fullName,
-        email: p.email || current.email,
-        phone: p.phone || current.phone,
-        location: p.location || current.location,
-        summary: p.resumeSummary || current.summary,
-        skills: p.skills || current.skills,
-        experience: p.experience || current.experience,
-        certifications: p.certificates || current.certifications,
-      }));
-      setStatus("Resume uploaded and prepared. Click Save resume to finish.");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Resume upload failed.");
-    } finally {
+      const nextParsed: ParsedData = {
+        ...parsed,
+        fullName: p.fullName || parsed.fullName,
+        targetRole: p.targetRole || parsed.targetRole,
+        email: p.email || parsed.email || activeUserEmail,
+        phone: p.phone || parsed.phone,
+        location: p.location || parsed.location,
+        summary: p.resumeSummary || parsed.summary,
+        skills: p.skills || parsed.skills,
+        experience: p.experience || parsed.experience,
+        education: p.education || parsed.education,
+        certifications: p.certificates || parsed.certifications,
+      };
+
+      setParsed(nextParsed);
       setParsing(false);
-      event.target.value = "";
-    }
-  }
+      setSaving(true);
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaving(true);
-    setStatus("Saving resume...");
-
-    try {
-      const supabase = getSupabaseClient();
       const { error: profileError } = await supabase.from("profiles").upsert({
-        id: userId,
-        full_name: parsed.fullName || null,
-        email: parsed.email || null,
-        phone: parsed.phone || null,
-        location: parsed.location || null,
-        preferred_roles: parsed.targetRole ? [parsed.targetRole] : [],
+        id: activeUserId,
+        full_name: nextParsed.fullName || null,
+        email: nextParsed.email || null,
+        phone: nextParsed.phone || null,
+        location: nextParsed.location || null,
+        preferred_roles: nextParsed.targetRole ? [nextParsed.targetRole] : [],
       }, { onConflict: "id" });
 
       if (profileError) throw profileError;
 
       const payload = {
-        profile_id: userId,
-        full_name: parsed.fullName || null,
-        target_role: parsed.targetRole || null,
-        email: parsed.email || null,
-        phone: parsed.phone || null,
-        location: parsed.location || null,
-        profile_summary: parsed.summary || null,
-        skills: splitList(parsed.skills),
-        work_experience: block(parsed.experience),
-        education_locked: block(parsed.education),
-        certifications_locked: splitList(parsed.certifications),
-        resume_file_path: filePath || null,
-        resume_file_name: fileName || null,
-        resume_file_type: fileType || null,
+        profile_id: activeUserId,
+        full_name: nextParsed.fullName || null,
+        target_role: nextParsed.targetRole || null,
+        email: nextParsed.email || null,
+        phone: nextParsed.phone || null,
+        location: nextParsed.location || null,
+        profile_summary: nextParsed.summary || null,
+        skills: splitList(nextParsed.skills),
+        work_experience: block(nextParsed.experience),
+        education_locked: block(nextParsed.education),
+        certifications_locked: splitList(nextParsed.certifications),
+        resume_file_path: path,
+        resume_file_name: file.name,
+        resume_file_type: detectedFileType || null,
       };
 
       if (resumeId) {
-        const { error } = await supabase.from("resume_profiles").update(payload).eq("id", resumeId).eq("profile_id", userId);
+        const { error } = await supabase.from("resume_profiles").update(payload).eq("id", resumeId).eq("profile_id", activeUserId);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from("resume_profiles").insert(payload).select("id").single();
+        const { data: resumeProfile, error } = await supabase.from("resume_profiles").insert(payload).select("id").single();
         if (error) throw error;
-        setResumeId(data.id);
+        setResumeId(resumeProfile.id);
       }
 
-      setStatus("Resume saved. Applix can now use it for automation.");
+      setStatus("Resume saved. Returning to dashboard...");
+      router.replace("/dashboard");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not save resume.");
+      setStatus(error instanceof Error ? error.message : "Resume upload failed.");
     } finally {
+      setParsing(false);
       setSaving(false);
+      event.target.value = "";
     }
   }
 
   const resumeReady = Boolean(fileName || filePath);
+  const uploadLabel = saving ? "Saving..." : parsing ? "Uploading..." : resumeReady ? "Upload / Change Resume" : "Upload Resume";
 
   return (
     <main className="applix-home-shell" style={{ gridTemplateRows: "auto 1fr", overflow: "auto", paddingTop: "24px" }}>
@@ -309,24 +312,24 @@ export default function ResumeCanvasPage() {
 
         <p className="applix-home-copy" style={{ marginTop: "16px" }}>{loading ? "Checking resume..." : status}</p>
 
-        <form onSubmit={save} style={{ width: "min(680px, 100%)", display: "grid", gap: "14px", marginTop: "32px" }}>
+        <div style={{ width: "min(680px, 100%)", display: "grid", gap: "14px", marginTop: "32px" }}>
           <label
             className="applix-setup-primary"
             style={{
-              cursor: parsing || loading ? "not-allowed" : "pointer",
+              cursor: parsing || saving || loading ? "not-allowed" : "pointer",
               gap: "12px",
               minHeight: "74px",
               fontSize: "clamp(20px, 3vw, 30px)",
             }}
           >
             <img src="/applix-logo.svg" alt="" aria-hidden="true" style={{ width: "54px", height: "54px", objectFit: "contain" }} />
-            {parsing ? "Processing..." : resumeReady ? "Upload / Change Resume" : "Upload Resume"}
+            {uploadLabel}
             <input
               type="file"
               accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={uploadResume}
               style={{ display: "none" }}
-              disabled={parsing || loading}
+              disabled={parsing || saving || loading}
             />
           </label>
 
@@ -349,11 +352,7 @@ export default function ResumeCanvasPage() {
               {fileName || "Resume uploaded"}
             </div>
           )}
-
-          <button className="applix-setup-outline" type="submit" disabled={saving || loading || parsing || !filePath} style={{ minHeight: "64px", fontSize: "22px", borderWidth: "2px" }}>
-            {saving ? "Saving..." : "Save resume"}
-          </button>
-        </form>
+        </div>
       </section>
     </main>
   );
