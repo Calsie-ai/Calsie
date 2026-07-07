@@ -13,7 +13,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const VERSION = "approve_job_for_outreach_v5_debug_logs";
+const VERSION = "approve_job_for_outreach_v6_outscraper_refresh";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -154,6 +154,26 @@ function emailStatusFor(job: Row): PipelineEmailStatus {
   return "not_found";
 }
 
+async function refreshOutscraperData(job: Row, jobId: string) {
+  const campaignId = text(job.campaign_id);
+  if (!campaignId) {
+    log("outscraper-refresh:skipped", { job_id: jobId, reason: "missing_campaign_id" });
+    return null;
+  }
+
+  log("outscraper-refresh:start", { job_id: jobId, campaign_id: campaignId });
+  const result = await invokeFunction("run-outscraper-campaigns", {
+    campaign_id: campaignId,
+    job_id: jobId,
+    results_limit: 5,
+    limit: 5,
+    dry_run: false,
+    save_to_database: true,
+  });
+  log("outscraper-refresh:finish", { job_id: jobId, campaign_id: campaignId, result });
+  return result;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -223,18 +243,20 @@ serve(async (req) => {
     let sendTriggered = false;
     let sendResult: Row | null = null;
     let sendError: string | null = null;
+    let outscraperRefreshResult: Row | null = null;
+    let outscraperRefreshError: string | null = null;
 
     try {
-      log("email-enrichment:start", { job_id: jobId });
+      log("email-enrichment:start", { job_id: jobId, phase: "initial" });
       await invokeFunction("enrich-job-emails", {
         job_id: jobId,
         only_approved: true,
         limit: 1,
       });
-      log("email-enrichment:finish", { job_id: jobId });
+      log("email-enrichment:finish", { job_id: jobId, phase: "initial" });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      log("email-enrichment:error", { job_id: jobId, error: message });
+      log("email-enrichment:error", { job_id: jobId, phase: "initial", error: message });
       await setJobStatus(supabase, jobId, authData.user.id, "failed");
       return json({
         ok: true,
@@ -248,20 +270,54 @@ serve(async (req) => {
         send_triggered: false,
         send_result: null,
         send_error: null,
+        outscraper_refresh_result: null,
+        outscraper_refresh_error: null,
         error: message,
       });
     }
 
-    const enrichedJob = await fetchOwnedJob(supabase, jobId, authData.user.id);
+    let enrichedJob = await fetchOwnedJob(supabase, jobId, authData.user.id);
     if (!enrichedJob) throw new Error("Approved job disappeared after enrichment");
 
     emailStatus = emailStatusFor(enrichedJob);
     log("email-status:resolved", {
       job_id: jobId,
+      phase: "after_initial_enrichment",
       email_status: emailStatus,
       has_extracted_email: Boolean(text(enrichedJob.extracted_email)),
       email_extraction_status: enrichedJob.email_extraction_status || null,
     });
+
+    if (emailStatus === "not_found") {
+      try {
+        outscraperRefreshResult = await refreshOutscraperData(enrichedJob, jobId);
+
+        log("email-enrichment:start", { job_id: jobId, phase: "after_outscraper_refresh" });
+        await invokeFunction("enrich-job-emails", {
+          job_id: jobId,
+          only_approved: true,
+          limit: 1,
+          force_retry: true,
+          max_attempts: 5,
+        });
+        log("email-enrichment:finish", { job_id: jobId, phase: "after_outscraper_refresh" });
+
+        const retriedJob = await fetchOwnedJob(supabase, jobId, authData.user.id);
+        if (!retriedJob) throw new Error("Approved job disappeared after Outscraper refresh");
+        enrichedJob = retriedJob;
+        emailStatus = emailStatusFor(enrichedJob);
+        log("email-status:resolved", {
+          job_id: jobId,
+          phase: "after_outscraper_refresh",
+          email_status: emailStatus,
+          has_extracted_email: Boolean(text(enrichedJob.extracted_email)),
+          email_extraction_status: enrichedJob.email_extraction_status || null,
+        });
+      } catch (error) {
+        outscraperRefreshError = error instanceof Error ? error.message : String(error);
+        log("outscraper-refresh:error", { job_id: jobId, error: outscraperRefreshError });
+      }
+    }
 
     if (emailStatus === "found") {
       await normalizeExistingEmail(supabase, jobId, authData.user.id);
@@ -269,7 +325,7 @@ serve(async (req) => {
 
     if (emailStatus === "not_found") {
       await setJobStatus(supabase, jobId, authData.user.id, "needs_email");
-      log("pipeline:needs-email", { job_id: jobId });
+      log("pipeline:needs-email", { job_id: jobId, outscraper_refresh_error: outscraperRefreshError });
       return json({
         ok: true,
         function: "approve-job-for-outreach",
@@ -282,12 +338,14 @@ serve(async (req) => {
         send_triggered: false,
         send_result: null,
         send_error: null,
+        outscraper_refresh_result: outscraperRefreshResult,
+        outscraper_refresh_error: outscraperRefreshError,
       });
     }
 
     if (emailStatus === "failed") {
       await setJobStatus(supabase, jobId, authData.user.id, "failed");
-      log("pipeline:email-failed", { job_id: jobId });
+      log("pipeline:email-failed", { job_id: jobId, outscraper_refresh_error: outscraperRefreshError });
       return json({
         ok: true,
         function: "approve-job-for-outreach",
@@ -300,6 +358,8 @@ serve(async (req) => {
         send_triggered: false,
         send_result: null,
         send_error: null,
+        outscraper_refresh_result: outscraperRefreshResult,
+        outscraper_refresh_error: outscraperRefreshError,
       });
     }
 
@@ -328,6 +388,8 @@ serve(async (req) => {
         send_triggered: false,
         send_result: null,
         send_error: null,
+        outscraper_refresh_result: outscraperRefreshResult,
+        outscraper_refresh_error: outscraperRefreshError,
         error: message,
       });
     }
@@ -350,6 +412,8 @@ serve(async (req) => {
         send_triggered: false,
         send_result: null,
         send_error: null,
+        outscraper_refresh_result: outscraperRefreshResult,
+        outscraper_refresh_error: outscraperRefreshError,
       });
     }
 
@@ -377,6 +441,7 @@ serve(async (req) => {
       queue_id: queueId,
       send_triggered: sendTriggered,
       send_error: sendError,
+      outscraper_refresh_error: outscraperRefreshError,
     });
 
     return json({
@@ -391,6 +456,8 @@ serve(async (req) => {
       send_triggered: sendTriggered,
       send_result: sendResult,
       send_error: sendError,
+      outscraper_refresh_result: outscraperRefreshResult,
+      outscraper_refresh_error: outscraperRefreshError,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
