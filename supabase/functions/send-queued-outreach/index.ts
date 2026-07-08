@@ -46,6 +46,12 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value);
 }
 
+function bool(value: unknown) {
+  if (value === true) return true;
+  const text = txt(value).toLowerCase();
+  return ["true", "1", "yes", "y"].includes(text);
+}
+
 function bearerToken(req: Request) {
   const authHeader = req.headers.get("authorization") || "";
   return authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -108,6 +114,26 @@ async function loadQueueRow(
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data || [])[0] as Row | undefined;
+}
+
+async function loadCampaign(supabase: ReturnType<typeof createClient>, campaignId: string) {
+  const { data, error } = await supabase
+    .from("campaigns")
+    .select("id,status,outreach")
+    .eq("id", campaignId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data as Row | null;
+}
+
+function campaignAllowsSending(campaign: Row | null) {
+  if (!campaign) return { allowed: false, reason: "campaign_not_found" };
+  const status = txt(campaign.status).toLowerCase();
+  if (["paused", "pause", "stopped", "cancelled", "canceled", "archived", "draft", "pending"].includes(status)) {
+    return { allowed: false, reason: `campaign_${status || "inactive"}` };
+  }
+  return { allowed: true, reason: "campaign_active" };
 }
 
 async function sentCountSince(supabase: ReturnType<typeof createClient>, userIdentifier: string, sinceIso: string) {
@@ -250,6 +276,17 @@ Deno.serve(async (req) => {
     }
 
     const input = await req.json().catch(() => ({}));
+    const explicitSend = bool(input.send_now) || bool(input.confirm_send);
+    if (!explicitSend) {
+      return json({
+        ok: true,
+        function: "send-queued-outreach",
+        send_skipped: true,
+        reason: "explicit_send_required",
+        message: "send_now=true is required. This prevents autonomous cron/GitHub Action email sending.",
+      });
+    }
+
     const queueId = txt(input.queue_id || input.outreach_queue_id || input.id);
     const campaignId = txt(input.campaign_id);
     const senderIdentifier = txt(input.user_identifier || input.sender_user_identifier || input.sender_email);
@@ -279,6 +316,26 @@ Deno.serve(async (req) => {
         queue_id: queueId || null,
         campaign_id: campaignId || null,
       }, 404);
+    }
+
+    const campaign = await loadCampaign(supabase, queuedRow.campaign_id);
+    const campaignGate = campaignAllowsSending(campaign);
+    if (!campaignGate.allowed) {
+      await rescheduleQueuedRow(
+        supabase,
+        queuedRow,
+        new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+        `Send skipped: ${campaignGate.reason}`,
+        nowIso,
+      );
+      return json({
+        ok: true,
+        function: "send-queued-outreach",
+        queue_id: queuedRow.id,
+        campaign_id: queuedRow.campaign_id,
+        send_skipped: true,
+        reason: campaignGate.reason,
+      });
     }
 
     const to = normalizeEmail(queuedRow.recipient_email);
