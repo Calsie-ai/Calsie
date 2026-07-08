@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 type Row = Record<string, any>;
 
 const DEFAULT_MAX_ATTEMPTS = 3;
+const DAILY_SEND_LIMIT = 25;
+const HOURLY_SEND_LIMIT = 5;
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY =
@@ -108,6 +110,62 @@ async function loadQueueRow(
   return (data || [])[0] as Row | undefined;
 }
 
+async function sentCountSince(supabase: ReturnType<typeof createClient>, userIdentifier: string, sinceIso: string) {
+  const { count, error } = await supabase
+    .from("outreach_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("user_identifier", userIdentifier)
+    .eq("status", "sent")
+    .gte("updated_at", sinceIso);
+  if (error) throw new Error(error.message);
+  return Number(count || 0);
+}
+
+async function rescheduleQueuedRow(
+  supabase: ReturnType<typeof createClient>,
+  row: Row,
+  scheduledSendAt: string,
+  reason: string,
+  nowIso: string
+) {
+  const { error } = await supabase
+    .from("outreach_queue")
+    .update({
+      scheduled_send_at: scheduledSendAt,
+      last_error: reason.slice(0, 500),
+      updated_at: nowIso,
+    })
+    .eq("id", row.id)
+    .eq("status", "queued");
+  if (error) throw new Error(error.message);
+}
+
+async function enforceSendLimits(
+  supabase: ReturnType<typeof createClient>,
+  row: Row,
+  userIdentifier: string,
+  now: Date
+) {
+  const dailySince = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const hourlySince = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+  const sentLast24Hours = await sentCountSince(supabase, userIdentifier, dailySince);
+
+  if (sentLast24Hours >= DAILY_SEND_LIMIT) {
+    const scheduledSendAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    await rescheduleQueuedRow(supabase, row, scheduledSendAt, "Daily user send limit reached; rescheduled.", now.toISOString());
+    return { allowed: false, reason: "daily_limit_reached", sentLast24Hours, scheduledSendAt };
+  }
+
+  const sentLastHour = await sentCountSince(supabase, userIdentifier, hourlySince);
+  if (sentLastHour >= HOURLY_SEND_LIMIT) {
+    const scheduledSendAt = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+    await rescheduleQueuedRow(supabase, row, scheduledSendAt, "Hourly user send throttle reached; rescheduled.", now.toISOString());
+    return { allowed: false, reason: "hourly_limit_reached", sentLast24Hours, sentLastHour, scheduledSendAt };
+  }
+
+  return { allowed: true, sentLast24Hours, sentLastHour };
+}
+
 async function markQueuedRowFailed(
   supabase: ReturnType<typeof createClient>,
   row: Row,
@@ -197,7 +255,8 @@ Deno.serve(async (req) => {
     const senderIdentifier = txt(input.user_identifier || input.sender_user_identifier || input.sender_email);
     const fromName = txt(input.from_name || input.sender_name || input.candidate_name, "Applix Candidate");
     const maxAttempts = Math.max(1, Math.min(10, Number(input.max_attempts || DEFAULT_MAX_ATTEMPTS)));
-    const nowIso = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
 
     if (queueId && !isUuid(queueId)) {
       return json({ ok: false, error: "queue_id must be a valid UUID.", queue_id: queueId }, 400);
@@ -230,6 +289,21 @@ Deno.serve(async (req) => {
     if (!resolvedSenderIdentifier) {
       await markQueuedRowFailed(supabase, queuedRow, "Missing sender user_identifier.", nowIso, "queued");
       return json({ ok: false, error: "Missing sender user_identifier.", queue_id: queuedRow.id }, 400);
+    }
+
+    const limitCheck = await enforceSendLimits(supabase, queuedRow, resolvedSenderIdentifier, now);
+    if (!limitCheck.allowed) {
+      return json({
+        ok: true,
+        function: "send-queued-outreach",
+        queue_id: queuedRow.id,
+        user_identifier: resolvedSenderIdentifier,
+        send_skipped: true,
+        limit_reached: limitCheck.reason,
+        scheduled_send_at: limitCheck.scheduledSendAt,
+        sent_last_24_hours: limitCheck.sentLast24Hours,
+        sent_last_hour: limitCheck.sentLastHour ?? null,
+      });
     }
 
     if (!to || !looksLikeEmail(to)) {
@@ -294,6 +368,8 @@ Deno.serve(async (req) => {
       queue_id: claimedRow.id,
       campaign_id: claimedRow.campaign_id,
       recipient_email: to,
+      sent_last_24_hours_before_send: limitCheck.sentLast24Hours,
+      sent_last_hour_before_send: limitCheck.sentLastHour,
       gmail_send_response: gmailResult.data,
     });
   } catch (error) {
