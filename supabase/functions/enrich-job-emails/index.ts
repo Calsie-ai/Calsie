@@ -17,6 +17,7 @@ type WebsiteCandidate = {
   title: string | null;
   snippet: string | null;
   raw: unknown;
+  providerConfidence?: number;
 };
 
 type WebsiteDiscoveryResult = {
@@ -35,6 +36,10 @@ type CompanyGroup = {
   location: string | null;
   userIdentifier: string;
   jobs: Row[];
+};
+
+type RunLimits = {
+  emailFinderCallsRemaining: number;
 };
 
 const corsHeaders = {
@@ -149,8 +154,22 @@ function normaliseCompany(value: unknown): string | null {
   return text(value)?.toLowerCase().replace(/\s+/g, " ") || null;
 }
 
+function companyNameFromJob(job: Row): string | null {
+  const raw = job.raw_payload || {};
+  return text(job.company)
+    || text(job.normalized_company)
+    || text(raw.company)
+    || text(raw.company_name)
+    || text(raw.employer)
+    || text(raw.organization)
+    || text(raw.hiringOrganization?.name)
+    || text(raw.companyInfo?.name)
+    || text(raw.data?.company)
+    || text(raw.data?.company_name);
+}
+
 function companyKey(job: Row): string | null {
-  return normaliseCompany(job.normalized_company) || normaliseCompany(job.company);
+  return normaliseCompany(job.normalized_company) || normaliseCompany(job.company) || normaliseCompany(companyNameFromJob(job));
 }
 
 function normaliseDomain(value: unknown): string | null {
@@ -168,10 +187,6 @@ function normaliseDomain(value: unknown): string | null {
 function isBlockedDomain(domain: string | null) {
   if (!domain) return true;
   return BLOCKED_WEBSITE_DOMAINS.some((blocked) => domain === blocked || domain.endsWith(`.${blocked}`));
-}
-
-function isBlockedWebsite(value: unknown) {
-  return isBlockedDomain(normaliseDomain(value));
 }
 
 function withProtocol(value: string) {
@@ -229,14 +244,22 @@ function rawEmailCandidates(payload: unknown): string[] {
   const body = payload as Row;
   const direct = [
     body?.email,
+    body?.value,
     body?.found_email,
     body?.contact_email,
     body?.company_email,
     body?.data?.email,
     body?.data?.found_email,
     body?.data?.contact_email,
-    ...(Array.isArray(body?.emails) ? body.emails : []),
-    ...(Array.isArray(body?.data?.emails) ? body.data.emails : []),
+    ...(Array.isArray(body?.emails) ? body.emails.map((item: Row | string) => typeof item === "string" ? item : item.email || item.value) : []),
+    ...(Array.isArray(body?.data?.emails) ? body.data.emails.map((item: Row | string) => typeof item === "string" ? item : item.email || item.value) : []),
+    ...(Array.isArray(body?.contacts) ? body.contacts.flatMap((item: Row) => [item.email, item.value, ...(Array.isArray(item.emails) ? item.emails.map((email: Row | string) => typeof email === "string" ? email : email.email || email.value) : [])]) : []),
+    ...(Array.isArray(body?.data) ? body.data.flatMap((item: Row) => [
+      item.email,
+      item.value,
+      ...(Array.isArray(item.emails) ? item.emails.map((email: Row | string) => typeof email === "string" ? email : email.email || email.value) : []),
+      ...(Array.isArray(item.contacts) ? item.contacts.flatMap((contact: Row) => [contact.email, contact.value, ...(Array.isArray(contact.emails) ? contact.emails.map((email: Row | string) => typeof email === "string" ? email : email.email || email.value) : [])]) : []),
+    ]) : []),
     ...(Array.isArray(body?.results) ? body.results.map((item: Row) => item.email || item.value) : []),
   ];
 
@@ -254,6 +277,7 @@ function companyWebsite(job: Row): string | null {
     job.company_website,
     raw.company_website,
     raw.website,
+    raw.domain,
     raw.companyWebsite,
     raw.employer_website,
     raw.companyUrl,
@@ -264,6 +288,7 @@ function companyWebsite(job: Row): string | null {
     raw.company?.url,
     raw.data?.company_website,
     raw.data?.website,
+    raw.data?.domain,
     raw.data?.companyWebsite,
   ];
 
@@ -338,18 +363,21 @@ function scoreWebsiteCandidate(candidate: WebsiteCandidate, company: string, loc
   if (CARE_KEYWORDS.some((keyword) => lower(combinedText).includes(keyword))) score += 15;
   if (URL_HINTS.some((hint) => lower(candidate.url).includes(hint))) score += 10;
   if (!domainLooksLikeCompany(domain, company) && !textMentionsCompany(combinedText, company)) score -= 30;
+  if (candidate.providerConfidence !== undefined) score = Math.max(score, candidate.providerConfidence);
 
   return score;
 }
 
 function searchQueries(company: string, location: string | null) {
   const withLocation = location ? [
+    `"${company}" "${location}"`,
     `"${company}" "${location}" contact`,
     `"${company}" "${location}" email`,
   ] : [];
 
   return [...new Set([
     ...withLocation,
+    company,
     `"${company}" "recruitment" email`,
     `"${company}" "careers"`,
     `"${company}" "NDIS" contact`,
@@ -366,14 +394,22 @@ function parseJson(value: string): unknown {
   }
 }
 
+function confidenceToPercent(value: unknown): number | undefined {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return undefined;
+  if (numeric <= 1) return Math.round(numeric * 100);
+  return Math.round(numeric);
+}
+
 function addCandidateFromObject(item: Row, out: WebsiteCandidate[]) {
-  const url = text(item.url || item.link || item.website || item.company_website || item.formattedUrl || item.displayLink);
+  const url = text(item.url || item.link || item.website || item.company_website || item.formattedUrl || item.displayLink || item.domain);
   if (!url) return;
   out.push({
     url,
-    title: text(item.title || item.name || item.company_name),
-    snippet: text(item.snippet || item.description || item.summary || item.text),
+    title: text(item.title || item.name || item.company_name || item.companyName || item.query),
+    snippet: text(item.snippet || item.description || item.summary || item.text || item.domain),
     raw: item,
+    providerConfidence: confidenceToPercent(item.confidence_score ?? item.confidence ?? item.score),
   });
 }
 
@@ -398,7 +434,7 @@ async function callSearchProvider(query: string, company: string, location: stri
   const headers: Record<string, string> = {
     "content-type": "application/json",
     authorization: `Bearer ${WEBSITE_SEARCH_API_KEY}`,
-    "x-api-key": WEBSITE_SEARCH_API_KEY,
+    "X-API-KEY": WEBSITE_SEARCH_API_KEY,
   };
 
   let requestUrl = WEBSITE_SEARCH_API_URL;
@@ -536,26 +572,50 @@ async function scrapeWebsiteForEmail(website: string): Promise<EmailResult> {
   };
 }
 
+function emailFinderQuery(job: Row, website: string | null) {
+  const officialWebsite = safeUrl(website || job.company_website_url || companyWebsite(job));
+  const domain = normaliseDomain(officialWebsite);
+  return domain || officialWebsite || companyNameFromJob(job) || "";
+}
+
 async function callEmailFinder(job: Row, website: string | null): Promise<EmailResult> {
   if (!EMAIL_FINDER_URL || !EMAIL_FINDER_API_KEY) {
     return { email: null, confidence: 0, source: "email_finder_not_configured", raw: { error: "EMAIL_FINDER_URL or EMAIL_FINDER_API_KEY is missing" }, companyWebsite: website, companyDomain: normaliseDomain(website) };
   }
 
-  const response = await fetch(EMAIL_FINDER_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${EMAIL_FINDER_API_KEY}`,
-      "x-api-key": EMAIL_FINDER_API_KEY,
-    },
-    body: JSON.stringify({ company_name: job.company, company_website: website, job_title: job.title, job_url: job.apply_url, raw_payload: job.raw_payload || {} }),
-  });
+  const query = emailFinderQuery(job, website);
+  if (!query) {
+    return { email: null, confidence: 0, source: "email_finder_no_query", raw: { error: "No email finder query could be built" }, companyWebsite: website, companyDomain: normaliseDomain(website) };
+  }
 
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    authorization: `Bearer ${EMAIL_FINDER_API_KEY}`,
+    "X-API-KEY": EMAIL_FINDER_API_KEY,
+  };
+
+  let requestUrl = EMAIL_FINDER_URL;
+  let init: RequestInit = {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ query, company_name: companyNameFromJob(job), company_website: website, job_title: job.title, job_url: job.apply_url, raw_payload: job.raw_payload || {} }),
+  };
+
+  if (requestUrl.includes("{query}") || requestUrl.includes("{q}") || requestUrl.includes("{api_key}")) {
+    requestUrl = requestUrl
+      .replaceAll("{query}", encodeURIComponent(query))
+      .replaceAll("{q}", encodeURIComponent(query))
+      .replaceAll("{api_key}", encodeURIComponent(EMAIL_FINDER_API_KEY));
+    init = { method: "GET", headers };
+  }
+
+  const response = await fetch(requestUrl, init);
   const textBody = await response.text().catch(() => "");
   const payload = parseJson(textBody);
   if (!response.ok) throw new Error(`Email finder failed ${response.status}: ${JSON.stringify(payload).slice(0, 500)}`);
-  const candidate = bestEmail(rawEmailCandidates(payload), website);
-  return { email: candidate?.email || null, confidence: candidate?.score || 0, source: "email_finder_api", raw: payload, companyWebsite: website, companyDomain: normaliseDomain(website) };
+  const officialWebsite = safeUrl(website);
+  const candidate = bestEmail(rawEmailCandidates(payload), officialWebsite);
+  return { email: candidate?.email || null, confidence: candidate?.score || 0, source: "email_finder_api", raw: payload, companyWebsite: officialWebsite, companyDomain: normaliseDomain(officialWebsite) };
 }
 
 function isApprovedJob(job: Row) {
@@ -565,6 +625,7 @@ function isApprovedJob(job: Row) {
 function canRetry(job: Row, maxAttempts: number) {
   const status = text(job.email_extraction_status)?.toLowerCase();
   if (status === "found") return false;
+  if (status === "provider_missing") return true;
   return Number(job.email_extraction_attempt_count || 0) < maxAttempts;
 }
 
@@ -573,7 +634,7 @@ function buildCompanyGroups(jobs: Row[]): CompanyGroup[] {
 
   for (const job of jobs) {
     const key = companyKey(job);
-    const companyName = text(job.company) || text(job.normalized_company);
+    const companyName = companyNameFromJob(job);
     if (!key || !companyName) continue;
 
     const existing = groups.get(key);
@@ -596,7 +657,7 @@ function buildCompanyGroups(jobs: Row[]): CompanyGroup[] {
 }
 
 function representativeJob(group: CompanyGroup) {
-  return group.jobs[0];
+  return { ...group.jobs[0], company: group.companyName };
 }
 
 function knownWebsiteForGroup(group: CompanyGroup) {
@@ -605,6 +666,10 @@ function knownWebsiteForGroup(group: CompanyGroup) {
     if (website) return website;
   }
   return null;
+}
+
+function cleanPatch(patch: Row) {
+  return Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
 }
 
 async function fetchReusableCandidates(supabase: ReturnType<typeof createClient>, group: CompanyGroup, domain: string | null) {
@@ -734,7 +799,7 @@ async function updateJobsForGroup(
   let updated = 0;
 
   for (const job of group.jobs) {
-    const nextPatch: Row = { ...patch, email_extraction_attempted_at: now };
+    const nextPatch: Row = cleanPatch({ ...patch, email_extraction_attempted_at: now });
     if (options.incrementEmailAttempt !== false) {
       nextPatch.email_extraction_attempt_count = Number(job.email_extraction_attempt_count || 0) + 1;
     }
@@ -762,7 +827,7 @@ function websitePatch(result: WebsiteDiscoveryResult) {
   };
 }
 
-async function processCompanyGroup(supabase: ReturnType<typeof createClient>, group: CompanyGroup) {
+async function processCompanyGroup(supabase: ReturnType<typeof createClient>, group: CompanyGroup, limits: RunLimits) {
   const job = representativeJob(group);
   const rawWebsite = knownWebsiteForGroup(group);
   const reusable = await findReusableContact(supabase, group);
@@ -785,7 +850,7 @@ async function processCompanyGroup(supabase: ReturnType<typeof createClient>, gr
       email_extraction_confidence: Number(reusable.confidence || 80),
       email_extraction_error: null,
     });
-    return { status: "cache_reused", websiteFound: Boolean(website), emailFound: true, updatedJobs, providerMissing: false };
+    return { status: "cache_reused", websiteFound: Boolean(website), emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: false };
   }
 
   const knownWebsite = safeUrl(reusable?.company_website || rawWebsite);
@@ -807,7 +872,7 @@ async function processCompanyGroup(supabase: ReturnType<typeof createClient>, gr
       email_extraction_confidence: result.confidence,
       email_extraction_error: null,
     });
-    return { status: "email_found", websiteFound: Boolean(knownWebsite), emailFound: true, updatedJobs, providerMissing: false };
+    return { status: "email_found", websiteFound: Boolean(knownWebsite), emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: false };
   }
 
   let website = knownWebsite;
@@ -815,30 +880,15 @@ async function processCompanyGroup(supabase: ReturnType<typeof createClient>, gr
     ? { status: "found", website, confidence: 80, source: reusable?.company_website ? "lead_contact_emails_cache" : "raw_payload", attempted: false, error: null, raw: null }
     : await discoverCompanyWebsite(group.companyName, group.location);
 
+  if (discovery.status === "provider_missing") {
+    return { status: "provider_missing", websiteFound: false, emailFound: false, updatedJobs: 0, providerMissing: true, emailFinderProviderMissing: false };
+  }
+
   if (discovery.status === "found") website = discovery.website;
 
   if (website) {
-    const scrapeResult = await scrapeWebsiteForEmail(website);
-    if (scrapeResult.email) {
-      const contactId = await saveReusableEmail(supabase, group, scrapeResult.email, scrapeResult);
-      const updatedJobs = await updateJobsForGroup(supabase, group, {
-        extracted_email: scrapeResult.email,
-        email_contact_id: contactId,
-        company_website_url: website,
-        website_discovery_status: "found",
-        website_discovery_source: discovery.source,
-        website_discovery_confidence: discovery.confidence,
-        website_discovery_error: null,
-        apply_method: "email",
-        email_extraction_status: "found",
-        email_extraction_source: scrapeResult.source,
-        email_extraction_confidence: scrapeResult.confidence,
-        email_extraction_error: null,
-      }, { incrementWebsiteAttempt: discovery.attempted });
-      return { status: "email_found", websiteFound: true, emailFound: true, updatedJobs, providerMissing: false };
-    }
-
-    if (EMAIL_FINDER_URL && EMAIL_FINDER_API_KEY) {
+    if (EMAIL_FINDER_URL && EMAIL_FINDER_API_KEY && limits.emailFinderCallsRemaining > 0) {
+      limits.emailFinderCallsRemaining -= 1;
       const finderResult = await callEmailFinder({ ...job, company_website_url: website }, website);
       const finderEmail = cleanEmail(finderResult.email);
       if (finderEmail) {
@@ -857,8 +907,28 @@ async function processCompanyGroup(supabase: ReturnType<typeof createClient>, gr
           email_extraction_confidence: finderResult.confidence,
           email_extraction_error: null,
         }, { incrementWebsiteAttempt: discovery.attempted });
-        return { status: "email_found", websiteFound: true, emailFound: true, updatedJobs, providerMissing: false };
+        return { status: "email_found", websiteFound: true, emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: false };
       }
+    }
+
+    const scrapeResult = await scrapeWebsiteForEmail(website);
+    if (scrapeResult.email) {
+      const contactId = await saveReusableEmail(supabase, group, scrapeResult.email, scrapeResult);
+      const updatedJobs = await updateJobsForGroup(supabase, group, {
+        extracted_email: scrapeResult.email,
+        email_contact_id: contactId,
+        company_website_url: website,
+        website_discovery_status: "found",
+        website_discovery_source: discovery.source,
+        website_discovery_confidence: discovery.confidence,
+        website_discovery_error: null,
+        apply_method: "email",
+        email_extraction_status: "found",
+        email_extraction_source: scrapeResult.source,
+        email_extraction_confidence: scrapeResult.confidence,
+        email_extraction_error: null,
+      }, { incrementWebsiteAttempt: discovery.attempted });
+      return { status: "email_found", websiteFound: true, emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: !EMAIL_FINDER_URL || !EMAIL_FINDER_API_KEY };
     }
 
     const updatedJobs = await updateJobsForGroup(supabase, group, {
@@ -873,25 +943,7 @@ async function processCompanyGroup(supabase: ReturnType<typeof createClient>, gr
       email_extraction_confidence: 0,
       email_extraction_error: null,
     }, { incrementWebsiteAttempt: discovery.attempted });
-    return { status: "not_found", websiteFound: true, emailFound: false, updatedJobs, providerMissing: false };
-  }
-
-  if (discovery.status === "provider_missing" && EMAIL_FINDER_URL && EMAIL_FINDER_API_KEY) {
-    const finderResult = await callEmailFinder(job, null);
-    const finderEmail = cleanEmail(finderResult.email);
-    if (finderEmail) {
-      const contactId = await saveReusableEmail(supabase, group, finderEmail, finderResult);
-      const updatedJobs = await updateJobsForGroup(supabase, group, {
-        extracted_email: finderEmail,
-        email_contact_id: contactId,
-        apply_method: "email",
-        email_extraction_status: "found",
-        email_extraction_source: finderResult.source,
-        email_extraction_confidence: finderResult.confidence,
-        email_extraction_error: null,
-      }, { incrementWebsiteAttempt: false });
-      return { status: "email_found", websiteFound: false, emailFound: true, updatedJobs, providerMissing: true };
-    }
+    return { status: "not_found", websiteFound: true, emailFound: false, updatedJobs, providerMissing: false, emailFinderProviderMissing: !EMAIL_FINDER_URL || !EMAIL_FINDER_API_KEY };
   }
 
   const failed = discovery.status === "failed";
@@ -909,7 +961,8 @@ async function processCompanyGroup(supabase: ReturnType<typeof createClient>, gr
     websiteFound: false,
     emailFound: false,
     updatedJobs,
-    providerMissing: discovery.status === "provider_missing",
+    providerMissing: false,
+    emailFinderProviderMissing: false,
   };
 }
 
@@ -927,6 +980,8 @@ serve(async (req) => {
     const jobId = text(input.job_id);
     const forceRetry = input.force_retry === true;
     const maxAttempts = Math.max(1, Math.min(10, Number(input.max_attempts || 3)));
+    const maxCompanySearches = Math.max(1, Math.min(100, Number(input.max_company_searches || 25)));
+    const maxEmailFinderCalls = Math.max(0, Math.min(100, Number(input.max_email_finder_calls || 25)));
     const onlyApproved = input.only_approved === false ? false : true;
     const queryLimit = jobId ? 1 : Math.max(limit * 4, 100);
 
@@ -936,7 +991,6 @@ serve(async (req) => {
       .from("jobs")
       .select("*")
       .is("extracted_email", null)
-      .not("company", "is", null)
       .order("created_at", { ascending: true })
       .limit(queryLimit);
 
@@ -955,11 +1009,13 @@ serve(async (req) => {
       .filter((job) => Boolean(companyKey(job)))
       .slice(0, jobId ? 1 : limit);
 
-    const groups = buildCompanyGroups(eligibleJobs);
+    const groups = buildCompanyGroups(eligibleJobs).slice(0, jobId ? 1 : maxCompanySearches);
+    const processedJobs = groups.reduce((total, group) => total + group.jobs.length, 0);
+    const limits: RunLimits = { emailFinderCallsRemaining: maxEmailFinderCalls };
     const summary = {
       ok: true,
       function: "enrich-job-emails",
-      processed_jobs: eligibleJobs.length,
+      processed_jobs: processedJobs,
       unique_companies: groups.length,
       cache_reused: 0,
       website_found: 0,
@@ -967,14 +1023,18 @@ serve(async (req) => {
       not_found: 0,
       low_confidence: 0,
       failed: 0,
+      provider_missing: 0,
       updated_jobs: 0,
       website_search_provider_missing: !WEBSITE_SEARCH_API_URL || !WEBSITE_SEARCH_API_KEY,
+      email_finder_provider_missing: !EMAIL_FINDER_URL || !EMAIL_FINDER_API_KEY,
       requested_job_id: jobId,
       only_approved: onlyApproved,
+      max_company_searches: maxCompanySearches,
+      max_email_finder_calls: maxEmailFinderCalls,
     };
 
     for (const group of groups) {
-      const result = await processCompanyGroup(supabase, group);
+      const result = await processCompanyGroup(supabase, group, limits);
       summary.updated_jobs += result.updatedJobs;
       if (result.status === "cache_reused") summary.cache_reused += 1;
       if (result.websiteFound) summary.website_found += 1;
@@ -982,7 +1042,9 @@ serve(async (req) => {
       if (result.status === "not_found") summary.not_found += 1;
       if (result.status === "low_confidence") summary.low_confidence += 1;
       if (result.status === "failed") summary.failed += 1;
+      if (result.status === "provider_missing") summary.provider_missing += 1;
       if (result.providerMissing) summary.website_search_provider_missing = true;
+      if (result.emailFinderProviderMissing) summary.email_finder_provider_missing = true;
     }
 
     return json(summary);
