@@ -139,6 +139,28 @@ async function findPoolContact(supabase: ReturnType<typeof createClient>, normal
     .sort((a: Row, b: Row) => Number(b.confidence || 0) - Number(a.confidence || 0))[0] || null;
 }
 
+async function loadQueueMappings(supabase: ReturnType<typeof createClient>, queueRow: Row) {
+  const { data, error } = await supabase
+    .from("company_enrichment_queue_jobs")
+    .select("id,queue_id,job_id,user_id,campaign_id,status")
+    .eq("queue_id", queueRow.id)
+    .eq("status", "pending");
+
+  if (error) throw new Error(error.message);
+
+  if ((data || []).length > 0) return data || [];
+
+  const legacyJobIds = Array.isArray(queueRow.job_ids) ? queueRow.job_ids.filter(Boolean) : [];
+  return legacyJobIds.map((jobId: string) => ({
+    id: null,
+    queue_id: queueRow.id,
+    job_id: jobId,
+    user_id: queueRow.user_id || null,
+    campaign_id: queueRow.campaign_id || null,
+    status: "pending",
+  }));
+}
+
 async function incrementPoolContact(supabase: ReturnType<typeof createClient>, row: Row, count: number) {
   const now = new Date().toISOString();
   const { error } = await supabase
@@ -148,126 +170,83 @@ async function incrementPoolContact(supabase: ReturnType<typeof createClient>, r
   if (error) throw new Error(error.message);
 }
 
-async function saveLeadContactEmail(supabase: ReturnType<typeof createClient>, queueRow: Row, poolRow: Row) {
-  const email = cleanEmail(poolRow.email);
-  if (!email || !queueRow.user_id) return null;
-
-  const existing = await supabase
-    .from("lead_contact_emails")
-    .select("id,reuse_count")
-    .eq("user_identifier", queueRow.user_id)
-    .eq("email", email)
-    .limit(1);
-  if (existing.error) throw new Error(existing.error.message);
-
-  const now = new Date().toISOString();
-  const payload = {
-    user_identifier: queueRow.user_id,
-    campaign_id: queueRow.campaign_id || null,
-    company_name: queueRow.company_name,
-    company_website: poolRow.company_website_url || null,
-    company_domain: poolRow.company_domain || null,
-    company_website_status: poolRow.company_website_url ? "found" : null,
-    website_confidence: Number(poolRow.confidence || 0),
-    email,
-    email_type: poolRow.email_type || "job_contact",
-    source: "company_contacts_pool",
-    confidence: Number(poolRow.confidence || 0),
-    status: "active",
-    raw_source: { pool_contact_id: poolRow.id, queue_id: queueRow.id, job_ids: queueRow.job_ids || [] },
-    last_checked_at: now,
-    last_used_at: now,
-    updated_at: now,
-  };
-
-  const existingRow = (existing.data || [])[0];
-  if (existingRow) {
-    const update = await supabase.from("lead_contact_emails").update({
-      ...payload,
-      reuse_count: Number(existingRow.reuse_count || 0) + Math.max(1, (queueRow.job_ids || []).length),
-    }).eq("id", existingRow.id).select("id").single();
-    if (update.error) throw new Error(update.error.message);
-    return update.data.id as string;
-  }
-
-  const insert = await supabase.from("lead_contact_emails").insert(payload).select("id").single();
-  if (insert.error) throw new Error(insert.error.message);
-  return insert.data.id as string;
-}
-
-async function updateJobsWithPoolContact(supabase: ReturnType<typeof createClient>, queueRow: Row, poolRow: Row) {
+async function updateMappedJobsWithPoolContact(supabase: ReturnType<typeof createClient>, mappings: Row[], poolRow: Row) {
   const email = cleanEmail(poolRow.email);
   if (!email) return 0;
+  const jobIds = [...new Set(mappings.map((mapping) => mapping.job_id).filter(Boolean))];
+  if (!jobIds.length) return 0;
 
   const now = new Date().toISOString();
-  const contactId = await saveLeadContactEmail(supabase, queueRow, poolRow);
-  const patch = {
-    extracted_email: email,
-    email_contact_id: contactId,
-    company_website_url: poolRow.company_website_url || null,
-    website_discovery_status: poolRow.company_website_url ? "found" : null,
-    website_discovery_source: "company_contacts_pool",
-    website_discovery_confidence: Number(poolRow.confidence || 0),
-    website_discovery_error: null,
-    apply_method: "email",
-    email_extraction_status: "found",
-    email_extraction_source: "company_contacts_pool",
-    email_extraction_confidence: Number(poolRow.confidence || 0),
-    email_extraction_error: null,
-    email_extraction_attempted_at: now,
-  };
+  const { error } = await supabase
+    .from("jobs")
+    .update({
+      extracted_email: email,
+      company_website_url: poolRow.company_website_url || null,
+      website_discovery_status: poolRow.company_website_url ? "found" : null,
+      website_discovery_source: "company_contacts_pool",
+      website_discovery_confidence: Number(poolRow.confidence || 0),
+      website_discovery_error: null,
+      apply_method: "email",
+      email_extraction_status: "found",
+      email_extraction_source: "company_contacts_pool",
+      email_extraction_confidence: Number(poolRow.confidence || 0),
+      email_extraction_error: null,
+      email_extraction_attempted_at: now,
+    })
+    .in("id", jobIds);
 
-  let updated = 0;
-  const jobIds = Array.isArray(queueRow.job_ids) ? queueRow.job_ids.filter(Boolean) : [];
-  if (jobIds.length) {
-    const byIds = await supabase.from("jobs").update(patch).in("id", jobIds);
-    if (byIds.error) throw new Error(byIds.error.message);
-    updated += jobIds.length;
-  }
-
-  if (queueRow.campaign_id && queueRow.normalized_company) {
-    const byCompany = await supabase
-      .from("jobs")
-      .update(patch)
-      .eq("campaign_id", queueRow.campaign_id)
-      .eq("normalized_company", queueRow.normalized_company)
-      .or("extracted_email.is.null,email_extraction_status.neq.found");
-    if (byCompany.error) throw new Error(byCompany.error.message);
-  }
-
-  await incrementPoolContact(supabase, poolRow, Math.max(1, jobIds.length));
-  return updated;
+  if (error) throw new Error(error.message);
+  await incrementPoolContact(supabase, poolRow, jobIds.length);
+  return jobIds.length;
 }
 
-async function createNotification(supabase: ReturnType<typeof createClient>, queueRow: Row, draftsReady: number) {
-  if (!queueRow.user_id) return;
+async function generateDraftsForMappings(supabase: ReturnType<typeof createClient>, mappings: Row[]) {
+  const byUserCampaign = new Map<string, { userId: string; campaignId: string; count: number }>();
+  for (const mapping of mappings) {
+    const userId = txt(mapping.user_id);
+    const campaignId = txt(mapping.campaign_id);
+    if (!userId || !campaignId) continue;
+    const key = `${userId}:${campaignId}`;
+    const existing = byUserCampaign.get(key) || { userId, campaignId, count: 0 };
+    existing.count += 1;
+    byUserCampaign.set(key, existing);
+  }
+
+  let draftsReady = 0;
+  for (const item of byUserCampaign.values()) {
+    const result = await invokeFunction("generate-job-outreach-drafts", {
+      campaign_id: item.campaignId,
+      user_id: item.userId,
+      only_approved: true,
+      send_immediately: false,
+      limit: Math.min(24, Math.max(1, item.count)),
+    });
+    const created = Number(result.draft_created_count || 0);
+    draftsReady += created;
+    if (created > 0) await createNotification(supabase, item.userId, item.campaignId, created);
+  }
+  return draftsReady;
+}
+
+async function createNotification(supabase: ReturnType<typeof createClient>, userId: string, campaignId: string, draftsReady: number) {
   await supabase.from("user_notifications").insert({
-    user_id: queueRow.user_id,
-    campaign_id: queueRow.campaign_id || null,
+    user_id: userId,
+    campaign_id: campaignId,
     type: "company_enrichment_completed",
     title: "Applications ready for review",
-    message: `Applix found 0 new jobs and prepared ${draftsReady} applications. Please review and approve before sending.`,
-    metadata: {
-      queue_id: queueRow.id,
-      normalized_company: queueRow.normalized_company,
-      job_ids: queueRow.job_ids || [],
-      drafts_ready: draftsReady,
-    },
+    message: `Applix prepared ${draftsReady} applications. Please review and approve before sending.`,
+    metadata: { drafts_ready: draftsReady },
   });
 }
 
-async function generateDrafts(supabase: ReturnType<typeof createClient>, queueRow: Row) {
-  if (!queueRow.campaign_id) return 0;
-  const result = await invokeFunction("generate-job-outreach-drafts", {
-    campaign_id: queueRow.campaign_id,
-    user_id: queueRow.user_id || undefined,
-    only_approved: true,
-    send_immediately: false,
-    limit: 5,
-  });
-  const draftsReady = Number(result.draft_created_count || 0);
-  if (draftsReady > 0) await createNotification(supabase, queueRow, draftsReady);
-  return draftsReady;
+async function markMappingsCompleted(supabase: ReturnType<typeof createClient>, mappings: Row[]) {
+  const mappingIds = mappings.map((mapping) => mapping.id).filter(Boolean);
+  if (!mappingIds.length) return;
+  const { error } = await supabase
+    .from("company_enrichment_queue_jobs")
+    .update({ status: "completed", processed_at: new Date().toISOString() })
+    .in("id", mappingIds);
+  if (error) throw new Error(error.message);
 }
 
 async function markCompleted(supabase: ReturnType<typeof createClient>, queueId: string) {
@@ -334,50 +313,52 @@ async function claimRows(supabase: ReturnType<typeof createClient>, limit: numbe
 }
 
 async function processRow(supabase: ReturnType<typeof createClient>, row: Row, limits: { emailFinderCallsRemaining: number }) {
+  const mappings = await loadQueueMappings(supabase, row);
+  const firstJobId = mappings.map((mapping) => mapping.job_id).filter(Boolean)[0];
+
   let pool = await findPoolContact(supabase, row.normalized_company);
+
+  if (!pool && firstJobId) {
+    const emailFinderCalls = limits.emailFinderCallsRemaining > 0 ? 1 : 0;
+    limits.emailFinderCallsRemaining -= emailFinderCalls;
+
+    const enrichResult = await invokeFunction("enrich-job-emails", {
+      job_id: firstJobId,
+      campaign_id: row.campaign_id || undefined,
+      only_approved: true,
+      force_retry: true,
+      limit: 1,
+      max_company_searches: 1,
+      max_email_finder_calls: emailFinderCalls,
+    });
+
+    if (Number(enrichResult.provider_missing || 0) > 0) {
+      throw new Error("Website search provider missing; retry after WEBSITE_SEARCH_API_URL and WEBSITE_SEARCH_API_KEY are configured.");
+    }
+    if (Number(enrichResult.failed || 0) > 0) {
+      throw new Error("enrich-job-emails failed for queued company.");
+    }
+
+    pool = await findPoolContact(supabase, row.normalized_company);
+  }
+
+  let updatedJobs = 0;
+  let draftsReady = 0;
+  let emailFound = false;
+  let websiteFound = false;
+  let poolReused = false;
+
   if (pool) {
-    const updatedJobs = await updateJobsWithPoolContact(supabase, row, pool);
-    const draftsReady = await generateDrafts(supabase, row);
-    await markCompleted(supabase, row.id);
-    return { status: "completed", poolReused: true, emailFound: true, websiteFound: Boolean(pool.company_website_url), updatedJobs, draftsReady };
-  }
-
-  const jobId = Array.isArray(row.job_ids) ? row.job_ids.filter(Boolean)[0] : null;
-  if (!jobId) {
-    await markCompleted(supabase, row.id);
-    return { status: "completed", poolReused: false, emailFound: false, websiteFound: false, updatedJobs: 0, draftsReady: 0 };
-  }
-
-  const emailFinderCalls = limits.emailFinderCallsRemaining > 0 ? 1 : 0;
-  limits.emailFinderCallsRemaining -= emailFinderCalls;
-
-  const enrichResult = await invokeFunction("enrich-job-emails", {
-    job_id: jobId,
-    campaign_id: row.campaign_id || undefined,
-    only_approved: true,
-    force_retry: true,
-    limit: 1,
-    max_company_searches: 1,
-    max_email_finder_calls: emailFinderCalls,
-  });
-
-  if (Number(enrichResult.provider_missing || 0) > 0) {
-    throw new Error("Website search provider missing; retry after WEBSITE_SEARCH_API_URL and WEBSITE_SEARCH_API_KEY are configured.");
-  }
-  if (Number(enrichResult.failed || 0) > 0) {
-    throw new Error("enrich-job-emails failed for queued company.");
-  }
-
-  pool = await findPoolContact(supabase, row.normalized_company);
-  if (pool) {
-    const updatedJobs = await updateJobsWithPoolContact(supabase, row, pool);
-    const draftsReady = await generateDrafts(supabase, row);
-    await markCompleted(supabase, row.id);
-    return { status: "completed", poolReused: false, emailFound: true, websiteFound: Boolean(pool.company_website_url || Number(enrichResult.website_found || 0)), updatedJobs, draftsReady };
+    emailFound = true;
+    websiteFound = Boolean(pool.company_website_url);
+    poolReused = true;
+    updatedJobs = await updateMappedJobsWithPoolContact(supabase, mappings, pool);
+    draftsReady = await generateDraftsForMappings(supabase, mappings);
+    await markMappingsCompleted(supabase, mappings);
   }
 
   await markCompleted(supabase, row.id);
-  return { status: "completed", poolReused: false, emailFound: false, websiteFound: Number(enrichResult.website_found || 0) > 0, updatedJobs: Number(enrichResult.updated_jobs || 0), draftsReady: 0 };
+  return { status: "completed", poolReused, emailFound, websiteFound, updatedJobs, draftsReady };
 }
 
 serve(async (req) => {
@@ -408,6 +389,7 @@ serve(async (req) => {
       failed: 0,
       retried: 0,
       drafts_ready: 0,
+      updated_jobs: 0,
     };
 
     for (const row of rows) {
@@ -418,6 +400,7 @@ serve(async (req) => {
         if (result.emailFound) summary.email_found += 1;
         if (result.status === "completed") summary.completed += 1;
         summary.drafts_ready += Number(result.draftsReady || 0);
+        summary.updated_jobs += Number(result.updatedJobs || 0);
       } catch (error) {
         const action = await markRetryOrFailed(supabase, row, error instanceof Error ? error.message : String(error));
         if (action === "failed") summary.failed += 1;
