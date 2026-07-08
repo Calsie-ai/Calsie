@@ -19,7 +19,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const BLOCKED_EMAIL_PARTS = ["sentry.io", "ingest", ".ingest.", "zendesk", "noreply", "no-reply", "do-not-reply", "donotreply", "privacy@", "accounts@", "billing@", "example@", "test@", "support@indeed"];
+const BLOCKED_EMAIL_PARTS = [
+  "sentry.io",
+  "ingest",
+  ".ingest.",
+  "zendesk",
+  "noreply",
+  "no-reply",
+  "do-not-reply",
+  "donotreply",
+  "privacy@",
+  "accounts@",
+  "billing@",
+  "example@",
+  "test@",
+  "support@indeed",
+];
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -181,6 +196,33 @@ async function updateJobsWithPoolContact(supabase: ReturnType<typeof createClien
   return jobIds.length;
 }
 
+async function addQueueJobMappings(
+  supabase: ReturnType<typeof createClient>,
+  queueId: string,
+  group: CompanyGroup,
+  userId: string,
+  campaignId: string,
+) {
+  const rows = group.jobs
+    .map((job) => ({
+      queue_id: queueId,
+      job_id: job.id,
+      user_id: userId,
+      campaign_id: campaignId,
+      status: "pending",
+    }))
+    .filter((row) => Boolean(row.job_id));
+
+  if (!rows.length) return 0;
+
+  const { error } = await supabase
+    .from("company_enrichment_queue_jobs")
+    .upsert(rows, { onConflict: "queue_id,job_id", ignoreDuplicates: true });
+
+  if (error) throw new Error(error.message);
+  return rows.length;
+}
+
 async function mergeQueueRow(supabase: ReturnType<typeof createClient>, group: CompanyGroup, userId: string, campaignId: string) {
   const jobIds = group.jobs.map((job) => job.id).filter(Boolean);
   const existing = await supabase
@@ -199,15 +241,12 @@ async function mergeQueueRow(supabase: ReturnType<typeof createClient>, group: C
     const update = await supabase
       .from("company_enrichment_queue")
       .update({
-        user_id: userId,
-        campaign_id: campaignId,
-        company_name: group.companyName,
-        location: group.location,
         job_ids: mergedJobIds,
         updated_at: new Date().toISOString(),
       })
       .eq("id", existingRow.id);
     if (update.error) throw new Error(update.error.message);
+    await addQueueJobMappings(supabase, existingRow.id, group, userId, campaignId);
     return existingRow.id as string;
   }
 
@@ -234,6 +273,7 @@ async function mergeQueueRow(supabase: ReturnType<typeof createClient>, group: C
     throw new Error(insert.error.message);
   }
 
+  await addQueueJobMappings(supabase, insert.data.id as string, group, userId, campaignId);
   return insert.data.id as string;
 }
 
@@ -261,7 +301,7 @@ async function createNotification(supabase: ReturnType<typeof createClient>, use
     title: queuedCompanies > 0 ? "Applications are being prepared" : "Applications ready for review",
     message: queuedCompanies > 0
       ? `Applix is preparing ${queuedCompanies} company contacts. Drafts will appear as soon as emails are found.`
-      : `Applix found 0 new jobs and prepared ${draftsReady} applications. Please review and approve before sending.`,
+      : `Applix prepared ${draftsReady} applications. Please review and approve before sending.`,
     metadata: { queued_companies: queuedCompanies, drafts_ready: draftsReady },
   });
 }
@@ -312,6 +352,7 @@ serve(async (req) => {
     let poolHits = 0;
     let queuedCompanies = 0;
     let updatedFromPool = 0;
+    let queueJobMappings = 0;
 
     for (const group of groups) {
       const pool = await findPoolContact(supabase, group);
@@ -322,6 +363,7 @@ serve(async (req) => {
       }
 
       await mergeQueueRow(supabase, group, authData.user.id, campaignId);
+      queueJobMappings += group.jobs.length;
       queuedCompanies += 1;
     }
 
@@ -346,6 +388,7 @@ serve(async (req) => {
       companies_seen: groups.length,
       pool_hits: poolHits,
       queued_companies: queuedCompanies,
+      queue_job_mappings: queueJobMappings,
       already_ready: alreadyReady,
       jobs_updated_from_pool: updatedFromPool,
       drafts_created: draftsCreated,
