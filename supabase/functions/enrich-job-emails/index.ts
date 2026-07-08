@@ -55,6 +55,10 @@ const WEBSITE_SEARCH_API_URL = Deno.env.get("WEBSITE_SEARCH_API_URL") || "";
 const WEBSITE_SEARCH_API_KEY = Deno.env.get("WEBSITE_SEARCH_API_KEY") || "";
 
 const BLOCKED_EMAIL_PARTS = [
+  "sentry.io",
+  "ingest",
+  ".ingest.",
+  "zendesk",
   "noreply",
   "no-reply",
   "do-not-reply",
@@ -98,9 +102,17 @@ const BLOCKED_WEBSITE_DOMAINS = [
   "smartrecruiters.com",
   "dayforcehcm.com",
   "greenhouse.io",
+  "grnh.se",
   "workable.com",
   "lever.co",
   "ashbyhq.com",
+  "ats.rippling.com",
+  "rippling.com",
+  "jobs.employmenthero.com",
+  "bamboohr.com",
+  "jobvite.com",
+  "teamtailor.com",
+  "myworkdayjobs.com",
 ];
 
 const CONTACT_PATHS = [
@@ -121,15 +133,7 @@ const CONTACT_PATHS = [
   "/disability-support",
 ];
 
-const CARE_KEYWORDS = [
-  "ndis",
-  "disability",
-  "care",
-  "support",
-  "home care",
-  "aged care",
-];
-
+const CARE_KEYWORDS = ["ndis", "disability", "care", "support", "home care", "aged care"];
 const URL_HINTS = ["contact", "about", "careers", "jobs", "recruitment", "staff"];
 const COMPANY_STOP_WORDS = new Set(["pty", "ltd", "limited", "the", "and", "&", "a", "an", "inc", "co", "company", "group"]);
 
@@ -214,6 +218,17 @@ function cleanEmail(value: unknown): string | null {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
   if (BLOCKED_EMAIL_PARTS.some((part) => email.includes(part))) return null;
   return email;
+}
+
+function emailDomain(email: string | null): string | null {
+  return email?.split("@")[1]?.toLowerCase() || null;
+}
+
+function emailDomainMatchesWebsite(email: string | null, website: string | null) {
+  const domain = emailDomain(email);
+  const websiteDomain = normaliseDomain(website);
+  if (!domain || !websiteDomain) return false;
+  return domain === websiteDomain || domain.endsWith(`.${websiteDomain}`) || websiteDomain.endsWith(`.${domain}`);
 }
 
 function collectStrings(value: unknown, depth = 0, out: string[] = []) {
@@ -507,8 +522,8 @@ function scoreEmail(email: string, website: string | null) {
   if (["recruitment", "careers", "career", "hr", "jobs", "job", "people"].some((prefix) => local.startsWith(prefix))) score += 70;
   if (["admin", "info", "contact", "hello", "office", "enquiries", "enquiry"].some((prefix) => local.startsWith(prefix))) score += 45;
   if (website) {
-    const websiteDomain = normaliseDomain(website);
-    if (websiteDomain && domain && (websiteDomain === domain || websiteDomain.endsWith(`.${domain}`) || domain.endsWith(websiteDomain))) score += 35;
+    if (emailDomainMatchesWebsite(email, website)) score += 35;
+    else score -= 25;
   }
   if (["gmail.com", "outlook.com", "hotmail.com", "yahoo.com", "icloud.com"].includes(domain)) score -= 15;
   return score;
@@ -518,6 +533,7 @@ function bestEmail(candidates: string[], website: string | null) {
   const clean = [...new Set(candidates.map(cleanEmail).filter(Boolean) as string[])];
   return clean
     .map((email) => ({ email, score: scoreEmail(email, website) }))
+    .filter((candidate) => !website || emailDomainMatchesWebsite(candidate.email, website) || candidate.score >= 70)
     .sort((a, b) => b.score - a.score)[0] || null;
 }
 
@@ -672,6 +688,118 @@ function cleanPatch(patch: Row) {
   return Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
 }
 
+function isReusablePoolRow(row: Row, website: string | null) {
+  const email = cleanEmail(row.email);
+  if (!email) return false;
+  if (Number(row.confidence || 0) < 70) return false;
+  if (text(row.status)?.toLowerCase() !== "active") return false;
+  if (website && !emailDomainMatchesWebsite(email, website) && Number(row.confidence || 0) < 90) return false;
+  return true;
+}
+
+async function findPoolContact(supabase: ReturnType<typeof createClient>, group: CompanyGroup) {
+  const website = knownWebsiteForGroup(group);
+  const domain = normaliseDomain(website);
+  const rows: Row[] = [];
+
+  if (domain) {
+    const byDomain = await supabase
+      .from("company_contacts_pool")
+      .select("*")
+      .eq("status", "active")
+      .eq("company_domain", domain)
+      .gte("confidence", 70)
+      .order("confidence", { ascending: false })
+      .limit(10);
+    if (byDomain.error) throw new Error(byDomain.error.message);
+    rows.push(...(byDomain.data || []));
+  }
+
+  const byCompany = await supabase
+    .from("company_contacts_pool")
+    .select("*")
+    .eq("status", "active")
+    .eq("normalized_company", group.key)
+    .gte("confidence", 70)
+    .order("confidence", { ascending: false })
+    .limit(10);
+  if (byCompany.error) throw new Error(byCompany.error.message);
+  rows.push(...(byCompany.data || []));
+
+  return [...new Map(rows.map((row) => [row.id, row])).values()]
+    .map((row) => ({ ...row, email: cleanEmail(row.email), company_website_url: safeUrl(row.company_website_url), company_domain: normaliseDomain(row.company_domain || row.company_website_url) }))
+    .filter((row) => isReusablePoolRow(row, row.company_website_url || website))
+    .sort((a, b) => {
+      const aSameDomain = emailDomainMatchesWebsite(a.email, a.company_website_url || website) ? 1 : 0;
+      const bSameDomain = emailDomainMatchesWebsite(b.email, b.company_website_url || website) ? 1 : 0;
+      return bSameDomain - aSameDomain || Number(b.confidence || 0) - Number(a.confidence || 0);
+    })[0] || null;
+}
+
+async function incrementPoolContact(supabase: ReturnType<typeof createClient>, row: Row, count: number) {
+  if (!row?.id) return;
+  const now = new Date().toISOString();
+  const update = await supabase
+    .from("company_contacts_pool")
+    .update({ use_count: Number(row.use_count || 0) + count, last_used_at: now, updated_at: now })
+    .eq("id", row.id);
+  if (update.error) throw new Error(update.error.message);
+}
+
+async function saveCompanyContactPool(supabase: ReturnType<typeof createClient>, group: CompanyGroup, email: string, result: EmailResult) {
+  const clean = cleanEmail(email);
+  if (!clean) return null;
+
+  const website = safeUrl(result.companyWebsite);
+  if (website && !emailDomainMatchesWebsite(clean, website) && Number(result.confidence || 0) < 70) return null;
+
+  const domain = normaliseDomain(result.companyDomain || website || emailDomain(clean));
+  const now = new Date().toISOString();
+  const job = representativeJob(group);
+  const payload = {
+    company_name: group.companyName,
+    normalized_company: group.key,
+    company_domain: domain,
+    company_website_url: website,
+    email: clean,
+    email_type: "job_contact",
+    source: result.source,
+    confidence: Math.max(0, Math.min(100, Math.round(Number(result.confidence || 0)))),
+    status: "active",
+    quality_status: Number(result.confidence || 0) >= 70 ? "verified" : "unverified",
+    last_verified_at: Number(result.confidence || 0) >= 70 ? now : null,
+    last_used_at: now,
+    use_count: group.jobs.length,
+    first_job_id: job.id || null,
+    first_campaign_id: job.campaign_id || null,
+    raw_source: { company_key: group.key, job_ids: group.jobs.map((item) => item.id), source: result.source, provider_result: result.raw },
+    updated_at: now,
+  };
+
+  const existing = await supabase
+    .from("company_contacts_pool")
+    .select("id,use_count,confidence")
+    .eq("normalized_company", group.key)
+    .eq("email", clean)
+    .limit(1);
+  if (existing.error) throw new Error(existing.error.message);
+
+  const existingRow = (existing.data || [])[0];
+  if (existingRow) {
+    const update = await supabase.from("company_contacts_pool").update({
+      ...payload,
+      confidence: Math.max(Number(existingRow.confidence || 0), payload.confidence),
+      use_count: Number(existingRow.use_count || 0) + group.jobs.length,
+    }).eq("id", existingRow.id).select("id").single();
+    if (update.error) throw new Error(update.error.message);
+    return update.data.id as string;
+  }
+
+  const insert = await supabase.from("company_contacts_pool").insert(payload).select("id").single();
+  if (insert.error) throw new Error(insert.error.message);
+  return insert.data.id as string;
+}
+
 async function fetchReusableCandidates(supabase: ReturnType<typeof createClient>, group: CompanyGroup, domain: string | null) {
   const rows: Row[] = [];
 
@@ -726,7 +854,7 @@ async function findReusableContact(supabase: ReturnType<typeof createClient>, gr
       const rowCompany = normaliseCompany(row.company_name);
       const companyMatches = rowCompany === group.key || textMentionsCompany(row.company_name, group.companyName);
       const domainMatches = domain && row.company_domain === domain;
-      return (row.email || row.company_website) && (companyMatches || domainMatches);
+      return row.email && Number(row.confidence || 0) >= 70 && (companyMatches || domainMatches);
     })
     .sort((a, b) => Number(b.confidence || b.website_confidence || 0) - Number(a.confidence || a.website_confidence || 0))[0] || null;
 }
@@ -734,7 +862,7 @@ async function findReusableContact(supabase: ReturnType<typeof createClient>, gr
 async function saveReusableEmail(supabase: ReturnType<typeof createClient>, group: CompanyGroup, email: string, result: EmailResult) {
   const now = new Date().toISOString();
   const website = safeUrl(result.companyWebsite);
-  const domain = normaliseDomain(result.companyDomain || website);
+  const domain = normaliseDomain(result.companyDomain || website || emailDomain(email));
   const job = representativeJob(group);
   const payload = {
     user_identifier: group.userIdentifier,
@@ -827,18 +955,77 @@ function websitePatch(result: WebsiteDiscoveryResult) {
   };
 }
 
+async function applyFoundEmail(supabase: ReturnType<typeof createClient>, group: CompanyGroup, email: string, result: EmailResult, source: string, discovery?: WebsiteDiscoveryResult) {
+  const clean = cleanEmail(email);
+  if (!clean) return null;
+  await saveCompanyContactPool(supabase, group, clean, result);
+  const contactId = await saveReusableEmail(supabase, group, clean, result);
+  const website = safeUrl(result.companyWebsite);
+  const updatedJobs = await updateJobsForGroup(supabase, group, {
+    extracted_email: clean,
+    email_contact_id: contactId,
+    company_website_url: website,
+    website_discovery_status: website ? "found" : undefined,
+    website_discovery_source: website ? (discovery?.source || source) : undefined,
+    website_discovery_confidence: website ? (discovery?.confidence || result.confidence) : undefined,
+    website_discovery_error: null,
+    apply_method: "email",
+    email_extraction_status: "found",
+    email_extraction_source: source,
+    email_extraction_confidence: result.confidence,
+    email_extraction_error: null,
+  }, { incrementWebsiteAttempt: discovery?.attempted || false });
+  return updatedJobs;
+}
+
 async function processCompanyGroup(supabase: ReturnType<typeof createClient>, group: CompanyGroup, limits: RunLimits) {
   const job = representativeJob(group);
   const rawWebsite = knownWebsiteForGroup(group);
-  const reusable = await findReusableContact(supabase, group);
 
+  const poolContact = await findPoolContact(supabase, group);
+  if (poolContact?.email) {
+    await incrementPoolContact(supabase, poolContact, group.jobs.length);
+    const website = safeUrl(poolContact.company_website_url || rawWebsite);
+    const contactId = await saveReusableEmail(supabase, group, poolContact.email, {
+      email: poolContact.email,
+      confidence: Number(poolContact.confidence || 80),
+      source: "company_contacts_pool",
+      raw: { pool_contact_id: poolContact.id },
+      companyWebsite: website,
+      companyDomain: normaliseDomain(poolContact.company_domain || website),
+    });
+    const updatedJobs = await updateJobsForGroup(supabase, group, {
+      extracted_email: poolContact.email,
+      email_contact_id: contactId,
+      company_website_url: website,
+      website_discovery_status: website ? "found" : undefined,
+      website_discovery_source: website ? "company_contacts_pool" : undefined,
+      website_discovery_confidence: Number(poolContact.confidence || 80),
+      website_discovery_error: null,
+      apply_method: "email",
+      email_extraction_status: "found",
+      email_extraction_source: "company_contacts_pool",
+      email_extraction_confidence: Number(poolContact.confidence || 80),
+      email_extraction_error: null,
+    }, { incrementEmailAttempt: false });
+    return { status: "pool_reused", websiteFound: Boolean(website), emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: false };
+  }
+
+  const reusable = await findReusableContact(supabase, group);
   if (reusable?.email) {
     await incrementReusableContact(supabase, reusable, group.jobs.length);
     const website = safeUrl(reusable.company_website || rawWebsite);
-    const contactId = reusable.id as string;
+    await saveCompanyContactPool(supabase, group, reusable.email, {
+      email: reusable.email,
+      confidence: Number(reusable.confidence || 80),
+      source: "lead_contact_emails_cache",
+      raw: { lead_contact_email_id: reusable.id },
+      companyWebsite: website,
+      companyDomain: normaliseDomain(reusable.company_domain || website),
+    });
     const updatedJobs = await updateJobsForGroup(supabase, group, {
       extracted_email: reusable.email,
-      email_contact_id: contactId,
+      email_contact_id: reusable.id,
       company_website_url: website,
       website_discovery_status: website ? "found" : undefined,
       website_discovery_source: website ? "lead_contact_emails_cache" : undefined,
@@ -849,35 +1036,21 @@ async function processCompanyGroup(supabase: ReturnType<typeof createClient>, gr
       email_extraction_source: "reused_lead_contact_emails",
       email_extraction_confidence: Number(reusable.confidence || 80),
       email_extraction_error: null,
-    });
+    }, { incrementEmailAttempt: false });
     return { status: "cache_reused", websiteFound: Boolean(website), emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: false };
   }
 
-  const knownWebsite = safeUrl(reusable?.company_website || rawWebsite);
+  const knownWebsite = safeUrl(rawWebsite);
   const rawEmail = bestEmail(group.jobs.flatMap((item) => rawEmailCandidates(item.raw_payload || {})), knownWebsite);
   if (rawEmail?.email) {
     const result: EmailResult = { email: rawEmail.email, confidence: rawEmail.score, source: "job_raw_payload_email", raw: { company_key: group.key }, companyWebsite: knownWebsite, companyDomain: normaliseDomain(knownWebsite) };
-    const contactId = await saveReusableEmail(supabase, group, rawEmail.email, result);
-    const updatedJobs = await updateJobsForGroup(supabase, group, {
-      extracted_email: rawEmail.email,
-      email_contact_id: contactId,
-      company_website_url: knownWebsite,
-      website_discovery_status: knownWebsite ? "found" : undefined,
-      website_discovery_source: knownWebsite ? "raw_payload" : undefined,
-      website_discovery_confidence: knownWebsite ? rawEmail.score : undefined,
-      website_discovery_error: null,
-      apply_method: "email",
-      email_extraction_status: "found",
-      email_extraction_source: result.source,
-      email_extraction_confidence: result.confidence,
-      email_extraction_error: null,
-    });
-    return { status: "email_found", websiteFound: Boolean(knownWebsite), emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: false };
+    const updatedJobs = await applyFoundEmail(supabase, group, rawEmail.email, result, result.source);
+    if (updatedJobs !== null) return { status: "email_found", websiteFound: Boolean(knownWebsite), emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: false };
   }
 
   let website = knownWebsite;
-  let discovery: WebsiteDiscoveryResult = website
-    ? { status: "found", website, confidence: 80, source: reusable?.company_website ? "lead_contact_emails_cache" : "raw_payload", attempted: false, error: null, raw: null }
+  const discovery: WebsiteDiscoveryResult = website
+    ? { status: "found", website, confidence: 80, source: "raw_payload", attempted: false, error: null, raw: null }
     : await discoverCompanyWebsite(group.companyName, group.location);
 
   if (discovery.status === "provider_missing") {
@@ -892,43 +1065,15 @@ async function processCompanyGroup(supabase: ReturnType<typeof createClient>, gr
       const finderResult = await callEmailFinder({ ...job, company_website_url: website }, website);
       const finderEmail = cleanEmail(finderResult.email);
       if (finderEmail) {
-        const contactId = await saveReusableEmail(supabase, group, finderEmail, finderResult);
-        const updatedJobs = await updateJobsForGroup(supabase, group, {
-          extracted_email: finderEmail,
-          email_contact_id: contactId,
-          company_website_url: website,
-          website_discovery_status: "found",
-          website_discovery_source: discovery.source,
-          website_discovery_confidence: discovery.confidence,
-          website_discovery_error: null,
-          apply_method: "email",
-          email_extraction_status: "found",
-          email_extraction_source: finderResult.source,
-          email_extraction_confidence: finderResult.confidence,
-          email_extraction_error: null,
-        }, { incrementWebsiteAttempt: discovery.attempted });
-        return { status: "email_found", websiteFound: true, emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: false };
+        const updatedJobs = await applyFoundEmail(supabase, group, finderEmail, finderResult, finderResult.source, discovery);
+        if (updatedJobs !== null) return { status: "email_found", websiteFound: true, emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: false };
       }
     }
 
     const scrapeResult = await scrapeWebsiteForEmail(website);
     if (scrapeResult.email) {
-      const contactId = await saveReusableEmail(supabase, group, scrapeResult.email, scrapeResult);
-      const updatedJobs = await updateJobsForGroup(supabase, group, {
-        extracted_email: scrapeResult.email,
-        email_contact_id: contactId,
-        company_website_url: website,
-        website_discovery_status: "found",
-        website_discovery_source: discovery.source,
-        website_discovery_confidence: discovery.confidence,
-        website_discovery_error: null,
-        apply_method: "email",
-        email_extraction_status: "found",
-        email_extraction_source: scrapeResult.source,
-        email_extraction_confidence: scrapeResult.confidence,
-        email_extraction_error: null,
-      }, { incrementWebsiteAttempt: discovery.attempted });
-      return { status: "email_found", websiteFound: true, emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: !EMAIL_FINDER_URL || !EMAIL_FINDER_API_KEY };
+      const updatedJobs = await applyFoundEmail(supabase, group, scrapeResult.email, scrapeResult, scrapeResult.source, discovery);
+      if (updatedJobs !== null) return { status: "email_found", websiteFound: true, emailFound: true, updatedJobs, providerMissing: false, emailFinderProviderMissing: !EMAIL_FINDER_URL || !EMAIL_FINDER_API_KEY };
     }
 
     const updatedJobs = await updateJobsForGroup(supabase, group, {
@@ -980,8 +1125,8 @@ serve(async (req) => {
     const jobId = text(input.job_id);
     const forceRetry = input.force_retry === true;
     const maxAttempts = Math.max(1, Math.min(10, Number(input.max_attempts || 3)));
-    const maxCompanySearches = Math.max(1, Math.min(100, Number(input.max_company_searches || 25)));
-    const maxEmailFinderCalls = Math.max(0, Math.min(100, Number(input.max_email_finder_calls || 25)));
+    const maxCompanySearches = Math.max(1, Math.min(5, Number(input.max_company_searches || (jobId ? 1 : 2))));
+    const maxEmailFinderCalls = Math.max(0, Math.min(5, Number(input.max_email_finder_calls || maxCompanySearches)));
     const onlyApproved = input.only_approved === false ? false : true;
     const queryLimit = jobId ? 1 : Math.max(limit * 4, 100);
 
@@ -1017,6 +1162,7 @@ serve(async (req) => {
       function: "enrich-job-emails",
       processed_jobs: processedJobs,
       unique_companies: groups.length,
+      pool_reused: 0,
       cache_reused: 0,
       website_found: 0,
       email_found: 0,
@@ -1036,6 +1182,7 @@ serve(async (req) => {
     for (const group of groups) {
       const result = await processCompanyGroup(supabase, group, limits);
       summary.updated_jobs += result.updatedJobs;
+      if (result.status === "pool_reused") summary.pool_reused += 1;
       if (result.status === "cache_reused") summary.cache_reused += 1;
       if (result.websiteFound) summary.website_found += 1;
       if (result.emailFound) summary.email_found += 1;
