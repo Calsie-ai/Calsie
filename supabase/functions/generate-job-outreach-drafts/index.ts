@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 type Row = Record<string, any>;
 
-const VERSION = "hourly_scheduled_drafts_v1";
+const VERSION = "hourly_scheduled_drafts_v2_draft_by_default";
 const HOUR_MS = 60 * 60 * 1000;
 
 const corsHeaders = {
@@ -40,6 +40,8 @@ function cleanEmail(value: unknown): string | null {
     "linkedin.com",
     "seek.com",
     "google.com",
+    "sentry.io",
+    "ingest",
   ];
 
   return blocked.some((part) => email.includes(part)) ? null : email;
@@ -144,7 +146,7 @@ Deno.serve(async (req) => {
       : 1;
     const jobId = text(input.job_id);
     const onlyApproved = input.only_approved === false ? false : true;
-    const sendImmediately = input.send_immediately === true || Boolean(jobId);
+    const sendImmediately = input.send_immediately === true;
     const baseTime = sendImmediately ? new Date() : new Date(Date.now() + startDelayHours * HOUR_MS);
     const campaignId = text(input.campaign_id);
     const userId = text(input.user_id);
