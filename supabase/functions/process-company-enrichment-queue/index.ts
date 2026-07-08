@@ -7,6 +7,9 @@ const FUNCTION_NAME = "process-company-enrichment-queue";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || Deno.env.get("APPLIX_SERVICE_ROLE_KEY") || "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") || Deno.env.get("APPLIX_CRON_SECRET") || "";
+const MAX_WORKER_LIMIT = 1;
+const ENRICH_TIMEOUT_MS = 55_000;
+const DRAFT_TIMEOUT_MS = 45_000;
 
 const corsHeaders = {
   "access-control-allow-origin": "*",
@@ -103,22 +106,34 @@ function isReusablePoolRow(row: Row) {
   return true;
 }
 
-async function invokeFunction(name: string, payload: Row) {
-  const response = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/${name}`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-    },
-    body: JSON.stringify(payload),
-  });
+async function invokeFunction(name: string, payload: Row, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/${name}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
 
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.ok === false) {
-    throw new Error(`${name} failed: ${txt(body?.error || response.statusText, "Unknown function error")}`);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || body?.ok === false) {
+      throw new Error(`${name} failed: ${txt(body?.error || response.statusText, "Unknown function error")}`);
+    }
+    return body as Row;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(`${name} timed out after ${Math.round(timeoutMs / 1000)} seconds`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
-  return body as Row;
 }
 
 async function findPoolContact(supabase: ReturnType<typeof createClient>, normalizedCompany: string) {
@@ -139,6 +154,18 @@ async function findPoolContact(supabase: ReturnType<typeof createClient>, normal
     .sort((a: Row, b: Row) => Number(b.confidence || 0) - Number(a.confidence || 0))[0] || null;
 }
 
+async function unlockStaleProcessingRows(supabase: ReturnType<typeof createClient>) {
+  const staleBefore = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { error, count } = await supabase
+    .from("company_enrichment_queue")
+    .update({ status: "pending", locked_at: null, locked_by: null, updated_at: new Date().toISOString() }, { count: "exact" })
+    .eq("status", "processing")
+    .lt("locked_at", staleBefore);
+
+  if (error) throw new Error(error.message);
+  return Number(count || 0);
+}
+
 async function loadQueueMappings(supabase: ReturnType<typeof createClient>, queueRow: Row) {
   const { data, error } = await supabase
     .from("company_enrichment_queue_jobs")
@@ -147,7 +174,6 @@ async function loadQueueMappings(supabase: ReturnType<typeof createClient>, queu
     .eq("status", "pending");
 
   if (error) throw new Error(error.message);
-
   if ((data || []).length > 0) return data || [];
 
   const legacyJobIds = Array.isArray(queueRow.job_ids) ? queueRow.job_ids.filter(Boolean) : [];
@@ -200,6 +226,17 @@ async function updateMappedJobsWithPoolContact(supabase: ReturnType<typeof creat
   return jobIds.length;
 }
 
+async function createNotification(supabase: ReturnType<typeof createClient>, userId: string, campaignId: string, draftsReady: number) {
+  await supabase.from("user_notifications").insert({
+    user_id: userId,
+    campaign_id: campaignId,
+    type: "company_enrichment_completed",
+    title: "Applications ready for review",
+    message: `Applix prepared ${draftsReady} applications. Please review and approve before sending.`,
+    metadata: { drafts_ready: draftsReady },
+  });
+}
+
 async function generateDraftsForMappings(supabase: ReturnType<typeof createClient>, mappings: Row[]) {
   const byUserCampaign = new Map<string, { userId: string; campaignId: string; count: number }>();
   for (const mapping of mappings) {
@@ -220,23 +257,12 @@ async function generateDraftsForMappings(supabase: ReturnType<typeof createClien
       only_approved: true,
       send_immediately: false,
       limit: Math.min(24, Math.max(1, item.count)),
-    });
+    }, DRAFT_TIMEOUT_MS);
     const created = Number(result.draft_created_count || 0);
     draftsReady += created;
     if (created > 0) await createNotification(supabase, item.userId, item.campaignId, created);
   }
   return draftsReady;
-}
-
-async function createNotification(supabase: ReturnType<typeof createClient>, userId: string, campaignId: string, draftsReady: number) {
-  await supabase.from("user_notifications").insert({
-    user_id: userId,
-    campaign_id: campaignId,
-    type: "company_enrichment_completed",
-    title: "Applications ready for review",
-    message: `Applix prepared ${draftsReady} applications. Please review and approve before sending.`,
-    metadata: { drafts_ready: draftsReady },
-  });
 }
 
 async function markMappingsCompleted(supabase: ReturnType<typeof createClient>, mappings: Row[]) {
@@ -262,7 +288,7 @@ async function markRetryOrFailed(supabase: ReturnType<typeof createClient>, row:
   const attempts = Number(row.attempts || 0) + 1;
   const maxAttempts = Number(row.max_attempts || 3);
   const failed = attempts >= maxAttempts;
-  const backoffMinutes = Math.min(240, Math.max(15, attempts * 15));
+  const backoffMinutes = message.includes("timed out") ? 5 : Math.min(240, Math.max(15, attempts * 15));
   const now = new Date();
   const availableAt = new Date(now.getTime() + backoffMinutes * 60 * 1000).toISOString();
 
@@ -282,7 +308,7 @@ async function markRetryOrFailed(supabase: ReturnType<typeof createClient>, row:
   return failed ? "failed" : "retried";
 }
 
-async function claimRows(supabase: ReturnType<typeof createClient>, limit: number, workerId: string) {
+async function claimRows(supabase: ReturnType<typeof createClient>, workerId: string) {
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("company_enrichment_queue")
@@ -291,13 +317,13 @@ async function claimRows(supabase: ReturnType<typeof createClient>, limit: numbe
     .lte("available_at", now)
     .order("priority", { ascending: true })
     .order("created_at", { ascending: true })
-    .limit(limit * 3);
+    .limit(3);
 
   if (error) throw new Error(error.message);
 
   const claimed: Row[] = [];
   for (const row of (data || []).filter((item: Row) => Number(item.attempts || 0) < Number(item.max_attempts || 3))) {
-    if (claimed.length >= limit) break;
+    if (claimed.length >= MAX_WORKER_LIMIT) break;
     const update = await supabase
       .from("company_enrichment_queue")
       .update({ status: "processing", locked_at: now, locked_by: workerId, updated_at: now })
@@ -317,26 +343,33 @@ async function processRow(supabase: ReturnType<typeof createClient>, row: Row, l
   const firstJobId = mappings.map((mapping) => mapping.job_id).filter(Boolean)[0];
 
   let pool = await findPoolContact(supabase, row.normalized_company);
+  let enrichTimedOut = false;
 
   if (!pool && firstJobId) {
     const emailFinderCalls = limits.emailFinderCallsRemaining > 0 ? 1 : 0;
     limits.emailFinderCallsRemaining -= emailFinderCalls;
 
-    const enrichResult = await invokeFunction("enrich-job-emails", {
-      job_id: firstJobId,
-      campaign_id: row.campaign_id || undefined,
-      only_approved: true,
-      force_retry: true,
-      limit: 1,
-      max_company_searches: 1,
-      max_email_finder_calls: emailFinderCalls,
-    });
+    try {
+      const enrichResult = await invokeFunction("enrich-job-emails", {
+        job_id: firstJobId,
+        campaign_id: row.campaign_id || undefined,
+        only_approved: true,
+        force_retry: true,
+        limit: 1,
+        max_company_searches: 1,
+        max_email_finder_calls: emailFinderCalls,
+      }, ENRICH_TIMEOUT_MS);
 
-    if (Number(enrichResult.provider_missing || 0) > 0) {
-      throw new Error("Website search provider missing; retry after WEBSITE_SEARCH_API_URL and WEBSITE_SEARCH_API_KEY are configured.");
-    }
-    if (Number(enrichResult.failed || 0) > 0) {
-      throw new Error("enrich-job-emails failed for queued company.");
+      if (Number(enrichResult.provider_missing || 0) > 0) {
+        throw new Error("Website search provider missing; retry after WEBSITE_SEARCH_API_URL and WEBSITE_SEARCH_API_KEY are configured.");
+      }
+      if (Number(enrichResult.failed || 0) > 0) {
+        throw new Error("enrich-job-emails failed for queued company.");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("timed out")) enrichTimedOut = true;
+      throw error;
     }
 
     pool = await findPoolContact(supabase, row.normalized_company);
@@ -354,10 +387,12 @@ async function processRow(supabase: ReturnType<typeof createClient>, row: Row, l
     poolReused = true;
     updatedJobs = await updateMappedJobsWithPoolContact(supabase, mappings, pool);
     draftsReady = await generateDraftsForMappings(supabase, mappings);
-    await markMappingsCompleted(supabase, mappings);
   }
 
-  await markCompleted(supabase, row.id);
+  if (!enrichTimedOut) {
+    await markMappingsCompleted(supabase, mappings);
+    await markCompleted(supabase, row.id);
+  }
   return { status: "completed", poolReused, emailFound, websiteFound, updatedJobs, draftsReady };
 }
 
@@ -370,17 +405,20 @@ serve(async (req) => {
     if (!isInternalAuthorized(req)) return json({ ok: false, error: "Unauthorized." }, 401);
 
     const input = await req.json().catch(() => ({}));
-    const limit = Math.max(1, Math.min(5, Number(input.limit || 2)));
-    const maxEmailFinderCalls = Math.max(0, Math.min(limit, Number(input.max_email_finder_calls ?? limit)));
+    const maxEmailFinderCalls = Math.max(0, Math.min(1, Number(input.max_email_finder_calls ?? 1)));
     const workerId = txt(input.lock_id, `${FUNCTION_NAME}-${crypto.randomUUID()}`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-    const rows = await claimRows(supabase, limit, workerId);
+    const stale_unlocked = await unlockStaleProcessingRows(supabase);
+    const rows = await claimRows(supabase, workerId);
     const limits = { emailFinderCallsRemaining: maxEmailFinderCalls };
 
     const summary = {
       ok: true,
       function: FUNCTION_NAME,
+      requested_limit_ignored: input.limit ?? null,
+      hard_limit: MAX_WORKER_LIMIT,
+      stale_unlocked,
       claimed: rows.length,
       pool_reused: 0,
       website_found: 0,
