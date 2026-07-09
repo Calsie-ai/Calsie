@@ -16,7 +16,7 @@ const onboardingSlides = [
   {
     title: "WHAT DOES IT DO",
     body:
-      "APPLIX CAN USE YOUR DETAILS, YOUR CV, AND YOUR SELECTED TEMPLATE TO PREPARE AND SEND JOB CONTACT EMAILS ON YOUR BEHALF.",
+      "APPLIX CAN USE YOUR DETAILS, YOUR CV, AND YOUR SELECTED TEMPLATE TO PREPARE JOB CONTACT EMAILS.",
   },
   {
     title: "HOW TO CONNECT THE APP",
@@ -149,7 +149,7 @@ export default function HomePage() {
           padding: 2,
         }}
       >
-        ☰
+        Menu
       </button>
     </header>
   );
@@ -192,13 +192,13 @@ export default function HomePage() {
     textTransform: "uppercase" as const,
   };
 
-  const fineDividerStyle = {
-    position: "relative" as const,
-    zIndex: 2,
-    width: "min(340px, calc(100vw - 52px))",
+  const sectionLineStyle = {
+    width: "min(340px, calc(100vw - 90px))",
     height: 1,
-    margin: "clamp(6px, 2vw, 12px) auto",
-    background: "linear-gradient(90deg, transparent, rgba(255, 92, 168, .72), transparent)",
+    margin: "18px auto 0",
+    background:
+      "linear-gradient(90deg, rgba(255,92,168,0) 0%, rgba(255,92,168,.55) 18%, rgba(255,92,168,.55) 82%, rgba(255,92,168,0) 100%)",
+    opacity: 0.9,
   };
 
   const primaryButtonStyle = {
@@ -225,317 +225,88 @@ export default function HomePage() {
   const activeSlide = onboardingSlides[carouselIndex];
 
   return (
-    <main
-      style={{
-        position: "relative",
-        minHeight: "100svh",
-        overflowX: "hidden",
-        backgroundColor: "#fff7fb",
-        color: ink,
-        fontFamily: "Arial, Helvetica, sans-serif",
-      }}
-    >
-      <div
-        aria-hidden="true"
-        style={{
-          position: "fixed",
-          inset: "-12% -35% -20%",
-          backgroundImage:
-            "linear-gradient(rgba(255, 70, 190, .24) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 70, 190, .24) 1px, transparent 1px)",
-          backgroundSize: "28px 28px",
-          transform: "perspective(760px) rotateX(22deg) scale(1.08)",
-          transformOrigin: "top center",
-          opacity: 0.96,
-          pointerEvents: "none",
-        }}
-      />
-
-      <div
-        aria-hidden="true"
-        style={{
-          position: "fixed",
-          inset: "-12% -35% -20%",
-          backgroundImage:
-            "linear-gradient(rgba(20, 16, 22, .34) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .34) 1px, transparent 1px)",
-          backgroundSize: "28px 28px",
-          transform: "perspective(760px) rotateX(22deg) scale(1.08)",
-          transformOrigin: "top center",
-          opacity: 0.34,
-          pointerEvents: "none",
-          WebkitMaskImage:
-            "linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%)",
-          maskImage:
-            "linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%)",
-        }}
-      />
-
-      <div
-        aria-hidden="true"
-        style={{
-          position: "fixed",
-          inset: 0,
-          background:
-            "radial-gradient(circle at 50% 24%, rgba(255,255,255,.9), rgba(255,255,255,.66) 31%, transparent 62%)",
-          pointerEvents: "none",
-        }}
-      />
+    <main style={{ position: "relative", minHeight: "100svh", overflowX: "hidden", backgroundColor: "#fff7fb", color: ink, fontFamily: "Arial, Helvetica, sans-serif" }}>
+      <div aria-hidden="true" style={{ position: "fixed", inset: "-12% -35% -20%", backgroundImage: "linear-gradient(rgba(255, 70, 190, .24) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 70, 190, .24) 1px, transparent 1px)", backgroundSize: "28px 28px", transform: "perspective(760px) rotateX(22deg) scale(1.08)", transformOrigin: "top center", opacity: 0.96, pointerEvents: "none" }} />
+      <div aria-hidden="true" style={{ position: "fixed", inset: "-12% -35% -20%", backgroundImage: "linear-gradient(rgba(20, 16, 22, .34) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .34) 1px, transparent 1px)", backgroundSize: "28px 28px", transform: "perspective(760px) rotateX(22deg) scale(1.08)", transformOrigin: "top center", opacity: 0.34, pointerEvents: "none", WebkitMaskImage: "linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%)", maskImage: "linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%)" }} />
+      <div aria-hidden="true" style={{ position: "fixed", inset: 0, background: "radial-gradient(circle at 50% 24%, rgba(255,255,255,.9), rgba(255,255,255,.66) 31%, transparent 62%)", pointerEvents: "none" }} />
 
       {header}
 
-      <section
-        style={{
-          ...sectionStyle,
-          minHeight: "auto",
-          paddingTop: "clamp(8px, 2vw, 18px)",
-          paddingBottom: "clamp(10px, 2vw, 22px)",
-          overflow: "hidden",
-        }}
-      >
-        <img
-          src="/applix-logo.svg"
-          alt="Applix logo"
-          style={{
-            position: "relative",
-            zIndex: 1,
-            width: "clamp(58px, 18vw, 126px)",
-            height: "auto",
-            display: "block",
-            marginBottom: "clamp(8px, 2vw, 12px)",
-            filter: "drop-shadow(0 12px 20px rgba(255, 92, 168, .18))",
-          }}
-        />
-
-        <h1
-          aria-label="APPLIX"
-          style={{
-            position: "relative",
-            zIndex: 1,
-            width: "100%",
-            margin: 0,
-            color: pink,
-            fontSize: "clamp(52px, 10vw, 82px)",
-            lineHeight: 0.92,
-            fontWeight: 950,
-            letterSpacing: "clamp(.02em, 1vw, .1em)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          APPLIX
-        </h1>
-
-        <p
-          style={{
-            position: "relative",
-            zIndex: 1,
-            maxWidth: "100%",
-            margin: "clamp(6px, 2vw, 8px) 0 clamp(14px, 3vw, 22px)",
-            color: ink,
-            fontSize: "clamp(8px, 2.8vw, 10px)",
-            lineHeight: 1.2,
-            fontWeight: 900,
-            letterSpacing: "clamp(.08em, 1vw, .18em)",
-            textTransform: "uppercase",
-          }}
-        >
-          Persistence at Scale
-        </p>
-
-        <p style={{ ...copyStyle, position: "relative", zIndex: 1, marginBottom: 0 }}>
-          APPLIX IS FIRST SYMBIOTIC INTELLIGENCE AI, APPLIX IS EMAIL AUTOMATION SYMBIOTE THAT HAS 20 LAYERS OF COGNITIVE CAPACITY, FOR STRAIGHT FORWARD USE PLEASE FOLLOW THE GUARD RAILS.
-        </p>
+      <section style={{ ...sectionStyle, minHeight: "auto", paddingTop: "clamp(8px, 2vw, 18px)", paddingBottom: "clamp(10px, 2vw, 22px)", overflow: "hidden" }}>
+        <img src="/applix-logo.svg" alt="Applix logo" style={{ position: "relative", zIndex: 1, width: "clamp(58px, 18vw, 126px)", height: "auto", display: "block", marginBottom: "clamp(8px, 2vw, 12px)", filter: "drop-shadow(0 12px 20px rgba(255, 92, 168, .18))" }} />
+        <h1 aria-label="APPLIX" style={{ position: "relative", zIndex: 1, width: "100%", margin: 0, color: pink, fontSize: "clamp(52px, 10vw, 82px)", lineHeight: 0.92, fontWeight: 950, letterSpacing: "clamp(.02em, 1vw, .1em)", whiteSpace: "nowrap" }}>APPLIX</h1>
+        <p style={{ position: "relative", zIndex: 1, maxWidth: "100%", margin: "clamp(6px, 2vw, 8px) 0 clamp(14px, 3vw, 22px)", color: ink, fontSize: "clamp(8px, 2.8vw, 10px)", lineHeight: 1.2, fontWeight: 900, letterSpacing: "clamp(.08em, 1vw, .18em)", textTransform: "uppercase" }}>Persistence at Scale</p>
+        <p style={{ ...copyStyle, position: "relative", zIndex: 1, marginBottom: 0 }}>APPLIX IS FIRST SYMBIOTIC INTELLIGENCE AI, APPLIX IS EMAIL AUTOMATION SYMBIOTE THAT HAS 20 LAYERS OF COGNITIVE CAPACITY, FOR STRAIGHT FORWARD USE PLEASE FOLLOW THE GUARD RAILS.</p>
+        <div aria-hidden="true" style={sectionLineStyle} />
       </section>
-
-      <div aria-hidden="true" style={fineDividerStyle} />
 
       <section style={{ ...sectionStyle, paddingTop: 8 }}>
         <p style={labelStyle}>WELCOME</p>
-        <h2
-          style={{
-            margin: "0 0 8px",
-            color: ink,
-            fontSize: "clamp(17px, 5.6vw, 25px)",
-            lineHeight: 1,
-            fontWeight: 950,
-            letterSpacing: ".08em",
-            textTransform: "uppercase",
-          }}
-        >
-          CALSIE | APPLIX
-        </h2>
-        <h3
-          style={{
-            margin: "0 0 18px",
-            color: pink,
-            fontSize: "clamp(22px, 8vw, 36px)",
-            lineHeight: .92,
-            fontWeight: 950,
-            letterSpacing: ".14em",
-            textTransform: "uppercase",
-          }}
-        >
-          ABOUT APPLIX
-        </h3>
-
-        <div
-          style={{
-            display: "grid",
-            gap: 10,
-            justifyItems: "center",
-            color: ink,
-            fontSize: "clamp(10px, 3.3vw, 14px)",
-            lineHeight: 1.05,
-            fontWeight: 950,
-            letterSpacing: ".08em",
-            textTransform: "uppercase",
-          }}
-        >
+        <h2 style={{ margin: "0 0 8px", color: ink, fontSize: "clamp(17px, 5.6vw, 25px)", lineHeight: 1, fontWeight: 950, letterSpacing: ".08em", textTransform: "uppercase" }}>CALSIE | APPLIX</h2>
+        <h3 style={{ margin: "0 0 18px", color: pink, fontSize: "clamp(22px, 8vw, 36px)", lineHeight: .92, fontWeight: 950, letterSpacing: ".14em", textTransform: "uppercase" }}>ABOUT APPLIX</h3>
+        <div style={{ display: "grid", gap: 10, justifyItems: "center", color: ink, fontSize: "clamp(10px, 3.3vw, 14px)", lineHeight: 1.05, fontWeight: 950, letterSpacing: ".08em", textTransform: "uppercase" }}>
           <p style={{ margin: 0 }}>HOST <span style={{ color: pink }}>| GMAIL</span></p>
           <p style={{ margin: 0 }}>SPAN <span style={{ color: pink }}>| 30 DAYS</span></p>
           <p style={{ margin: 0 }}>DATA <span style={{ color: "#58b7ee" }}>| INDEED</span></p>
           <p style={{ margin: 0 }}>TASK <span>| 25/DAY</span></p>
         </div>
+        <div aria-hidden="true" style={sectionLineStyle} />
       </section>
-
-      <div aria-hidden="true" style={fineDividerStyle} />
 
       <section style={sectionStyle}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 20 }}>HOW TO USE APPLIX</h2>
-        <p style={copyStyle}>
-          DONT USE YOUR PERSONAL EMAIL, CREATE NEW GMAIL ONLY FOR APPLIX, SO APPLIX CAN USE IT ON YOUR BEHALF.
-        </p>
-        <p style={{ ...copyStyle, marginBottom: 0 }}>
-          ENTER YOUR NAME, THIS WILL BE USED BY APPLIX TO ADRESS YOU WHEN APPLIX IS EXECUTING TASK
-        </p>
+        <p style={copyStyle}>DONT USE YOUR PERSONAL EMAIL, CREATE NEW GMAIL ONLY FOR APPLIX, SO APPLIX CAN USE IT ON YOUR BEHALF.</p>
+        <p style={{ ...copyStyle, marginBottom: 0 }}>ENTER YOUR NAME, THIS WILL BE USED BY APPLIX TO ADRESS YOU WHEN APPLIX IS EXECUTING TASK</p>
+        <div aria-hidden="true" style={sectionLineStyle} />
       </section>
-
-      <div aria-hidden="true" style={fineDividerStyle} />
 
       <section style={sectionStyle}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 18 }}>Upload Your CV</h2>
-        <p style={copyStyle}>
-          UPLOAD YOUR RESUME/CV, APPLIX WILL ATTACH YOUR DOCUMENTSTO EVERY COMPANY IT CONTACTS PLEASE NO PERSONAL INFORMATION / CREDITS ON YOUR DOCUMENTS KEEP IT GENRAL AS MUCH AS YOU CAN
-        </p>
+        <p style={copyStyle}>UPLOAD YOUR RESUME/CV, APPLIX WILL ATTACH YOUR DOCUMENTSTO EVERY COMPANY IT CONTACTS PLEASE NO PERSONAL INFORMATION / CREDITS ON YOUR DOCUMENTS KEEP IT GENRAL AS MUCH AS YOU CAN</p>
+        <div aria-hidden="true" style={sectionLineStyle} />
       </section>
-
-      <div aria-hidden="true" style={fineDividerStyle} />
 
       <section style={sectionStyle}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 18 }}>Fill Up Template</h2>
-        <p style={copyStyle}>
-          Browse Template :
-          <br />
-          Example:
-          <br />
-          Business Analyst
-          <br />
-          Support Worker,AIN, AgeCare, IT Support, Internship.
-          <br />
-          or Start With Standard Form By Applix
-        </p>
+        <p style={copyStyle}>Browse Template :<br />Example:<br />Business Analyst<br />Support Worker,AIN, AgeCare, IT Support, Internship.<br />or Start With Standard Form By Applix</p>
+        <div aria-hidden="true" style={sectionLineStyle} />
       </section>
-
-      <div aria-hidden="true" style={fineDividerStyle} />
 
       <section style={sectionStyle}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 24 }}>HOW TO SET UP GUARD RAILS</h2>
         <h3 style={sectionHeadingStyle}>Authorize Applix</h3>
-        <p style={copyStyle}>
-          CONNECT YOUR APPLIX TO YOUR GMAIL ACCOUNT CREATED FOR APPLIX USE ONLY. ALLOW TO SEND ON EMAIL ON BEHALF
-        </p>
+        <p style={copyStyle}>CONNECT YOUR APPLIX TO YOUR GMAIL ACCOUNT CREATED FOR APPLIX USE ONLY.</p>
         <h3 style={sectionHeadingStyle}>Run Applix</h3>
-        <p style={copyStyle}>
-          APPLIX WILL BE ACTIVATED FOR 30 DAYS, EXECUTE TASK 1/HR. KEEP YOUR ACCOUNT LOGGED IN, YOU CAN CLOSE THE BROWSER
-        </p>
+        <p style={copyStyle}>APPLIX WILL BE ACTIVATED FOR 30 DAYS, EXECUTE TASK 1/HR. KEEP YOUR ACCOUNT LOGGED IN, YOU CAN CLOSE THE BROWSER</p>
+        <div aria-hidden="true" style={sectionLineStyle} />
       </section>
-
-      <div aria-hidden="true" style={fineDividerStyle} />
 
       <section style={{ ...sectionStyle, gap: 14, paddingBottom: "clamp(38px, 8vw, 76px)" }}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 2 }}>APPLIX START CHECK</h2>
-
         {!carouselComplete && (
-          <div
-            style={{
-              width: "min(360px, calc(100vw - 28px))",
-              display: "grid",
-              gap: 12,
-              justifyItems: "center",
-              padding: "18px 16px",
-              borderRadius: 26,
-              background: "rgba(255,255,255,.42)",
-              border: "1px solid rgba(22, 19, 26, .08)",
-              boxShadow: "0 14px 30px rgba(0,0,0,.08)",
-              backdropFilter: "blur(8px)",
-            }}
-          >
-            <p style={{ ...sectionHeadingStyle, marginBottom: 0 }}>
-              {carouselIndex + 1}/{onboardingSlides.length}
-            </p>
+          <div style={{ width: "min(360px, calc(100vw - 28px))", display: "grid", gap: 12, justifyItems: "center", padding: "18px 16px", borderRadius: 26, background: "rgba(255,255,255,.42)", border: "1px solid rgba(22, 19, 26, .08)", boxShadow: "0 14px 30px rgba(0,0,0,.08)", backdropFilter: "blur(8px)" }}>
+            <p style={{ ...sectionHeadingStyle, marginBottom: 0 }}>{carouselIndex + 1}/{onboardingSlides.length}</p>
             <h3 style={{ ...sectionHeadingStyle, marginBottom: 0 }}>{activeSlide.title}</h3>
             <p style={{ ...copyStyle, marginBottom: 0 }}>{activeSlide.body}</p>
-            <button type="button" onClick={confirmSlide} style={primaryButtonStyle}>
-              Yes, I understood
-            </button>
+            <button type="button" onClick={confirmSlide} style={primaryButtonStyle}>Yes, I understood</button>
           </div>
         )}
-
         {carouselComplete && !signedInEmail && (
           <div style={{ display: "grid", gap: 12, justifyItems: "center" }}>
-            <p style={{ ...copyStyle, marginBottom: 0 }}>
-              ALL START CHECKS COMPLETED. CONTINUE WITH GOOGLE TO ENTER APPLIX.
-            </p>
-            <button type="button" onClick={loginWithGoogle} disabled={loading} style={primaryButtonStyle}>
-              {loading ? "Connecting..." : "Continue with Google"}
-            </button>
+            <p style={{ ...copyStyle, marginBottom: 0 }}>ALL START CHECKS COMPLETED. CONTINUE WITH GOOGLE TO ENTER APPLIX.</p>
+            <button type="button" onClick={loginWithGoogle} disabled={loading} style={primaryButtonStyle}>{loading ? "Connecting..." : "Continue with Google"}</button>
           </div>
         )}
-
-        {!carouselComplete && !signedInEmail && (
-          <button type="button" disabled style={lockedButtonStyle}>
-            Google login locked
-          </button>
-        )}
-
-        {checkingSession && (
-          <p style={{ margin: 0, fontSize: "clamp(10px, 3vw, 13px)", fontWeight: 800 }}>
-            Checking your login...
-          </p>
-        )}
-
+        {!carouselComplete && !signedInEmail && <button type="button" disabled style={lockedButtonStyle}>Google login locked</button>}
+        {checkingSession && <p style={{ margin: 0, fontSize: "clamp(10px, 3vw, 13px)", fontWeight: 800 }}>Checking your login...</p>}
         {!checkingSession && signedInEmail && (
           <div style={{ display: "grid", gap: 10, justifyItems: "center" }}>
-            <Link
-              href="/dashboard"
-              style={{
-                ...primaryButtonStyle,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                textDecoration: "none",
-              }}
-            >
-              Go to dashboard
-            </Link>
-            <button type="button" onClick={signOut} style={primaryButtonStyle}>
-              Logout
-            </button>
+            <Link href="/dashboard" style={{ ...primaryButtonStyle, display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>Go to dashboard</Link>
+            <button type="button" onClick={signOut} style={primaryButtonStyle}>Logout</button>
           </div>
         )}
-
-        {status && (
-          <p
-            style={{
-              width: "min(320px, calc(100vw - 20px))",
-              margin: "4px 0 0",
-              color: "#7f1d1d",
-              fontSize: "clamp(10px, 3vw, 12px)",
-              fontWeight: 800,
-              lineHeight: 1.45,
-            }}
-          >
-            {status}
-          </p>
-        )}
+        {status && <p style={{ width: "min(320px, calc(100vw - 20px))", margin: "4px 0 0", color: "#7f1d1d", fontSize: "clamp(10px, 3vw, 12px)", fontWeight: 800, lineHeight: 1.45 }}>{status}</p>}
+        <div aria-hidden="true" style={sectionLineStyle} />
       </section>
     </main>
   );
