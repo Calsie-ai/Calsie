@@ -125,6 +125,15 @@ export default function HomePage() {
     textTransform: "uppercase" as const,
   };
 
+  const frontTitleStyle = {
+    ...copyStyle,
+    width: "auto",
+    margin: "0 0 8px",
+    fontSize: "clamp(8px, 2.15vw, 10px)",
+    lineHeight: 1.25,
+    letterSpacing: ".1em",
+  };
+
   const sectionLineStyle = {
     width: "min(340px, calc(100vw - 90px))",
     height: 1,
@@ -170,7 +179,7 @@ export default function HomePage() {
 
       <section style={{ ...sectionStyle, paddingTop: 8 }}>
         <p style={labelStyle}>WELCOME</p>
-        <h2 style={{ margin: "0 0 8px", color: ink, fontSize: "clamp(17px, 5.6vw, 25px)", lineHeight: 1, fontWeight: 950, letterSpacing: ".08em", textTransform: "uppercase" }}>CALSIE | APPLIX</h2>
+        <h2 style={frontTitleStyle}>CALSIE | APPLIX</h2>
         <h3 style={{ margin: "0 0 18px", color: pastelRed, fontSize: "clamp(22px, 8vw, 36px)", lineHeight: .92, fontWeight: 950, letterSpacing: ".14em", textTransform: "uppercase" }}>ABOUT APPLIX</h3>
         <div style={{ display: "grid", gap: 10, justifyItems: "center", color: ink, fontSize: "clamp(10px, 3.3vw, 14px)", lineHeight: 1.05, fontWeight: 950, letterSpacing: ".08em", textTransform: "uppercase" }}>
           <p style={{ margin: 0 }}>HOST <span style={{ color: pastelRed }}>| GMAIL</span></p>
