@@ -53,3 +53,38 @@ body .applix-setup-orb span {
   color: var(--calsie-red) !important;
   text-shadow: 0 4px 0 rgba(92, 22, 22, .16), 0 0 22px rgba(255, 111, 111, .42) !important;
 }
+
+/* Tracker page: make the dashboard link a flying Applix GIF button. */
+body .agent-home-link {
+  width: clamp(142px, 26vw, 220px) !important;
+  height: clamp(64px, 10vw, 96px) !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 111, 111, .22) !important;
+  border-radius: 24px !important;
+  background:
+    rgba(255, 255, 255, .92)
+    url('/applix-flying.gif') center / 78% auto no-repeat !important;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, .12) !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  overflow: hidden !important;
+}
+
+body .agent-home-link::after {
+  content: "Dashboard";
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+body .agent-home-link:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, .16) !important;
+}
+
+body .agent-home-link:focus-visible {
+  outline: 3px solid rgba(255, 111, 111, .72) !important;
+  outline-offset: 4px !important;
+}
