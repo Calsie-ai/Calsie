@@ -124,6 +124,10 @@
   cursor: not-allowed !important;
 }
 
+.dashboard-cockpit-shell .dashboard-actions .connector-button {
+  display: none !important;
+}
+
 .dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker'] {
   width: min(100%, 520px) !important;
   min-height: clamp(84px, 15vw, 118px) !important;
