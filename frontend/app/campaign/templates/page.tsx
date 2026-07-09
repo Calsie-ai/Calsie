@@ -99,10 +99,38 @@ const templates: CampaignTemplate[] = [
     },
   },
   {
+    id: "social-work-mental-health",
+    title: "Social Work / Mental Health",
+    description: "Higher-paying social work, casework, NDIS, hospital, and mental health roles.",
+    accent: "02",
+    values: {
+      campaignName: "Social Work Mental Health Campaign",
+      targetRole: "Mental Health Clinician",
+      relatedRoles: "Mental Health Social Worker\nHospital Social Worker\nSocial Worker Level 1/2\nCase Manager\nChild and Family Practitioner\nNDIS Support Coordinator\nSpecialist Support Coordinator\nPsychosocial Recovery Coach\nMental Health Case Manager\nAged Care Social Worker\nCare Coordinator\nCommunity Services Program Coordinator",
+      location: "Sydney NSW, Melbourne VIC, Tasmania, Australia wide",
+      workType: "Full-time, Part-time, Contract",
+      postedWithin: "30 days",
+      industry: "Social Work / Mental Health / Community Services / NDIS / Healthcare / Aged Care",
+      mustIncludeKeywords: "Master of Social Work\nMental Health\nCasework\nCase Management\nPsychosocial\nRecovery\nNDIS\nSupport Coordination\nHospital Social Work\nCommunity Services\nFamily Support\nAged Care\nDischarge Planning\nNeeds Assessment\nSupport Plans",
+      avoidKeywords: "Volunteer\nStudent Placement\nUnpaid\nHospitality\nFood Server\nHousekeeping\nCleaner\nRegistered Nurse\nSenior Manager\nDirector\nClinical Psychologist",
+      targetCompanyType: "Hospitals and health districts\nCommunity mental health providers\nNDIS providers\nNon-profit community services\nFamily support services\nAged care providers\nGovernment child protection and community services\nPsychosocial recovery providers",
+      tone: "Professional, warm, confident, and human-services focused",
+      mainMessage: "I am a Master of Social Work graduate with mental health recovery, casework, aged care, and community services experience. I am interested in social work, mental health, NDIS coordination, hospital social work, and case management opportunities.",
+      strengthsToMention: "Mental health recovery support\nCasework and needs assessment\nIndividual support planning\nCommunity linkage and referrals\nFamily and carer engagement\nClient documentation and reporting\nAged care and hospital-adjacent experience\nCulturally competent communication\nAdmin, rostering, and stakeholder coordination",
+      availability: "Available to discuss suitable opportunities",
+      specialNotes: "Prioritise higher-paying roles such as Mental Health Clinician, Hospital Social Worker, Specialist Support Coordinator, Psychosocial Recovery Coach, Case Manager, and Program Coordinator. Do not prioritise basic support worker roles unless they are strong stepping-stone roles.",
+      dailyLimit: "25",
+      campaignSpan: "30",
+      followUpAllowed: "No",
+      onlyContactJobsWithEmail: "Yes",
+      requireUserApproval: "Yes",
+    },
+  },
+  {
     id: "business-analyst",
     title: "Business Analyst",
     description: "Requirements, process, and stakeholder focused search.",
-    accent: "02",
+    accent: "03",
     values: {
       campaignName: "Business Analyst Sydney Campaign",
       targetRole: "Business Analyst",
@@ -130,7 +158,7 @@ const templates: CampaignTemplate[] = [
     id: "it-support",
     title: "IT Support",
     description: "Service desk and technical support campaign setup.",
-    accent: "03",
+    accent: "04",
     values: {
       campaignName: "IT Support Sydney Campaign",
       targetRole: "IT Support",
@@ -158,16 +186,13 @@ const templates: CampaignTemplate[] = [
     id: "custom-template",
     title: "Custom Template",
     description: "Start clean with Applix guard rails already set.",
-    accent: "04",
+    accent: "05",
     values: emptyTemplate,
   },
 ];
 
 function splitList(value: string) {
-  return value
-    .split(/[\n,]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return value.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
 }
 
 function postedWithinDays(value: string) {
@@ -190,22 +215,17 @@ export default function CampaignTemplatesPage() {
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const selectedTemplate = useMemo(
-    () => templates.find((template) => template.id === selectedTemplateId) || null,
-    [selectedTemplateId]
-  );
+  const selectedTemplate = useMemo(() => templates.find((template) => template.id === selectedTemplateId) || null, [selectedTemplateId]);
 
   useEffect(() => {
     async function checkUser() {
       try {
         const supabase = getSupabaseClient();
         const { data, error } = await supabase.auth.getUser();
-
         if (error || !data.user) {
           router.replace("/");
           return;
         }
-
         setUserId(data.user.id);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Could not check login.");
@@ -303,11 +323,7 @@ export default function CampaignTemplatesPage() {
         location,
         target_business_type: targetRole,
         search,
-        filters: {
-          ...search,
-          require_email: requireEmail,
-          require_user_approval: requireApproval,
-        },
+        filters: { ...search, require_email: requireEmail, require_user_approval: requireApproval },
         outreach,
         status: "draft",
       });
@@ -348,12 +364,7 @@ export default function CampaignTemplatesPage() {
           <p className="templates-carousel-hint">Swipe template</p>
           <div className="templates-gallery" aria-label="Campaign templates">
             {templates.map((template) => (
-              <button
-                className={`template-card ${selectedTemplateId === template.id ? "selected" : ""}`}
-                type="button"
-                key={template.id}
-                onClick={() => selectTemplate(template)}
-              >
+              <button className={`template-card ${selectedTemplateId === template.id ? "selected" : ""}`} type="button" key={template.id} onClick={() => selectTemplate(template)}>
                 <span>{template.accent}</span>
                 <strong>{template.title}</strong>
                 <p>{template.description}</p>
@@ -376,460 +387,91 @@ export default function CampaignTemplatesPage() {
 
             <fieldset>
               <legend>Campaign basics</legend>
-              <label>
-                Campaign name
-                <input value={form.campaignName} onChange={(event) => updateField("campaignName", event.target.value)} required />
-              </label>
-              <label>
-                Target role
-                <input value={form.targetRole} onChange={(event) => updateField("targetRole", event.target.value)} required />
-              </label>
-              <label>
-                Related roles
-                <textarea value={form.relatedRoles} onChange={(event) => updateField("relatedRoles", event.target.value)} rows={5} />
-              </label>
-              <label>
-                Location
-                <input value={form.location} onChange={(event) => updateField("location", event.target.value)} required />
-              </label>
-              <label>
-                Work type
-                <input value={form.workType} onChange={(event) => updateField("workType", event.target.value)} />
-              </label>
-              <label>
-                Posted within
-                <input value={form.postedWithin} onChange={(event) => updateField("postedWithin", event.target.value)} />
-              </label>
+              <label>Campaign name<input value={form.campaignName} onChange={(event) => updateField("campaignName", event.target.value)} required /></label>
+              <label>Target role<input value={form.targetRole} onChange={(event) => updateField("targetRole", event.target.value)} required /></label>
+              <label>Related roles<textarea value={form.relatedRoles} onChange={(event) => updateField("relatedRoles", event.target.value)} rows={5} /></label>
+              <label>Location<input value={form.location} onChange={(event) => updateField("location", event.target.value)} required /></label>
+              <label>Work type<input value={form.workType} onChange={(event) => updateField("workType", event.target.value)} /></label>
+              <label>Posted within<input value={form.postedWithin} onChange={(event) => updateField("postedWithin", event.target.value)} /></label>
             </fieldset>
 
             <fieldset>
               <legend>Job/company filter</legend>
-              <label>
-                Industry
-                <input value={form.industry} onChange={(event) => updateField("industry", event.target.value)} />
-              </label>
-              <label>
-                Must include keywords
-                <textarea value={form.mustIncludeKeywords} onChange={(event) => updateField("mustIncludeKeywords", event.target.value)} rows={5} />
-              </label>
-              <label>
-                Avoid keywords
-                <textarea value={form.avoidKeywords} onChange={(event) => updateField("avoidKeywords", event.target.value)} rows={5} />
-              </label>
-              <label>
-                Target company type
-                <textarea value={form.targetCompanyType} onChange={(event) => updateField("targetCompanyType", event.target.value)} rows={4} />
-              </label>
+              <label>Industry<input value={form.industry} onChange={(event) => updateField("industry", event.target.value)} /></label>
+              <label>Must include keywords<textarea value={form.mustIncludeKeywords} onChange={(event) => updateField("mustIncludeKeywords", event.target.value)} rows={5} /></label>
+              <label>Avoid keywords<textarea value={form.avoidKeywords} onChange={(event) => updateField("avoidKeywords", event.target.value)} rows={5} /></label>
+              <label>Target company type<textarea value={form.targetCompanyType} onChange={(event) => updateField("targetCompanyType", event.target.value)} rows={4} /></label>
             </fieldset>
 
             <fieldset>
               <legend>Outreach instruction</legend>
-              <label>
-                Tone
-                <input value={form.tone} onChange={(event) => updateField("tone", event.target.value)} />
-              </label>
-              <label>
-                Main message
-                <textarea value={form.mainMessage} onChange={(event) => updateField("mainMessage", event.target.value)} rows={4} />
-              </label>
-              <label>
-                Strengths to mention
-                <textarea value={form.strengthsToMention} onChange={(event) => updateField("strengthsToMention", event.target.value)} rows={5} />
-              </label>
-              <label>
-                Availability
-                <input value={form.availability} onChange={(event) => updateField("availability", event.target.value)} />
-              </label>
-              <label>
-                Special notes
-                <textarea value={form.specialNotes} onChange={(event) => updateField("specialNotes", event.target.value)} rows={4} />
-              </label>
+              <label>Tone<input value={form.tone} onChange={(event) => updateField("tone", event.target.value)} /></label>
+              <label>Main message<textarea value={form.mainMessage} onChange={(event) => updateField("mainMessage", event.target.value)} rows={4} /></label>
+              <label>Strengths to mention<textarea value={form.strengthsToMention} onChange={(event) => updateField("strengthsToMention", event.target.value)} rows={5} /></label>
+              <label>Availability<input value={form.availability} onChange={(event) => updateField("availability", event.target.value)} /></label>
+              <label>Special notes<textarea value={form.specialNotes} onChange={(event) => updateField("specialNotes", event.target.value)} rows={4} /></label>
             </fieldset>
 
             <fieldset>
               <legend>Guard rails</legend>
-              <label>
-                Daily limit
-                <input type="number" min="1" value={form.dailyLimit} onChange={(event) => updateField("dailyLimit", event.target.value)} required />
-              </label>
-              <label>
-                Campaign span
-                <input type="number" min="1" value={form.campaignSpan} onChange={(event) => updateField("campaignSpan", event.target.value)} required />
-              </label>
-              <label>
-                Follow-up allowed
-                <select value={form.followUpAllowed} onChange={(event) => updateField("followUpAllowed", event.target.value)}>
-                  <option>No</option>
-                  <option>Yes</option>
-                </select>
-              </label>
-              <label>
-                Only contact jobs with email
-                <select value={form.onlyContactJobsWithEmail} onChange={(event) => updateField("onlyContactJobsWithEmail", event.target.value)}>
-                  <option>Yes</option>
-                  <option>No</option>
-                </select>
-              </label>
-              <label>
-                Require user approval before sending
-                <select value={form.requireUserApproval} onChange={(event) => updateField("requireUserApproval", event.target.value)}>
-                  <option>Yes</option>
-                  <option>No</option>
-                </select>
-              </label>
+              <label>Daily limit<input type="number" min="1" value={form.dailyLimit} onChange={(event) => updateField("dailyLimit", event.target.value)} required /></label>
+              <label>Campaign span<input type="number" min="1" value={form.campaignSpan} onChange={(event) => updateField("campaignSpan", event.target.value)} required /></label>
+              <label>Follow-up allowed<select value={form.followUpAllowed} onChange={(event) => updateField("followUpAllowed", event.target.value)}><option>No</option><option>Yes</option></select></label>
+              <label>Only contact jobs with email<select value={form.onlyContactJobsWithEmail} onChange={(event) => updateField("onlyContactJobsWithEmail", event.target.value)}><option>Yes</option><option>No</option></select></label>
+              <label>Require user approval before sending<select value={form.requireUserApproval} onChange={(event) => updateField("requireUserApproval", event.target.value)}><option>Yes</option><option>No</option></select></label>
             </fieldset>
 
             <div className="template-form-actions">
               <Link className="template-secondary" href="/dashboard">Back to dashboard</Link>
-              <button className="template-primary" type="submit" disabled={checkingUser || saving || created}>
-                {saving ? "Saving..." : created ? "Campaign created" : "Save Template / Create Campaign"}
-              </button>
+              <button className="template-primary" type="submit" disabled={checkingUser || saving || created}>{saving ? "Saving..." : created ? "Campaign created" : "Save Template / Create Campaign"}</button>
             </div>
           </form>
         )}
       </section>
 
       <style>{`
-        .templates-shell {
-          position: relative;
-          min-height: 100vh;
-          overflow-x: hidden;
-          overflow-y: auto;
-          padding: clamp(76px, 13vh, 108px) 14px 46px;
-          background-color: #fff7fb;
-          background-image:
-            linear-gradient(rgba(255, 70, 190, .24) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 70, 190, .24) 1px, transparent 1px);
-          background-size: 28px 28px;
-          color: #16131a;
-        }
-
-        .templates-shell::before {
-          content: "";
-          position: fixed;
-          inset: -12% -35% -20%;
-          background-image:
-            linear-gradient(rgba(20, 16, 22, .34) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(20, 16, 22, .34) 1px, transparent 1px);
-          background-size: 28px 28px;
-          transform: perspective(760px) rotateX(22deg) scale(1.08);
-          transform-origin: top center;
-          opacity: .26;
-          pointer-events: none;
-          z-index: 0;
-          -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%);
-          mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%);
-        }
-
-        .templates-shell::after {
-          content: "";
-          position: fixed;
-          inset: 0;
-          background: radial-gradient(circle at 50% 12%, rgba(255,255,255,.95), rgba(255,255,255,.7) 34%, transparent 70%);
-          pointer-events: none;
-          z-index: 0;
-        }
-
+        .templates-shell { position: relative; min-height: 100vh; overflow-x: hidden; overflow-y: auto; padding: clamp(76px, 13vh, 108px) 14px 46px; background: transparent; color: #f8eaff; }
         .templates-shell > * { position: relative; z-index: 1; }
-
-        .templates-nav {
-          position: fixed;
-          top: max(14px, env(safe-area-inset-top));
-          left: 14px;
-          right: 14px;
-          z-index: 20;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          pointer-events: none;
-        }
-
-        .templates-round,
-        .templates-dashboard-link {
-          pointer-events: auto;
-          min-height: 44px;
-          border-radius: 999px;
-          border: 1px solid rgba(22, 19, 26, .16);
-          background: rgba(255,255,255,.74);
-          color: #16131a;
-          box-shadow: 0 10px 26px rgba(0,0,0,.09);
-          backdrop-filter: blur(12px);
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0 18px;
-          font-size: 13px;
-          font-weight: 950;
-          text-transform: uppercase;
-          letter-spacing: .08em;
-        }
-
+        .templates-nav { position: fixed; top: max(14px, env(safe-area-inset-top)); left: 14px; right: 14px; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; pointer-events: none; }
+        .templates-round, .templates-dashboard-link { pointer-events: auto; min-height: 44px; border-radius: 999px; border: 1px solid rgba(255, 92, 168, .34); background: rgba(16, 7, 32, .68); color: #ffe7fb; box-shadow: 0 10px 26px rgba(0,0,0,.24); backdrop-filter: blur(12px); display: inline-flex; align-items: center; justify-content: center; padding: 0 18px; font-size: 13px; font-weight: 950; text-transform: uppercase; letter-spacing: .08em; }
         .templates-round { width: 68px; }
-
-        .templates-hero {
-          width: min(760px, 92vw);
-          margin: 0 auto clamp(18px, 4vw, 32px);
-          display: grid;
-          justify-items: center;
-          text-align: center;
-        }
-
-        .templates-hero img {
-          width: clamp(82px, 22vw, 124px);
-          height: auto;
-          display: block;
-          object-fit: contain;
-          filter: drop-shadow(0 18px 25px rgba(0,0,0,.16));
-        }
-
-        .templates-brand {
-          margin: 8px 0 6px;
-          color: #ff5ca8;
-          font-size: clamp(38px, 12vw, 68px);
-          font-weight: 950;
-          letter-spacing: .18em;
-        }
-
-        .templates-kicker {
-          margin: 0 0 14px;
-          color: #16131a;
-          font-size: 13px;
-          font-weight: 950;
-          letter-spacing: .18em;
-          text-transform: uppercase;
-        }
-
-        .templates-hero h1 {
-          margin: 0;
-          color: #ff4f9d;
-          font-size: clamp(40px, 11vw, 78px);
-          line-height: 1;
-          font-weight: 950;
-          text-transform: uppercase;
-          letter-spacing: .04em;
-          text-shadow: 0 16px 42px rgba(255, 92, 168, .18);
-        }
-
-        .templates-copy {
-          max-width: 420px;
-          margin: 14px auto 0;
-          color: rgba(22, 19, 26, .82);
-          font-size: clamp(15px, 3.7vw, 20px);
-          line-height: 1.42;
-          font-weight: 800;
-        }
-
-        .templates-stack {
-          width: min(980px, 100%);
-          margin: 0 auto;
-          display: grid;
-          justify-items: center;
-          gap: clamp(16px, 3.5vw, 26px);
-        }
-
-        .templates-status,
-        .template-empty-card,
-        .template-form-card,
-        .template-card {
-          background: rgba(255,255,255,.68);
-          border: 1px solid rgba(255, 92, 168, .28);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 18px 44px rgba(255, 92, 168, .1), 0 14px 34px rgba(0,0,0,.06);
-          backdrop-filter: blur(16px) saturate(1.08);
-          color: #16131a;
-        }
-
-        .templates-status {
-          width: min(100%, 420px);
-          margin: 0;
-          padding: 13px 16px;
-          border-radius: 18px;
-          text-align: center;
-          font-weight: 900;
-        }
-
-        .templates-status.success { color: #065f46; border-color: rgba(16,185,129,.22); }
-        .templates-status.error { color: #991b1b; border-color: rgba(248,113,113,.35); }
-
-        .templates-carousel-wrap {
-          width: 100%;
-          display: grid;
-          gap: 10px;
-        }
-
-        .templates-carousel-hint {
-          margin: 0;
-          color: #ff4f9d;
-          font-size: 12px;
-          font-weight: 950;
-          letter-spacing: .16em;
-          text-transform: uppercase;
-          text-align: center;
-        }
-
-        .templates-gallery {
-          width: 100%;
-          display: flex;
-          gap: 14px;
-          overflow-x: auto;
-          overflow-y: hidden;
-          scroll-snap-type: x mandatory;
-          scroll-padding: max(14px, calc((100vw - min(360px, calc(100vw - 42px))) / 2));
-          padding: 2px max(14px, calc((100vw - min(360px, calc(100vw - 42px))) / 2)) 18px;
-          -webkit-overflow-scrolling: touch;
-          scrollbar-width: thin;
-        }
-
-        .templates-gallery::-webkit-scrollbar { height: 8px; }
-        .templates-gallery::-webkit-scrollbar-track { background: rgba(255, 92, 168, .12); border-radius: 999px; }
-        .templates-gallery::-webkit-scrollbar-thumb { background: rgba(255, 92, 168, .72); border-radius: 999px; }
-
-        .template-card {
-          flex: 0 0 min(360px, calc(100vw - 42px));
-          width: min(360px, calc(100vw - 42px));
-          min-height: 224px;
-          display: grid;
-          justify-items: start;
-          align-content: space-between;
-          gap: 12px;
-          padding: clamp(22px, 5vw, 30px);
-          border-radius: 24px;
-          text-align: left;
-          scroll-snap-align: center;
-          scroll-snap-stop: always;
-        }
-
-        .template-card.selected {
-          border-color: rgba(255, 92, 168, .92);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.82), 0 0 0 2px rgba(255, 92, 168, .16), 0 20px 48px rgba(255, 92, 168, .18);
-        }
-
-        .template-card span {
-          display: inline-grid;
-          place-items: center;
-          width: 42px;
-          height: 42px;
-          border-radius: 999px;
-          background: #ff5ca8;
-          color: #16131a;
-          font-weight: 950;
-        }
-
-        .template-card strong {
-          color: #ff4f9d;
-          font-size: clamp(26px, 7vw, 42px);
-          line-height: 1.04;
-          font-weight: 950;
-          text-transform: uppercase;
-          letter-spacing: .04em;
-        }
-
-        .template-card p,
-        .template-empty-card p {
-          margin: 0;
-          color: rgba(22, 19, 26, .76);
-          font-size: 15px;
-          line-height: 1.4;
-          font-weight: 800;
-        }
-
-        .template-empty-card {
-          width: min(100%, 420px);
-          display: grid;
-          justify-items: center;
-          gap: 10px;
-          padding: 24px;
-          border-radius: 24px;
-          text-align: center;
-        }
-
-        .template-empty-card strong {
-          color: #16131a;
-          font-size: 24px;
-          font-weight: 950;
-          text-transform: uppercase;
-        }
-
-        .template-form-card {
-          width: min(100%, 420px);
-          display: grid;
-          gap: 18px;
-          padding: clamp(18px, 5vw, 26px);
-          border-radius: 26px;
-        }
-
+        .templates-hero { width: min(760px, 92vw); margin: 0 auto clamp(18px, 4vw, 32px); display: grid; justify-items: center; text-align: center; }
+        .templates-hero img { width: clamp(82px, 22vw, 124px); height: auto; display: block; object-fit: contain; filter: drop-shadow(0 18px 25px rgba(0,0,0,.16)); }
+        .templates-brand { margin: 8px 0 6px; color: #ff5ca8; font-size: clamp(38px, 12vw, 68px); font-weight: 950; letter-spacing: .18em; }
+        .templates-kicker { margin: 0 0 14px; color: #ffe7fb; font-size: 13px; font-weight: 950; letter-spacing: .18em; text-transform: uppercase; }
+        .templates-hero h1 { margin: 0; color: #ff4f9d; font-size: clamp(40px, 11vw, 78px); line-height: 1; font-weight: 950; text-transform: uppercase; letter-spacing: .04em; text-shadow: 0 16px 42px rgba(255, 92, 168, .22); }
+        .templates-copy { max-width: 420px; margin: 14px auto 0; color: rgba(255, 231, 251, .82); font-size: clamp(15px, 3.7vw, 20px); line-height: 1.42; font-weight: 800; }
+        .templates-stack { width: min(980px, 100%); margin: 0 auto; display: grid; justify-items: center; gap: clamp(16px, 3.5vw, 26px); }
+        .templates-status, .template-empty-card, .template-form-card, .template-card { background: rgba(18, 7, 35, .72); border: 1px solid rgba(255, 92, 168, .32); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 18px 44px rgba(255, 92, 168, .08), 0 14px 34px rgba(0,0,0,.32); backdrop-filter: blur(16px) saturate(1.08); color: #ffe7fb; }
+        .templates-status { width: min(100%, 420px); margin: 0; padding: 13px 16px; border-radius: 18px; text-align: center; font-weight: 900; }
+        .templates-status.success { color: #86efac; border-color: rgba(16,185,129,.28); }
+        .templates-status.error { color: #fecaca; border-color: rgba(248,113,113,.42); }
+        .templates-carousel-wrap { width: 100%; display: grid; gap: 10px; }
+        .templates-carousel-hint { margin: 0; color: #ff4f9d; font-size: 12px; font-weight: 950; letter-spacing: .16em; text-transform: uppercase; text-align: center; }
+        .templates-gallery { width: 100%; display: flex; gap: 14px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-padding: max(14px, calc((100vw - min(360px, calc(100vw - 42px))) / 2)); padding: 2px max(14px, calc((100vw - min(360px, calc(100vw - 42px))) / 2)) 18px; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+        .template-card { flex: 0 0 min(360px, calc(100vw - 42px)); width: min(360px, calc(100vw - 42px)); min-height: 224px; display: grid; justify-items: start; align-content: space-between; gap: 12px; padding: clamp(22px, 5vw, 30px); border-radius: 24px; text-align: left; scroll-snap-align: center; scroll-snap-stop: always; }
+        .template-card.selected { border-color: rgba(255, 92, 168, .92); box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 0 0 2px rgba(255, 92, 168, .2), 0 20px 48px rgba(255, 92, 168, .18); }
+        .template-card span { display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 999px; background: #ff5ca8; color: #16131a; font-weight: 950; }
+        .template-card strong { color: #ff7abd; font-size: clamp(26px, 7vw, 42px); line-height: 1.04; font-weight: 950; text-transform: uppercase; letter-spacing: .04em; }
+        .template-card p, .template-empty-card p { margin: 0; color: rgba(255, 231, 251, .76); font-size: 15px; line-height: 1.4; font-weight: 800; }
+        .template-empty-card { width: min(100%, 420px); display: grid; justify-items: center; gap: 10px; padding: 24px; border-radius: 24px; text-align: center; }
+        .template-empty-card strong { color: #ffe7fb; font-size: 24px; font-weight: 950; text-transform: uppercase; }
+        .template-form-card { width: min(100%, 420px); display: grid; gap: 18px; padding: clamp(18px, 5vw, 26px); border-radius: 26px; }
         .form-heading { display: grid; gap: 6px; text-align: center; }
-        .form-heading p { margin: 0; color: #b91c65; font-size: 12px; font-weight: 950; letter-spacing: .1em; text-transform: uppercase; }
-        .form-heading h2 { margin: 0; color: #16131a; font-size: clamp(24px, 7vw, 34px); line-height: 1.05; font-weight: 950; text-transform: uppercase; }
-
-        .template-form-card fieldset {
-          min-width: 0;
-          margin: 0;
-          padding: 18px;
-          border: 1px solid rgba(255, 92, 168, .22);
-          border-radius: 22px;
-          display: grid;
-          gap: 13px;
-          background: rgba(255,255,255,.44);
-        }
-
-        .template-form-card legend { padding: 0 8px; color: #ff4f9d; font-size: 13px; font-weight: 950; letter-spacing: .1em; text-transform: uppercase; }
-        .template-form-card label { min-width: 0; display: grid; gap: 7px; color: #16131a; font-size: 13px; font-weight: 950; letter-spacing: .04em; text-transform: uppercase; }
-
-        .template-form-card input,
-        .template-form-card textarea,
-        .template-form-card select {
-          width: 100%;
-          min-width: 0;
-          border: 1px solid rgba(22, 19, 26, .13);
-          border-radius: 16px;
-          background: rgba(255,255,255,.82);
-          color: #16131a;
-          outline: none;
-          padding: 13px 14px;
-          font-size: 15px;
-          line-height: 1.35;
-          font-weight: 800;
-          letter-spacing: 0;
-          text-transform: none;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
-        }
-
+        .form-heading p { margin: 0; color: #ff7abd; font-size: 12px; font-weight: 950; letter-spacing: .1em; text-transform: uppercase; }
+        .form-heading h2 { margin: 0; color: #ffe7fb; font-size: clamp(24px, 7vw, 34px); line-height: 1.05; font-weight: 950; text-transform: uppercase; }
+        .template-form-card fieldset { min-width: 0; margin: 0; padding: 18px; border: 1px solid rgba(255, 92, 168, .26); border-radius: 22px; display: grid; gap: 13px; background: rgba(255,255,255,.04); }
+        .template-form-card legend { padding: 0 8px; color: #ff7abd; font-size: 13px; font-weight: 950; letter-spacing: .1em; text-transform: uppercase; }
+        .template-form-card label { min-width: 0; display: grid; gap: 7px; color: #ffe7fb; font-size: 13px; font-weight: 950; letter-spacing: .04em; text-transform: uppercase; }
+        .template-form-card input, .template-form-card textarea, .template-form-card select { width: 100%; min-width: 0; border: 1px solid rgba(255, 92, 168, .28); border-radius: 16px; background: rgba(255,255,255,.9); color: #16131a; outline: none; padding: 13px 14px; font-size: 15px; line-height: 1.35; font-weight: 800; letter-spacing: 0; text-transform: none; }
         .template-form-card textarea { resize: vertical; }
-        .template-form-card input:focus,
-        .template-form-card textarea:focus,
-        .template-form-card select:focus { border-color: rgba(255, 92, 168, .92); box-shadow: 0 0 0 4px rgba(255, 92, 168, .14); }
-
+        .template-form-card input:focus, .template-form-card textarea:focus, .template-form-card select:focus { border-color: rgba(255, 92, 168, .92); box-shadow: 0 0 0 4px rgba(255, 92, 168, .18); }
         .template-form-actions { display: grid; gap: 12px; }
-
-        .template-primary,
-        .template-secondary {
-          width: 100%;
-          min-height: 58px;
-          border-radius: 999px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 14px 18px;
-          text-align: center;
-          font-size: clamp(16px, 4.4vw, 20px);
-          font-weight: 950;
-          letter-spacing: .02em;
-          border: 1px solid rgba(22, 19, 26, .78);
-          box-shadow: 0 12px 28px rgba(0,0,0,.08);
-        }
-
+        .template-primary, .template-secondary { width: 100%; min-height: 58px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; padding: 14px 18px; text-align: center; font-size: clamp(16px, 4.4vw, 20px); font-weight: 950; letter-spacing: .02em; border: 1px solid rgba(255, 231, 251, .4); box-shadow: 0 12px 28px rgba(0,0,0,.18); }
         .template-primary { background: #ff5ca8; border-color: #ff5ca8; color: #16131a; }
-        .template-secondary { background: rgba(255,255,255,.58); color: #16131a; }
-        .template-primary:disabled { background: rgba(22, 19, 26, .34); border-color: transparent; color: rgba(255,255,255,.76); }
-
-        @media (max-width: 640px) {
-          .templates-shell { padding-top: 72px; }
-          .templates-stack { width: 100%; }
-          .template-card { min-height: 214px; border-radius: 22px; }
-          .template-form-card,
-          .template-empty-card { border-radius: 22px; }
-        }
+        .template-secondary { background: rgba(255,255,255,.08); color: #ffe7fb; }
+        .template-primary:disabled { background: rgba(255,255,255,.2); border-color: transparent; color: rgba(255,255,255,.76); }
+        @media (max-width: 640px) { .templates-shell { padding-top: 72px; } .templates-stack { width: 100%; } .template-card { min-height: 214px; border-radius: 22px; } .template-form-card, .template-empty-card { border-radius: 22px; } }
       `}</style>
     </main>
   );
