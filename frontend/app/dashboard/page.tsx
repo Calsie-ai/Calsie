@@ -550,7 +550,6 @@ export default function DashboardPage() {
           </div>
 
           <div className='applix-home-actions dashboard-actions'>
-            {!resumeReady && <button className='applix-setup-outline resume-upload-button' type='button' onClick={openResumePicker} disabled={busy || loading}>Upload Resume</button>}
             {!gmailReady && <button className={`applix-setup-outline connector-button status-${gmailConnectorStatus}`} type='button' onClick={connectGmail} disabled={busy || !email}>{busy ? 'Opening...' : 'Connect Applix'}</button>}
             {!latestCampaign && <Link className='applix-setup-outline recommended-template-action' href='/campaign/templates'>Browse Template</Link>}
             {!latestCampaign && <Link className='applix-setup-outline' href='/campaign/new'>Create Campaign</Link>}
