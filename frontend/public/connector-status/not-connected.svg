@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 169" role="img" aria-label="Applix connector not connected">
+  <rect width="300" height="169" fill="none"/>
+  <g transform="translate(58 52)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 31 C32 18, 45 18, 64 29" stroke="#16131a" stroke-width="8"/>
+    <path d="M55 24 L88 24 L88 55 L55 55 Z" fill="#fff8f7" stroke="#16131a" stroke-width="6"/>
+    <path d="M88 18 L122 18 Q134 18 134 39.5 Q134 61 122 61 L88 61 Z" fill="#ffb067" stroke="#16131a" stroke-width="6"/>
+    <path d="M134 27 H160" stroke="#ff6f6f" stroke-width="7"/>
+    <path d="M134 52 H160" stroke="#ff6f6f" stroke-width="7"/>
+    <path d="M164 22 V58" stroke="#ff6f6f" stroke-width="7"/>
+    <path d="M66 31 H79 M66 48 H79" stroke="#ff6f6f" stroke-width="5"/>
+    <path d="M102 29 V51" stroke="#ffffff" stroke-width="5" opacity="0.85"/>
+  </g>
+</svg>
