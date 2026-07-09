@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getSupabaseClient } from "../lib/supabaseClient";
 
 const pastelRed = "#ff6f6f";
 const ink = "#16131a";
@@ -31,6 +32,8 @@ const onboardingSlides = [
 export default function HomePage() {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [carouselComplete, setCarouselComplete] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
   const activeSlide = onboardingSlides[carouselIndex];
 
   function confirmSlide() {
@@ -40,6 +43,31 @@ export default function HomePage() {
     }
 
     setCarouselComplete(true);
+  }
+
+  async function loginWithGoogle() {
+    if (loading) return;
+
+    setStatus("");
+    setLoading(true);
+
+    try {
+      const supabase = getSupabaseClient();
+      const redirectTo = `${window.location.origin}/auth/callback?next=/dashboard`;
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      });
+
+      if (error) {
+        setStatus(error.message);
+        setLoading(false);
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not continue with Google.");
+      setLoading(false);
+    }
   }
 
   const header = (
@@ -229,8 +257,12 @@ export default function HomePage() {
             <button type="button" onClick={confirmSlide} style={primaryButtonStyle}>Yes, I understood</button>
           </>
         ) : (
-          <p style={{ ...copyStyle, marginBottom: 0 }}>START CHECK COMPLETE.</p>
+          <>
+            <p style={{ ...copyStyle, marginBottom: 0 }}>START CHECK COMPLETE.</p>
+            <button type="button" onClick={loginWithGoogle} disabled={loading} style={primaryButtonStyle}>{loading ? "Opening..." : "Sign in / Sign up"}</button>
+          </>
         )}
+        {status && <p style={{ ...copyStyle, marginTop: 6, marginBottom: 0, color: "#991b1b" }}>{status}</p>}
         <div aria-hidden="true" style={sectionLineStyle} />
       </section>
     </main>
