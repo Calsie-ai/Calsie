@@ -1,8 +1,8 @@
-/* Calsie / Applix brand colour override: pastel red, not pink. */
+/* Calsie / Applix brand colour override: #ff5757, not pink. */
 :root {
-  --calsie-red: #ff6f6f;
-  --calsie-red-soft: rgba(255, 111, 111, 0.18);
-  --calsie-red-line: rgba(255, 111, 111, 0.58);
+  --calsie-red: #ff5757;
+  --calsie-red-soft: rgba(255, 87, 87, 0.18);
+  --calsie-red-line: rgba(255, 87, 87, 0.58);
   --calsie-red-bg: #fff8f7;
   --calsie-ink: #16131a;
 }
@@ -10,8 +10,8 @@
 body .dashboard-cockpit-shell {
   background-color: var(--calsie-red-bg) !important;
   background-image:
-    linear-gradient(rgba(255, 111, 111, .23) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 111, 111, .23) 1px, transparent 1px) !important;
+    linear-gradient(rgba(255, 87, 87, .23) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 87, 87, .23) 1px, transparent 1px) !important;
 }
 
 body .dashboard-hero > p:first-of-type,
@@ -36,22 +36,22 @@ body .dashboard-actions .recommended-template-action {
 }
 
 body .campaign-pill {
-  background: rgba(255, 111, 111, .12) !important;
-  border-color: rgba(255, 111, 111, .28) !important;
+  background: rgba(255, 87, 87, .12) !important;
+  border-color: rgba(255, 87, 87, .28) !important;
 }
 
 body .resume-action:hover,
 body .dashboard-app-connect:hover {
-  background: rgba(255, 111, 111, .05) !important;
+  background: rgba(255, 87, 87, .05) !important;
 }
 
 body .resume-action:focus-visible {
-  outline-color: rgba(255, 111, 111, .72) !important;
+  outline-color: rgba(255, 87, 87, .72) !important;
 }
 
 body .applix-setup-orb span {
   color: var(--calsie-red) !important;
-  text-shadow: 0 4px 0 rgba(92, 22, 22, .16), 0 0 22px rgba(255, 111, 111, .42) !important;
+  text-shadow: 0 4px 0 rgba(92, 22, 22, .16), 0 0 22px rgba(255, 87, 87, .42) !important;
 }
 
 /* Tracker page: make the dashboard link a flying Applix GIF button. */
@@ -59,7 +59,7 @@ body .agent-home-link {
   width: clamp(142px, 26vw, 220px) !important;
   height: clamp(64px, 10vw, 96px) !important;
   padding: 0 !important;
-  border: 1px solid rgba(255, 111, 111, .22) !important;
+  border: 1px solid rgba(255, 87, 87, .22) !important;
   border-radius: 24px !important;
   background:
     rgba(255, 255, 255, .92)
@@ -85,6 +85,6 @@ body .agent-home-link:hover {
 }
 
 body .agent-home-link:focus-visible {
-  outline: 3px solid rgba(255, 111, 111, .72) !important;
+  outline: 3px solid rgba(255, 87, 87, .72) !important;
   outline-offset: 4px !important;
 }
