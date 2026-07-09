@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import "./globals.css";
 import "./resume-status-overrides.css";
+import "./brand-colors.css";
 
 export const metadata = {
   title: "Symbiote Applix",
