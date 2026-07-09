@@ -97,12 +97,12 @@ async function extractPdfText(buffer: Buffer) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.toLowerCase().includes("dommatrix")) {
-      throw new Error("This PDF parser needs DOMMatrix and failed in the server runtime. For this MVP test, upload DOCX or TXT, or copy the resume text into the editable Master Resume fields.");
+      throw new Error("This PDF parser needs DOMMatrix and failed in the server runtime. Resume file was uploaded, but automatic parsing was skipped.");
     }
     throw error;
   }
 
-  throw new Error("PDF parser could not read this file. Try DOCX or TXT, or upload a text-based PDF.");
+  throw new Error("PDF parser could not read this file. Resume file was uploaded, but automatic parsing was skipped.");
 }
 
 async function extractText(file: File) {
@@ -125,7 +125,7 @@ async function extractText(file: File) {
     return buffer.toString("utf8");
   }
 
-  throw new Error("Unsupported file type. Upload PDF, DOCX, or TXT for now.");
+  throw new Error("Unsupported file type. Resume file was uploaded, but automatic parsing was skipped.");
 }
 
 function mergeParsed(aiParsed: any, fallback: ParsedResume): ParsedResume {
@@ -198,9 +198,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Resume file is too large. Please upload under 8MB." }, { status: 400 });
     }
 
-    const rawText = await extractText(file);
+    let rawText = "";
+    let parseWarning = "";
+
+    try {
+      rawText = await extractText(file);
+    } catch (error: any) {
+      parseWarning = error?.message || "Could not parse resume text. Resume file was uploaded, but automatic parsing was skipped.";
+    }
+
     if (!rawText.trim()) {
-      return NextResponse.json({ ok: false, error: "Could not read text from this resume. Try DOCX, TXT, or a text-based PDF." }, { status: 400 });
+      const parsed = emptyParsedResume();
+      return NextResponse.json({
+        ok: true,
+        filename: file.name,
+        textLength: 0,
+        textPreview: "",
+        usedOpenAI: false,
+        openAIError: parseWarning || "Could not read text from this resume. Resume file was uploaded, but automatic parsing was skipped.",
+        filledCount: 0,
+        parsed,
+        rawText: "",
+      });
     }
 
     const result = await parseWithOpenAI(rawText);
