@@ -192,6 +192,15 @@ export default function HomePage() {
     textTransform: "uppercase" as const,
   };
 
+  const fineDividerStyle = {
+    position: "relative" as const,
+    zIndex: 2,
+    width: "min(340px, calc(100vw - 52px))",
+    height: 1,
+    margin: "clamp(6px, 2vw, 12px) auto",
+    background: "linear-gradient(90deg, transparent, rgba(255, 92, 168, .72), transparent)",
+  };
+
   const primaryButtonStyle = {
     minHeight: 40,
     minWidth: 170,
@@ -283,7 +292,7 @@ export default function HomePage() {
         }}
       >
         <img
-          src="/applix-flying.gif"
+          src="/applix-logo.svg"
           alt="Applix logo"
           style={{
             position: "relative",
@@ -336,6 +345,8 @@ export default function HomePage() {
         </p>
       </section>
 
+      <div aria-hidden="true" style={fineDividerStyle} />
+
       <section style={{ ...sectionStyle, paddingTop: 8 }}>
         <p style={labelStyle}>WELCOME</p>
         <h2
@@ -385,6 +396,8 @@ export default function HomePage() {
         </div>
       </section>
 
+      <div aria-hidden="true" style={fineDividerStyle} />
+
       <section style={sectionStyle}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 20 }}>HOW TO USE APPLIX</h2>
         <p style={copyStyle}>
@@ -395,12 +408,16 @@ export default function HomePage() {
         </p>
       </section>
 
+      <div aria-hidden="true" style={fineDividerStyle} />
+
       <section style={sectionStyle}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 18 }}>Upload Your CV</h2>
         <p style={copyStyle}>
           UPLOAD YOUR RESUME/CV, APPLIX WILL ATTACH YOUR DOCUMENTSTO EVERY COMPANY IT CONTACTS PLEASE NO PERSONAL INFORMATION / CREDITS ON YOUR DOCUMENTS KEEP IT GENRAL AS MUCH AS YOU CAN
         </p>
       </section>
+
+      <div aria-hidden="true" style={fineDividerStyle} />
 
       <section style={sectionStyle}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 18 }}>Fill Up Template</h2>
@@ -417,6 +434,8 @@ export default function HomePage() {
         </p>
       </section>
 
+      <div aria-hidden="true" style={fineDividerStyle} />
+
       <section style={sectionStyle}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 24 }}>HOW TO SET UP GUARD RAILS</h2>
         <h3 style={sectionHeadingStyle}>Authorize Applix</h3>
@@ -428,6 +447,8 @@ export default function HomePage() {
           APPLIX WILL BE ACTIVATED FOR 30 DAYS, EXECUTE TASK 1/HR. KEEP YOUR ACCOUNT LOGGED IN, YOU CAN CLOSE THE BROWSER
         </p>
       </section>
+
+      <div aria-hidden="true" style={fineDividerStyle} />
 
       <section style={{ ...sectionStyle, gap: 14, paddingBottom: "clamp(38px, 8vw, 76px)" }}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 2 }}>APPLIX START CHECK</h2>
