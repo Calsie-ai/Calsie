@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import "./globals.css";
+import "./outrun-background.css";
 import "./resume-status-overrides.css";
 import "./campaign-actions-overrides.css";
 import "./tracker-theme-overrides.css";
