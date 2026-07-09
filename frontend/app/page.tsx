@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { getSupabaseClient } from "../lib/supabaseClient";
 
-const pastelRed = "#ff6f6f";
+const calsieRed = "#ff5757";
 const ink = "#16131a";
 
 const onboardingSlides = [
@@ -138,7 +138,7 @@ export default function HomePage() {
 
   const sectionHeadingStyle = {
     ...labelStyle,
-    color: pastelRed,
+    color: calsieRed,
     fontSize: "clamp(10px, 3.3vw, 14px)",
   };
 
@@ -166,7 +166,7 @@ export default function HomePage() {
     width: "min(340px, calc(100vw - 90px))",
     height: 1,
     margin: "18px auto 0",
-    background: "linear-gradient(90deg, rgba(255,111,111,0) 0%, rgba(255,111,111,.58) 18%, rgba(255,111,111,.58) 82%, rgba(255,111,111,0) 100%)",
+    background: "linear-gradient(90deg, rgba(255,87,87,0) 0%, rgba(255,87,87,.58) 18%, rgba(255,87,87,.58) 82%, rgba(255,87,87,0) 100%)",
     opacity: 0.92,
   };
 
@@ -181,25 +181,25 @@ export default function HomePage() {
     border: 0,
     borderRadius: 999,
     padding: "9px 18px",
-    background: pastelRed,
+    background: calsieRed,
     color: ink,
     fontSize: "clamp(10px, 3.2vw, 13px)",
     lineHeight: 1.1,
     fontWeight: 900,
-    boxShadow: "0 10px 22px rgba(255, 111, 111, .28)",
+    boxShadow: "0 10px 22px rgba(255, 87, 87, .28)",
   };
 
   return (
     <main style={{ position: "relative", minHeight: "100svh", overflowX: "hidden", backgroundColor: "#fff8f7", color: ink, fontFamily: "Arial, Helvetica, sans-serif" }}>
-      <div aria-hidden="true" style={{ position: "fixed", inset: "-12% -35% -20%", backgroundImage: "linear-gradient(rgba(255, 111, 111, .23) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 111, 111, .23) 1px, transparent 1px)", backgroundSize: "28px 28px", transform: "perspective(760px) rotateX(22deg) scale(1.08)", transformOrigin: "top center", opacity: 0.96, pointerEvents: "none" }} />
+      <div aria-hidden="true" style={{ position: "fixed", inset: "-12% -35% -20%", backgroundImage: "linear-gradient(rgba(255, 87, 87, .23) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 87, 87, .23) 1px, transparent 1px)", backgroundSize: "28px 28px", transform: "perspective(760px) rotateX(22deg) scale(1.08)", transformOrigin: "top center", opacity: 0.96, pointerEvents: "none" }} />
       <div aria-hidden="true" style={{ position: "fixed", inset: "-12% -35% -20%", backgroundImage: "linear-gradient(rgba(20, 16, 22, .34) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .34) 1px, transparent 1px)", backgroundSize: "28px 28px", transform: "perspective(760px) rotateX(22deg) scale(1.08)", transformOrigin: "top center", opacity: 0.34, pointerEvents: "none", WebkitMaskImage: "linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%)", maskImage: "linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%)" }} />
       <div aria-hidden="true" style={{ position: "fixed", inset: 0, background: "radial-gradient(circle at 50% 24%, rgba(255,255,255,.9), rgba(255,255,255,.66) 31%, transparent 62%)", pointerEvents: "none" }} />
 
       {header}
 
       <section style={{ ...sectionStyle, minHeight: "auto", paddingTop: "clamp(8px, 2vw, 18px)", paddingBottom: "clamp(10px, 2vw, 22px)", overflow: "hidden" }}>
-        <img src="/applix-logo.svg" alt="Applix logo" style={{ position: "relative", zIndex: 1, width: "clamp(58px, 18vw, 126px)", height: "auto", display: "block", marginBottom: "clamp(8px, 2vw, 12px)", filter: "drop-shadow(0 12px 20px rgba(255, 111, 111, .18))" }} />
-        <h1 aria-label="APPLIX" style={{ position: "relative", zIndex: 1, width: "100%", margin: 0, color: pastelRed, fontSize: "clamp(52px, 10vw, 82px)", lineHeight: 0.92, fontWeight: 950, letterSpacing: "clamp(.02em, 1vw, .1em)", whiteSpace: "nowrap" }}>APPLIX</h1>
+        <img src="/applix-logo.svg" alt="Applix logo" style={{ position: "relative", zIndex: 1, width: "clamp(58px, 18vw, 126px)", height: "auto", display: "block", marginBottom: "clamp(8px, 2vw, 12px)", filter: "drop-shadow(0 12px 20px rgba(255, 87, 87, .18))" }} />
+        <h1 aria-label="APPLIX" style={{ position: "relative", zIndex: 1, width: "100%", margin: 0, color: calsieRed, fontSize: "clamp(52px, 10vw, 82px)", lineHeight: 0.92, fontWeight: 950, letterSpacing: "clamp(.02em, 1vw, .1em)", whiteSpace: "nowrap" }}>APPLIX</h1>
         <p style={{ position: "relative", zIndex: 1, maxWidth: "100%", margin: "clamp(6px, 2vw, 8px) 0 clamp(14px, 3vw, 22px)", color: ink, fontSize: "clamp(8px, 2.8vw, 10px)", lineHeight: 1.2, fontWeight: 900, letterSpacing: "clamp(.08em, 1vw, .18em)", textTransform: "uppercase" }}>Persistence at Scale</p>
         <p style={{ ...copyStyle, position: "relative", zIndex: 1, marginBottom: 0 }}>APPLIX IS FIRST SYMBIOTIC INTELLIGENCE AI, APPLIX IS EMAIL AUTOMATION SYMBIOTE THAT HAS 20 LAYERS OF COGNITIVE CAPACITY, FOR STRAIGHT FORWARD USE PLEASE FOLLOW THE GUARD RAILS.</p>
         <div aria-hidden="true" style={sectionLineStyle} />
@@ -208,10 +208,10 @@ export default function HomePage() {
       <section style={{ ...sectionStyle, paddingTop: 8 }}>
         <p style={labelStyle}>WELCOME</p>
         <h2 style={frontTitleStyle}>CALSIE | APPLIX</h2>
-        <h3 style={{ margin: "0 0 18px", color: pastelRed, fontSize: "clamp(22px, 8vw, 36px)", lineHeight: .92, fontWeight: 950, letterSpacing: ".14em", textTransform: "uppercase" }}>ABOUT APPLIX</h3>
+        <h3 style={{ margin: "0 0 18px", color: calsieRed, fontSize: "clamp(22px, 8vw, 36px)", lineHeight: .92, fontWeight: 950, letterSpacing: ".14em", textTransform: "uppercase" }}>ABOUT APPLIX</h3>
         <div style={{ display: "grid", gap: 10, justifyItems: "center", color: ink, fontSize: "clamp(10px, 3.3vw, 14px)", lineHeight: 1.05, fontWeight: 950, letterSpacing: ".08em", textTransform: "uppercase" }}>
-          <p style={{ margin: 0 }}>HOST <span style={{ color: pastelRed }}>| GMAIL</span></p>
-          <p style={{ margin: 0 }}>SPAN <span style={{ color: pastelRed }}>| 30 DAYS</span></p>
+          <p style={{ margin: 0 }}>HOST <span style={{ color: calsieRed }}>| GMAIL</span></p>
+          <p style={{ margin: 0 }}>SPAN <span style={{ color: calsieRed }}>| 30 DAYS</span></p>
           <p style={{ margin: 0 }}>DATA <span style={{ color: "#58b7ee" }}>| INDEED</span></p>
           <p style={{ margin: 0 }}>TASK <span>| 25/DAY</span></p>
         </div>
