@@ -1,9 +1,9 @@
 :root {
   --applix-outrun-bg: #080012;
   --applix-outrun-bg-2: #160022;
-  --applix-outrun-grid: rgba(255, 0, 214, .24);
-  --applix-outrun-grid-soft: rgba(255, 77, 166, .12);
-  --applix-outrun-glow: rgba(255, 0, 180, .28);
+  --applix-outrun-grid: rgba(255, 48, 120, .26);
+  --applix-outrun-grid-soft: rgba(255, 48, 120, .11);
+  --applix-outrun-glow: rgba(255, 0, 160, .14);
 }
 
 html,
@@ -28,22 +28,21 @@ body::after {
 body::before {
   z-index: -3;
   background:
-    radial-gradient(circle at 50% 42%, var(--applix-outrun-glow) 0%, rgba(255, 0, 180, .12) 18%, transparent 44%),
-    radial-gradient(circle at 50% -18%, rgba(109, 40, 217, .42) 0%, transparent 52%),
-    linear-gradient(180deg, #12001f 0%, #0a0015 48%, #05000c 100%) !important;
+    radial-gradient(circle at 50% 48%, var(--applix-outrun-glow) 0%, rgba(255, 0, 160, .07) 16%, transparent 40%),
+    linear-gradient(180deg, #10001b 0%, #090012 46%, #030008 100%) !important;
 }
 
 body::after {
   z-index: 9999;
-  opacity: .16;
-  mix-blend-mode: screen;
+  opacity: .09;
+  mix-blend-mode: soft-light;
   background:
     repeating-linear-gradient(
       180deg,
-      rgba(255, 255, 255, .18) 0,
-      rgba(255, 255, 255, .18) 1px,
+      rgba(255, 255, 255, .12) 0,
+      rgba(255, 255, 255, .12) 1px,
       transparent 1px,
-      transparent 4px
+      transparent 5px
     );
 }
 
@@ -67,19 +66,20 @@ main::before {
   position: fixed !important;
   left: -30vw !important;
   right: -30vw !important;
-  bottom: -42vh !important;
-  height: 92vh !important;
+  top: -10vh !important;
+  bottom: auto !important;
+  height: 118vh !important;
   pointer-events: none !important;
   z-index: -2 !important;
-  opacity: .78 !important;
-  transform: perspective(520px) rotateX(62deg) scale(1.25) !important;
-  transform-origin: center bottom !important;
+  opacity: .66 !important;
+  transform: perspective(760px) rotateX(54deg) scale(1.18) !important;
+  transform-origin: center top !important;
   background-image:
     linear-gradient(to right, var(--applix-outrun-grid) 1px, transparent 1px),
     linear-gradient(to bottom, var(--applix-outrun-grid-soft) 1px, transparent 1px) !important;
-  background-size: 86px 86px !important;
-  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,.95) 0%, rgba(0,0,0,.72) 36%, rgba(0,0,0,.28) 70%, transparent 100%) !important;
-  mask-image: linear-gradient(to top, rgba(0,0,0,.95) 0%, rgba(0,0,0,.72) 36%, rgba(0,0,0,.28) 70%, transparent 100%) !important;
+  background-size: 84px 84px !important;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.9) 0%, rgba(0,0,0,.8) 34%, rgba(0,0,0,.34) 70%, transparent 100%) !important;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,.9) 0%, rgba(0,0,0,.8) 34%, rgba(0,0,0,.34) 70%, transparent 100%) !important;
 }
 
 .applix-home-shell::after,
@@ -93,16 +93,63 @@ main::after {
   pointer-events: none !important;
   z-index: -1 !important;
   background:
-    radial-gradient(circle at 50% 45%, rgba(255, 0, 180, .2), transparent 32%),
-    radial-gradient(circle at 50% 102%, rgba(255, 48, 130, .18), transparent 34%),
-    linear-gradient(90deg, rgba(0,0,0,.5), transparent 20%, transparent 80%, rgba(0,0,0,.5)),
-    linear-gradient(180deg, rgba(0,0,0,.18), transparent 30%, rgba(0,0,0,.32)) !important;
+    radial-gradient(circle at 50% 52%, rgba(255, 0, 160, .12), transparent 30%),
+    linear-gradient(90deg, rgba(0,0,0,.62), transparent 24%, transparent 76%, rgba(0,0,0,.62)),
+    linear-gradient(180deg, rgba(0,0,0,.18), transparent 34%, rgba(0,0,0,.46)) !important;
 }
 
 /* Keep content readable on the darker global background without rewriting layouts. */
+.applix-home-shell,
 .dashboard-cockpit-shell,
-.agent-log-shell {
+.agent-log-shell,
+.applix-setup-shell,
+main {
   color: #f7f0ff !important;
+}
+
+.applix-home-shell h1,
+.applix-home-shell h2,
+.applix-home-shell h3,
+.applix-home-shell strong,
+.dashboard-cockpit-shell .dashboard-card-clean strong,
+.dashboard-cockpit-shell .home-check strong,
+.dashboard-cockpit-shell .campaign-summary-card strong,
+.dashboard-cockpit-shell .dashboard-hero h1,
+.dashboard-cockpit-shell .resume-warning,
+.agent-log-shell h1,
+.agent-log-shell h2,
+.agent-log-shell strong,
+.applix-setup-shell h1,
+.applix-setup-shell h2,
+.applix-setup-shell strong,
+main h1,
+main h2,
+main h3,
+main strong {
+  color: #ffffff !important;
+  text-shadow: 0 0 18px rgba(255, 0, 160, .18) !important;
+}
+
+.applix-home-shell p,
+.applix-home-shell span,
+.applix-home-shell label,
+.dashboard-cockpit-shell .dashboard-card-clean p,
+.dashboard-cockpit-shell .home-check p,
+.dashboard-cockpit-shell .dashboard-subtitle,
+.dashboard-cockpit-shell .campaign-target,
+.dashboard-cockpit-shell .resume-file-name,
+.agent-log-shell p,
+.agent-log-shell span,
+.agent-log-shell td,
+.agent-log-shell small,
+.agent-log-shell em,
+.applix-setup-shell p,
+.applix-setup-shell span,
+.applix-setup-shell label,
+main p,
+main span,
+main label {
+  color: rgba(247, 240, 255, .8) !important;
 }
 
 .dashboard-cockpit-shell .dashboard-card-clean,
@@ -114,34 +161,10 @@ main::after {
 .dashboard-cockpit-shell .applix-intro-card,
 .agent-log-card,
 .summary-card {
-  background: rgba(12, 4, 28, .62) !important;
+  background: rgba(8, 0, 18, .48) !important;
   border-color: rgba(255, 255, 255, .12) !important;
   color: #f7f0ff !important;
-  backdrop-filter: blur(12px) !important;
-}
-
-.dashboard-cockpit-shell .dashboard-card-clean strong,
-.dashboard-cockpit-shell .home-check strong,
-.dashboard-cockpit-shell .campaign-summary-card strong,
-.dashboard-cockpit-shell .dashboard-hero h1,
-.dashboard-cockpit-shell .resume-warning,
-.agent-log-shell h1,
-.agent-log-shell h2,
-.agent-log-shell strong {
-  color: #ffffff !important;
-}
-
-.dashboard-cockpit-shell .dashboard-card-clean p,
-.dashboard-cockpit-shell .home-check p,
-.dashboard-cockpit-shell .dashboard-subtitle,
-.dashboard-cockpit-shell .campaign-target,
-.dashboard-cockpit-shell .resume-file-name,
-.agent-log-shell p,
-.agent-log-shell span,
-.agent-log-shell td,
-.agent-log-shell small,
-.agent-log-shell em {
-  color: rgba(247, 240, 255, .78) !important;
+  backdrop-filter: blur(8px) !important;
 }
 
 .dashboard-cockpit-shell .applix-setup-back,
@@ -150,13 +173,13 @@ main::after {
 .agent-action-row a,
 .agent-action-row button,
 .sheet-pagination button {
-  background: rgba(10, 2, 24, .68) !important;
+  background: rgba(10, 2, 24, .72) !important;
   color: #ffffff !important;
-  border-color: rgba(255, 255, 255, .16) !important;
+  border-color: rgba(255, 255, 255, .18) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
   body::after {
-    opacity: .1;
+    opacity: .06;
   }
 }
