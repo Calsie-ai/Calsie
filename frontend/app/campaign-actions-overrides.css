@@ -124,6 +124,31 @@
   cursor: not-allowed !important;
 }
 
+.dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker'] {
+  width: min(100%, 520px) !important;
+  min-height: clamp(84px, 15vw, 118px) !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent url('/TrackApplix.svg') center / contain no-repeat !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker']::before,
+.dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker']::after {
+  display: none !important;
+  content: none !important;
+}
+
+.dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker']:hover {
+  transform: translateY(-1px) !important;
+  filter: drop-shadow(0 12px 20px rgba(255, 87, 87, .18)) !important;
+}
+
 @media (max-width: 520px) {
   .dashboard-cockpit-shell .campaign-buttons {
     gap: 4px !important;
@@ -139,5 +164,9 @@
   .dashboard-cockpit-shell .campaign-buttons .ghost-button,
   .dashboard-cockpit-shell .campaign-buttons::before {
     min-height: 38px !important;
+  }
+
+  .dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker'] {
+    min-height: 84px !important;
   }
 }
