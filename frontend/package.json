@@ -17,8 +17,8 @@
     "stripe": "latest"
   },
   "devDependencies": {
-    "typescript": "latest",
+    "@types/node": "latest",
     "@types/react": "latest",
-    "@types/node": "latest"
+    "typescript": "7.0.2"
   }
 }

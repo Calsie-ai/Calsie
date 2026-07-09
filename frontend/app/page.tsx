@@ -283,7 +283,7 @@ export default function HomePage() {
         }}
       >
         <img
-          src="/applix-logo.svg"
+          src="/applix-flying.gif"
           alt="Applix logo"
           style={{
             position: "relative",
