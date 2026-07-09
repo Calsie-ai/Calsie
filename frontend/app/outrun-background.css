@@ -46,11 +46,14 @@ body::after {
 .dashboard-cockpit-shell,
 .agent-log-shell,
 .applix-setup-shell,
-main {
+main,
+body main.dashboard-cockpit-shell,
+html body .dashboard-cockpit-shell {
   position: relative;
   isolation: isolate;
   background-color: transparent !important;
   background-image: none !important;
+  color: #f7f0ff !important;
 }
 
 /* Kill old landing-page inline spotlight / hue wash. */
@@ -100,13 +103,48 @@ main::after {
     linear-gradient(180deg, rgba(0,0,0,.35), transparent 36%, rgba(0,0,0,.58)) !important;
 }
 
-/* Keep content readable on the darker global background without rewriting layouts. */
-.applix-home-shell,
-.dashboard-cockpit-shell,
-.agent-log-shell,
-.applix-setup-shell,
-main {
-  color: #f7f0ff !important;
+/* Stronger dashboard overrides because dashboard page has its own inline theme style tag. */
+html body main.dashboard-cockpit-shell,
+html body .dashboard-cockpit-shell {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+html body main.dashboard-cockpit-shell::before,
+html body .dashboard-cockpit-shell::before {
+  content: "" !important;
+  display: block !important;
+  position: fixed !important;
+  left: -30vw !important;
+  right: -30vw !important;
+  top: -8vh !important;
+  bottom: auto !important;
+  height: 118vh !important;
+  pointer-events: none !important;
+  z-index: -2 !important;
+  opacity: .72 !important;
+  transform: perspective(760px) rotateX(54deg) scale(1.18) !important;
+  transform-origin: center top !important;
+  background-image:
+    linear-gradient(to right, var(--applix-outrun-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--applix-outrun-grid-soft) 1px, transparent 1px) !important;
+  background-size: 84px 84px !important;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.92) 0%, rgba(0,0,0,.82) 42%, rgba(0,0,0,.46) 76%, transparent 100%) !important;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,.92) 0%, rgba(0,0,0,.82) 42%, rgba(0,0,0,.46) 76%, transparent 100%) !important;
+}
+
+html body main.dashboard-cockpit-shell::after,
+html body .dashboard-cockpit-shell::after {
+  content: "" !important;
+  display: block !important;
+  position: fixed !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  z-index: -1 !important;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.7), transparent 22%, transparent 78%, rgba(0,0,0,.7)),
+    linear-gradient(180deg, rgba(0,0,0,.35), transparent 36%, rgba(0,0,0,.58)) !important;
 }
 
 .applix-home-shell h1,
