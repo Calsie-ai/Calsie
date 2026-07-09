@@ -53,6 +53,13 @@ main {
   background-image: none !important;
 }
 
+/* Kill old landing-page inline spotlight / hue wash. */
+main > div[aria-hidden="true"]:nth-of-type(3) {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
 .applix-home-shell::before,
 .dashboard-cockpit-shell::before,
 .agent-log-shell::before,
@@ -143,8 +150,9 @@ main strong {
 .applix-setup-shell label,
 main p,
 main span,
-main label {
-  color: rgba(247, 240, 255, .82) !important;
+main label,
+main button {
+  color: rgba(247, 240, 255, .86) !important;
 }
 
 .dashboard-cockpit-shell .dashboard-card-clean,
