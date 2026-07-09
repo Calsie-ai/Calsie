@@ -3,6 +3,11 @@
   content: none !important;
 }
 
+.dashboard-cockpit-shell .dashboard-app-connect.ready {
+  pointer-events: none !important;
+  cursor: default !important;
+}
+
 .dashboard-cockpit-shell .campaign-summary-card {
   padding-top: clamp(18px, 4vw, 30px) !important;
 }
@@ -122,10 +127,6 @@
 .dashboard-cockpit-shell .campaign-buttons .ghost-button:disabled {
   opacity: .55 !important;
   cursor: not-allowed !important;
-}
-
-.dashboard-cockpit-shell .dashboard-actions .connector-button {
-  display: none !important;
 }
 
 .dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker'] {
