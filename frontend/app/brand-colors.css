@@ -1,0 +1,55 @@
+/* Calsie / Applix brand colour override: pastel red, not pink. */
+:root {
+  --calsie-red: #ff6f6f;
+  --calsie-red-soft: rgba(255, 111, 111, 0.18);
+  --calsie-red-line: rgba(255, 111, 111, 0.58);
+  --calsie-red-bg: #fff8f7;
+  --calsie-ink: #16131a;
+}
+
+body .dashboard-cockpit-shell {
+  background-color: var(--calsie-red-bg) !important;
+  background-image:
+    linear-gradient(rgba(255, 111, 111, .23) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 111, 111, .23) 1px, transparent 1px) !important;
+}
+
+body .dashboard-hero > p:first-of-type,
+body .campaign-pill,
+body .dashboard-card-clean a,
+body .home-campaign-card a {
+  color: var(--calsie-red) !important;
+}
+
+body .applix-intro-card::after,
+body .resume-card-wrap::after,
+body .dashboard-single-row::after {
+  background: var(--calsie-red) !important;
+}
+
+body .browse-template-button,
+body .dashboard-actions .applix-setup-primary,
+body .dashboard-actions .recommended-template-action {
+  background: var(--calsie-red) !important;
+  border-color: var(--calsie-red) !important;
+  color: var(--calsie-ink) !important;
+}
+
+body .campaign-pill {
+  background: rgba(255, 111, 111, .12) !important;
+  border-color: rgba(255, 111, 111, .28) !important;
+}
+
+body .resume-action:hover,
+body .dashboard-app-connect:hover {
+  background: rgba(255, 111, 111, .05) !important;
+}
+
+body .resume-action:focus-visible {
+  outline-color: rgba(255, 111, 111, .72) !important;
+}
+
+body .applix-setup-orb span {
+  color: var(--calsie-red) !important;
+  text-shadow: 0 4px 0 rgba(92, 22, 22, .16), 0 0 22px rgba(255, 111, 111, .42) !important;
+}
