@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getSupabaseClient } from "../lib/supabaseClient";
+import { useState } from "react";
 
 const pink = "#ff5ca8";
 const ink = "#16131a";
@@ -10,68 +8,30 @@ const ink = "#16131a";
 const onboardingSlides = [
   {
     title: "WHAT IS APPLIX",
-    body:
-      "APPLIX IS FIRST SYMBIOTIC INTELLIGENCE AI. IT IS AN EMAIL AUTOMATION SYMBIOTE BUILT TO HELP YOU CONTACT EMPLOYERS IN A CONTROLLED WAY.",
+    body: "APPLIX IS FIRST SYMBIOTIC INTELLIGENCE AI. IT IS AN EMAIL AUTOMATION SYMBIOTE BUILT TO HELP YOU CONTACT EMPLOYERS IN A CONTROLLED WAY.",
   },
   {
     title: "WHAT DOES IT DO",
-    body:
-      "APPLIX CAN USE YOUR DETAILS, YOUR CV, AND YOUR SELECTED TEMPLATE TO PREPARE JOB CONTACT EMAILS.",
+    body: "APPLIX CAN USE YOUR DETAILS, YOUR CV, AND YOUR SELECTED TEMPLATE TO PREPARE JOB CONTACT EMAILS.",
   },
   {
     title: "HOW TO CONNECT THE APP",
-    body:
-      "CREATE A NEW GMAIL ONLY FOR APPLIX. DO NOT USE YOUR PERSONAL EMAIL. AUTHORIZE APPLIX WITH THAT GMAIL ACCOUNT ONLY.",
+    body: "CREATE A NEW GMAIL ONLY FOR APPLIX. DO NOT USE YOUR PERSONAL EMAIL. AUTHORIZE APPLIX WITH THAT GMAIL ACCOUNT ONLY.",
   },
   {
     title: "HOW IT WORKS",
-    body:
-      "APPLIX RUNS WITH GUARD RAILS. IT CAN EXECUTE TASKS OVER 30 DAYS, CONTACT COMPANIES, AND USE YOUR DOCUMENTS AND TEMPLATE AS INSTRUCTIONS.",
+    body: "APPLIX RUNS WITH GUARD RAILS. IT CAN EXECUTE TASKS OVER 30 DAYS, CONTACT COMPANIES, AND USE YOUR DOCUMENTS AND TEMPLATE AS INSTRUCTIONS.",
   },
   {
     title: "TERMS AND CONDITIONS",
-    body:
-      "BY CONTINUING, YOU UNDERSTAND THIS IS A DRAFT TEST FLOW. YOU ARE RESPONSIBLE FOR YOUR EMAIL ACCOUNT, YOUR CV, YOUR DETAILS, AND THE INSTRUCTIONS YOU GIVE APPLIX.",
+    body: "BY CONTINUING, YOU UNDERSTAND THIS IS A DRAFT TEST FLOW. YOU ARE RESPONSIBLE FOR YOUR EMAIL ACCOUNT, YOUR CV, YOUR DETAILS, AND THE INSTRUCTIONS YOU GIVE APPLIX.",
   },
 ];
 
 export default function HomePage() {
-  const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
-  const [signedInEmail, setSignedInEmail] = useState("");
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [carouselComplete, setCarouselComplete] = useState(false);
-
-  useEffect(() => {
-    async function checkSession() {
-      try {
-        const supabase = getSupabaseClient();
-        const { data } = await supabase.auth.getUser();
-
-        if (data.user) {
-          setSignedInEmail(data.user.email || "");
-        }
-      } catch {
-        // Keep Google login available if Supabase is not configured yet.
-      } finally {
-        setCheckingSession(false);
-      }
-    }
-
-    checkSession();
-  }, []);
-
-  async function signOut() {
-    try {
-      const supabase = getSupabaseClient();
-      await supabase.auth.signOut();
-      setSignedInEmail("");
-      setStatus("");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not log out.");
-    }
-  }
+  const activeSlide = onboardingSlides[carouselIndex];
 
   function confirmSlide() {
     if (carouselIndex < onboardingSlides.length - 1) {
@@ -80,33 +40,6 @@ export default function HomePage() {
     }
 
     setCarouselComplete(true);
-  }
-
-  async function loginWithGoogle() {
-    if (!carouselComplete || loading) return;
-
-    setStatus("");
-    setLoading(true);
-
-    try {
-      const supabase = getSupabaseClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=/dashboard`;
-
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo,
-        },
-      });
-
-      if (error) {
-        setStatus(error.message);
-        setLoading(false);
-      }
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not continue with Google.");
-      setLoading(false);
-    }
   }
 
   const header = (
@@ -196,9 +129,13 @@ export default function HomePage() {
     width: "min(340px, calc(100vw - 90px))",
     height: 1,
     margin: "18px auto 0",
-    background:
-      "linear-gradient(90deg, rgba(255,92,168,0) 0%, rgba(255,92,168,.55) 18%, rgba(255,92,168,.55) 82%, rgba(255,92,168,0) 100%)",
+    background: "linear-gradient(90deg, rgba(255,92,168,0) 0%, rgba(255,92,168,.55) 18%, rgba(255,92,168,.55) 82%, rgba(255,92,168,0) 100%)",
     opacity: 0.9,
+  };
+
+  const topSectionLineStyle = {
+    ...sectionLineStyle,
+    margin: "0 auto 18px",
   };
 
   const primaryButtonStyle = {
@@ -214,15 +151,6 @@ export default function HomePage() {
     fontWeight: 900,
     boxShadow: "0 10px 22px rgba(255, 92, 168, .35)",
   };
-
-  const lockedButtonStyle = {
-    ...primaryButtonStyle,
-    background: "#4c4c4f",
-    color: "rgba(255,255,255,.7)",
-    boxShadow: "0 10px 22px rgba(0,0,0,.14)",
-  };
-
-  const activeSlide = onboardingSlides[carouselIndex];
 
   return (
     <main style={{ position: "relative", minHeight: "100svh", overflowX: "hidden", backgroundColor: "#fff7fb", color: ink, fontFamily: "Arial, Helvetica, sans-serif" }}>
@@ -262,13 +190,13 @@ export default function HomePage() {
 
       <section style={sectionStyle}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 18 }}>Upload Your CV</h2>
-        <p style={copyStyle}>UPLOAD YOUR RESUME/CV, APPLIX WILL ATTACH YOUR DOCUMENTSTO EVERY COMPANY IT CONTACTS PLEASE NO PERSONAL INFORMATION / CREDITS ON YOUR DOCUMENTS KEEP IT GENRAL AS MUCH AS YOU CAN</p>
+        <p style={copyStyle}>UPLOAD YOUR RESUME/CV, APPLIX WILL ATTACH YOUR DOCUMENTS TO EVERY COMPANY IT CONTACTS. PLEASE NO PERSONAL INFORMATION / CREDITS ON YOUR DOCUMENTS. KEEP IT GENERAL AS MUCH AS YOU CAN.</p>
         <div aria-hidden="true" style={sectionLineStyle} />
       </section>
 
       <section style={sectionStyle}>
         <h2 style={{ ...sectionHeadingStyle, marginBottom: 18 }}>Fill Up Template</h2>
-        <p style={copyStyle}>Browse Template :<br />Example:<br />Business Analyst<br />Support Worker,AIN, AgeCare, IT Support, Internship.<br />or Start With Standard Form By Applix</p>
+        <p style={copyStyle}>Browse Template :<br />Example:<br />Business Analyst<br />Support Worker, AIN, AgeCare, IT Support, Internship.<br />or Start With Standard Form By Applix</p>
         <div aria-hidden="true" style={sectionLineStyle} />
       </section>
 
@@ -281,31 +209,19 @@ export default function HomePage() {
         <div aria-hidden="true" style={sectionLineStyle} />
       </section>
 
-      <section style={{ ...sectionStyle, gap: 14, paddingBottom: "clamp(38px, 8vw, 76px)" }}>
-        <h2 style={{ ...sectionHeadingStyle, marginBottom: 2 }}>APPLIX START CHECK</h2>
-        {!carouselComplete && (
-          <div style={{ width: "min(360px, calc(100vw - 28px))", display: "grid", gap: 12, justifyItems: "center", padding: "18px 16px", borderRadius: 26, background: "rgba(255,255,255,.42)", border: "1px solid rgba(22, 19, 26, .08)", boxShadow: "0 14px 30px rgba(0,0,0,.08)", backdropFilter: "blur(8px)" }}>
+      <section style={{ ...sectionStyle, gap: 12, paddingBottom: "clamp(38px, 8vw, 76px)" }}>
+        <h2 style={{ ...sectionHeadingStyle, marginBottom: 4 }}>APPLIX START CHECK</h2>
+        <div aria-hidden="true" style={topSectionLineStyle} />
+        {!carouselComplete ? (
+          <>
             <p style={{ ...sectionHeadingStyle, marginBottom: 0 }}>{carouselIndex + 1}/{onboardingSlides.length}</p>
             <h3 style={{ ...sectionHeadingStyle, marginBottom: 0 }}>{activeSlide.title}</h3>
-            <p style={{ ...copyStyle, marginBottom: 0 }}>{activeSlide.body}</p>
+            <p style={{ ...copyStyle, marginBottom: 2 }}>{activeSlide.body}</p>
             <button type="button" onClick={confirmSlide} style={primaryButtonStyle}>Yes, I understood</button>
-          </div>
+          </>
+        ) : (
+          <p style={{ ...copyStyle, marginBottom: 0 }}>START CHECK COMPLETE.</p>
         )}
-        {carouselComplete && !signedInEmail && (
-          <div style={{ display: "grid", gap: 12, justifyItems: "center" }}>
-            <p style={{ ...copyStyle, marginBottom: 0 }}>ALL START CHECKS COMPLETED. CONTINUE WITH GOOGLE TO ENTER APPLIX.</p>
-            <button type="button" onClick={loginWithGoogle} disabled={loading} style={primaryButtonStyle}>{loading ? "Connecting..." : "Continue with Google"}</button>
-          </div>
-        )}
-        {!carouselComplete && !signedInEmail && <button type="button" disabled style={lockedButtonStyle}>Google login locked</button>}
-        {checkingSession && <p style={{ margin: 0, fontSize: "clamp(10px, 3vw, 13px)", fontWeight: 800 }}>Checking your login...</p>}
-        {!checkingSession && signedInEmail && (
-          <div style={{ display: "grid", gap: 10, justifyItems: "center" }}>
-            <Link href="/dashboard" style={{ ...primaryButtonStyle, display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>Go to dashboard</Link>
-            <button type="button" onClick={signOut} style={primaryButtonStyle}>Logout</button>
-          </div>
-        )}
-        {status && <p style={{ width: "min(320px, calc(100vw - 20px))", margin: "4px 0 0", color: "#7f1d1d", fontSize: "clamp(10px, 3vw, 12px)", fontWeight: 800, lineHeight: 1.45 }}>{status}</p>}
         <div aria-hidden="true" style={sectionLineStyle} />
       </section>
     </main>
