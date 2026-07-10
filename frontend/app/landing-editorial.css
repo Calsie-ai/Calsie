@@ -476,7 +476,6 @@ body:has(.applix-landing)::after {
 }
 
 .applix-feature-card,
-.applix-step-card,
 .applix-start-card {
   border: 1px solid var(--applix-border);
   border-radius: 8px;
@@ -497,41 +496,103 @@ body:has(.applix-landing)::after {
   border-color: var(--applix-accent);
 }
 
-.applix-feature-number,
-.applix-step-number {
+.applix-feature-number {
   color: var(--applix-accent) !important;
   font-size: 13px;
   font-weight: 900;
 }
 
-.applix-feature-card h3,
-.applix-step-card h3 {
+.applix-feature-card h3 {
   margin: 0;
   color: var(--applix-black) !important;
   font-size: 21px;
   line-height: 1.2;
 }
 
-.applix-feature-card p,
-.applix-step-card p {
+.applix-feature-card p {
   margin: 0;
   color: var(--applix-muted) !important;
   font-size: 15px;
   line-height: 1.55;
 }
 
-.applix-steps-grid {
+.applix-how-header {
+  max-width: 620px;
+  margin-bottom: clamp(38px, 6vw, 66px);
+}
+
+.applix-how-header h2 {
+  font-size: clamp(32px, 4vw, 44px);
+  line-height: 1.12;
+  font-weight: 500;
+}
+
+.applix-how-header p {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.applix-step-track {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(34px, 7vw, 92px);
+  align-items: start;
+}
+
+.applix-step-track::before {
+  content: "";
+  position: absolute;
+  top: 20px;
+  left: calc(16.666% + 21px);
+  right: calc(16.666% + 21px);
+  height: 1px;
+  background: rgba(0, 0, 0, .34);
 }
 
 .applix-step-card {
-  min-height: 228px;
+  position: relative;
+  z-index: 1;
+  min-height: auto;
   display: grid;
+  justify-items: center;
   align-content: start;
-  gap: 18px;
-  padding: 22px;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  text-align: center;
+}
+
+.applix-step-number {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 10px;
+  border: 1px solid rgba(0, 0, 0, .58);
+  background: var(--applix-white) !important;
+  color: var(--applix-black) !important;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.applix-step-card h3 {
+  margin: 0;
+  color: var(--applix-black) !important;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 850;
+}
+
+.applix-step-card p {
+  max-width: 260px;
+  margin: 0 auto;
+  color: var(--applix-muted) !important;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .applix-philosophy {
@@ -703,8 +764,7 @@ body:has(.applix-landing)::after {
     grid-template-columns: 1fr;
   }
 
-  .applix-stats-grid,
-  .applix-steps-grid {
+  .applix-stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -722,6 +782,23 @@ body:has(.applix-landing)::after {
 
   .applix-trust-item:nth-child(n + 3) {
     border-top: 1px solid var(--applix-border);
+  }
+}
+
+@media (max-width: 760px) {
+  .applix-step-track {
+    max-width: 420px;
+    grid-template-columns: 1fr;
+    gap: 32px;
+    margin: 0 auto;
+  }
+
+  .applix-step-track::before {
+    display: none;
+  }
+
+  .applix-step-card p {
+    max-width: 320px;
   }
 }
 
@@ -769,7 +846,6 @@ body:has(.applix-landing)::after {
 
   .applix-stats-grid,
   .applix-card-grid,
-  .applix-steps-grid,
   .applix-trust-grid,
   .applix-footer-inner {
     grid-template-columns: 1fr;
