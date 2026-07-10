@@ -53,20 +53,16 @@ const features = [
 
 const steps = [
   {
-    title: "Set up your profile",
-    body: "Upload your resume and define the roles, locations, and preferences that matter.",
+    title: "Connect your profile",
+    body: "Upload your resume and set the roles, locations, and preferences Applix should use.",
   },
   {
-    title: "Review matched jobs",
-    body: "See relevant opportunities selected around your profile and search direction.",
-  },
-  {
-    title: "Generate tailored applications",
-    body: "Let Applix prepare resume and email drafts for each role.",
+    title: "Configure your workflow",
+    body: "Review matched jobs and let Applix prepare tailored resumes and emails for each role.",
   },
   {
     title: "Approve and apply",
-    body: "Stay in control while moving through applications faster.",
+    body: "Check every draft, choose what moves forward, and apply faster with full control.",
   },
 ];
 
@@ -312,16 +308,16 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="applix-section" id="how-it-works" aria-labelledby="steps-title">
+      <section className="applix-section applix-how" id="how-it-works" aria-labelledby="steps-title">
         <div className="applix-container">
-          <div className="applix-section-header">
-            <p className="applix-eyebrow">How it works</p>
-            <h2 id="steps-title">A focused path from setup to approval.</h2>
+          <div className="applix-section-header centered applix-how-header">
+            <h2 id="steps-title">How Applix works</h2>
+            <p>Get up and applying in minutes, not days.</p>
           </div>
-          <div className="applix-steps-grid">
+          <div className="applix-step-track">
             {steps.map((step, index) => (
               <article className="applix-step-card" key={step.title}>
-                <span className="applix-step-number">Step {index + 1}</span>
+                <span className="applix-step-number">{index + 1}</span>
                 <h3>{step.title}</h3>
                 <p>{step.body}</p>
               </article>
