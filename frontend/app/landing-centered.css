@@ -108,6 +108,39 @@ body:has(.applix-landing),
   background: rgba(255, 235, 237, .94) !important;
 }
 
+/* Keep the final CTA readable on the light pink landing theme. */
+.applix-landing .applix-final-cta {
+  color: var(--applix-black) !important;
+  border-top: 1px solid rgba(0, 0, 0, .08);
+  border-bottom: 1px solid rgba(0, 0, 0, .08);
+}
+
+.applix-landing .applix-final-copy h2 {
+  color: var(--applix-black) !important;
+}
+
+.applix-landing .applix-final-copy .applix-eyebrow {
+  color: var(--applix-accent) !important;
+}
+
+.applix-landing .applix-final-copy p {
+  color: var(--applix-muted) !important;
+}
+
+.applix-landing .applix-final-actions .applix-button,
+.applix-landing .applix-start-card .applix-button {
+  border-color: var(--applix-accent) !important;
+  background: var(--applix-accent) !important;
+  color: var(--applix-black) !important;
+}
+
+.applix-landing .applix-start-card {
+  border: 1px solid rgba(0, 0, 0, .14);
+  background: var(--applix-white) !important;
+  color: var(--applix-black) !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .08);
+}
+
 @media (max-width: 640px) {
   .applix-landing .applix-hero-grid,
   .applix-landing .applix-philosophy-panel,
