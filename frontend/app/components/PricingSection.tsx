@@ -56,18 +56,18 @@ export default function PricingSection() {
       id="pricing"
       aria-labelledby="pricing-title"
       style={{
-        background: "#fffdf8",
+        background: "#ffebed",
         color: "#111111",
         padding: "120px 32px 132px",
         scrollMarginTop: "88px",
         fontFamily: "inherit",
+        borderTop: "1px solid rgba(17,17,17,0.08)",
+        borderBottom: "1px solid rgba(17,17,17,0.08)",
       }}
     >
       <div style={{ width: "min(1380px, 100%)", margin: "0 auto" }}>
         <header style={{ textAlign: "center", maxWidth: "900px", margin: "0 auto 70px" }}>
-          <p className="applix-eyebrow" style={{ margin: "0 0 18px" }}>
-            Pricing
-          </p>
+          <p className="applix-eyebrow" style={{ margin: "0 0 18px" }}>Pricing</p>
           <h2
             id="pricing-title"
             style={{
@@ -81,28 +81,12 @@ export default function PricingSection() {
           >
             Simple, transparent pricing
           </h2>
-          <p
-            style={{
-              margin: "26px auto 0",
-              maxWidth: "760px",
-              fontSize: "clamp(18px, 1.5vw, 22px)",
-              lineHeight: 1.6,
-              color: "#555",
-            }}
-          >
+          <p style={{ margin: "26px auto 0", maxWidth: "760px", fontSize: "clamp(18px, 1.5vw, 22px)", lineHeight: 1.6, color: "#555" }}>
             Start free, choose the complete Applix campaign, or contact us for a custom workflow.
           </p>
         </header>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            alignItems: "stretch",
-            maxWidth: "1280px",
-            margin: "0 auto",
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", alignItems: "stretch", maxWidth: "1280px", margin: "0 auto" }}>
           {plans.map((plan) => (
             <article
               key={plan.name}
@@ -118,68 +102,31 @@ export default function PricingSection() {
                 transform: plan.featured ? "translateY(-18px)" : "none",
                 boxShadow: plan.featured ? "0 30px 80px rgba(0,0,0,0.2)" : "none",
                 zIndex: plan.featured ? 2 : 1,
-                fontFamily: "inherit",
               }}
             >
               {plan.featured ? (
-                <span
-                  style={{
-                    alignSelf: "flex-start",
-                    marginBottom: "28px",
-                    padding: "8px 12px",
-                    border: "1px solid rgba(255,255,255,0.72)",
-                    fontSize: "12px",
-                    fontWeight: 800,
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                  }}
-                >
+                <span style={{ alignSelf: "flex-start", marginBottom: "28px", padding: "8px 12px", border: "1px solid rgba(255,255,255,0.72)", fontSize: "12px", fontWeight: 800, textTransform: "uppercase" }}>
                   Most popular
                 </span>
               ) : null}
 
               <p style={{ margin: 0, fontSize: "18px", fontWeight: 800 }}>{plan.name}</p>
               <div style={{ display: "flex", alignItems: "baseline", gap: "10px", margin: "22px 0 18px" }}>
-                <strong
-                  style={{
-                    fontSize: plan.price.length > 7 ? "50px" : "68px",
-                    lineHeight: 1,
-                    fontWeight: 800,
-                    letterSpacing: "-0.05em",
-                  }}
-                >
-                  {plan.price}
-                </strong>
+                <strong style={{ fontSize: plan.price.length > 7 ? "50px" : "68px", lineHeight: 1, fontWeight: 800 }}>{plan.price}</strong>
                 {plan.suffix ? <span style={{ opacity: 0.72, fontSize: "16px" }}>{plan.suffix}</span> : null}
               </div>
-
-              <p style={{ margin: 0, minHeight: "92px", fontSize: "17px", lineHeight: 1.65, opacity: 0.76 }}>
-                {plan.note}
-              </p>
+              <p style={{ margin: 0, minHeight: "92px", fontSize: "17px", lineHeight: 1.65, opacity: 0.76 }}>{plan.note}</p>
 
               <div style={{ display: "grid", gap: "18px", margin: "38px 0" }}>
                 {plan.features.map((feature) => (
-                  <div
-                    key={feature}
-                    style={{ display: "flex", gap: "13px", alignItems: "flex-start", fontSize: "16px", lineHeight: 1.5 }}
-                  >
+                  <div key={feature} style={{ display: "flex", gap: "13px", alignItems: "flex-start", fontSize: "16px", lineHeight: 1.5 }}>
                     <span aria-hidden="true" style={{ fontWeight: 900 }}>✓</span>
                     <span>{feature}</span>
                   </div>
                 ))}
               </div>
 
-              <a
-                className="applix-button applix-button--primary"
-                href={plan.href}
-                style={{
-                  marginTop: "auto",
-                  minHeight: "58px",
-                  width: "100%",
-                  fontSize: "14px",
-                  textTransform: "uppercase",
-                }}
-              >
+              <a className="applix-button applix-button--primary" href={plan.href} style={{ marginTop: "auto", minHeight: "58px", width: "100%", fontSize: "14px", textTransform: "uppercase" }}>
                 {plan.action}
               </a>
             </article>
