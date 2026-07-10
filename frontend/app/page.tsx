@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { getSupabaseClient } from "../lib/supabaseClient";
+import AppFooter from "./components/AppFooter";
 import PricingSection from "./components/PricingSection";
 
 const navLinks = [
@@ -227,12 +228,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="applix-footer">
-        <div className="applix-container applix-footer-inner">
-          <div className="applix-footer-brand"><strong>Applix</strong><p>AI-powered job application support for modern job seekers.</p></div>
-          <nav className="applix-footer-links" aria-label="Footer navigation"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a><a href="/support">Support</a></nav>
-        </div>
-      </footer>
+      <AppFooter />
     </main>
   );
 }
