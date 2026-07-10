@@ -65,10 +65,7 @@ export default function PricingSection() {
     >
       <div style={{ width: "min(1380px, 100%)", margin: "0 auto" }}>
         <header style={{ textAlign: "center", maxWidth: "900px", margin: "0 auto 70px" }}>
-          <p
-            className="applix-eyebrow"
-            style={{ margin: "0 0 18px", color: "#111111" }}
-          >
+          <p className="applix-eyebrow" style={{ margin: "0 0 18px" }}>
             Pricing
           </p>
           <h2
@@ -173,21 +170,13 @@ export default function PricingSection() {
               </div>
 
               <a
+                className="applix-button applix-button--primary"
                 href={plan.href}
                 style={{
                   marginTop: "auto",
                   minHeight: "58px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 22px",
-                  border: plan.featured ? "1px solid #ffffff" : "1px solid #111111",
-                  background: plan.featured ? "#ffffff" : "#111111",
-                  color: plan.featured ? "#111111" : "#ffffff",
-                  textDecoration: "none",
+                  width: "100%",
                   fontSize: "14px",
-                  fontWeight: 800,
-                  letterSpacing: "0.05em",
                   textTransform: "uppercase",
                 }}
               >
