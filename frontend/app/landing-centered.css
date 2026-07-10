@@ -14,6 +14,38 @@
   margin-right: auto;
 }
 
+.applix-landing .applix-hero .applix-eyebrow {
+  display: none;
+}
+
+.applix-landing .applix-hero h1 {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-width: none;
+  margin-bottom: 28px;
+  font-size: 0 !important;
+  line-height: 1;
+}
+
+.applix-landing .applix-hero h1::before {
+  content: "APPLIX";
+  color: var(--applix-black);
+  font-size: clamp(58px, 10vw, 104px);
+  font-weight: 900;
+  line-height: .9;
+  letter-spacing: -.055em !important;
+}
+
+.applix-landing .applix-hero h1::after {
+  content: "PERSISTENCE AT SCALE";
+  color: var(--applix-accent);
+  font-size: clamp(16px, 2.2vw, 24px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0 !important;
+}
+
 .applix-landing .applix-hero-actions {
   justify-content: center;
 }
@@ -61,7 +93,6 @@
   text-align: left;
 }
 
-/* Keep the full landing page on the same soft pink canvas. */
 body:has(.applix-landing),
 .applix-landing,
 .applix-landing .applix-header,
@@ -87,5 +118,13 @@ body:has(.applix-landing),
   .applix-landing .applix-hero-actions,
   .applix-landing .applix-final-actions {
     justify-content: center;
+  }
+
+  .applix-landing .applix-hero h1::before {
+    font-size: clamp(52px, 18vw, 76px);
+  }
+
+  .applix-landing .applix-hero h1::after {
+    font-size: clamp(14px, 4.4vw, 18px);
   }
 }
