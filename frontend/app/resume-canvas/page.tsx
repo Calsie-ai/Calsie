@@ -151,6 +151,10 @@ export default function ResumeCanvasPage() {
 
       if (userError || !activeUserId) throw new Error("Missing user session. Please refresh and sign in again.");
 
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (sessionError || !accessToken) throw new Error("Missing login session. Please sign in again.");
+
       if (!userId) setUserId(activeUserId);
 
       const path = `${activeUserId}/master-source.${safeExt(file)}`;
@@ -167,7 +171,11 @@ export default function ResumeCanvasPage() {
 
       const formData = new FormData();
       formData.append("resume", file);
-      const response = await fetch("/api/applix/parse-resume", { method: "POST", body: formData });
+      const response = await fetch("/api/applix/parse-resume", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
+      });
       const data = await response.json();
       if (!response.ok || !data?.ok) throw new Error(data?.error || "Could not parse resume.");
 
