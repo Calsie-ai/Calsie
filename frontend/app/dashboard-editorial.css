@@ -1,0 +1,375 @@
+html body main.dashboard-cockpit-shell {
+  --dashboard-accent: #FE818D;
+  --dashboard-black: #000000;
+  --dashboard-white: #FFFFFF;
+  --dashboard-tint: #FFF7F8;
+  --dashboard-border: #EAEAEA;
+  --dashboard-muted: #5C5C5C;
+
+  width: 100% !important;
+  min-height: 100vh !important;
+  padding: 28px 20px 72px !important;
+  margin: 0 !important;
+  background: var(--dashboard-white) !important;
+  color: var(--dashboard-black) !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  overflow-x: hidden !important;
+}
+
+html body main.dashboard-cockpit-shell::before,
+html body main.dashboard-cockpit-shell::after {
+  content: none !important;
+  display: none !important;
+}
+
+html body main.dashboard-cockpit-shell > * {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+html body main.dashboard-cockpit-shell .applix-setup-back,
+html body main.dashboard-cockpit-shell .applix-setup-info {
+  position: fixed !important;
+  top: max(18px, env(safe-area-inset-top)) !important;
+  width: 46px !important;
+  height: 46px !important;
+  border: 1px solid var(--dashboard-black) !important;
+  border-radius: 0 !important;
+  background: var(--dashboard-white) !important;
+  color: var(--dashboard-black) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html body main.dashboard-cockpit-shell .applix-setup-back {
+  left: 18px !important;
+}
+
+html body main.dashboard-cockpit-shell .applix-setup-info {
+  right: 18px !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-hero {
+  width: min(100%, 900px) !important;
+  max-width: 900px !important;
+  margin: 0 auto 44px !important;
+  padding-top: 72px !important;
+  text-align: center !important;
+  justify-items: center !important;
+  color: var(--dashboard-black) !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-hero img {
+  width: clamp(82px, 12vw, 126px) !important;
+  margin: 0 auto 8px !important;
+  filter: none !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-hero > p:first-of-type {
+  margin: 0 0 6px !important;
+  color: var(--dashboard-accent) !important;
+  font-size: clamp(36px, 8vw, 64px) !important;
+  font-weight: 950 !important;
+  letter-spacing: .12em !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-hero .applix-setup-kicker {
+  margin: 0 0 14px !important;
+  color: var(--dashboard-accent) !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  letter-spacing: .16em !important;
+  text-transform: uppercase !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-hero h1 {
+  margin: 0 !important;
+  max-width: 760px !important;
+  color: var(--dashboard-black) !important;
+  font-size: clamp(46px, 7vw, 82px) !important;
+  line-height: .96 !important;
+  font-weight: 950 !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-subtitle {
+  max-width: 680px !important;
+  margin: 20px auto 0 !important;
+  color: var(--dashboard-muted) !important;
+  font-size: clamp(16px, 2vw, 20px) !important;
+  line-height: 1.55 !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-stack {
+  width: min(100%, 980px) !important;
+  max-width: 980px !important;
+  margin: 0 auto !important;
+  display: grid !important;
+  gap: 20px !important;
+  align-items: stretch !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-stack > * {
+  width: 100% !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-card-clean,
+html body main.dashboard-cockpit-shell .home-campaign-card,
+html body main.dashboard-cockpit-shell .home-check-grid,
+html body main.dashboard-cockpit-shell .dashboard-single-row,
+html body main.dashboard-cockpit-shell .resume-card-wrap,
+html body main.dashboard-cockpit-shell .campaign-summary-card,
+html body main.dashboard-cockpit-shell .applix-intro-card,
+html body main.dashboard-cockpit-shell .dashboard-actions {
+  width: 100% !important;
+  border: 1px solid var(--dashboard-border) !important;
+  border-radius: 8px !important;
+  background: var(--dashboard-white) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-card-clean {
+  padding: 28px !important;
+  text-align: center !important;
+  display: grid !important;
+  justify-items: center !important;
+  gap: 12px !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-card-clean strong,
+html body main.dashboard-cockpit-shell .home-check strong {
+  color: var(--dashboard-black) !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-card-clean strong {
+  font-size: clamp(22px, 3vw, 32px) !important;
+  line-height: 1.15 !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-card-clean p,
+html body main.dashboard-cockpit-shell .home-check p {
+  color: var(--dashboard-muted) !important;
+  font-size: 15px !important;
+  line-height: 1.6 !important;
+}
+
+html body main.dashboard-cockpit-shell .applix-intro-card,
+html body main.dashboard-cockpit-shell .resume-card-wrap,
+html body main.dashboard-cockpit-shell .dashboard-single-row {
+  padding: 28px !important;
+}
+
+html body main.dashboard-cockpit-shell .applix-intro-card::after,
+html body main.dashboard-cockpit-shell .resume-card-wrap::after,
+html body main.dashboard-cockpit-shell .dashboard-single-row::after {
+  content: none !important;
+  display: none !important;
+}
+
+html body main.dashboard-cockpit-shell .resume-warning {
+  margin: 0 0 18px !important;
+  color: var(--dashboard-black) !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  letter-spacing: .04em !important;
+  text-transform: uppercase !important;
+}
+
+html body main.dashboard-cockpit-shell .resume-action,
+html body main.dashboard-cockpit-shell .dashboard-app-connect {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  min-height: 240px !important;
+  padding: 28px !important;
+  border: 1px solid var(--dashboard-border) !important;
+  border-radius: 8px !important;
+  background: var(--dashboard-tint) !important;
+  color: var(--dashboard-black) !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  transition: border-color .15s ease, transform .15s ease !important;
+}
+
+html body main.dashboard-cockpit-shell .resume-action:hover,
+html body main.dashboard-cockpit-shell .dashboard-app-connect:hover {
+  border-color: var(--dashboard-accent) !important;
+  background: var(--dashboard-tint) !important;
+  transform: translateY(-2px) !important;
+}
+
+html body main.dashboard-cockpit-shell .resume-action:focus-visible,
+html body main.dashboard-cockpit-shell .dashboard-app-connect:focus-visible,
+html body main.dashboard-cockpit-shell a:focus-visible,
+html body main.dashboard-cockpit-shell button:focus-visible {
+  outline: 3px solid rgba(254,129,141,.4) !important;
+  outline-offset: 3px !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-status-icon {
+  display: block !important;
+  margin: 0 auto 10px !important;
+  object-fit: contain !important;
+}
+
+html body main.dashboard-cockpit-shell .resume-status-icon,
+html body main.dashboard-cockpit-shell .connector-status-icon {
+  width: clamp(130px, 24vw, 190px) !important;
+  max-width: 100% !important;
+  height: auto !important;
+  transform: none !important;
+}
+
+html body main.dashboard-cockpit-shell .resume-file-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+  margin-top: 16px !important;
+}
+
+html body main.dashboard-cockpit-shell .resume-file-name {
+  margin: 0 !important;
+  color: var(--dashboard-muted) !important;
+  font-size: 13px !important;
+}
+
+html body main.dashboard-cockpit-shell .resume-delete-button,
+html body main.dashboard-cockpit-shell .ghost-button,
+html body main.dashboard-cockpit-shell .ghost-link {
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+html body main.dashboard-cockpit-shell .resume-delete-button {
+  border: 1px solid #D14343 !important;
+  background: var(--dashboard-white) !important;
+  color: #8A1C1C !important;
+}
+
+html body main.dashboard-cockpit-shell .campaign-summary-card {
+  padding: 30px !important;
+  text-align: center !important;
+}
+
+html body main.dashboard-cockpit-shell .campaign-pill {
+  border: 1px solid rgba(254,129,141,.45) !important;
+  border-radius: 999px !important;
+  background: var(--dashboard-tint) !important;
+  color: var(--dashboard-black) !important;
+}
+
+html body main.dashboard-cockpit-shell .campaign-status-box {
+  border: 1px solid var(--dashboard-border) !important;
+  border-radius: 6px !important;
+  background: var(--dashboard-white) !important;
+  color: var(--dashboard-black) !important;
+  box-shadow: none !important;
+}
+
+html body main.dashboard-cockpit-shell .pulse-dot {
+  background: var(--dashboard-accent) !important;
+  box-shadow: none !important;
+}
+
+html body main.dashboard-cockpit-shell .browse-template-button,
+html body main.dashboard-cockpit-shell .dashboard-actions .applix-setup-primary,
+html body main.dashboard-cockpit-shell .dashboard-actions .recommended-template-action {
+  border: 1px solid var(--dashboard-accent) !important;
+  border-radius: 6px !important;
+  background: var(--dashboard-accent) !important;
+  color: var(--dashboard-black) !important;
+  box-shadow: none !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  padding: 24px !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-actions .applix-setup-outline,
+html body main.dashboard-cockpit-shell .dashboard-actions .applix-setup-primary {
+  min-height: 48px !important;
+  padding: 0 20px !important;
+  border-radius: 6px !important;
+  font-weight: 900 !important;
+  box-shadow: none !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-actions .applix-setup-outline {
+  border: 1px solid var(--dashboard-black) !important;
+  background: var(--dashboard-white) !important;
+  color: var(--dashboard-black) !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-actions .applix-setup-primary:disabled {
+  border-color: var(--dashboard-border) !important;
+  background: #D9D9D9 !important;
+  color: #737373 !important;
+}
+
+html body main.dashboard-cockpit-shell .applix-setup-status.success {
+  border: 1px solid var(--dashboard-border) !important;
+  border-radius: 6px !important;
+  background: var(--dashboard-tint) !important;
+  color: var(--dashboard-black) !important;
+}
+
+@media (min-width: 760px) {
+  html body main.dashboard-cockpit-shell .dashboard-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  html body main.dashboard-cockpit-shell .applix-intro-card,
+  html body main.dashboard-cockpit-shell .campaign-summary-card,
+  html body main.dashboard-cockpit-shell .dashboard-actions,
+  html body main.dashboard-cockpit-shell .applix-setup-status,
+  html body main.dashboard-cockpit-shell .error-text {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  html body main.dashboard-cockpit-shell {
+    padding: 18px 14px 48px !important;
+  }
+
+  html body main.dashboard-cockpit-shell .dashboard-hero {
+    padding-top: 66px !important;
+    margin-bottom: 28px !important;
+  }
+
+  html body main.dashboard-cockpit-shell .dashboard-card-clean,
+  html body main.dashboard-cockpit-shell .applix-intro-card,
+  html body main.dashboard-cockpit-shell .resume-card-wrap,
+  html body main.dashboard-cockpit-shell .dashboard-single-row,
+  html body main.dashboard-cockpit-shell .campaign-summary-card,
+  html body main.dashboard-cockpit-shell .dashboard-actions {
+    padding: 20px !important;
+  }
+
+  html body main.dashboard-cockpit-shell .resume-action,
+  html body main.dashboard-cockpit-shell .dashboard-app-connect {
+    min-height: 210px !important;
+    padding: 20px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body main.dashboard-cockpit-shell .resume-action,
+  html body main.dashboard-cockpit-shell .dashboard-app-connect {
+    transition: none !important;
+  }
+
+  html body main.dashboard-cockpit-shell .resume-action:hover,
+  html body main.dashboard-cockpit-shell .dashboard-app-connect:hover {
+    transform: none !important;
+  }
+}
