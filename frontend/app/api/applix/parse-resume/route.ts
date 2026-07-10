@@ -1,6 +1,10 @@
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
 type ParsedResume = {
   fullName: string;
@@ -24,6 +28,38 @@ function emptyParsedResume(): ParsedResume {
     experience: "",
     certificates: "",
   };
+}
+
+function getBearerToken(req: Request) {
+  const authorization = req.headers.get("authorization") || "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || "";
+}
+
+async function authenticateResumeParseRequest(req: Request) {
+  const accessToken = getBearerToken(req);
+
+  if (!accessToken) {
+    return { response: NextResponse.json({ ok: false, error: "Missing login session. Please sign in again." }, { status: 401 }) };
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return { response: NextResponse.json({ ok: false, error: "Missing Supabase environment variables." }, { status: 500 }) };
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+  const { data, error } = await supabase.auth.getUser(accessToken);
+
+  if (error || !data.user) {
+    return { response: NextResponse.json({ ok: false, error: "Invalid or expired login session." }, { status: 401 }) };
+  }
+
+  return { userId: data.user.id };
 }
 
 function getLines(text: string) {
@@ -187,6 +223,9 @@ async function parseWithOpenAI(rawText: string): Promise<{ parsed: ParsedResume;
 
 export async function POST(req: Request) {
   try {
+    const authResult = await authenticateResumeParseRequest(req);
+    if ("response" in authResult) return authResult.response;
+
     const formData = await req.formData();
     const file = formData.get("resume");
 
@@ -213,12 +252,10 @@ export async function POST(req: Request) {
         ok: true,
         filename: file.name,
         textLength: 0,
-        textPreview: "",
         usedOpenAI: false,
         openAIError: parseWarning || "Could not read text from this resume. Resume file was uploaded, but automatic parsing was skipped.",
         filledCount: 0,
         parsed,
-        rawText: "",
       });
     }
 
@@ -228,12 +265,10 @@ export async function POST(req: Request) {
       ok: true,
       filename: file.name,
       textLength: rawText.length,
-      textPreview: rawText.slice(0, 700),
       usedOpenAI: result.usedOpenAI,
       openAIError: result.openAIError,
       filledCount: countFilled(result.parsed),
       parsed: result.parsed,
-      rawText,
     });
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message || "Resume parsing failed." }, { status: 500 });
