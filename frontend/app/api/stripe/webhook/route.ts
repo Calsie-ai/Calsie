@@ -44,6 +44,10 @@ function getPeriodEnd(subscription: Stripe.Subscription) {
   return typeof periodEnd === "number" ? new Date(periodEnd * 1000).toISOString() : null;
 }
 
+function getStripeObjectId(value: string | { id?: string } | null) {
+  return typeof value === "string" ? value : value?.id || null;
+}
+
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.user_id || null;
   const email = session.customer_details?.email || session.customer_email || session.metadata?.email || null;
@@ -57,7 +61,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   await upsertSubscription({
     user_id: userId,
     email,
-    stripe_customer_id: typeof session.customer === "string" ? session.customer : session.customer?.id || null,
+    stripe_customer_id: getStripeObjectId(session.customer),
     stripe_subscription_id: subscriptionId,
     stripe_checkout_session_id: session.id,
     status: subscription?.status || "active",
@@ -76,7 +80,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   await upsertSubscription({
     user_id: userId,
     email,
-    stripe_customer_id: typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id,
+    stripe_customer_id: getStripeObjectId(subscription.customer),
     stripe_subscription_id: subscription.id,
     status: subscription.status,
     plan_name: "Applix Pro",
@@ -93,6 +97,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Missing STRIPE_SECRET_KEY." }, { status: 500 });
     }
 
+    if (!STRIPE_WEBHOOK_SECRET) {
+      return NextResponse.json({ ok: false, error: "Missing STRIPE_WEBHOOK_SECRET." }, { status: 500 });
+    }
+
     if (!SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json({ ok: false, error: "Missing SUPABASE_SERVICE_ROLE_KEY." }, { status: 500 });
     }
@@ -100,15 +108,11 @@ export async function POST(req: Request) {
     const body = await req.text();
     const signature = req.headers.get("stripe-signature");
 
-    let event: Stripe.Event;
-    if (STRIPE_WEBHOOK_SECRET) {
-      if (!signature) {
-        return NextResponse.json({ ok: false, error: "Missing Stripe signature." }, { status: 400 });
-      }
-      event = stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET);
-    } else {
-      event = JSON.parse(body) as Stripe.Event;
+    if (!signature) {
+      return NextResponse.json({ ok: false, error: "Missing Stripe signature." }, { status: 400 });
     }
+
+    const event = stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET);
 
     if (event.type === "checkout.session.completed") {
       await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
