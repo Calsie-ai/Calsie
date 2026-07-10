@@ -50,6 +50,8 @@ const plans = [
   },
 ];
 
+const applixFont = "Arial, Helvetica, sans-serif";
+
 export default function PricingSection() {
   return (
     <section
@@ -60,6 +62,7 @@ export default function PricingSection() {
         color: "#111111",
         padding: "96px 20px 112px",
         scrollMarginTop: "88px",
+        fontFamily: applixFont,
       }}
     >
       <div style={{ width: "min(1120px, 100%)", margin: "0 auto" }}>
@@ -71,14 +74,34 @@ export default function PricingSection() {
               fontWeight: 800,
               letterSpacing: "0.16em",
               textTransform: "uppercase",
+              fontFamily: applixFont,
             }}
           >
             Pricing
           </p>
-          <h2 id="pricing-title" style={{ margin: 0, fontSize: "clamp(36px, 5vw, 58px)", lineHeight: 1.02 }}>
+          <h2
+            id="pricing-title"
+            style={{
+              margin: 0,
+              fontSize: "clamp(36px, 5vw, 58px)",
+              lineHeight: 1.02,
+              fontWeight: 800,
+              letterSpacing: "-0.045em",
+              fontFamily: applixFont,
+            }}
+          >
             Simple, transparent pricing
           </h2>
-          <p style={{ margin: "18px auto 0", maxWidth: "620px", fontSize: "17px", lineHeight: 1.65, color: "#555" }}>
+          <p
+            style={{
+              margin: "18px auto 0",
+              maxWidth: "620px",
+              fontSize: "17px",
+              lineHeight: 1.65,
+              color: "#555",
+              fontFamily: applixFont,
+            }}
+          >
             Start free, choose the complete Applix campaign, or contact us for a custom workflow.
           </p>
         </header>
@@ -107,6 +130,7 @@ export default function PricingSection() {
                 transform: plan.featured ? "translateY(-14px)" : "none",
                 boxShadow: plan.featured ? "0 24px 70px rgba(0,0,0,0.18)" : "none",
                 zIndex: plan.featured ? 2 : 1,
+                fontFamily: applixFont,
               }}
             >
               {plan.featured ? (
@@ -120,22 +144,33 @@ export default function PricingSection() {
                     fontWeight: 800,
                     letterSpacing: "0.14em",
                     textTransform: "uppercase",
+                    fontFamily: applixFont,
                   }}
                 >
                   Most popular
                 </span>
               ) : null}
 
-              <p style={{ margin: 0, fontSize: "15px", fontWeight: 700 }}>{plan.name}</p>
+              <p style={{ margin: 0, fontSize: "15px", fontWeight: 700, fontFamily: applixFont }}>{plan.name}</p>
               <div style={{ display: "flex", alignItems: "baseline", gap: "8px", margin: "18px 0 14px" }}>
-                <strong style={{ fontSize: plan.price.length > 7 ? "38px" : "52px", lineHeight: 1 }}>{plan.price}</strong>
-                {plan.suffix ? <span style={{ opacity: 0.7 }}>{plan.suffix}</span> : null}
+                <strong
+                  style={{
+                    fontSize: plan.price.length > 7 ? "38px" : "52px",
+                    lineHeight: 1,
+                    fontWeight: 800,
+                    letterSpacing: "-0.04em",
+                    fontFamily: applixFont,
+                  }}
+                >
+                  {plan.price}
+                </strong>
+                {plan.suffix ? <span style={{ opacity: 0.7, fontFamily: applixFont }}>{plan.suffix}</span> : null}
               </div>
-              <p style={{ margin: 0, minHeight: "76px", lineHeight: 1.6, opacity: 0.74 }}>{plan.note}</p>
+              <p style={{ margin: 0, minHeight: "76px", lineHeight: 1.6, opacity: 0.74, fontFamily: applixFont }}>{plan.note}</p>
 
               <div style={{ display: "grid", gap: "15px", margin: "30px 0" }}>
                 {plan.features.map((feature) => (
-                  <div key={feature} style={{ display: "flex", gap: "11px", alignItems: "flex-start", lineHeight: 1.45 }}>
+                  <div key={feature} style={{ display: "flex", gap: "11px", alignItems: "flex-start", lineHeight: 1.45, fontFamily: applixFont }}>
                     <span aria-hidden="true" style={{ fontWeight: 900 }}>✓</span>
                     <span>{feature}</span>
                   </div>
@@ -159,6 +194,7 @@ export default function PricingSection() {
                   fontWeight: 800,
                   letterSpacing: "0.04em",
                   textTransform: "uppercase",
+                  fontFamily: applixFont,
                 }}
               >
                 {plan.action}
@@ -167,7 +203,7 @@ export default function PricingSection() {
           ))}
         </div>
 
-        <p style={{ margin: "26px auto 0", textAlign: "center", color: "#666", fontSize: "13px" }}>
+        <p style={{ margin: "26px auto 0", textAlign: "center", color: "#666", fontSize: "13px", fontFamily: applixFont }}>
           Prices are shown in Australian dollars. You review and approve applications before they move forward.
         </p>
       </div>
