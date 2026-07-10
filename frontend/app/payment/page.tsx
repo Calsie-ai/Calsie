@@ -1,11 +1,20 @@
 export default function PaymentPage() {
-  const planFeatures = [
+  const included = [
     "2-minute guided setup",
-    "Up to 100 job opportunities per day",
+    "Up to 100 opportunities per day",
     "Up to 1,000 opportunities across 10 days",
-    "AI-tailored resume and application email drafts",
-    "Review and approval before applications move forward",
-    "Application tracking in one dashboard",
+    "AI-tailored resume drafts",
+    "AI-written application emails",
+    "Application tracking dashboard",
+  ];
+
+  const controls = [
+    "Review before anything moves forward",
+    "Approve the jobs you want",
+    "Keep your existing resume details",
+    "Track prepared and applied roles",
+    "Use guided or automated workflow",
+    "Support available when needed",
   ];
 
   return (
@@ -16,13 +25,11 @@ export default function PaymentPage() {
             <img src="/applix-logo.svg" alt="" />
             <span>Applix</span>
           </a>
-
           <nav className="applix-nav" aria-label="Payment navigation">
             <a href="/#features">Features</a>
             <a href="/#how-it-works">How it works</a>
             <a href="/support">Support</a>
           </nav>
-
           <div className="applix-actions">
             <a className="applix-button applix-button--subtle" href="/">
               Back home
@@ -31,106 +38,171 @@ export default function PaymentPage() {
         </div>
       </header>
 
-      <section className="applix-hero" aria-labelledby="payment-title">
-        <div className="applix-container applix-hero-grid">
-          <div>
-            <p className="applix-eyebrow">Simple Applix plan</p>
-            <h1 id="payment-title">Move faster with one clear payment plan</h1>
-            <p className="applix-hero-copy">
-              Get the complete Applix workflow for finding opportunities, preparing tailored
-              application materials, reviewing drafts, and tracking progress while staying in control.
+      <section style={{ padding: "72px 20px 88px" }} aria-labelledby="payment-title">
+        <div className="applix-container">
+          <div style={{ textAlign: "center", maxWidth: "720px", margin: "0 auto 44px" }}>
+            <p className="applix-eyebrow">Simple, transparent pricing</p>
+            <h1 id="payment-title" style={{ marginBottom: "12px" }}>
+              One clear Applix plan
+            </h1>
+            <p className="applix-hero-copy" style={{ margin: "0 auto" }}>
+              Everything you need to prepare, review, and track job applications in one controlled workflow.
             </p>
-
-            <div className="applix-stats-grid" style={{ marginTop: "32px" }}>
-              <div className="applix-stat">
-                <strong>2 min</strong>
-                <span>guided setup</span>
-              </div>
-              <div className="applix-stat">
-                <strong>100/day</strong>
-                <span>job capability</span>
-              </div>
-              <div className="applix-stat">
-                <strong>10 days</strong>
-                <span>campaign period</span>
-              </div>
-              <div className="applix-stat">
-                <strong>Full control</strong>
-                <span>review before applying</span>
-              </div>
-            </div>
           </div>
 
-          <article className="applix-product-panel" aria-label="Applix payment plan">
-            <div className="applix-panel-topbar">
-              <div className="applix-panel-title">
-                <strong>Applix Plan</strong>
-                <span>Complete AI job application workflow</span>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              alignItems: "stretch",
+              maxWidth: "1120px",
+              margin: "0 auto",
+            }}
+          >
+            <article
+              style={{
+                border: "1px solid rgba(17,17,17,0.18)",
+                padding: "34px 28px 26px",
+                background: "#ffffff",
+                display: "flex",
+                flexDirection: "column",
+                minHeight: "520px",
+              }}
+            >
+              <div>
+                <p className="applix-eyebrow">Included</p>
+                <h2 style={{ fontSize: "30px", margin: "8px 0 8px" }}>Complete workflow</h2>
+                <p style={{ marginTop: 0 }}>
+                  The tools and limits already included in the current Applix plan.
+                </p>
               </div>
-              <span className="applix-panel-pill">One-time payment</span>
-            </div>
 
-            <div style={{ padding: "28px 0 18px" }}>
-              <p className="applix-eyebrow">Launch plan</p>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "8px", margin: "10px 0 8px" }}>
-                <strong style={{ fontSize: "56px", lineHeight: 1 }}>A$20</strong>
-                <span>AUD</span>
-              </div>
-              <p style={{ margin: 0 }}>
-                Access the current Applix application campaign workflow for up to 10 days.
-              </p>
-            </div>
-
-            <div className="applix-workflow-list">
-              {planFeatures.map((feature, index) => (
-                <div className="applix-workflow-item" key={feature}>
-                  <span>{index + 1}</span>
-                  <div>
-                    <strong>{feature}</strong>
+              <div style={{ marginTop: "28px", display: "grid", gap: "16px" }}>
+                {included.map((item) => (
+                  <div key={item} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                    <span aria-hidden="true">✓</span>
+                    <span>{item}</span>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            <div style={{ marginTop: "24px" }}>
-              <a className="applix-button applix-button--primary" href="/dashboard" style={{ width: "100%", justifyContent: "center" }}>
+              <a
+                className="applix-button"
+                href="/#features"
+                style={{ marginTop: "auto", justifyContent: "center", width: "100%" }}
+              >
+                View features
+              </a>
+            </article>
+
+            <article
+              style={{
+                border: "1px solid #111111",
+                padding: "28px 28px 26px",
+                background: "#111111",
+                color: "#ffffff",
+                display: "flex",
+                flexDirection: "column",
+                minHeight: "560px",
+                transform: "translateY(-14px)",
+                boxShadow: "0 22px 60px rgba(0,0,0,0.18)",
+                position: "relative",
+                zIndex: 2,
+              }}
+            >
+              <div>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    border: "1px solid rgba(255,255,255,0.65)",
+                    padding: "5px 10px",
+                    fontSize: "11px",
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    marginBottom: "18px",
+                  }}
+                >
+                  Current plan
+                </span>
+                <h2 style={{ fontSize: "30px", margin: "0 0 8px" }}>Applix Plan</h2>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "8px", margin: "8px 0 10px" }}>
+                  <strong style={{ fontSize: "54px", lineHeight: 1 }}>A$20</strong>
+                  <span style={{ opacity: 0.75 }}>AUD</span>
+                </div>
+                <p style={{ marginTop: 0, opacity: 0.78 }}>
+                  One-time payment for the current 10-day application campaign workflow.
+                </p>
+              </div>
+
+              <div style={{ marginTop: "28px", display: "grid", gap: "16px" }}>
+                {included.map((item) => (
+                  <div key={item} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                    <span aria-hidden="true">✓</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              <a
+                href="/dashboard"
+                style={{
+                  marginTop: "auto",
+                  width: "100%",
+                  minHeight: "48px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "#ffffff",
+                  color: "#111111",
+                  textDecoration: "none",
+                  fontWeight: 700,
+                  padding: "0 18px",
+                }}
+              >
                 Continue to Applix
               </a>
-              <p className="applix-supporting-line" style={{ marginTop: "12px" }}>
-                Secure online payment will be connected when the Stripe checkout setup is completed.
-              </p>
-            </div>
-          </article>
-        </div>
-      </section>
+            </article>
 
-      <section className="applix-section" aria-labelledby="included-title">
-        <div className="applix-container">
-          <div className="applix-section-header centered">
-            <p className="applix-eyebrow">Included</p>
-            <h2 id="included-title">Everything stays aligned with the existing Applix workflow</h2>
-            <p>
-              The plan, campaign capability, approval controls, and tracking experience remain unchanged.
-            </p>
+            <article
+              style={{
+                border: "1px solid rgba(17,17,17,0.18)",
+                padding: "34px 28px 26px",
+                background: "#ffffff",
+                display: "flex",
+                flexDirection: "column",
+                minHeight: "520px",
+              }}
+            >
+              <div>
+                <p className="applix-eyebrow">Control</p>
+                <h2 style={{ fontSize: "30px", margin: "8px 0 8px" }}>You stay in charge</h2>
+                <p style={{ marginTop: 0 }}>
+                  The plan keeps review, approval, and tracking visible throughout the process.
+                </p>
+              </div>
+
+              <div style={{ marginTop: "28px", display: "grid", gap: "16px" }}>
+                {controls.map((item) => (
+                  <div key={item} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                    <span aria-hidden="true">✓</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              <a
+                className="applix-button"
+                href="/support"
+                style={{ marginTop: "auto", justifyContent: "center", width: "100%" }}
+              >
+                Contact support
+              </a>
+            </article>
           </div>
 
-          <div className="applix-card-grid">
-            <article className="applix-feature-card">
-              <span className="applix-feature-number">01</span>
-              <h3>Find opportunities</h3>
-              <p>Use your selected role, location, and work preferences to discover relevant jobs.</p>
-            </article>
-            <article className="applix-feature-card">
-              <span className="applix-feature-number">02</span>
-              <h3>Prepare applications</h3>
-              <p>Generate tailored resume and email drafts for the opportunities you choose.</p>
-            </article>
-            <article className="applix-feature-card">
-              <span className="applix-feature-number">03</span>
-              <h3>Review and track</h3>
-              <p>Keep approval close and follow prepared, approved, and applied opportunities in one place.</p>
-            </article>
-          </div>
+          <p style={{ textAlign: "center", marginTop: "28px", fontSize: "13px", opacity: 0.68 }}>
+            Stripe checkout is not connected yet. This update changes the page layout only.
+          </p>
         </div>
       </section>
 
