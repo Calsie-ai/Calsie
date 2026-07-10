@@ -250,6 +250,10 @@ export default function DashboardPage() {
         return;
       }
 
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (sessionError || !accessToken) throw new Error('Missing login session. Please sign in again.');
+
       const { data: existingResume, error: existingResumeError } = await supabase
         .from('resume_profiles')
         .select('id,full_name,target_role,email,phone,location,profile_summary,skills,work_experience,education_locked,certifications_locked,resume_file_path,resume_file_name,resume_file_type')
@@ -275,7 +279,11 @@ export default function DashboardPage() {
       if (!isLegacyDocFile(file)) {
         const formData = new FormData();
         formData.append('resume', file);
-        const response = await fetch('/api/applix/parse-resume', { method: 'POST', body: formData });
+        const response = await fetch('/api/applix/parse-resume', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: formData,
+        });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.ok) throw new Error(data?.error || 'Could not parse resume.');
         parsed = data.parsed || null;
@@ -473,7 +481,7 @@ export default function DashboardPage() {
             >
               <img
                 className='dashboard-status-icon resume-status-icon'
-                src={resumeReady ? '/resume-status/resume-has-been-updated.gif' : '/resume-status/upload-resume.gif'}
+                src={resumeReady ? '/resume-status/resume-has-been-updated.svg' : '/resume-status/upload-resume.gif'}
                 alt={resumeReady ? 'Resume has been uploaded' : 'Upload resume'}
               />
 
