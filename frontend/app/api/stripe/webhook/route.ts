@@ -39,9 +39,14 @@ async function upsertSubscription(payload: SubscriptionPayload) {
   });
 }
 
-function getPeriodEnd(subscription: Stripe.Subscription) {
-  const periodEnd = subscription.current_period_end;
-  return typeof periodEnd === "number" ? new Date(periodEnd * 1000).toISOString() : null;
+function getPeriodEnd(subscription: Stripe.Subscription): string | null {
+  const periodEnds = subscription.items.data
+    .map((item) => item.current_period_end)
+    .filter((value): value is number => typeof value === "number");
+
+  if (periodEnds.length === 0) return null;
+
+  return new Date(Math.max(...periodEnds) * 1000).toISOString();
 }
 
 function getStripeObjectId(value: string | { id?: string } | null) {
