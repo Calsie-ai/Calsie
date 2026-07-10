@@ -61,6 +61,22 @@
   text-align: left;
 }
 
+/* Keep the full landing page on the same soft pink canvas. */
+body:has(.applix-landing),
+.applix-landing,
+.applix-landing .applix-header,
+.applix-landing .applix-hero,
+.applix-landing .applix-section,
+.applix-landing .applix-philosophy,
+.applix-landing .applix-final-cta,
+.applix-landing .applix-footer {
+  background: #ffebed !important;
+}
+
+.applix-landing .applix-header {
+  background: rgba(255, 235, 237, .94) !important;
+}
+
 @media (max-width: 640px) {
   .applix-landing .applix-hero-grid,
   .applix-landing .applix-philosophy-panel,
