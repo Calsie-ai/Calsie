@@ -9,7 +9,7 @@ type Campaign = { id: string; name?: string | null; target_business_type?: strin
 type AgentStatus = "found" | "prepared" | "approved" | "needs_email" | "queued" | "applied" | "interviewing" | "saved" | "declined" | "skipped" | "rejected" | "failed" | "waiting";
 type JobsRow = { id: string; title?: string | null; company?: string | null; location?: string | null; description?: string | null; apply_url?: string | null; source?: string | null; status?: string | null; created_at?: string | null; campaign_id?: string | null; user_decision?: string | null; reviewed_at?: string | null };
 type AgentLog = { id: string; campaignId?: string | null; company: string; jobTitle: string; location: string; website: string; jobUrl: string; source: string; status: AgentStatus; actionTime: string };
-type ApprovalResponse = { ok: boolean; job_id: string; approval_status: "approved"; email_status: "found" | "not_found" | "failed"; draft_status: "created" | "not_created"; queue_id?: string | null; error?: string };
+type ApprovalResponse = { ok: boolean; job_id: string; approval_status?: "approved" | string | null; email_status?: "found" | "not_found" | "failed" | "provider_missing" | string | null; draft_status?: "created" | "queued" | "not_created" | "failed" | string | null; queue_id?: string | null; next_step?: string | null; error?: string };
 
 const PAGE_SIZE = 20;
 const STATUS_OPTIONS: AgentStatus[] = ["found", "prepared", "approved", "needs_email", "queued", "applied", "interviewing", "saved", "declined", "skipped", "rejected", "failed", "waiting"];
@@ -67,10 +67,26 @@ function statusLabel(status: AgentStatus) {
   const labels: Record<AgentStatus, string> = { found: "Found", prepared: "Prepared", approved: "Approved", needs_email: "Needs email", queued: "Queued", applied: "Applied", interviewing: "Interviewing", saved: "Saved", declined: "Declined", skipped: "Skipped", rejected: "Rejected", failed: "Failed", waiting: "Waiting" };
   return labels[status] || "Waiting";
 }
+function normalizeApprovalField(value: unknown) { return cleanText(value).toLowerCase().replace(/\s+/g, "_"); }
 function statusAfterApproval(result: ApprovalResponse): AgentStatus {
-  if (result.email_status === "found" && result.draft_status === "created") return "queued";
-  if (result.email_status === "not_found") return "needs_email";
-  return "failed";
+  const emailStatus = normalizeApprovalField(result.email_status);
+  const draftStatus = normalizeApprovalField(result.draft_status);
+
+  if (result.queue_id || draftStatus === "queued") return "queued";
+  if (emailStatus === "failed" || draftStatus === "failed") return "failed";
+  if (emailStatus && emailStatus !== "found") return "needs_email";
+  return "approved";
+}
+function approvalMessage(result: ApprovalResponse) {
+  const emailStatus = normalizeApprovalField(result.email_status);
+  const draftStatus = normalizeApprovalField(result.draft_status);
+
+  if (result.queue_id || draftStatus === "queued") return "Approved. Outreach draft is queued.";
+  if (draftStatus === "created") return "Approved. Outreach draft was created and is ready for the next queue step.";
+  if (emailStatus === "failed" || draftStatus === "failed") return "Approved, but enrichment or draft creation failed. Check Supabase function logs.";
+  if (emailStatus && emailStatus !== "found") return "Approved. Email enrichment is still required before Applix can create a draft.";
+  if (draftStatus === "not_created") return result.next_step ? `Approved. Draft was not created yet. ${result.next_step}` : "Approved. Draft was not created yet; enrichment or draft generation still needs to run.";
+  return "Approved. Applix is waiting for enrichment or draft generation before queueing outreach.";
 }
 
 export default function TrackerPage() {
@@ -206,14 +222,7 @@ export default function TrackerPage() {
       const result = payload as ApprovalResponse;
       const finalStatus = statusAfterApproval(result);
       setLogs((current) => current.map((row) => row.id === log.id ? { ...row, status: finalStatus } : row));
-
-      if (result.email_status === "found" && result.draft_status === "created") {
-        setActionMessage("Approved. Applix found an email and queued the outreach draft.");
-      } else if (result.email_status === "not_found") {
-        setActionMessage("Approved, but Applix could not find an email yet. This job needs email discovery.");
-      } else {
-        setActionMessage("Approved, but draft creation failed. Check Supabase function logs.");
-      }
+      setActionMessage(approvalMessage(result));
     } catch (error) { setLogs(previousLogs); setActionMessage(getErrorMessage(error, "Could not review this job.")); } finally { setSavingStatusId(null); }
   }
 
