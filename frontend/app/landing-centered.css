@@ -1,0 +1,75 @@
+.applix-landing .applix-hero-grid {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  text-align: center;
+}
+
+.applix-landing .applix-hero-grid > div:first-child {
+  width: min(100%, 920px);
+}
+
+.applix-landing .applix-hero h1,
+.applix-landing .applix-hero-copy {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.applix-landing .applix-hero-actions {
+  justify-content: center;
+}
+
+.applix-landing .applix-status {
+  display: inline-block;
+  text-align: left;
+}
+
+.applix-landing .applix-product-panel {
+  width: min(100%, 760px);
+  text-align: left;
+}
+
+.applix-landing .applix-section-header {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.applix-landing .applix-philosophy-panel,
+.applix-landing .applix-final-grid {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  text-align: center;
+}
+
+.applix-landing .applix-philosophy-panel > *,
+.applix-landing .applix-final-grid > * {
+  width: min(100%, 820px);
+}
+
+.applix-landing .applix-philosophy-note {
+  border-left: 0;
+  border-top: 4px solid var(--applix-accent);
+  padding: 24px 0 0;
+}
+
+.applix-landing .applix-final-actions {
+  justify-content: center;
+}
+
+.applix-landing .applix-start-card {
+  width: min(100%, 620px);
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .applix-landing .applix-hero-grid,
+  .applix-landing .applix-philosophy-panel,
+  .applix-landing .applix-final-grid {
+    text-align: center;
+  }
+
+  .applix-landing .applix-hero-actions,
+  .applix-landing .applix-final-actions {
+    justify-content: center;
+  }
+}

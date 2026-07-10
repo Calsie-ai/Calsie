@@ -5,10 +5,12 @@ import "./campaign-actions-overrides.css";
 import "./tracker-theme-overrides.css";
 import "./brand-colors.css";
 import "./outrun-background.css";
+import "./landing-editorial.css";
+import "./landing-centered.css";
 
 export const metadata = {
-  title: "Symbiote Applix",
-  description: "AI employment symbiote",
+  title: "Applix | AI Job Application Assistant",
+  description: "AI-powered job application support for modern job seekers.",
 };
 
 export default function RootLayout({

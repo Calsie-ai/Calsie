@@ -3,29 +3,93 @@
 import { useState } from "react";
 import { getSupabaseClient } from "../lib/supabaseClient";
 
-const calsieRed = "#ff5757";
-const ink = "#16131a";
+const navLinks = [
+  { label: "Features", href: "#features" },
+  { label: "How it Works", href: "#how-it-works" },
+  { label: "Pricing", href: "#pricing" },
+  { label: "About", href: "#about" },
+];
+
+const stats = [
+  { value: "2 min", label: "setup" },
+  { value: "100/day", label: "job capability" },
+  { value: "Tailored", label: "emails and resumes" },
+  { value: "Control", label: "approve before applying" },
+];
+
+const trustLabels = [
+  "AI-assisted workflow",
+  "Resume tailoring",
+  "Human approval",
+  "Job tracking",
+];
+
+const features = [
+  {
+    title: "Smart Job Matching",
+    body: "Find relevant roles based on your preferences, resume, and the type of work you actually want.",
+  },
+  {
+    title: "Tailored Resume Generation",
+    body: "Create focused resume drafts for each opportunity without rebuilding your profile from scratch.",
+  },
+  {
+    title: "AI Email Drafting",
+    body: "Generate application emails that are specific, concise, and matched to the role in front of you.",
+  },
+  {
+    title: "Approval Workflow",
+    body: "Review, edit, and approve applications before anything gets sent on your behalf.",
+  },
+  {
+    title: "Application Tracking",
+    body: "Keep prepared, approved, and applied jobs organized in one workflow instead of scattered tabs.",
+  },
+  {
+    title: "Flexible Automation",
+    body: "Choose guided assistance now and deeper automation when you are ready for more speed.",
+  },
+];
+
+const steps = [
+  {
+    title: "Set up your profile",
+    body: "Upload your resume and define the roles, locations, and preferences that matter.",
+  },
+  {
+    title: "Review matched jobs",
+    body: "See relevant opportunities selected around your profile and search direction.",
+  },
+  {
+    title: "Generate tailored applications",
+    body: "Let Applix prepare resume and email drafts for each role.",
+  },
+  {
+    title: "Approve and apply",
+    body: "Stay in control while moving through applications faster.",
+  },
+];
 
 const onboardingSlides = [
   {
-    title: "WHAT IS APPLIX",
-    body: "APPLIX IS FIRST SYMBIOTIC INTELLIGENCE AI. IT IS AN EMAIL AUTOMATION SYMBIOTE BUILT TO HELP YOU CONTACT EMPLOYERS IN A CONTROLLED WAY.",
+    title: "What is Applix",
+    body: "Applix is an AI-powered job application assistant built to help you prepare and manage job outreach in a controlled way.",
   },
   {
-    title: "WHAT DOES IT DO",
-    body: "APPLIX CAN USE YOUR DETAILS, YOUR CV, AND YOUR SELECTED TEMPLATE TO PREPARE JOB CONTACT EMAILS.",
+    title: "What it does",
+    body: "Applix can use your details, resume, and selected instructions to prepare job application emails and role-specific resume drafts.",
   },
   {
-    title: "HOW TO CONNECT THE APP",
-    body: "CREATE A NEW GMAIL ONLY FOR APPLIX. DO NOT USE YOUR PERSONAL EMAIL. AUTHORIZE APPLIX WITH THAT GMAIL ACCOUNT ONLY.",
+    title: "How to connect the app",
+    body: "Create or choose the Gmail account you want Applix to use, then authorize Applix with that account only.",
   },
   {
-    title: "HOW IT WORKS",
-    body: "APPLIX RUNS WITH GUARD RAILS. IT CAN EXECUTE TASKS OVER 30 DAYS, CONTACT COMPANIES, AND USE YOUR DOCUMENTS AND TEMPLATE AS INSTRUCTIONS.",
+    title: "How it works",
+    body: "Applix runs with guardrails. You can review the workflow, approve applications, and decide how much automation to use.",
   },
   {
-    title: "TERMS AND CONDITIONS",
-    body: "BY CONTINUING, YOU UNDERSTAND THIS IS A DRAFT TEST FLOW. YOU ARE RESPONSIBLE FOR YOUR EMAIL ACCOUNT, YOUR CV, YOUR DETAILS, AND THE INSTRUCTIONS YOU GIVE APPLIX.",
+    title: "Terms and control",
+    body: "By continuing, you understand you are responsible for your email account, resume, details, and the instructions you give Applix.",
   },
 ];
 
@@ -37,6 +101,8 @@ export default function HomePage() {
   const activeSlide = onboardingSlides[carouselIndex];
 
   function confirmSlide() {
+    setStatus("");
+
     if (carouselIndex < onboardingSlides.length - 1) {
       setCarouselIndex((current) => current + 1);
       return;
@@ -70,201 +136,301 @@ export default function HomePage() {
     }
   }
 
-  const header = (
-    <header
-      style={{
-        position: "relative",
-        zIndex: 2,
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 8,
-        width: "100%",
-        padding: "clamp(10px, 3vw, 18px) clamp(10px, 3.5vw, 20px)",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "calc(100vw - 54px)",
-          fontSize: "clamp(8px, 2.6vw, 11px)",
-          lineHeight: 1.15,
-          fontWeight: 900,
-          letterSpacing: "clamp(.02em, .55vw, .08em)",
-          textTransform: "uppercase",
-          whiteSpace: "normal",
-          overflowWrap: "anywhere",
-        }}
-      >
-        CALSIE | APPLIX
-      </div>
-
-      <button
-        aria-label="Open menu"
-        style={{
-          flexShrink: 0,
-          border: 0,
-          background: "transparent",
-          color: "#1d1824",
-          fontSize: "clamp(18px, 5vw, 22px)",
-          lineHeight: 1,
-          padding: 2,
-        }}
-      >
-        Menu
-      </button>
-    </header>
-  );
-
-  const sectionStyle = {
-    position: "relative" as const,
-    zIndex: 2,
-    display: "flex",
-    flexDirection: "column" as const,
-    alignItems: "center",
-    justifyContent: "center",
-    textAlign: "center" as const,
-    width: "100%",
-    padding: "clamp(16px, 3vw, 28px) clamp(18px, 6vw, 42px)",
-  };
-
-  const labelStyle = {
-    margin: "0 0 10px",
-    color: ink,
-    fontSize: "clamp(8px, 2.4vw, 10px)",
-    fontWeight: 900,
-    letterSpacing: ".18em",
-    textTransform: "uppercase" as const,
-  };
-
-  const sectionHeadingStyle = {
-    ...labelStyle,
-    color: calsieRed,
-    fontSize: "clamp(10px, 3.3vw, 14px)",
-  };
-
-  const copyStyle = {
-    width: "min(280px, 100%)",
-    margin: "0 auto 14px",
-    color: ink,
-    fontSize: "clamp(8px, 2.15vw, 10px)",
-    lineHeight: 1.25,
-    fontWeight: 900,
-    letterSpacing: ".1em",
-    textTransform: "uppercase" as const,
-  };
-
-  const frontTitleStyle = {
-    ...copyStyle,
-    width: "auto",
-    margin: "0 0 8px",
-    fontSize: "clamp(8px, 2.15vw, 10px)",
-    lineHeight: 1.25,
-    letterSpacing: ".1em",
-  };
-
-  const sectionLineStyle = {
-    width: "min(340px, calc(100vw - 90px))",
-    height: 1,
-    margin: "18px auto 0",
-    background: "linear-gradient(90deg, rgba(255,87,87,0) 0%, rgba(255,87,87,.58) 18%, rgba(255,87,87,.58) 82%, rgba(255,87,87,0) 100%)",
-    opacity: 0.92,
-  };
-
-  const topSectionLineStyle = {
-    ...sectionLineStyle,
-    margin: "0 auto 18px",
-  };
-
-  const primaryButtonStyle = {
-    minHeight: 40,
-    minWidth: 170,
-    border: 0,
-    borderRadius: 999,
-    padding: "9px 18px",
-    background: calsieRed,
-    color: ink,
-    fontSize: "clamp(10px, 3.2vw, 13px)",
-    lineHeight: 1.1,
-    fontWeight: 900,
-    boxShadow: "0 10px 22px rgba(255, 87, 87, .28)",
-  };
-
   return (
-    <main style={{ position: "relative", minHeight: "100svh", overflowX: "hidden", backgroundColor: "#fff8f7", color: ink, fontFamily: "Arial, Helvetica, sans-serif" }}>
-      <div aria-hidden="true" style={{ position: "fixed", inset: "-12% -35% -20%", backgroundImage: "linear-gradient(rgba(255, 87, 87, .23) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 87, 87, .23) 1px, transparent 1px)", backgroundSize: "28px 28px", transform: "perspective(760px) rotateX(22deg) scale(1.08)", transformOrigin: "top center", opacity: 0.96, pointerEvents: "none" }} />
-      <div aria-hidden="true" style={{ position: "fixed", inset: "-12% -35% -20%", backgroundImage: "linear-gradient(rgba(20, 16, 22, .34) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 16, 22, .34) 1px, transparent 1px)", backgroundSize: "28px 28px", transform: "perspective(760px) rotateX(22deg) scale(1.08)", transformOrigin: "top center", opacity: 0.34, pointerEvents: "none", WebkitMaskImage: "linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%)", maskImage: "linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%)" }} />
-      <div aria-hidden="true" style={{ position: "fixed", inset: 0, background: "radial-gradient(circle at 50% 24%, rgba(255,255,255,.9), rgba(255,255,255,.66) 31%, transparent 62%)", pointerEvents: "none" }} />
+    <main className="applix-landing" id="top">
+      <header className="applix-header">
+        <div className="applix-container applix-header-inner">
+          <a className="applix-brand" href="#top" aria-label="Applix home">
+            <img src="/applix-logo.svg" alt="" />
+            <span>Applix</span>
+          </a>
 
-      {header}
+          <nav className="applix-nav" aria-label="Primary navigation">
+            {navLinks.map((link) => (
+              <a key={link.href} href={link.href}>
+                {link.label}
+              </a>
+            ))}
+          </nav>
 
-      <section style={{ ...sectionStyle, minHeight: "auto", paddingTop: "clamp(8px, 2vw, 18px)", paddingBottom: "clamp(10px, 2vw, 22px)", overflow: "hidden" }}>
-        <img src="/applix-logo.svg" alt="Applix logo" style={{ position: "relative", zIndex: 1, width: "clamp(58px, 18vw, 126px)", height: "auto", display: "block", marginBottom: "clamp(8px, 2vw, 12px)", filter: "drop-shadow(0 12px 20px rgba(255, 87, 87, .18))" }} />
-        <h1 aria-label="APPLIX" style={{ position: "relative", zIndex: 1, width: "100%", margin: 0, color: calsieRed, fontSize: "clamp(52px, 10vw, 82px)", lineHeight: 0.92, fontWeight: 950, letterSpacing: "clamp(.02em, 1vw, .1em)", whiteSpace: "nowrap" }}>APPLIX</h1>
-        <p style={{ position: "relative", zIndex: 1, maxWidth: "100%", margin: "clamp(6px, 2vw, 8px) 0 clamp(14px, 3vw, 22px)", color: ink, fontSize: "clamp(8px, 2.8vw, 10px)", lineHeight: 1.2, fontWeight: 900, letterSpacing: "clamp(.08em, 1vw, .18em)", textTransform: "uppercase" }}>Persistence at Scale</p>
-        <p style={{ ...copyStyle, position: "relative", zIndex: 1, marginBottom: 0 }}>APPLIX IS FIRST SYMBIOTIC INTELLIGENCE AI, APPLIX IS EMAIL AUTOMATION SYMBIOTE THAT HAS 20 LAYERS OF COGNITIVE CAPACITY, FOR STRAIGHT FORWARD USE PLEASE FOLLOW THE GUARD RAILS.</p>
-        <div aria-hidden="true" style={sectionLineStyle} />
-      </section>
-
-      <section style={{ ...sectionStyle, paddingTop: 8 }}>
-        <p style={labelStyle}>WELCOME</p>
-        <h2 style={frontTitleStyle}>CALSIE | APPLIX</h2>
-        <h3 style={{ margin: "0 0 18px", color: calsieRed, fontSize: "clamp(22px, 8vw, 36px)", lineHeight: .92, fontWeight: 950, letterSpacing: ".14em", textTransform: "uppercase" }}>ABOUT APPLIX</h3>
-        <div style={{ display: "grid", gap: 10, justifyItems: "center", color: ink, fontSize: "clamp(10px, 3.3vw, 14px)", lineHeight: 1.05, fontWeight: 950, letterSpacing: ".08em", textTransform: "uppercase" }}>
-          <p style={{ margin: 0 }}>HOST <span style={{ color: calsieRed }}>| GMAIL</span></p>
-          <p style={{ margin: 0 }}>SPAN <span style={{ color: calsieRed }}>| 30 DAYS</span></p>
-          <p style={{ margin: 0 }}>DATA <span style={{ color: "#58b7ee" }}>| INDEED</span></p>
-          <p style={{ margin: 0 }}>TASK <span>| 25/DAY</span></p>
+          <div className="applix-actions">
+            <button
+              type="button"
+              className="applix-button applix-button--subtle"
+              onClick={loginWithGoogle}
+              disabled={loading}
+            >
+              {loading ? "Opening" : "Log in"}
+            </button>
+            <a className="applix-button applix-button--primary" href="#start-check">
+              Get Started
+            </a>
+          </div>
         </div>
-        <div aria-hidden="true" style={sectionLineStyle} />
+      </header>
+
+      <section className="applix-hero" aria-labelledby="hero-title">
+        <div className="applix-container applix-hero-grid">
+          <div>
+            <p className="applix-eyebrow">AI Job Application Assistant</p>
+            <h1 id="hero-title">Apply to jobs faster with AI that works with you</h1>
+            <p className="applix-hero-copy">
+              Applix helps you discover jobs, tailor your resume, generate application emails,
+              and apply with confidence - all in one streamlined workflow.
+            </p>
+            <div className="applix-hero-actions">
+              <a className="applix-button applix-button--primary" href="#start-check">
+                Get Started
+              </a>
+              <a className="applix-button" href="#how-it-works">
+                See How It Works
+              </a>
+            </div>
+            <p className="applix-supporting-line">
+              Review every application yourself or automate parts of the process.
+            </p>
+            {status ? (
+              <p className="applix-status" role="alert">
+                {status}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="applix-product-panel" aria-label="Applix workflow preview">
+            <div className="applix-panel-topbar">
+              <div className="applix-panel-title">
+                <strong>Application workflow</strong>
+                <span>Today&apos;s matched roles</span>
+              </div>
+              <span className="applix-panel-pill">Human approval on</span>
+            </div>
+
+            <div className="applix-match-list">
+              <div className="applix-match-row">
+                <span className="applix-match-score">94%</span>
+                <div className="applix-row-copy">
+                  <strong>Product Analyst</strong>
+                  <span>Resume draft ready</span>
+                </div>
+                <span className="applix-row-status">Review</span>
+              </div>
+              <div className="applix-match-row">
+                <span className="applix-match-score">88%</span>
+                <div className="applix-row-copy">
+                  <strong>Operations Coordinator</strong>
+                  <span>Email generated</span>
+                </div>
+                <span className="applix-row-status">Approve</span>
+              </div>
+              <div className="applix-match-row">
+                <span className="applix-match-score">82%</span>
+                <div className="applix-row-copy">
+                  <strong>Customer Success Associate</strong>
+                  <span>Preferences matched</span>
+                </div>
+                <span className="applix-row-status">Queue</span>
+              </div>
+            </div>
+
+            <div className="applix-workflow-list">
+              <div className="applix-workflow-item">
+                <span>1</span>
+                <div>
+                  <strong>Match role</strong>
+                  <small>Check fit against your profile and preferences.</small>
+                </div>
+              </div>
+              <div className="applix-workflow-item">
+                <span>2</span>
+                <div>
+                  <strong>Tailor materials</strong>
+                  <small>Prepare resume and email drafts for the role.</small>
+                </div>
+              </div>
+              <div className="applix-workflow-item">
+                <span>3</span>
+                <div>
+                  <strong>Approve send</strong>
+                  <small>You decide what moves forward.</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section style={sectionStyle}>
-        <h2 style={{ ...sectionHeadingStyle, marginBottom: 20 }}>HOW TO USE APPLIX</h2>
-        <p style={copyStyle}>DONT USE YOUR PERSONAL EMAIL, CREATE NEW GMAIL ONLY FOR APPLIX, SO APPLIX CAN USE IT ON YOUR BEHALF.</p>
-        <p style={{ ...copyStyle, marginBottom: 0 }}>ENTER YOUR NAME, THIS WILL BE USED BY APPLIX TO ADRESS YOU WHEN APPLIX IS EXECUTING TASK</p>
-        <div aria-hidden="true" style={sectionLineStyle} />
+      <section className="applix-stats" aria-label="Applix highlights">
+        <div className="applix-container applix-stats-grid">
+          {stats.map((stat) => (
+            <div className="applix-stat" key={stat.label}>
+              <strong>{stat.value}</strong>
+              <span>{stat.label}</span>
+            </div>
+          ))}
+        </div>
       </section>
 
-      <section style={sectionStyle}>
-        <h2 style={{ ...sectionHeadingStyle, marginBottom: 18 }}>Upload Your CV</h2>
-        <p style={copyStyle}>UPLOAD YOUR RESUME/CV, APPLIX WILL ATTACH YOUR DOCUMENTS TO EVERY COMPANY IT CONTACTS. PLEASE NO PERSONAL INFORMATION / CREDITS ON YOUR DOCUMENTS. KEEP IT GENERAL AS MUCH AS YOU CAN.</p>
-        <div aria-hidden="true" style={sectionLineStyle} />
+      <section className="applix-section" id="about" aria-labelledby="trust-title">
+        <div className="applix-container">
+          <div className="applix-section-header centered">
+            <p className="applix-eyebrow">Built for modern job seekers</p>
+            <h2 id="trust-title">Less repetition. More deliberate applications.</h2>
+            <p>
+              Applix is designed to reduce repetitive job application work and help users
+              move faster without losing control.
+            </p>
+          </div>
+          <div className="applix-trust-grid" aria-label="Applix trust signals">
+            {trustLabels.map((label) => (
+              <div className="applix-trust-item" key={label}>
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
-      <section style={sectionStyle}>
-        <h2 style={{ ...sectionHeadingStyle, marginBottom: 18 }}>Fill Up Template</h2>
-        <p style={copyStyle}>Browse Template :<br />Example:<br />Business Analyst<br />Support Worker, AIN, AgeCare, IT Support, Internship.<br />or Start With Standard Form By Applix</p>
-        <div aria-hidden="true" style={sectionLineStyle} />
+      <section className="applix-section" id="features" aria-labelledby="features-title">
+        <div className="applix-container">
+          <div className="applix-section-header">
+            <p className="applix-eyebrow">Features</p>
+            <h2 id="features-title">Everything you need to move from search to send.</h2>
+            <p>
+              A cleaner workflow for finding roles, tailoring materials, reviewing drafts,
+              and tracking every application in motion.
+            </p>
+          </div>
+          <div className="applix-card-grid">
+            {features.map((feature, index) => (
+              <article className="applix-feature-card" key={feature.title}>
+                <span className="applix-feature-number">0{index + 1}</span>
+                <h3>{feature.title}</h3>
+                <p>{feature.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
       </section>
 
-      <section style={sectionStyle}>
-        <h2 style={{ ...sectionHeadingStyle, marginBottom: 24 }}>HOW TO SET UP GUARD RAILS</h2>
-        <h3 style={sectionHeadingStyle}>Authorize Applix</h3>
-        <p style={copyStyle}>CONNECT YOUR APPLIX TO YOUR GMAIL ACCOUNT CREATED FOR APPLIX USE ONLY.</p>
-        <h3 style={sectionHeadingStyle}>Run Applix</h3>
-        <p style={copyStyle}>APPLIX WILL BE ACTIVATED FOR 30 DAYS, EXECUTE TASK 1/HR. KEEP YOUR ACCOUNT LOGGED IN, YOU CAN CLOSE THE BROWSER</p>
-        <div aria-hidden="true" style={sectionLineStyle} />
+      <section className="applix-section" id="how-it-works" aria-labelledby="steps-title">
+        <div className="applix-container">
+          <div className="applix-section-header">
+            <p className="applix-eyebrow">How it works</p>
+            <h2 id="steps-title">A focused path from setup to approval.</h2>
+          </div>
+          <div className="applix-steps-grid">
+            {steps.map((step, index) => (
+              <article className="applix-step-card" key={step.title}>
+                <span className="applix-step-number">Step {index + 1}</span>
+                <h3>{step.title}</h3>
+                <p>{step.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
       </section>
 
-      <section style={{ ...sectionStyle, gap: 12, paddingBottom: "clamp(38px, 8vw, 76px)" }}>
-        <h2 style={{ ...sectionHeadingStyle, marginBottom: 4 }}>APPLIX START CHECK</h2>
-        <div aria-hidden="true" style={topSectionLineStyle} />
-        {!carouselComplete ? (
-          <>
-            <p style={{ ...sectionHeadingStyle, marginBottom: 0 }}>{carouselIndex + 1}/{onboardingSlides.length}</p>
-            <h3 style={{ ...sectionHeadingStyle, marginBottom: 0 }}>{activeSlide.title}</h3>
-            <p style={{ ...copyStyle, marginBottom: 2 }}>{activeSlide.body}</p>
-            <button type="button" onClick={confirmSlide} style={primaryButtonStyle}>Yes, I understood</button>
-          </>
-        ) : (
-          <>
-            <p style={{ ...copyStyle, marginBottom: 0 }}>START CHECK COMPLETE.</p>
-            <button type="button" onClick={loginWithGoogle} disabled={loading} style={primaryButtonStyle}>{loading ? "Opening..." : "Sign in / Sign up"}</button>
-          </>
-        )}
-        {status && <p style={{ ...copyStyle, marginTop: 6, marginBottom: 0, color: "#991b1b" }}>{status}</p>}
-        <div aria-hidden="true" style={sectionLineStyle} />
+      <section className="applix-philosophy" aria-labelledby="why-title">
+        <div className="applix-container applix-philosophy-panel">
+          <div>
+            <p className="applix-eyebrow">Why Applix</p>
+            <h2 id="why-title">Fast applications, without losing control.</h2>
+            <p>
+              Applix is built for people who want the speed of AI without blindly handing
+              over the entire application process. It helps reduce repetitive effort while
+              keeping review and approval at the center.
+            </p>
+          </div>
+          <div className="applix-philosophy-note">
+            <strong>AI should accelerate the workflow, not take away your judgment.</strong>
+            <span>
+              Keep approval close, choose the right level of automation, and move faster
+              with a system designed around your decisions.
+            </span>
+          </div>
+        </div>
       </section>
+
+      <section className="applix-final-cta" id="pricing" aria-labelledby="cta-title">
+        <div className="applix-container applix-final-grid" id="start-check">
+          <div className="applix-final-copy">
+            <p className="applix-eyebrow">Start with control</p>
+            <h2 id="cta-title">Start applying smarter with Applix</h2>
+            <p>
+              Set up in minutes and streamline your job application workflow with AI-powered
+              support. Review the guardrails, choose your pace, and continue into Applix when ready.
+            </p>
+            <div className="applix-final-actions">
+              <a className="applix-button applix-button--light" href="#start-check">
+                Get Started
+              </a>
+              <a className="applix-button" href="#features">
+                Learn More
+              </a>
+            </div>
+          </div>
+
+          <div className="applix-start-card" aria-live="polite">
+            <div className="applix-start-card-top">
+              <span>{carouselComplete ? "Ready to continue" : `${carouselIndex + 1}/${onboardingSlides.length}`}</span>
+              <div className="applix-progress" aria-hidden="true">
+                {onboardingSlides.map((slide, index) => (
+                  <span
+                    key={slide.title}
+                    className={index <= carouselIndex || carouselComplete ? "is-active" : undefined}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {!carouselComplete ? (
+              <>
+                <h3>{activeSlide.title}</h3>
+                <p>{activeSlide.body}</p>
+                <button type="button" className="applix-button applix-button--primary" onClick={confirmSlide}>
+                  {carouselIndex === onboardingSlides.length - 1 ? "Complete start check" : "Yes, I understood"}
+                </button>
+              </>
+            ) : (
+              <>
+                <h3>Start check complete</h3>
+                <p>
+                  Continue with Google to open Applix and move into your dashboard workflow.
+                </p>
+                <button
+                  type="button"
+                  className="applix-button applix-button--primary"
+                  onClick={loginWithGoogle}
+                  disabled={loading}
+                >
+                  {loading ? "Opening" : "Sign in / Sign up"}
+                </button>
+              </>
+            )}
+
+            {status ? (
+              <p className="applix-status" role="alert">
+                {status}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      <footer className="applix-footer">
+        <div className="applix-container applix-footer-inner">
+          <div className="applix-footer-brand">
+            <strong>Applix</strong>
+            <p>AI-powered job application support for modern job seekers.</p>
+          </div>
+          <nav className="applix-footer-links" aria-label="Footer navigation">
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+            <a href="/contact">Contact</a>
+            <a href="/support">Support</a>
+          </nav>
+        </div>
+      </footer>
     </main>
   );
 }
