@@ -7,6 +7,12 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const LAUNCH_FUNCTION_NAME = process.env.APPLIX_LAUNCH_FUNCTION || "launch-applix-campaign";
 const REQUIRE_PAYMENT = process.env.APPLIX_REQUIRE_PAYMENT === "true";
 
+const DAILY_JOB_LIMIT = 24;
+const DAILY_EMAIL_LIMIT = 24;
+const HOURLY_EMAIL_LIMIT = 1;
+const CAMPAIGN_DAYS = 30;
+const TOTAL_CAP = 720;
+
 type ScheduleBody = {
   access_token?: string;
   campaign_id?: string;
@@ -99,6 +105,38 @@ export async function POST(req: Request) {
       }, { status: 402 });
     }
 
+    const campaignPatchResponse = await fetch(`${SUPABASE_URL}/rest/v1/campaigns?id=eq.${encodeURIComponent(campaignId)}&user_id=eq.${encodeURIComponent(currentUser.id)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        apikey: SUPABASE_ANON_KEY,
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        outreach: {
+          scheduled: true,
+          active: true,
+          campaign_days: CAMPAIGN_DAYS,
+          daily_job_limit: DAILY_JOB_LIMIT,
+          daily_email_limit: DAILY_EMAIL_LIMIT,
+          hourly_email_limit: HOURLY_EMAIL_LIMIT,
+          daily_cap: DAILY_EMAIL_LIMIT,
+          hourly_cap: HOURLY_EMAIL_LIMIT,
+          total_cap: TOTAL_CAP,
+          require_email: true,
+          require_user_approval: true,
+          approval_mode: "Ask me before applying",
+          test_mode: false,
+        },
+      }),
+    });
+
+    if (!campaignPatchResponse.ok) {
+      const details = await campaignPatchResponse.json().catch(() => null);
+      return NextResponse.json({ ok: false, error: "Could not apply campaign limits.", details }, { status: campaignPatchResponse.status });
+    }
+
     const launchResponse = await fetch(`${SUPABASE_URL}/functions/v1/${LAUNCH_FUNCTION_NAME}`, {
       method: "POST",
       headers: {
@@ -108,8 +146,13 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         campaign_id: campaignId,
-        results_limit: 100,
-        queue_limit: 100,
+        results_limit: DAILY_JOB_LIMIT,
+        queue_limit: DAILY_JOB_LIMIT,
+        target_email_count: DAILY_EMAIL_LIMIT,
+        hourly_email_limit: HOURLY_EMAIL_LIMIT,
+        daily_email_limit: DAILY_EMAIL_LIMIT,
+        campaign_days: CAMPAIGN_DAYS,
+        total_cap: TOTAL_CAP,
         min_lead_score: 70,
         exact_private_company_only: true,
       }),
@@ -130,9 +173,17 @@ export async function POST(req: Request) {
       ok: true,
       outreach: {
         enabled: true,
+        scheduled: true,
+        active: true,
         mode: "production",
         test_mode: false,
         agent_status: "ready_for_review",
+        campaign_days: CAMPAIGN_DAYS,
+        daily_job_limit: DAILY_JOB_LIMIT,
+        daily_email_limit: DAILY_EMAIL_LIMIT,
+        hourly_email_limit: HOURLY_EMAIL_LIMIT,
+        total_cap: TOTAL_CAP,
+        require_user_approval: true,
       },
       campaign: null,
       agent_run: launchData,
