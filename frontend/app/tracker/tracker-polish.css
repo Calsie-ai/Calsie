@@ -1,16 +1,5 @@
+html body main.agent-log-shell{background:#fff7f8!important}
 html body main.agent-log-shell .agent-log-hero{display:none!important}
 html body main.agent-log-shell .agent-log-header{margin-bottom:24px!important}
-html body main.agent-log-shell .agent-day-timeline.agent-log-card{background:linear-gradient(135deg,#fff7f8 0%,#ffebed 60%,#ffd9df 100%)!important;color:#111!important;border:1px solid #e7a7b1!important;border-radius:16px!important;box-shadow:0 12px 30px rgba(80,0,25,.12)!important;padding:26px!important}
-html body main.agent-log-shell .day-line-header{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:end!important;gap:20px!important;margin-bottom:18px!important}
-html body main.agent-log-shell .agent-day-timeline .agent-kicker{color:#fe5f70!important}
-html body main.agent-log-shell .day-line-header h2,html body main.agent-log-shell .day-line-header>span{color:#111!important}
-html body main.agent-log-shell .day-dot-row{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important;gap:12px!important}
-html body main.agent-log-shell .day-dot-row::before{display:none!important}
-html body main.agent-log-shell .day-dot-row button{display:grid!important;grid-template-columns:14px minmax(0,1fr)!important;grid-template-areas:'dot title' 'dot meta' 'dot date'!important;justify-items:start!important;align-items:start!important;gap:3px 10px!important;min-height:84px!important;padding:15px!important;border:1px solid #efb6bf!important;border-radius:12px!important;background:rgba(255,255,255,.62)!important;color:#111!important;text-align:left!important}
-html body main.agent-log-shell .day-dot-row button.active{background:#fff!important;border-color:#fe818d!important;box-shadow:0 7px 18px rgba(80,0,25,.10)!important}
-html body main.agent-log-shell .day-dot{grid-area:dot!important;width:10px!important;height:10px!important;margin-top:4px!important;border:2px solid #fe818d!important;background:#fff!important;box-shadow:none!important}
-html body main.agent-log-shell .day-dot-row button.active .day-dot{background:#fe818d!important;border-color:#fe818d!important;box-shadow:none!important}
-html body main.agent-log-shell .day-dot-row strong{grid-area:title!important;color:#111!important}
-html body main.agent-log-shell .day-dot-row small{grid-area:meta!important;color:#555!important;text-align:left!important}
-html body main.agent-log-shell .day-dot-row em{grid-area:date!important;color:#777!important}
-@media(max-width:700px){html body main.agent-log-shell .day-line-header{grid-template-columns:1fr!important;align-items:start!important}html body main.agent-log-shell .day-dot-row{grid-template-columns:1fr!important}}
+html body main.agent-log-shell .agent-day-timeline.agent-log-card{background:#ffebed!important;color:#000!important;border:1px solid #e9aab2!important;border-radius:8px!important;box-shadow:none!important;padding:30px!important}
+html body main.agent-log-shell .day-line-header{display:block!important;margin
