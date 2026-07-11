@@ -8,28 +8,4 @@ import "./outrun-background.css";
 import "./landing-editorial.css";
 import "./landing-centered.css";
 import "./dashboard-editorial.css";
-import "./dashboard-template-overrides.css";
-import "./dashboard-inline-template.css";
-import "./dashboard-template-browser.css";
-import "./tracker-editorial.css";
-import DashboardTemplateBrowser from "./components/DashboardTemplateBrowser";
-
-export const metadata = {
-  title: "Applix | AI Job Application Assistant",
-  description: "AI-powered job application support for modern job seekers.",
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body>
-        {children}
-        <DashboardTemplateBrowser />
-      </body>
-    </html>
-  );
-}
+import "./dashboard-template-over
