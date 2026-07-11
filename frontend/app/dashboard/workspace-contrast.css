@@ -1,0 +1,17 @@
+html body .applix-workspace .workspace-main,
+html body .applix-workspace .workspace-main section {
+  color: #ffffff !important;
+}
+
+html body .applix-workspace .workspace-main h1,
+html body .applix-workspace .workspace-main header h1 {
+  color: #ffffff !important;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.28);
+}
+
+html body .applix-workspace .workspace-main header > p {
+  color: #fe818d !important;
+}
+
+html body .applix-workspace .workspace-main header > span {
+  color: #d8d
