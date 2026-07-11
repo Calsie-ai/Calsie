@@ -1,11 +1,6 @@
 import type { ReactNode } from "react";
-import DashboardTemplateBrowser from "../components/DashboardTemplateBrowser";
+import "./workspace.css";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  return (
-    <>
-      {children}
-      <DashboardTemplateBrowser />
-    </>
-  );
+  return children;
 }
