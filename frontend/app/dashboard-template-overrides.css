@@ -1,0 +1,110 @@
+html body main.dashboard-cockpit-shell .dashboard-hero h1,
+html body main.dashboard-cockpit-shell .dashboard-subtitle,
+html body main.dashboard-cockpit-shell .dashboard-hero h1::before,
+html body main.dashboard-cockpit-shell .dashboard-hero h1::after,
+html body main.dashboard-cockpit-shell .dashboard-subtitle::before,
+html body main.dashboard-cockpit-shell .dashboard-subtitle::after {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  text-decoration: none !important;
+  border: 0 !important;
+  outline: 0 !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-hero h1 {
+  color: #111111 !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-subtitle {
+  color: #5c5c5c !important;
+}
+
+html body main.dashboard-cockpit-shell .campaign-summary-card:has(.browse-template-button) {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  padding: 34px 0 0 !important;
+  border: 0 !important;
+  border-top: 1px solid #111111 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  text-align: left !important;
+  justify-items: stretch !important;
+  gap: 18px !important;
+}
+
+html body main.dashboard-cockpit-shell .campaign-summary-card:has(.browse-template-button)::before {
+  content: "TEMPLATES";
+  display: block;
+  margin-bottom: -4px;
+  color: #111111;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .18em;
+}
+
+html body main.dashboard-cockpit-shell .campaign-summary-card:has(.browse-template-button) > strong {
+  display: block !important;
+  max-width: 760px !important;
+  margin: 0 !important;
+  color: #111111 !important;
+  font-size: clamp(32px, 5vw, 54px) !important;
+  line-height: 1 !important;
+  letter-spacing: -.04em !important;
+  text-align: left !important;
+}
+
+html body main.dashboard-cockpit-shell .campaign-summary-card:has(.browse-template-button) > p {
+  max-width: 680px !important;
+  margin: 0 !important;
+  color: #5c5c5c !important;
+  font-size: 16px !important;
+  text-align: left !important;
+}
+
+html body main.dashboard-cockpit-shell .campaign-summary-card:has(.browse-template-button)::after {
+  content: "QUICK START\A 24 jobs per day\A\A CONTROLLED\A 1 approved email per hour\A\A 30-DAY PLAN\A Up to 720 applications";
+  white-space: pre-line;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  min-height: 260px;
+  margin-top: 12px;
+  padding: 26px;
+  border: 1px solid #e6e6e6;
+  background:
+    linear-gradient(135deg, rgba(254,129,141,.18), transparent 55%),
+    #ffffff;
+  color: #111111;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.55;
+  letter-spacing: -.01em;
+}
+
+html body main.dashboard-cockpit-shell .campaign-summary-card:has(.browse-template-button) .browse-template-button {
+  justify-self: start !important;
+  min-height: 48px !important;
+  padding: 0 22px !important;
+  border: 1px solid #111111 !important;
+  border-radius: 0 !important;
+  background: #111111 !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+}
+
+html body main.dashboard-cockpit-shell .campaign-summary-card:has(.browse-template-button) .browse-template-button:hover {
+  background: #fe818d !important;
+  color: #111111 !important;
+  border-color: #fe818d !important;
+}
+
+@media (max-width: 700px) {
+  html body main.dashboard-cockpit-shell .campaign-summary-card:has(.browse-template-button)::after {
+    grid-template-columns: 1fr;
+    min-height: 220px;
+  }
+}
