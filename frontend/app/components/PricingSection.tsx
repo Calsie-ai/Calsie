@@ -18,14 +18,15 @@ const plans = [
     name: "Applix Pro",
     price: "A$20",
     suffix: "one-time",
-    note: "The complete 10-day application campaign for active job seekers.",
+    note: "A controlled 30-day application campaign for active job seekers.",
     features: [
       "2-minute guided setup",
-      "Up to 100 opportunities per day",
-      "Up to 1,000 opportunities in 10 days",
+      "Up to 24 applications per day",
+      "One approved application per hour",
+      "Up to 720 applications in 30 days",
       "AI-tailored resume drafts",
       "AI-written application emails",
-      "Review and approval controls",
+      "Approval required before sending",
       "Application tracking dashboard",
     ],
     action: "Choose Applix Pro",
@@ -82,7 +83,7 @@ export default function PricingSection() {
             Simple, transparent pricing
           </h2>
           <p style={{ margin: "26px auto 0", maxWidth: "760px", fontSize: "clamp(18px, 1.5vw, 22px)", lineHeight: 1.6, color: "#555" }}>
-            Start free, choose the complete Applix campaign, or contact us for a custom workflow.
+            Start free, choose the controlled 30-day Applix campaign, or contact us for a custom workflow.
           </p>
         </header>
 
@@ -134,7 +135,7 @@ export default function PricingSection() {
         </div>
 
         <p style={{ margin: "34px auto 0", textAlign: "center", color: "#666", fontSize: "15px" }}>
-          Prices are shown in Australian dollars. You review and approve applications before they move forward.
+          Prices are shown in Australian dollars. Applications require your approval and are limited to one send per hour.
         </p>
       </div>
     </section>
