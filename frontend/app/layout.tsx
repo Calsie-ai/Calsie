@@ -8,6 +8,7 @@ import "./outrun-background.css";
 import "./landing-editorial.css";
 import "./landing-centered.css";
 import "./dashboard-editorial.css";
+import "./dashboard-template-overrides.css";
 import "./tracker-editorial.css";
 
 export const metadata = {
