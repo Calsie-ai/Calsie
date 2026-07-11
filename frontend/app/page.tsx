@@ -14,9 +14,9 @@ const navLinks = [
 
 const stats = [
   { value: "2 min", label: "setup" },
-  { value: "100/day", label: "job capability" },
-  { value: "Tailored", label: "emails and resumes" },
-  { value: "Control", label: "approve before applying" },
+  { value: "24/day", label: "approved applications" },
+  { value: "1/hour", label: "controlled sending" },
+  { value: "720", label: "maximum over 30 days" },
 ];
 
 const trustLabels = ["AI-assisted workflow", "Resume tailoring", "Human approval", "Job tracking"];
@@ -27,21 +27,21 @@ const features = [
   ["AI Email Drafting", "Generate application emails that are specific, concise, and matched to the role in front of you."],
   ["Approval Workflow", "Review, edit, and approve applications before anything gets sent on your behalf."],
   ["Application Tracking", "Keep prepared, approved, and applied jobs organized in one workflow instead of scattered tabs."],
-  ["Flexible Automation", "Choose guided assistance now and deeper automation when you are ready for more speed."],
+  ["Controlled Automation", "Send no more than one approved application per hour, with a maximum of 24 per day."],
 ];
 
 const steps = [
   ["Connect your profile", "Upload your resume and set the roles, locations, and preferences Applix should use."],
-  ["Configure your workflow", "Review matched jobs and let Applix prepare tailored resumes and emails for each role."],
-  ["Approve and apply", "Check every draft, choose what moves forward, and apply faster with full control."],
+  ["Review prepared applications", "Applix prepares up to 24 opportunities per day and releases them across the day."],
+  ["Approve and send", "Approve the applications you want. Applix sends no more than one approved application each hour."],
 ];
 
 const onboardingSlides = [
   ["What is Applix", "Applix is an AI-powered job application assistant built to help you prepare and manage job outreach in a controlled way."],
-  ["What it does", "Applix can use your details, resume, and selected instructions to prepare job application emails and role-specific resume drafts."],
+  ["What it does", "Applix can use your details, resume, and selected instructions to prepare up to 24 job applications per day."],
   ["How to connect the app", "Create or choose the Gmail account you want Applix to use, then authorize Applix with that account only."],
-  ["How it works", "Applix runs with guardrails. You can review the workflow, approve applications, and decide how much automation to use."],
-  ["Terms and control", "By continuing, you understand you are responsible for your email account, resume, details, and the instructions you give Applix."],
+  ["How it works", "Applications require your approval. The sending pace is limited to one approved application per hour for up to 30 days."],
+  ["Terms and control", "By continuing, you understand you are responsible for your email account, resume, details, and the applications you approve."],
 ];
 
 export default function HomePage() {
@@ -104,12 +104,12 @@ export default function HomePage() {
           <div>
             <p className="applix-eyebrow">AI Job Application Assistant</p>
             <h1 id="hero-title">Apply to jobs faster with AI that works with you</h1>
-            <p className="applix-hero-copy">Applix helps you discover jobs, tailor your resume, generate application emails, and apply with confidence - all in one streamlined workflow.</p>
+            <p className="applix-hero-copy">Applix prepares up to 24 applications per day, requires your approval, and sends no more than one approved application per hour for up to 30 days.</p>
             <div className="applix-hero-actions">
               <a className="applix-button applix-button--primary" href="#start-check">Get Started</a>
               <a className="applix-button" href="#how-it-works">See How It Works</a>
             </div>
-            <p className="applix-supporting-line">Review every application yourself or automate parts of the process.</p>
+            <p className="applix-supporting-line">Up to 720 approved applications over a 30-day campaign.</p>
             {status ? <p className="applix-status" role="alert">{status}</p> : null}
           </div>
 
@@ -135,7 +135,7 @@ export default function HomePage() {
               {[
                 ["1", "Match role", "Check fit against your profile and preferences."],
                 ["2", "Tailor materials", "Prepare resume and email drafts for the role."],
-                ["3", "Approve send", "You decide what moves forward."],
+                ["3", "Approve send", "One approved application can move forward each hour."],
               ].map(([number, title, copy]) => (
                 <div className="applix-workflow-item" key={number}>
                   <span>{number}</span><div><strong>{title}</strong><small>{copy}</small></div>
@@ -157,7 +157,7 @@ export default function HomePage() {
           <div className="applix-section-header centered">
             <p className="applix-eyebrow">Built for modern job seekers</p>
             <h2 id="trust-title">Less repetition. More deliberate applications.</h2>
-            <p>Applix is designed to reduce repetitive job application work and help users move faster without losing control.</p>
+            <p>Applix is designed to reduce repetitive job application work while keeping every send under your control.</p>
           </div>
           <div className="applix-trust-grid" aria-label="Applix trust signals">
             {trustLabels.map((label) => <div className="applix-trust-item" key={label}>{label}</div>)}
@@ -170,7 +170,7 @@ export default function HomePage() {
           <div className="applix-section-header">
             <p className="applix-eyebrow">Features</p>
             <h2 id="features-title">Everything you need to move from search to send.</h2>
-            <p>A cleaner workflow for finding roles, tailoring materials, reviewing drafts, and tracking every application in motion.</p>
+            <p>A controlled workflow for finding roles, tailoring materials, reviewing drafts, and tracking every application.</p>
           </div>
           <div className="applix-card-grid">
             {features.map(([title, body], index) => (
@@ -184,7 +184,7 @@ export default function HomePage() {
 
       <section className="applix-section applix-how" id="how-it-works" aria-labelledby="steps-title">
         <div className="applix-container">
-          <div className="applix-section-header centered applix-how-header"><h2 id="steps-title">How Applix works</h2><p>Get up and applying in minutes, not days.</p></div>
+          <div className="applix-section-header centered applix-how-header"><h2 id="steps-title">How Applix works</h2><p>Prepare up to 24 applications a day while keeping approval in your hands.</p></div>
           <div className="applix-step-track">
             {steps.map(([title, body], index) => (
               <article className="applix-step-card" key={title}><span className="applix-step-number">{index + 1}</span><h3>{title}</h3><p>{body}</p></article>
@@ -195,8 +195,8 @@ export default function HomePage() {
 
       <section className="applix-philosophy" aria-labelledby="why-title">
         <div className="applix-container applix-philosophy-panel">
-          <div><p className="applix-eyebrow">Why Applix</p><h2 id="why-title">Fast applications, without losing control.</h2><p>Applix is built for people who want the speed of AI without blindly handing over the entire application process. It helps reduce repetitive effort while keeping review and approval at the center.</p></div>
-          <div className="applix-philosophy-note"><strong>AI should accelerate the workflow, not take away your judgment.</strong><span>Keep approval close, choose the right level of automation, and move faster with a system designed around your decisions.</span></div>
+          <div><p className="applix-eyebrow">Why Applix</p><h2 id="why-title">Fast applications, without losing control.</h2><p>Applix is built for people who want AI speed with a clear daily cap, an hourly sending limit, and approval before every application moves forward.</p></div>
+          <div className="applix-philosophy-note"><strong>AI should accelerate the workflow, not take away your judgment.</strong><span>Approve applications in advance, pause at any time, and send no more than one approved application per hour.</span></div>
         </div>
       </section>
 
@@ -206,8 +206,8 @@ export default function HomePage() {
         <div className="applix-container applix-final-grid" id="start-check">
           <div className="applix-final-copy">
             <p className="applix-eyebrow">Start with control</p>
-            <h2 id="cta-title">Start applying smarter with Applix</h2>
-            <p>Set up in minutes and streamline your job application workflow with AI-powered support. Review the guardrails, choose your pace, and continue into Applix when ready.</p>
+            <h2 id="cta-title">Start a 30-day Applix campaign</h2>
+            <p>Prepare up to 24 applications per day, approve the ones you want, and send no more than one approved application per hour—up to 720 applications over 30 days.</p>
             <div className="applix-final-actions"><a className="applix-button applix-button--light" href="#start-check">Get Started</a><a className="applix-button" href="#features">Learn More</a></div>
           </div>
 
@@ -221,7 +221,7 @@ export default function HomePage() {
             {!carouselComplete ? (
               <><h3>{activeSlide[0]}</h3><p>{activeSlide[1]}</p><button type="button" className="applix-button applix-button--primary" onClick={confirmSlide}>{carouselIndex === onboardingSlides.length - 1 ? "Complete start check" : "Yes, I understood"}</button></>
             ) : (
-              <><h3>Start check complete</h3><p>Continue with Google to open Applix and move into your dashboard workflow.</p><button type="button" className="applix-button applix-button--primary" onClick={loginWithGoogle} disabled={loading}>{loading ? "Opening" : "Sign in / Sign up"}</button></>
+              <><h3>Start check complete</h3><p>Continue with Google to open Applix and create your controlled 30-day campaign.</p><button type="button" className="applix-button applix-button--primary" onClick={loginWithGoogle} disabled={loading}>{loading ? "Opening" : "Sign in / Sign up"}</button></>
             )}
             {status ? <p className="applix-status" role="alert">{status}</p> : null}
           </div>
