@@ -39,3 +39,9 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: supabase functions deploy applix-agent-orchestrator --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Deploy run-company-enrichment-chain
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: supabase functions deploy run-company-enrichment-chain --project-ref "$SUPABASE_PROJECT_REF"
