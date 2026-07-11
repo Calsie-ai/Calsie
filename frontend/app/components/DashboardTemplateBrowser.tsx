@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 
 const templates = [
@@ -10,11 +12,29 @@ const templates = [
   { id: "it-support", title: "IT Support", role: "IT Support", location: "Sydney NSW", description: "Service desk, help desk, and junior technical support roles." },
 ];
 
-export default function DashboardTemplateBrowser({ onCreated }: { onCreated?: () => void }) {
+export default function DashboardTemplateBrowser() {
+  const pathname = usePathname();
+  const [mountNode, setMountNode] = useState<Element | null>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState("");
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (pathname !== "/dashboard") {
+      setMountNode(null);
+      return;
+    }
+
+    const findMount = () => {
+      const target = document.querySelector(".dashboard-stack");
+      if (target) setMountNode(target);
+    };
+
+    findMount();
+    const timer = window.setTimeout(findMount, 250);
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
 
   const filtered = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -63,9 +83,8 @@ export default function DashboardTemplateBrowser({ onCreated }: { onCreated?: ()
       });
 
       if (error) throw error;
-      setMessage(`${template.title} template added.`);
-      setOpen(false);
-      onCreated?.();
+      setMessage(`${template.title} template added. Refreshing dashboard...`);
+      window.setTimeout(() => window.location.reload(), 500);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not use template.");
     } finally {
@@ -73,36 +92,42 @@ export default function DashboardTemplateBrowser({ onCreated }: { onCreated?: ()
     }
   }
 
-  return (
+  if (!mountNode) return null;
+
+  return createPortal(
     <section className="dashboard-template-browser">
       <div className="dashboard-template-heading">
         <div>
           <span>TEMPLATES</span>
           <h2>Browse templates</h2>
-          <p>Search a ready-made campaign and add it without leaving the dashboard.</p>
+          <p>Search and use a ready-made campaign without leaving this dashboard.</p>
         </div>
         <button type="button" onClick={() => setOpen((value) => !value)}>{open ? "Close" : "Browse templates"}</button>
       </div>
 
       {open && (
         <div className="dashboard-template-panel">
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search templates or job roles" aria-label="Search campaign templates" />
+          <div className="dashboard-template-search-row">
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search templates or job roles" aria-label="Search campaign templates" />
+            <span>{filtered.length} templates</span>
+          </div>
           <div className="dashboard-template-grid">
-            {filtered.map((template) => (
+            {filtered.map((template, index) => (
               <article key={template.id}>
-                <div className="dashboard-template-visual"><span>{template.title}</span></div>
-                <small>{template.role}</small>
+                <div className={`dashboard-template-visual visual-${index + 1}`}><span>{template.title}</span></div>
+                <small>0{index + 1} · {template.role}</small>
                 <h3>{template.title}</h3>
                 <p>{template.description}</p>
-                <button type="button" disabled={Boolean(busyId)} onClick={() => void useTemplate(template)}>{busyId === template.id ? "Adding..." : "Use template"}</button>
+                <button type="button" disabled={Boolean(busyId)} onClick={() => void useTemplate(template)}>{busyId === template.id ? "Adding..." : "Use template →"}</button>
               </article>
             ))}
           </div>
-          {!filtered.length && <p>No templates match your search.</p>}
+          {!filtered.length && <p className="dashboard-template-empty">No templates match your search.</p>}
         </div>
       )}
 
       {message && <p className="dashboard-template-message">{message}</p>}
-    </section>
+    </section>,
+    mountNode,
   );
 }
