@@ -1,6 +1,2 @@
-html body main.dashboard-cockpit-shell .dashboard-hero h1,
-html body main.dashboard-cockpit-shell .dashboard-subtitle,
-html body main.dashboard-cockpit-shell .applix-intro-card,
-html body main.dashboard-cockpit-shell .applix-intro-card strong,
-html body main.dashboard-cockpit-shell .applix-intro-card p,
-html body main.dashboard-cockpit-shell .dashboard-hero h1::before
+html body main.dashboard-cockpit-shell .applix-intro-card{display:none!important}
+html body main.dashboard-cockpit-shell .dashboard-template-browser{order:-1!important;margin-top:0!important;padding-top:28px!important}
