@@ -1,0 +1,187 @@
+html body main.dashboard-cockpit-shell .dashboard-template-browser {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  margin-top: 10px !important;
+  padding-top: 30px !important;
+  border-top: 1px solid #111111 !important;
+  background: transparent !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-heading {
+  display: flex !important;
+  align-items: end !important;
+  justify-content: space-between !important;
+  gap: 24px !important;
+  margin-bottom: 24px !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-heading span {
+  display: block !important;
+  margin-bottom: 10px !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: .18em !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-heading h2 {
+  margin: 0 !important;
+  color: #111111 !important;
+  font-size: clamp(34px, 5vw, 56px) !important;
+  line-height: 1 !important;
+  letter-spacing: -.045em !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-heading p {
+  max-width: 680px !important;
+  margin: 12px 0 0 !important;
+  color: #5c5c5c !important;
+  font-size: 16px !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-heading button,
+html body main.dashboard-cockpit-shell .dashboard-template-grid article > button {
+  min-height: 46px !important;
+  padding: 0 20px !important;
+  border: 1px solid #111111 !important;
+  border-radius: 0 !important;
+  background: #111111 !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-heading button:hover,
+html body main.dashboard-cockpit-shell .dashboard-template-grid article > button:hover {
+  border-color: #fe818d !important;
+  background: #fe818d !important;
+  color: #111111 !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-panel {
+  display: grid !important;
+  gap: 24px !important;
+  padding: 24px 0 4px !important;
+  border-top: 1px solid #e7e7e7 !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-search-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-search-row input {
+  flex: 1 !important;
+  min-height: 50px !important;
+  padding: 0 16px !important;
+  border: 1px solid #111111 !important;
+  border-radius: 0 !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+  font-size: 15px !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-search-row span {
+  color: #5c5c5c !important;
+  font-size: 13px !important;
+  white-space: nowrap !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 24px !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-grid article {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  padding: 0 0 18px !important;
+  border-bottom: 1px solid #d9d9d9 !important;
+  background: transparent !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-visual {
+  display: flex !important;
+  align-items: flex-end !important;
+  min-height: 210px !important;
+  margin-bottom: 14px !important;
+  padding: 18px !important;
+  border: 1px solid #d7d7d7 !important;
+  background: linear-gradient(135deg, #f5f5f5, #dedede) !important;
+  overflow: hidden !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-visual.visual-2 {
+  background: linear-gradient(135deg, #111111, #505050) !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-visual.visual-3 {
+  background: linear-gradient(135deg, rgba(254,129,141,.25), #ffffff) !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-visual.visual-4 {
+  background: linear-gradient(135deg, #ececec, #ffffff) !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-visual span {
+  max-width: 90% !important;
+  padding: 7px 9px !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-grid small {
+  color: #6a6a6a !important;
+  font-size: 10px !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-grid h3 {
+  margin: 10px 0 8px !important;
+  color: #111111 !important;
+  font-size: 20px !important;
+  line-height: 1.15 !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-grid p {
+  flex: 1 !important;
+  margin: 0 0 18px !important;
+  color: #5c5c5c !important;
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-grid article > button {
+  align-self: flex-start !important;
+  min-height: 40px !important;
+  padding: 0 14px !important;
+  font-size: 12px !important;
+}
+
+html body main.dashboard-cockpit-shell .dashboard-template-message,
+html body main.dashboard-cockpit-shell .dashboard-template-empty {
+  margin: 10px 0 0 !important;
+  color: #111111 !important;
+  font-size: 14px !important;
+}
+
+@media (max-width: 820px) {
+  html body main.dashboard-cockpit-shell .dashboard-template-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  html body main.dashboard-cockpit-shell .dashboard-template-heading {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  html body main.dashboard-cockpit-shell .dashboard-template-search-row {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+}
