@@ -12,4 +12,4 @@ import "./dashboard-template-overrides.css";
 import "./dashboard-template-browser.css";
 import "./tracker-editorial.css";
 
-export const metadata
+export const metadata =
