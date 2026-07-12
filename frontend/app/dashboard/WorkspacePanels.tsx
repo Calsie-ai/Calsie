@@ -49,6 +49,9 @@ export default function WorkspacePanels({
   );
   const status = campaign?.status || "Not configured";
   const running = ["active", "launched", "scheduled"].includes(status);
+  const paused = status === "paused";
+  const statusClass = running ? "is-running" : paused ? "is-paused" : "is-idle";
+  const statusText = running ? "Campaign running" : paused ? "Paused" : status;
 
   if (active === "templates") {
     return (
@@ -166,8 +169,8 @@ export default function WorkspacePanels({
             <h1>Application tracker</h1>
             <span>Follow the campaign pipeline, review applications, and download your records here.</span>
           </div>
-          <span className={`workspace-status-pill ${running ? "is-running" : ""}`}>
-            <i /> {running ? "Campaign running" : status}
+          <span className={`workspace-status-pill ${statusClass}`}>
+            <i /> {statusText}
           </span>
         </header>
 

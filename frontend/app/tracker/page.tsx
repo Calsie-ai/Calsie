@@ -24,8 +24,7 @@ function normalizeStatus(value: unknown): AgentStatus | null {
   if (status === "progressing" || status === "interview") return "interviewing";
   if (status === "ready_for_review" || status === "pending_user_approval") return "prepared";
   if (status === "email_not_found") return "needs_email";
-  if (STATUS_OPTIONS.includes(status as AgentStatus)) return status as AgentStatus;
-  return null;
+  return STATUS_OPTIONS.includes(status as AgentStatus) ? status as AgentStatus : null;
 }
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
@@ -49,29 +48,26 @@ function statusFor(row: JobsRow): AgentStatus {
   if (description.includes("rejected")) return "rejected";
   if (description.includes("skipped")) return "skipped";
   if (description.includes("failed")) return "failed";
-  if (row.apply_url) return "prepared";
-  return "found";
+  return row.apply_url ? "prepared" : "found";
 }
 function mapSavedJob(row: JobsRow): AgentLog {
   const source = cleanText(row.source);
   const jobUrl = cleanText(row.apply_url);
-  const website = source.startsWith("http") ? source : "";
-  return { id: row.id, campaignId: row.campaign_id, company: cleanText(row.company, "Company not saved"), jobTitle: cleanText(row.title, "Opportunity not named"), location: cleanText(row.location, "Location not saved"), website, jobUrl, source, status: statusFor(row), actionTime: row.created_at || "" };
+  return { id: row.id, campaignId: row.campaign_id, company: cleanText(row.company, "Company not saved"), jobTitle: cleanText(row.title, "Opportunity not named"), location: cleanText(row.location, "Location not saved"), website: source.startsWith("http") ? source : "", jobUrl, source, status: statusFor(row), actionTime: row.created_at || "" };
 }
 function csvCell(value: string) { return `"${value.replace(/"/g, '""').replace(/\r?\n/g, " ")}"`; }
 function safeFileName(value: string) { return cleanText(value, "applix-agent-logs").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "applix-agent-logs"; }
-function formatDate(value: string) { if (!value) return "Not logged yet"; const date = new Date(value); if (Number.isNaN(date.getTime())) return value; return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); }
-function formatShortDate(value: string) { if (!value || value === "unknown") return "No date"; const date = new Date(`${value}T00:00:00`); if (Number.isNaN(date.getTime())) return value; return date.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
-function dayKey(value: string) { if (!value) return "unknown"; const date = new Date(value); if (Number.isNaN(date.getTime())) return "unknown"; return date.toISOString().slice(0, 10); }
+function formatDate(value: string) { if (!value) return "Not logged yet"; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); }
+function formatShortDate(value: string) { if (!value || value === "unknown") return "No date"; const date = new Date(`${value}T00:00:00`); return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+function dayKey(value: string) { if (!value) return "unknown"; const date = new Date(value); return Number.isNaN(date.getTime()) ? "unknown" : date.toISOString().slice(0, 10); }
 function statusLabel(status: AgentStatus) {
   const labels: Record<AgentStatus, string> = { found: "Found", prepared: "Prepared", approved: "Approved", needs_email: "Needs email", queued: "Queued", applied: "Applied", interviewing: "Interviewing", saved: "Saved", declined: "Declined", skipped: "Skipped", rejected: "Rejected", failed: "Failed", waiting: "Waiting" };
-  return labels[status] || "Waiting";
+  return labels[status];
 }
 function normalizeApprovalField(value: unknown) { return cleanText(value).toLowerCase().replace(/\s+/g, "_"); }
 function statusAfterApproval(result: ApprovalResponse): AgentStatus {
   const emailStatus = normalizeApprovalField(result.email_status);
   const draftStatus = normalizeApprovalField(result.draft_status);
-
   if (result.queue_id || draftStatus === "queued") return "queued";
   if (emailStatus === "failed" || draftStatus === "failed") return "failed";
   if (emailStatus && emailStatus !== "found") return "needs_email";
@@ -80,7 +76,6 @@ function statusAfterApproval(result: ApprovalResponse): AgentStatus {
 function approvalMessage(result: ApprovalResponse) {
   const emailStatus = normalizeApprovalField(result.email_status);
   const draftStatus = normalizeApprovalField(result.draft_status);
-
   if (result.queue_id || draftStatus === "queued") return "Approved. Outreach draft is queued.";
   if (draftStatus === "created") return "Approved. Outreach draft was created and is ready for the next queue step.";
   if (emailStatus === "failed" || draftStatus === "failed") return "Approved, but enrichment or draft creation failed. Check Supabase function logs.";
@@ -102,6 +97,8 @@ export default function TrackerPage() {
   const [reloading, setReloading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [sheetMinimized, setSheetMinimized] = useState(false);
+  const [sheetMaximized, setSheetMaximized] = useState(false);
 
   const summary = useMemo(() => ({
     found: logs.length,
@@ -164,7 +161,7 @@ export default function TrackerPage() {
       setLogs(savedJobsData.map(mapSavedJob));
     } catch (error) { setErrorMessage(getErrorMessage(error, "Could not load agent logs.")); setLogs([]); } finally { setLoading(false); }
   }
-  useEffect(() => { loadTracker(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [router]);
+  useEffect(() => { void loadTracker(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [router]);
 
   async function reloadLogs() { setReloading(true); setActionMessage(""); try { await loadTracker(); setActionMessage("Applix logs reloaded from Supabase."); } catch (error) { setActionMessage(getErrorMessage(error, "Could not reload Applix logs.")); } finally { setReloading(false); } }
 
@@ -188,7 +185,6 @@ export default function TrackerPage() {
       const supabase = getSupabaseClient();
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData.user) throw new Error("Missing login session. Please sign in again.");
-
       if (decision === "declined") {
         const now = new Date().toISOString();
         const jobUpdate = await supabase.from("jobs").update({ status: "declined", user_decision: "declined", reviewed_at: now }).eq("id", log.id).eq("user_id", userData.user.id);
@@ -196,34 +192,25 @@ export default function TrackerPage() {
         setActionMessage("Declined.");
         return;
       }
-
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       if (sessionError || !accessToken) throw new Error("Missing login session. Please sign in again.");
       if (!supabaseUrl || !supabaseAnonKey) throw new Error("Missing Supabase environment variables.");
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/approve-job-for-outreach`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          apikey: supabaseAnonKey,
-          authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ job_id: log.id }),
-      });
-
+      const response = await fetch(`${supabaseUrl}/functions/v1/approve-job-for-outreach`, { method: "POST", headers: { "content-type": "application/json", apikey: supabaseAnonKey, authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ job_id: log.id }) });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || payload?.ok === false) {
-        throw new Error(getErrorMessage(payload, "Could not approve this job."));
-      }
-
+      if (!response.ok || payload?.ok === false) throw new Error(getErrorMessage(payload, "Could not approve this job."));
       const result = payload as ApprovalResponse;
       const finalStatus = statusAfterApproval(result);
       setLogs((current) => current.map((row) => row.id === log.id ? { ...row, status: finalStatus } : row));
       setActionMessage(approvalMessage(result));
     } catch (error) { setLogs(previousLogs); setActionMessage(getErrorMessage(error, "Could not review this job.")); } finally { setSavingStatusId(null); }
+  }
+
+  function toggleSheetMaximized() {
+    setSheetMinimized(false);
+    setSheetMaximized((value) => !value);
   }
 
   return (
@@ -239,21 +226,7 @@ export default function TrackerPage() {
       {actionMessage && <p className="agent-message">{actionMessage}</p>}{errorMessage && <p className="agent-error">{errorMessage}</p>}{loading && <p className="agent-message">Loading Applix logs...</p>}
       {!loading && !errorMessage && logs.length === 0 && <section className="agent-log-card empty-agent-card"><img src="/applix-logo.svg" alt="" aria-hidden="true" /><h2>No Applix logs yet</h2><p>When Applix starts finding and preparing opportunities, the company, website, job post URL, status, and action time will appear here.</p></section>}
 
-      {!loading && !errorMessage && logs.length > 0 && <section className="agent-log-card table-card"><div className="table-title-row"><div><p className="agent-kicker">{visibleDayLabel}</p><h2>Jobs Applix touched</h2></div><span>{visibleLogs.length} records · page {safePage} of {totalPages}</span></div><div className="agent-table-wrap editable-sheet-wrap"><table className="editable-sheet-table"><thead><tr><th>Company</th><th>Opportunity</th><th>Website</th><th>Job post</th><th>Status</th><th>Review</th><th>Action time</th></tr></thead><tbody>{pagedLogs.map((log) => <tr key={log.id}><td data-label="Company"><strong>{log.company}</strong><span>{log.location}</span></td><td data-label="Opportunity">{log.jobTitle}</td><td data-label="Website">{log.website ? <a href={log.website} target="_blank" rel="noreferrer">Website</a> : <span className="muted-cell">Not saved</span>}</td><td data-label="Job post">{log.jobUrl ? <a href={log.jobUrl} target="_blank" rel="noreferrer">Job post</a> : <span className="muted-cell">Not saved</span>}</td><td data-label="Status"><select className={`status-select ${log.status}`} value={log.status} disabled={savingStatusId === log.id} onChange={(event) => saveJobStatus(log.id, event.target.value as AgentStatus)}>{STATUS_OPTIONS.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></td><td data-label="Review"><div className="review-actions"><button className="approve-button" type="button" disabled={savingStatusId === log.id || log.status === "approved" || log.status === "queued"} onClick={() => reviewJob(log, "approved")}>Approve</button><button className="decline-button" type="button" disabled={savingStatusId === log.id || log.status === "declined"} onClick={() => reviewJob(log, "declined")}>Decline</button></div></td><td data-label="Action time">{formatDate(log.actionTime)}</td></tr>)}</tbody></table></div><div className="sheet-pagination"><button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</button><span>Rows {visibleLogs.length === 0 ? 0 : pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, visibleLogs.length)} of {visibleLogs.length}</span><button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Next</button></div></section>}
-
-      <style>{`
-        .agent-log-shell{min-height:100vh;padding:clamp(22px,4vw,44px) 16px 54px;color:white;background:radial-gradient(circle at 12% 0%,rgba(168,85,247,.28),transparent 28%),radial-gradient(circle at 86% 18%,rgba(34,211,238,.16),transparent 24%),linear-gradient(180deg,#100b26 0%,#070b18 56%,#030306 100%)}
-        .agent-log-header,.agent-log-hero,.agent-log-card,.agent-summary-grid,.agent-action-row{width:min(1180px,100%);margin-left:auto;margin-right:auto}.agent-log-header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:clamp(26px,5vw,46px)}.agent-log-brand{display:inline-flex;align-items:center;gap:12px}.agent-log-brand img{width:54px;height:54px;object-fit:contain}.agent-log-brand strong{display:block;color:#ff7fa8;letter-spacing:.18em;font-size:16px}.agent-log-brand span{color:rgba(255,255,255,.62);font-size:12px;font-weight:850}
-        .agent-home-link,.agent-action-row a,.agent-action-row button,.sheet-pagination button{border:1px solid rgba(220,235,255,.2);border-radius:999px;background:rgba(255,255,255,.08);color:white;font-weight:950;padding:12px 18px;min-height:48px;display:inline-flex;align-items:center;justify-content:center;backdrop-filter:blur(18px);cursor:pointer}.agent-action-row button:disabled,.sheet-pagination button:disabled,.review-actions button:disabled{opacity:.45;cursor:not-allowed}
-        .agent-log-hero{text-align:center;margin-bottom:22px}.agent-kicker{margin:0 0 8px;color:#a7f3d0;font-size:12px;font-weight:950;letter-spacing:.14em;text-transform:uppercase}.agent-log-hero h1{margin:0;font-size:clamp(40px,7vw,76px);line-height:.95;letter-spacing:-2px}.agent-log-hero p{max-width:680px;margin:16px auto 0;color:rgba(255,255,255,.74);font-size:clamp(16px,2vw,20px);line-height:1.5}.agent-log-card{border:1px solid rgba(200,230,255,.2);border-radius:30px;background:linear-gradient(180deg,rgba(18,25,43,.72),rgba(7,12,24,.86));box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 22px 70px rgba(0,0,0,.3);backdrop-filter:blur(22px) saturate(1.12)}
-        .campaign-overview{text-align:center;padding:24px;margin-bottom:18px}.campaign-overview h2{margin:10px 0 6px;font-size:clamp(24px,4vw,38px)}.campaign-overview p{margin:0;color:rgba(255,255,255,.72)}.active-pill{display:inline-flex;padding:7px 14px;border-radius:999px;background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.26);color:#bff7ff;font-size:12px;font-weight:950;letter-spacing:.08em;text-transform:uppercase}.agent-summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}.summary-card{border-radius:24px;padding:20px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);text-align:center}.summary-card span{display:block;color:rgba(255,255,255,.68);font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.summary-card strong{display:block;margin-top:8px;font-size:clamp(30px,5vw,52px);line-height:1}
-        .agent-day-timeline{padding:clamp(18px,3vw,28px);margin-bottom:18px}.day-line-header{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:20px}.day-line-header h2{margin:0;font-size:clamp(22px,3.8vw,36px)}.day-line-header>span{color:rgba(255,255,255,.68);font-weight:900}.day-dot-row{position:relative;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}.day-dot-row::before{content:"";position:absolute;left:6%;right:6%;top:22px;height:2px;background:linear-gradient(90deg,rgba(34,211,238,.15),rgba(255,106,181,.5),rgba(34,211,238,.15))}.day-dot-row button{position:relative;display:grid;justify-items:center;gap:6px;padding:8px 12px 14px;border:0;border-radius:20px;background:transparent;color:white;cursor:pointer}.day-dot{width:42px;height:42px;border-radius:999px;display:block;border:2px solid rgba(255,255,255,.24);background:linear-gradient(180deg,rgba(18,25,43,.96),rgba(7,12,24,.96));box-shadow:0 0 0 5px rgba(255,255,255,.04)}.day-dot-row button.active .day-dot{border-color:rgba(255,106,181,.98);box-shadow:0 0 0 5px rgba(255,106,181,.15),0 0 22px rgba(255,106,181,.38)}.day-dot-row strong{font-size:16px;font-weight:950}.day-dot-row small{color:rgba(255,255,255,.7);font-weight:850;text-align:center}.day-dot-row em{color:rgba(255,255,255,.45);font-style:normal;font-size:12px;font-weight:850}
-        .agent-action-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:18px}.agent-action-row a:nth-child(2){background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.28)}.agent-action-row a:nth-child(3){background:rgba(255,106,181,.12);border-color:rgba(255,106,181,.34)}.agent-action-row a[aria-disabled="true"]{opacity:.45;pointer-events:none}.agent-message,.agent-error{width:min(1180px,100%);margin:0 auto 18px;text-align:center;font-weight:850}.agent-message{color:#a7f3d0}.agent-error{color:#fca5a5}.empty-agent-card{padding:34px;text-align:center}.empty-agent-card img{width:110px;height:110px;object-fit:contain}.empty-agent-card h2{font-size:clamp(28px,5vw,44px);margin:0 0 10px}.empty-agent-card p{max-width:650px;margin:0 auto;color:rgba(255,255,255,.72);line-height:1.5}
-        .table-card{padding:clamp(18px,3vw,30px)}.table-title-row{display:flex;justify-content:space-between;gap:16px;align-items:end;margin-bottom:18px}.table-title-row h2{margin:0;font-size:clamp(26px,4vw,42px)}.table-title-row span{color:rgba(255,255,255,.68);font-weight:850}.agent-table-wrap{overflow-x:auto;border-radius:22px;border:1px solid rgba(255,255,255,.1)}.editable-sheet-table{width:100%;border-collapse:collapse;min-width:1040px}.editable-sheet-table th,.editable-sheet-table td{padding:14px 16px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08)}.editable-sheet-table th{position:sticky;top:0;z-index:1;background:rgba(7,12,24,.95);color:rgba(255,255,255,.68);font-size:12px;text-transform:uppercase;letter-spacing:.08em}.editable-sheet-table tbody tr:hover{background:rgba(255,255,255,.045)}.editable-sheet-table td{color:rgba(255,255,255,.86);vertical-align:top}.editable-sheet-table td strong{display:block;color:white}.editable-sheet-table td span{display:block;color:rgba(255,255,255,.58);margin-top:4px}.editable-sheet-table td a{color:#bff7ff;font-weight:900}.muted-cell{color:rgba(255,255,255,.48)}
-        .status-select{width:155px;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:9px 12px;color:white;font-weight:950;background:rgba(15,23,42,.95);outline:none;cursor:pointer}.status-select option{color:#0f172a;background:white}.status-select.found{border-color:rgba(96,165,250,.38);box-shadow:inset 0 0 0 999px rgba(96,165,250,.12)}.status-select.prepared,.status-select.queued{border-color:rgba(34,211,238,.42);box-shadow:inset 0 0 0 999px rgba(34,211,238,.12)}.status-select.approved,.status-select.applied{border-color:rgba(52,211,153,.42);box-shadow:inset 0 0 0 999px rgba(52,211,153,.12)}.status-select.needs_email{border-color:rgba(251,191,36,.42);box-shadow:inset 0 0 0 999px rgba(251,191,36,.12)}.status-select.interviewing,.status-select.saved{border-color:rgba(168,85,247,.42);box-shadow:inset 0 0 0 999px rgba(168,85,247,.12)}.status-select.skipped{border-color:rgba(251,191,36,.42);box-shadow:inset 0 0 0 999px rgba(251,191,36,.12)}.status-select.declined,.status-select.rejected,.status-select.failed{border-color:rgba(248,113,113,.42);box-shadow:inset 0 0 0 999px rgba(248,113,113,.12)}
-        .review-actions{display:flex;gap:8px;flex-wrap:wrap}.review-actions button{border:1px solid rgba(255,255,255,.16);border-radius:999px;color:white;font-weight:950;padding:9px 12px;cursor:pointer}.approve-button{background:rgba(52,211,153,.18);border-color:rgba(52,211,153,.38)!important}.decline-button{background:rgba(248,113,113,.16);border-color:rgba(248,113,113,.38)!important}.sheet-pagination{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:18px;color:rgba(255,255,255,.72);font-weight:900}.sheet-pagination span{text-align:center}
-        @media(max-width:760px){.agent-log-header{align-items:flex-start}.agent-summary-grid{grid-template-columns:repeat(2,1fr)}.day-line-header{display:grid;align-items:start;text-align:center}.day-dot-row{grid-template-columns:repeat(2,1fr)}.day-dot-row::before{display:none}.agent-action-row,.sheet-pagination{display:grid;grid-template-columns:1fr}.agent-action-row a,.agent-action-row button,.sheet-pagination button{width:100%}.table-title-row{display:grid;align-items:start}.editable-sheet-table{min-width:0}.editable-sheet-table thead{display:none}.editable-sheet-table tbody,.editable-sheet-table tr,.editable-sheet-table td{display:block;width:100%}.editable-sheet-table tr{padding:16px;border-bottom:1px solid rgba(255,255,255,.1)}.editable-sheet-table td{padding:8px 0;border-bottom:0}.editable-sheet-table td::before{content:attr(data-label);display:block;margin-bottom:5px;color:rgba(255,255,255,.48);font-size:11px;font-weight:950;text-transform:uppercase;letter-spacing:.08em}.status-select{width:100%}.review-actions{display:grid;grid-template-columns:1fr 1fr}}
-      `}</style>
+      {!loading && !errorMessage && logs.length > 0 && <section className={`agent-log-card table-card${sheetMinimized ? " is-minimized" : ""}${sheetMaximized ? " is-maximized" : ""}`}><div className="table-title-row"><div><p className="agent-kicker">{visibleDayLabel}</p><h2>Jobs Applix touched</h2></div><div className="sheet-title-actions"><span>{visibleLogs.length} records · page {safePage} of {totalPages}</span><button type="button" className="sheet-view-button" aria-label="Minimize application sheet" title="Minimize application sheet" onClick={() => { setSheetMinimized((value) => !value); setSheetMaximized(false); }}>−</button><button type="button" className="sheet-view-button" aria-label={sheetMaximized ? "Restore application sheet" : "Maximize application sheet"} title={sheetMaximized ? "Restore application sheet" : "Maximize application sheet"} onClick={toggleSheetMaximized}>{sheetMaximized ? "▣" : "□"}</button></div></div>{!sheetMinimized && <><div className="agent-table-wrap editable-sheet-wrap"><table className="editable-sheet-table"><thead><tr><th>Company</th><th>Opportunity</th><th>Website</th><th>Job post</th><th>Status</th><th>Review</th><th>Action time</th></tr></thead><tbody>{pagedLogs.map((log) => <tr key={log.id}><td data-label="Company"><strong>{log.company}</strong><span>{log.location}</span></td><td data-label="Opportunity">{log.jobTitle}</td><td data-label="Website">{log.website ? <a href={log.website} target="_blank" rel="noreferrer">Website</a> : <span className="muted-cell">Not saved</span>}</td><td data-label="Job post">{log.jobUrl ? <a href={log.jobUrl} target="_blank" rel="noreferrer">Job post</a> : <span className="muted-cell">Not saved</span>}</td><td data-label="Status"><select className={`status-select ${log.status}`} value={log.status} disabled={savingStatusId === log.id} onChange={(event) => void saveJobStatus(log.id, event.target.value as AgentStatus)}>{STATUS_OPTIONS.map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}</select></td><td data-label="Review"><div className="review-actions"><button className="approve-button" type="button" disabled={savingStatusId === log.id || log.status === "approved" || log.status === "queued"} onClick={() => void reviewJob(log, "approved")}>Approve</button><button className="decline-button" type="button" disabled={savingStatusId === log.id || log.status === "declined"} onClick={() => void reviewJob(log, "declined")}>Decline</button></div></td><td data-label="Action time">{formatDate(log.actionTime)}</td></tr>)}</tbody></table></div><div className="sheet-pagination"><button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</button><span>Rows {visibleLogs.length === 0 ? 0 : pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, visibleLogs.length)} of {visibleLogs.length}</span><button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Next</button></div></>}</section>}
     </main>
   );
 }
