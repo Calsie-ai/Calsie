@@ -1,0 +1,93 @@
+html body main.agent-log-shell .sheet-title-actions > .sheet-view-button,
+html body main.agent-log-shell .sheet-title-actions > .sheet-scroll-actions {
+  display: none !important;
+}
+
+html body main.agent-log-shell .sheet-title-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+html body main.agent-log-shell .sheet-title-actions > span {
+  color: #111 !important;
+  opacity: 1 !important;
+}
+
+html body main.agent-log-shell .sheet-zoom-controls {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 4px !important;
+  border: 1px solid #f1a8b1 !important;
+  border-radius: 8px !important;
+  background: #ffebed !important;
+}
+
+html body main.agent-log-shell .sheet-zoom-button {
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  border: 1px solid #111 !important;
+  border-radius: 6px !important;
+  background: #fe818d !important;
+  color: #111 !important;
+  font-size: 22px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+}
+
+html body main.agent-log-shell .sheet-zoom-button:hover:not(:disabled) {
+  background: #111 !important;
+  color: #fff !important;
+}
+
+html body main.agent-log-shell .sheet-zoom-button:disabled {
+  border-color: #d8d8d3 !important;
+  background: #f2eeee !important;
+  color: #777 !important;
+  opacity: 1 !important;
+}
+
+html body main.agent-log-shell .sheet-zoom-value {
+  min-width: 46px !important;
+  color: #111 !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+}
+
+html body main.agent-log-shell .editable-sheet-table {
+  zoom: var(--sheet-zoom, 1);
+  transform-origin: top left !important;
+}
+
+html body main.agent-log-shell .day-dot-row button,
+html body main.agent-log-shell .day-dot-row button strong,
+html body main.agent-log-shell .day-dot-row button span,
+html body main.agent-log-shell .day-dot-row button small,
+html body main.agent-log-shell .day-dot-row button em {
+  color: #111 !important;
+  opacity: 1 !important;
+}
+
+html body main.agent-log-shell .day-dot-row button.active,
+html body main.agent-log-shell .day-dot-row button.active strong,
+html body main.agent-log-shell .day-dot-row button.active span {
+  color: #111 !important;
+}
+
+@media (max-width: 850px) {
+  html body main.agent-log-shell .sheet-title-actions {
+    justify-content: flex-start !important;
+    width: 100% !important;
+  }
+}
