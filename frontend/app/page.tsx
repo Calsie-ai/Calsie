@@ -104,7 +104,7 @@ export default function HomePage() {
           <div>
             <p className="applix-eyebrow">AI Job Application Assistant</p>
             <h1 id="hero-title">Apply to jobs faster with AI that works with you</h1>
-            <p className="applix-hero-copy">Applix prepares up to 24 applications per day, requires your approval, and sends no more than one approved application per hour for up to 30 days.</p>
+            <p className="applix-hero-copy"><strong>The best opportunities start with being seen.</strong><br />Because the right resume means nothing if the right person never sees it.</p>
             <div className="applix-hero-actions">
               <a className="applix-button applix-button--primary" href="#start-check">Get Started</a>
               <a className="applix-button" href="#how-it-works">See How It Works</a>
