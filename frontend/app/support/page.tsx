@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+const SUPPORT_EMAIL = "hostsajan@gmail.com";
+
 const shellStyle = {
   minHeight: "100vh",
   background: "#ffffff",
@@ -35,8 +37,9 @@ export default function SupportPage() {
           If Applix is not behaving as expected, check that you are signed in, your resume is uploaded, your connector is active, and your campaign is configured before restarting the workflow.
         </p>
         <p style={{ fontSize: "18px", lineHeight: 1.7 }}>
-          For help with billing, access, Gmail connection, tracker approvals, or resume parsing, contact the Applix team through your account support channel.
+          For help with billing, access, Gmail connection, tracker approvals, resume parsing, privacy, or account deletion, contact Applix support at:
         </p>
+        <a href={`mailto:${SUPPORT_EMAIL}`} style={{ ...linkStyle, fontSize: "22px" }}>{SUPPORT_EMAIL}</a>
         <Link href="/contact" style={{ ...linkStyle, fontSize: "18px" }}>Contact Applix</Link>
       </section>
     </main>
