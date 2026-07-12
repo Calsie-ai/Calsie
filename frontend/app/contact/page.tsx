@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+const SUPPORT_EMAIL = "hostsajan@gmail.com";
+
 const shellStyle = {
   minHeight: "100vh",
   background: "#ffffff",
@@ -32,8 +34,9 @@ export default function ContactPage() {
           <h1 style={{ margin: 0, fontSize: "clamp(38px, 8vw, 72px)", lineHeight: 1 }}>Contact Applix</h1>
         </div>
         <p style={{ fontSize: "18px", lineHeight: 1.7 }}>
-          For account, billing, campaign, or privacy questions, contact the Applix team through your existing support channel or onboarding email.
+          For account, billing, campaign, Gmail connection, or privacy questions, email the Applix support team.
         </p>
+        <a href={`mailto:${SUPPORT_EMAIL}`} style={{ ...linkStyle, fontSize: "22px" }}>{SUPPORT_EMAIL}</a>
         <p style={{ fontSize: "18px", lineHeight: 1.7 }}>
           Include your account email, a short description of the issue, and any relevant campaign or job-tracker details so the team can help quickly.
         </p>
