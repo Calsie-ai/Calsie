@@ -1,0 +1,32 @@
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill,
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill span,
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill b {
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill.is-running {
+  border: 1px solid #fe818d !important;
+  background: #ffebed !important;
+  color: #111 !important;
+}
+
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill.is-running i {
+  background: #fe5f70 !important;
+}
+
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill.is-paused {
+  border: 1px solid #111 !important;
+  background: #111 !important;
+  color: #fff !important;
+}
+
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill.is-idle {
+  border: 1px solid #999 !important;
+  background: #fff !important;
+  color: #333 !important;
+}
+
+html body main.applix-workspace .workspace-tracker-heading > div > span {
+  color: #d8d8d3 !important;
+}
