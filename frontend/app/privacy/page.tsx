@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+const SUPPORT_EMAIL = "hostsajan@gmail.com";
+
 const shellStyle = {
   minHeight: "100vh",
   background: "#ffffff",
@@ -39,9 +41,10 @@ export default function PrivacyPage() {
           We protect access to private app actions with authenticated Supabase sessions. Connected provider tokens, billing records, and campaign data should be handled only for product operation, support, security, and compliance needs.
         </p>
         <p style={{ fontSize: "18px", lineHeight: 1.7 }}>
-          To request access, correction, or deletion of your information, contact the Applix team through your account support channel.
+          To request access, correction, deletion, or help with connected Google account data, email Applix support at{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}`} style={linkStyle}>{SUPPORT_EMAIL}</a>.
         </p>
-        <p style={{ fontSize: "14px", lineHeight: 1.6 }}>Last updated: July 10, 2026</p>
+        <p style={{ fontSize: "14px", lineHeight: 1.6 }}>Last updated: July 12, 2026</p>
       </section>
     </main>
   );
