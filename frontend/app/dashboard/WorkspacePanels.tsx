@@ -38,15 +38,18 @@ export default function WorkspacePanels({
   onToggleCampaign: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const templates = useMemo(
-    () =>
-      CAMPAIGN_TEMPLATES.filter((item) =>
-        `${item.title} ${item.role} ${item.category}`
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-      ),
-    [query],
-  );
+  const templates = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const matchingTemplates = CAMPAIGN_TEMPLATES.filter((item) =>
+      `${item.title} ${item.role} ${item.category} ${item.description}`
+        .toLowerCase()
+        .includes(normalizedQuery),
+    );
+
+    // The custom campaign card always occupies the first grid position,
+    // so only five ready-made templates are shown at once.
+    return matchingTemplates.slice(0, 5);
+  }, [query]);
   const status = campaign?.status || "Not configured";
   const running = ["active", "launched", "scheduled"].includes(status);
   const paused = status === "paused";
@@ -59,7 +62,7 @@ export default function WorkspacePanels({
         <header>
           <p>Templates</p>
           <h1>Browse templates</h1>
-          <span>Search and use a ready-made campaign without leaving the dashboard.</span>
+          <span>Choose a custom campaign first, or search the ready-made templates below.</span>
         </header>
         <input
           className="workspace-search"
@@ -68,6 +71,15 @@ export default function WorkspacePanels({
           placeholder="Search templates or job roles"
         />
         <div className="workspace-template-grid">
+          <article className="workspace-template-custom">
+            <small>Custom campaign</small>
+            <h3>Build your own campaign</h3>
+            <p>Choose the role, location, job type, requirements, and campaign settings yourself.</p>
+            <span className="workspace-template-usage">1,200 times used</span>
+            <Link className="workspace-template-link" href="/campaign/new">
+              Create custom
+            </Link>
+          </article>
           {templates.map((item) => (
             <article key={item.id}>
               <small>{item.category}</small>
@@ -79,6 +91,9 @@ export default function WorkspacePanels({
             </article>
           ))}
         </div>
+        {query.trim() && templates.length === 0 && (
+          <div className="workspace-message">No ready-made templates match that search. Use the custom campaign card above.</div>
+        )}
       </section>
     );
   }
