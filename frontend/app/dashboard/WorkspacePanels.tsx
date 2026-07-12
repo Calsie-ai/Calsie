@@ -38,6 +38,12 @@ export default function WorkspacePanels({
   onToggleCampaign: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<CampaignTemplate | null>(null);
+  const [reviewTitle, setReviewTitle] = useState("");
+  const [reviewRole, setReviewRole] = useState("");
+  const [reviewLocation, setReviewLocation] = useState("");
+  const [reviewDescription, setReviewDescription] = useState("");
+
   const templates = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const matchingTemplates = CAMPAIGN_TEMPLATES.filter((item) =>
@@ -46,10 +52,32 @@ export default function WorkspacePanels({
         .includes(normalizedQuery),
     );
 
-    // The custom campaign card always occupies the first grid position,
-    // so only five ready-made templates are shown at once.
     return matchingTemplates.slice(0, 5);
   }, [query]);
+
+  function openTemplateReview(item: CampaignTemplate) {
+    setSelectedTemplate(item);
+    setReviewTitle(item.title);
+    setReviewRole(item.role);
+    setReviewLocation(item.location);
+    setReviewDescription(item.description);
+  }
+
+  function closeTemplateReview() {
+    setSelectedTemplate(null);
+  }
+
+  function confirmTemplate() {
+    if (!selectedTemplate) return;
+    onUseTemplate({
+      ...selectedTemplate,
+      title: reviewTitle.trim() || selectedTemplate.title,
+      role: reviewRole.trim() || selectedTemplate.role,
+      location: reviewLocation.trim() || selectedTemplate.location,
+      description: reviewDescription.trim() || selectedTemplate.description,
+    });
+  }
+
   const status = campaign?.status || "Not configured";
   const running = ["active", "launched", "scheduled"].includes(status);
   const paused = status === "paused";
@@ -62,37 +90,91 @@ export default function WorkspacePanels({
         <header>
           <p>Templates</p>
           <h1>Browse templates</h1>
-          <span>Choose a custom campaign first, or search the ready-made templates below.</span>
+          <span>Choose a custom campaign or review a ready-made template before creating it.</span>
         </header>
-        <input
-          className="workspace-search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search templates or job roles"
-        />
-        <div className="workspace-template-grid">
-          <article className="workspace-template-custom">
-            <small>Custom campaign</small>
-            <h3>Build your own campaign</h3>
-            <p>Choose the role, location, job type, requirements, and campaign settings yourself.</p>
-            <span className="workspace-template-usage">1,200 times used</span>
-            <Link className="workspace-template-link" href="/campaign/new">
-              Create custom
-            </Link>
-          </article>
-          {templates.map((item) => (
-            <article key={item.id}>
-              <small>{item.category}</small>
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
-              <button onClick={() => onUseTemplate(item)} disabled={busy}>
-                Use template
+
+        {selectedTemplate ? (
+          <div className="workspace-template-review">
+            <div className="workspace-template-review-heading">
+              <div>
+                <small>{selectedTemplate.category}</small>
+                <h2>Review template</h2>
+                <p>Change any detail before adding this campaign to your workspace.</p>
+              </div>
+              <button type="button" className="workspace-secondary" onClick={closeTemplateReview}>
+                Back to templates
               </button>
-            </article>
-          ))}
-        </div>
-        {query.trim() && templates.length === 0 && (
-          <div className="workspace-message">No ready-made templates match that search. Use the custom campaign card above.</div>
+            </div>
+
+            <div className="workspace-template-review-grid">
+              <label>
+                Campaign name
+                <input value={reviewTitle} onChange={(event) => setReviewTitle(event.target.value)} />
+              </label>
+              <label>
+                Target role
+                <input value={reviewRole} onChange={(event) => setReviewRole(event.target.value)} />
+              </label>
+              <label>
+                Target location
+                <input value={reviewLocation} onChange={(event) => setReviewLocation(event.target.value)} />
+              </label>
+              <label className="workspace-template-review-wide">
+                Template details
+                <textarea rows={4} value={reviewDescription} onChange={(event) => setReviewDescription(event.target.value)} />
+              </label>
+            </div>
+
+            <div className="workspace-template-review-summary">
+              <strong>Campaign plan</strong>
+              <span>24 jobs per day</span>
+              <span>1 approved email per hour</span>
+              <span>30 days · up to 720 applications</span>
+              <span>Approval required before sending</span>
+            </div>
+
+            <div className="workspace-actions">
+              <button type="button" className="workspace-secondary" onClick={closeTemplateReview}>
+                Cancel
+              </button>
+              <button type="button" className="workspace-primary" onClick={confirmTemplate} disabled={busy || !reviewTitle.trim() || !reviewRole.trim()}>
+                {busy ? "Adding template..." : "Confirm and add campaign"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <input
+              className="workspace-search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search templates or job roles"
+            />
+            <div className="workspace-template-grid">
+              <article className="workspace-template-custom">
+                <small>Custom campaign</small>
+                <h3>Build your own campaign</h3>
+                <p>Choose the role, location, job type, requirements, and campaign settings yourself.</p>
+                <span className="workspace-template-usage">1,200 times used</span>
+                <Link className="workspace-template-link" href="/campaign/new">
+                  Create custom
+                </Link>
+              </article>
+              {templates.map((item) => (
+                <article key={item.id}>
+                  <small>{item.category}</small>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <button type="button" onClick={() => openTemplateReview(item)} disabled={busy}>
+                    Review template
+                  </button>
+                </article>
+              ))}
+            </div>
+            {query.trim() && templates.length === 0 && (
+              <div className="workspace-message">No ready-made templates match that search. Use the custom campaign card above.</div>
+            )}
+          </>
         )}
       </section>
     );
@@ -111,12 +193,7 @@ export default function WorkspacePanels({
           <p>{resumeReady ? resumeName || "Resume saved" : "Upload a PDF, DOC, or DOCX file."}</p>
           <label className="workspace-primary">
             {busy ? "Working..." : "Upload or replace resume"}
-            <input
-              hidden
-              type="file"
-              accept=".pdf,.doc,.docx"
-              onChange={(event) => event.target.files?.[0] && onResumeUpload(event.target.files[0])}
-            />
+            <input hidden type="file" accept=".pdf,.doc,.docx" onChange={(event) => event.target.files?.[0] && onResumeUpload(event.target.files[0])} />
           </label>
           <Link href="/resume-canvas">Open resume editor</Link>
         </div>
@@ -134,11 +211,7 @@ export default function WorkspacePanels({
         </header>
         <div className="workspace-card">
           <h3>{gmailReady ? "Gmail connected" : "Gmail disconnected"}</h3>
-          <p>
-            {gmailReady
-              ? "Applix can prepare approved sends through your connected account."
-              : "Connect Gmail before starting a campaign."}
-          </p>
+          <p>{gmailReady ? "Applix can prepare approved sends through your connected account." : "Connect Gmail before starting a campaign."}</p>
           <button className="workspace-primary" onClick={onConnectGmail} disabled={busy || gmailReady}>
             {gmailReady ? "Connected" : "Connect Gmail"}
           </button>
@@ -153,7 +226,7 @@ export default function WorkspacePanels({
         <header>
           <p>Campaign</p>
           <h1>Set up campaign</h1>
-          <span>Use the fixed controlled production plan.</span>
+          <span>Review the campaign you selected from Browse Templates.</span>
         </header>
         <div className="workspace-plan">
           <div><b>24</b><span>jobs per day</span></div>
@@ -163,9 +236,8 @@ export default function WorkspacePanels({
         </div>
         <div className="workspace-card">
           <h3>{campaign?.name || "No campaign selected"}</h3>
-          <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Choose a template or create a custom campaign."}</p>
+          <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Choose and review a campaign from Browse Templates first."}</p>
           <div className="workspace-actions">
-            <Link className="workspace-secondary" href="/campaign/new">Custom campaign</Link>
             <button className="workspace-primary" onClick={onToggleCampaign} disabled={busy || !campaign}>
               {running ? "Pause Campaign" : "Start Campaign"}
             </button>
@@ -184,17 +256,10 @@ export default function WorkspacePanels({
             <h1>Application tracker</h1>
             <span>Follow the campaign pipeline, review applications, and download your records here.</span>
           </div>
-          <span className={`workspace-status-pill ${statusClass}`}>
-            <i /> {statusText}
-          </span>
+          <span className={`workspace-status-pill ${statusClass}`}><i /> {statusText}</span>
         </header>
-
         <div className="workspace-tracker-frame-wrap">
-          <iframe
-            className="workspace-tracker-frame"
-            src="/tracker?embedded=1"
-            title="Applix application tracker"
-          />
+          <iframe className="workspace-tracker-frame" src="/tracker?embedded=1" title="Applix application tracker" />
         </div>
       </section>
     );
