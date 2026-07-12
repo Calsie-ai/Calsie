@@ -1,3 +1,5 @@
+const SUPPORT_EMAIL = "hostsajan@gmail.com";
+
 const footerGroups = [
   {
     title: "Product",
@@ -55,6 +57,9 @@ export default function AppFooter() {
             <p style={{ margin: "18px 0 0", color: "#555", fontSize: "15px", lineHeight: 1.65 }}>
               AI-powered job application support that helps people move faster while keeping every important decision in their hands.
             </p>
+            <a href={`mailto:${SUPPORT_EMAIL}`} style={{ display: "inline-block", marginTop: "16px", fontSize: "14px", fontWeight: 800 }}>
+              {SUPPORT_EMAIL}
+            </a>
             <div style={{ display: "flex", gap: "10px", marginTop: "24px" }} aria-label="Social links">
               {["in", "x", "ig"].map((label) => (
                 <a
