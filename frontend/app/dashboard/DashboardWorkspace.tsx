@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import WorkspaceSidebar from "./WorkspaceSidebar";
-import WorkspacePanels from "./WorkspacePanels";
+import WorkspacePanelsLive from "./WorkspacePanelsLive";
 import { CAMPAIGN_PLAN, isCampaignRunning, type CampaignRecord, type CampaignTemplate, type WorkspaceTab } from "./workspace-data";
 
 export default function DashboardWorkspace() {
@@ -45,8 +45,21 @@ export default function DashboardWorkspace() {
         name: `${template.title} Campaign`,
         location: template.location,
         target_business_type: template.role,
-        search: { target_role: template.role, target_location: template.location, fetch_frequency: "daily", campaign_days: 30, daily_job_limit: 24, template_id: template.id },
-        filters: { location: template.location },
+        search: {
+          target_role: template.role,
+          target_location: template.location,
+          query_terms: template.queryTerms,
+          include_title_terms: template.includeTitleTerms,
+          exclude_title_terms: template.excludeTitleTerms,
+          description_keywords: template.descriptionKeywords,
+          job_types: template.jobTypes,
+          posted_within_days: template.postedWithinDays,
+          fetch_frequency: "daily",
+          campaign_days: 30,
+          daily_job_limit: 24,
+          template_id: template.id,
+        },
+        filters: { location: template.location, job_types: template.jobTypes, posted_within_days: template.postedWithinDays },
         outreach: CAMPAIGN_PLAN,
         status: "draft",
       }).select("id,name,location,target_business_type,search,outreach,status,created_at").single();
@@ -113,5 +126,5 @@ export default function DashboardWorkspace() {
 
   async function logout() { const supabase = getSupabaseClient(); await supabase.auth.signOut(); router.replace("/"); }
 
-  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanels active={active} campaign={campaign} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onToggleCampaign={() => void toggleCampaign()} /></div></main>;
+  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanelsLive active={active} campaign={campaign} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onToggleCampaign={() => void toggleCampaign()} /></div></main>;
 }
