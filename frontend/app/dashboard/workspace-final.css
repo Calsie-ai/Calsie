@@ -56,3 +56,17 @@ html body main.applix-workspace .workspace-privacy-pill:hover {
   background: #e3f5e5 !important;
   border-color: #b9dcbf !important;
 }
+
+html body main.applix-workspace .workspace-search {
+  background: #ffffff !important;
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+  caret-color: #fe5f70 !important;
+  opacity: 1 !important;
+}
+
+html body main.applix-workspace .workspace-search::placeholder {
+  color: #737373 !important;
+  -webkit-text-fill-color: #737373 !important;
+  opacity: 1 !important;
+}
