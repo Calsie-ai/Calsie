@@ -30,3 +30,29 @@ html body main.applix-workspace .workspace-tracker-heading .workspace-status-pil
 html body main.applix-workspace .workspace-tracker-heading > div > span {
   color: #d8d8d3 !important;
 }
+
+html body main.applix-workspace .workspace-privacy-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 22px;
+}
+
+html body main.applix-workspace .workspace-privacy-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 9px 16px;
+  border: 1px solid #cfe8d2 !important;
+  border-radius: 999px;
+  background: #eef9ef !important;
+  color: #173a1d !important;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: none !important;
+}
+
+html body main.applix-workspace .workspace-privacy-pill:hover {
+  background: #e3f5e5 !important;
+  border-color: #b9dcbf !important;
+}
