@@ -7,7 +7,6 @@
 html,
 body {
   min-height: 100%;
-  background: var(--applix-outrun-bg) !important;
 }
 
 body {
@@ -15,40 +14,46 @@ body {
   overflow-x: hidden;
 }
 
-body::before,
-body::after {
+body:has(.applix-home-shell),
+body:has(.dashboard-cockpit-shell),
+body:has(.agent-log-shell),
+body:has(.applix-setup-shell) {
+  background: var(--applix-outrun-bg) !important;
+}
+
+body:has(.applix-home-shell)::before,
+body:has(.dashboard-cockpit-shell)::before,
+body:has(.agent-log-shell)::before,
+body:has(.applix-setup-shell)::before,
+body:has(.applix-home-shell)::after,
+body:has(.dashboard-cockpit-shell)::after,
+body:has(.agent-log-shell)::after,
+body:has(.applix-setup-shell)::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
 }
 
-body::before {
+body:has(.applix-home-shell)::before,
+body:has(.dashboard-cockpit-shell)::before,
+body:has(.agent-log-shell)::before,
+body:has(.applix-setup-shell)::before {
   z-index: -3;
   background: linear-gradient(180deg, #0c0018 0%, #07000f 48%, #020006 100%) !important;
 }
 
-body::after {
+body:has(.applix-home-shell)::after,
+body:has(.dashboard-cockpit-shell)::after,
+body:has(.agent-log-shell)::after,
+body:has(.applix-setup-shell)::after {
   z-index: 9999;
   opacity: .07;
   mix-blend-mode: soft-light;
-  background:
-    repeating-linear-gradient(
-      180deg,
-      rgba(255, 255, 255, .1) 0,
-      rgba(255, 255, 255, .1) 1px,
-      transparent 1px,
-      transparent 5px
-    );
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, .1) 0, rgba(255, 255, 255, .1) 1px, transparent 1px, transparent 5px);
 }
 
-.applix-home-shell,
-.dashboard-cockpit-shell,
-.agent-log-shell,
-.applix-setup-shell,
-main,
-body main.dashboard-cockpit-shell,
-html body .dashboard-cockpit-shell {
+:is(.applix-home-shell, .dashboard-cockpit-shell, .agent-log-shell, .applix-setup-shell) {
   position: relative;
   isolation: isolate;
   background-color: transparent !important;
@@ -56,171 +61,62 @@ html body .dashboard-cockpit-shell {
   color: #f7f0ff !important;
 }
 
-/* Kill old landing-page inline spotlight / hue wash. */
-main > div[aria-hidden="true"]:nth-of-type(3) {
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-}
-
-.applix-home-shell::before,
-.dashboard-cockpit-shell::before,
-.agent-log-shell::before,
-.applix-setup-shell::before,
-main::before {
+:is(.applix-home-shell, .dashboard-cockpit-shell, .agent-log-shell, .applix-setup-shell)::before {
   content: "" !important;
   position: fixed !important;
   left: -30vw !important;
   right: -30vw !important;
   top: -8vh !important;
-  bottom: auto !important;
   height: 118vh !important;
   pointer-events: none !important;
   z-index: -2 !important;
   opacity: .72 !important;
   transform: perspective(760px) rotateX(54deg) scale(1.18) !important;
   transform-origin: center top !important;
-  background-image:
-    linear-gradient(to right, var(--applix-outrun-grid) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--applix-outrun-grid-soft) 1px, transparent 1px) !important;
+  background-image: linear-gradient(to right, var(--applix-outrun-grid) 1px, transparent 1px), linear-gradient(to bottom, var(--applix-outrun-grid-soft) 1px, transparent 1px) !important;
   background-size: 84px 84px !important;
   -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.92) 0%, rgba(0,0,0,.82) 42%, rgba(0,0,0,.46) 76%, transparent 100%) !important;
   mask-image: linear-gradient(to bottom, rgba(0,0,0,.92) 0%, rgba(0,0,0,.82) 42%, rgba(0,0,0,.46) 76%, transparent 100%) !important;
 }
 
-.applix-home-shell::after,
-.dashboard-cockpit-shell::after,
-.agent-log-shell::after,
-.applix-setup-shell::after,
-main::after {
+:is(.applix-home-shell, .dashboard-cockpit-shell, .agent-log-shell, .applix-setup-shell)::after {
   content: "" !important;
   position: fixed !important;
   inset: 0 !important;
   pointer-events: none !important;
   z-index: -1 !important;
-  background:
-    linear-gradient(90deg, rgba(0,0,0,.7), transparent 22%, transparent 78%, rgba(0,0,0,.7)),
-    linear-gradient(180deg, rgba(0,0,0,.35), transparent 36%, rgba(0,0,0,.58)) !important;
+  background: linear-gradient(90deg, rgba(0,0,0,.7), transparent 22%, transparent 78%, rgba(0,0,0,.7)), linear-gradient(180deg, rgba(0,0,0,.35), transparent 36%, rgba(0,0,0,.58)) !important;
 }
 
-/* Stronger dashboard overrides because dashboard page has its own inline theme style tag. */
-html body main.dashboard-cockpit-shell,
-html body .dashboard-cockpit-shell {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-html body main.dashboard-cockpit-shell::before,
-html body .dashboard-cockpit-shell::before {
-  content: "" !important;
-  display: block !important;
-  position: fixed !important;
-  left: -30vw !important;
-  right: -30vw !important;
-  top: -8vh !important;
-  bottom: auto !important;
-  height: 118vh !important;
-  pointer-events: none !important;
-  z-index: -2 !important;
-  opacity: .72 !important;
-  transform: perspective(760px) rotateX(54deg) scale(1.18) !important;
-  transform-origin: center top !important;
-  background-image:
-    linear-gradient(to right, var(--applix-outrun-grid) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--applix-outrun-grid-soft) 1px, transparent 1px) !important;
-  background-size: 84px 84px !important;
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.92) 0%, rgba(0,0,0,.82) 42%, rgba(0,0,0,.46) 76%, transparent 100%) !important;
-  mask-image: linear-gradient(to bottom, rgba(0,0,0,.92) 0%, rgba(0,0,0,.82) 42%, rgba(0,0,0,.46) 76%, transparent 100%) !important;
-}
-
-html body main.dashboard-cockpit-shell::after,
-html body .dashboard-cockpit-shell::after {
-  content: "" !important;
-  display: block !important;
-  position: fixed !important;
-  inset: 0 !important;
-  pointer-events: none !important;
-  z-index: -1 !important;
-  background:
-    linear-gradient(90deg, rgba(0,0,0,.7), transparent 22%, transparent 78%, rgba(0,0,0,.7)),
-    linear-gradient(180deg, rgba(0,0,0,.35), transparent 36%, rgba(0,0,0,.58)) !important;
-}
-
-.applix-home-shell h1,
-.applix-home-shell h2,
-.applix-home-shell h3,
-.applix-home-shell strong,
-.dashboard-cockpit-shell .dashboard-card-clean strong,
-.dashboard-cockpit-shell .home-check strong,
-.dashboard-cockpit-shell .campaign-summary-card strong,
-.dashboard-cockpit-shell .dashboard-hero h1,
-.dashboard-cockpit-shell .resume-warning,
-.agent-log-shell h1,
-.agent-log-shell h2,
-.agent-log-shell strong,
-.applix-setup-shell h1,
-.applix-setup-shell h2,
-.applix-setup-shell strong,
-main h1,
-main h2,
-main h3,
-main strong {
+:is(.applix-home-shell, .dashboard-cockpit-shell, .agent-log-shell, .applix-setup-shell) :is(h1, h2, h3, strong) {
   color: #ffffff !important;
   text-shadow: none !important;
 }
 
-.applix-home-shell p,
-.applix-home-shell span,
-.applix-home-shell label,
-.dashboard-cockpit-shell .dashboard-card-clean p,
-.dashboard-cockpit-shell .home-check p,
-.dashboard-cockpit-shell .dashboard-subtitle,
-.dashboard-cockpit-shell .campaign-target,
-.dashboard-cockpit-shell .resume-file-name,
-.agent-log-shell p,
-.agent-log-shell span,
-.agent-log-shell td,
-.agent-log-shell small,
-.agent-log-shell em,
-.applix-setup-shell p,
-.applix-setup-shell span,
-.applix-setup-shell label,
-main p,
-main span,
-main label,
-main button {
+:is(.applix-home-shell, .dashboard-cockpit-shell, .agent-log-shell, .applix-setup-shell) :is(p, span, label, button, td, small, em) {
   color: rgba(247, 240, 255, .86) !important;
 }
 
-.dashboard-cockpit-shell .dashboard-card-clean,
-.dashboard-cockpit-shell .home-campaign-card,
-.dashboard-cockpit-shell .home-check-grid,
-.dashboard-cockpit-shell .dashboard-single-row,
-.dashboard-cockpit-shell .resume-card-wrap,
-.dashboard-cockpit-shell .campaign-summary-card,
-.dashboard-cockpit-shell .applix-intro-card,
-.agent-log-card,
-.summary-card {
+.dashboard-cockpit-shell :is(.dashboard-card-clean, .home-campaign-card, .home-check-grid, .dashboard-single-row, .resume-card-wrap, .campaign-summary-card, .applix-intro-card),
+.agent-log-shell :is(.agent-log-card, .summary-card) {
   background: rgba(8, 0, 18, .5) !important;
   border-color: rgba(255, 255, 255, .12) !important;
   color: #f7f0ff !important;
   backdrop-filter: blur(7px) !important;
 }
 
-.dashboard-cockpit-shell .applix-setup-back,
-.dashboard-cockpit-shell .applix-setup-info,
-.agent-home-link,
-.agent-action-row a,
-.agent-action-row button,
-.sheet-pagination button {
+.dashboard-cockpit-shell :is(.applix-setup-back, .applix-setup-info),
+.agent-log-shell :is(.agent-home-link, .agent-action-row a, .agent-action-row button, .sheet-pagination button) {
   background: rgba(10, 2, 24, .72) !important;
   color: #ffffff !important;
   border-color: rgba(255, 255, 255, .18) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  body::after {
+  body:has(.applix-home-shell)::after,
+  body:has(.dashboard-cockpit-shell)::after,
+  body:has(.agent-log-shell)::after,
+  body:has(.applix-setup-shell)::after {
     opacity: .05;
   }
 }
