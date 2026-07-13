@@ -1,0 +1,68 @@
+body:has(.applix-auth-scope) {
+  background: #ffebed !important;
+  color: #16131a !important;
+}
+
+body:has(.applix-auth-scope)::before,
+body:has(.applix-auth-scope)::after,
+.applix-auth-scope main::before,
+.applix-auth-scope main::after {
+  display: none !important;
+  content: none !important;
+}
+
+.applix-auth-scope,
+.applix-auth-scope main {
+  min-height: 100vh;
+  background: #ffebed !important;
+  background-image: none !important;
+  color: #16131a !important;
+  color-scheme: light;
+}
+
+.applix-auth-scope section {
+  background: #ffffff !important;
+  color: #16131a !important;
+  border: 1px solid rgba(0, 0, 0, .12) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .12) !important;
+}
+
+.applix-auth-scope :is(h1, h2, h3, strong, label, a) {
+  color: #000000 !important;
+}
+
+.applix-auth-scope p {
+  color: #5f5961 !important;
+}
+
+.applix-auth-scope section > p:first-of-type {
+  background: #ffebed !important;
+  color: #ff5757 !important;
+}
+
+.applix-auth-scope input,
+.applix-auth-scope textarea,
+.applix-auth-scope select {
+  background: #ffffff !important;
+  color: #16131a !important;
+  -webkit-text-fill-color: #16131a !important;
+  border-color: rgba(0, 0, 0, .16) !important;
+  caret-color: #ff5757;
+}
+
+.applix-auth-scope input:focus,
+.applix-auth-scope textarea:focus,
+.applix-auth-scope select:focus {
+  border-color: #ff5757 !important;
+  box-shadow: 0 0 0 4px rgba(255, 87, 87, .16) !important;
+}
+
+.applix-auth-scope button {
+  border-color: rgba(0, 0, 0, .16) !important;
+}
+
+.applix-auth-scope button[style*="background: rgb(17, 24, 39)"],
+.applix-auth-scope button[style*="background: #111827"] {
+  background: #000000 !important;
+  color: #ffffff !important;
+}
