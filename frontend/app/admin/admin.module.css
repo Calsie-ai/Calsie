@@ -1,0 +1,20 @@
+.scope {
+  min-height: 100vh;
+  background: #f4f7fb;
+  color: #111827;
+  color-scheme: light;
+  isolation: isolate;
+}
+
+.scope :global(main) {
+  background: #f4f7fb !important;
+  color: #111827 !important;
+}
+
+.scope :global(main > header h1),
+.scope :global(main > header h2),
+.scope :global(main > header h3) {
+  color: #0f172a !important;
+}
+
+.scope :global(main > header
