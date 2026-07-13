@@ -6,15 +6,21 @@
   isolation: isolate;
 }
 
-.scope :global(main) {
+.scope main {
+  min-height: 100vh;
   background: #f4f7fb !important;
   color: #111827 !important;
 }
 
-.scope :global(main > header h1),
-.scope :global(main > header h2),
-.scope :global(main > header h3) {
+.scope main > header h1,
+.scope main > header h2,
+.scope main > header h3 {
   color: #0f172a !important;
 }
 
-.scope :global(main > header
+.scope main > header p {
+  color: #64748b;
+}
+
+.scope main > section > div {
+  background
