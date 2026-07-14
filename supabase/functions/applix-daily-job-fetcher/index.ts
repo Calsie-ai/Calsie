@@ -16,7 +16,7 @@ const ELIGIBLE_STATUSES = ["launched", "scheduled", "active"];
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-cron-secret",
+    "authorization, x-client-info, apikey, content-type, x-cron-secret, x-applix-cron-secret, cron-secret",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -29,6 +29,32 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "content-type": "application/json" },
   });
+}
+
+function bearerToken(req: Request) {
+  return (req.headers.get("authorization") || "")
+    .replace(/^Bearer\s+/i, "")
+    .trim();
+}
+
+function isInternalAuthorized(req: Request) {
+  const token = bearerToken(req);
+  const cronSecret = req.headers.get("x-cron-secret") ||
+    req.headers.get("x-applix-cron-secret") ||
+    req.headers.get("cron-secret") ||
+    "";
+
+  if (
+    SUPABASE_SERVICE_ROLE_KEY &&
+    token === SUPABASE_SERVICE_ROLE_KEY
+  ) {
+    return true;
+  }
+
+  return Boolean(
+    CRON_SECRET &&
+      (token === CRON_SECRET || cronSecret === CRON_SECRET)
+  );
 }
 
 function text(value: unknown): string | null {
@@ -230,20 +256,19 @@ serve(async (req) => {
     if (req.method !== "POST") {
       return json({ ok: false, error: "Use POST" }, 405);
     }
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !CRON_SECRET) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return json(
         { ok: false, error: "Missing daily fetcher configuration" },
         500,
       );
     }
 
-    const authHeader = req.headers.get("authorization") || "";
-    const cronHeader = req.headers.get("x-cron-secret") || "";
-    const bearerSecret = authHeader.startsWith("Bearer ")
-      ? authHeader.slice(7)
-      : "";
-    if (cronHeader !== CRON_SECRET && bearerSecret !== CRON_SECRET) {
-      return json({ ok: false, error: "Unauthorized" }, 401);
+    if (!isInternalAuthorized(req)) {
+      return json({
+        ok: false,
+        function: FUNCTION_NAME,
+        error: "Unauthorized internal scheduler request",
+      }, 401);
     }
 
     const input = await req.json().catch(() => ({}));
