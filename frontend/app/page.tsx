@@ -31,15 +31,15 @@ const features = [
 ];
 
 const steps = [
-  ["Connect your profile", "Upload your resume and set the roles, locations, and preferences Applix should use."],
-  ["Review prepared applications", "Applix prepares up to 24 opportunities per day and releases them across the day."],
-  ["Approve and send", "Approve the applications you want. Applix sends no more than one approved application each hour."],
+  ["Connect your profile", "Upload your resume and set the roles, locations, and preferences Calsie Jobs should use."],
+  ["Review prepared applications", "Calsie Jobs prepares up to 24 opportunities per day and releases them across the day."],
+  ["Approve and send", "Approve the applications you want. Calsie Jobs sends no more than one approved application each hour."],
 ];
 
 const onboardingSlides = [
-  ["What is Applix", "Applix is an AI-powered job application assistant built to help you prepare and manage job outreach in a controlled way."],
-  ["What it does", "Applix can use your details, resume, and selected instructions to prepare up to 24 job applications per day."],
-  ["How to connect the app", "Create or choose the Gmail account you want Applix to use, then authorize Applix with that account only."],
+  ["What is Calsie Jobs", "Calsie Jobs is an AI-powered job application assistant built to help you prepare and manage job outreach in a controlled way."],
+  ["What it does", "Calsie Jobs can use your details, resume, and selected instructions to prepare up to 24 job applications per day."],
+  ["How to connect the app", "Create or choose the Gmail account you want Calsie Jobs to use, then authorize Calsie Jobs with that account only."],
   ["How it works", "Applications require your approval. The sending pace is limited to one approved application per hour for up to 30 days."],
   ["Terms and control", "By continuing, you understand you are responsible for your email account, resume, details, and the applications you approve."],
 ];
@@ -98,9 +98,9 @@ export default function HomePage() {
     <main className="applix-landing" id="top">
       <header className="applix-header">
         <div className="applix-container applix-header-inner">
-          <a className="applix-brand" href="#top" aria-label="Applix home">
+          <a className="applix-brand" href="#top" aria-label="Calsie Jobs home">
             <img src="/applix-logo.svg" alt="" />
-            <span>Applix</span>
+            <span>Calsie | Jobs</span>
           </a>
           <nav className="applix-nav" aria-label="Primary navigation">
             {navLinks.map((link) => <a key={link.href} href={link.href}>{link.label}</a>)}
@@ -128,7 +128,7 @@ export default function HomePage() {
             {status ? <p className="applix-status" role="alert">{status}</p> : null}
           </div>
 
-          <div className="applix-tracker-preview" aria-label="Example Applix application tracker">
+          <div className="applix-tracker-preview" aria-label="Example Calsie Jobs application tracker">
             <div className="applix-tracker-head">
               <div>
                 <span className="applix-tracker-kicker">AI mission control</span>
@@ -175,7 +175,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="applix-stats" aria-label="Applix highlights">
+      <section className="applix-stats" aria-label="Calsie Jobs highlights">
         <div className="applix-container applix-stats-grid">
           {stats.map((stat) => <div className="applix-stat" key={stat.label}><strong>{stat.value}</strong><span>{stat.label}</span></div>)}
         </div>
@@ -186,9 +186,9 @@ export default function HomePage() {
           <div className="applix-section-header centered">
             <p className="applix-eyebrow">Built for modern job seekers</p>
             <h2 id="trust-title">Less repetition. More deliberate applications.</h2>
-            <p>Applix is designed to reduce repetitive job application work while keeping every send under your control.</p>
+            <p>Calsie Jobs is designed to reduce repetitive job application work while keeping every send under your control.</p>
           </div>
-          <div className="applix-trust-grid" aria-label="Applix trust signals">
+          <div className="applix-trust-grid" aria-label="Calsie Jobs trust signals">
             {trustLabels.map((label) => <div className="applix-trust-item" key={label}>{label}</div>)}
           </div>
         </div>
@@ -213,7 +213,7 @@ export default function HomePage() {
 
       <section className="applix-section applix-how" id="how-it-works" aria-labelledby="steps-title">
         <div className="applix-container">
-          <div className="applix-section-header centered applix-how-header"><h2 id="steps-title">How Applix works</h2><p>Prepare up to 24 applications a day while keeping approval in your hands.</p></div>
+          <div className="applix-section-header centered applix-how-header"><h2 id="steps-title">How Calsie Jobs works</h2><p>Prepare up to 24 applications a day while keeping approval in your hands.</p></div>
           <div className="applix-step-track">
             {steps.map(([title, body], index) => (
               <article className="applix-step-card" key={title}><span className="applix-step-number">{index + 1}</span><h3>{title}</h3><p>{body}</p></article>
@@ -224,7 +224,7 @@ export default function HomePage() {
 
       <section className="applix-philosophy" aria-labelledby="why-title">
         <div className="applix-container applix-philosophy-panel">
-          <div><p className="applix-eyebrow">Why Applix</p><h2 id="why-title">Fast applications, without losing control.</h2><p>Applix is built for people who want AI speed with a clear daily cap, an hourly sending limit, and approval before every application moves forward.</p></div>
+          <div><p className="applix-eyebrow">Why Calsie Jobs</p><h2 id="why-title">Fast applications, without losing control.</h2><p>Calsie Jobs is built for people who want AI speed with a clear daily cap, an hourly sending limit, and approval before every application moves forward.</p></div>
           <div className="applix-philosophy-note"><strong>AI should accelerate the workflow, not take away your judgment.</strong><span>Approve applications in advance, pause at any time, and send no more than one approved application per hour.</span></div>
         </div>
       </section>
@@ -235,7 +235,7 @@ export default function HomePage() {
         <div className="applix-container applix-final-grid" id="start-check">
           <div className="applix-final-copy">
             <p className="applix-eyebrow">Start with control</p>
-            <h2 id="cta-title">Start a 30-day Applix campaign</h2>
+            <h2 id="cta-title">Start a 30-day Calsie Jobs campaign</h2>
             <p>Prepare up to 24 applications per day, approve the ones you want, and send no more than one approved application per hour—up to 720 applications over 30 days.</p>
             <div className="applix-final-actions"><a className="applix-button applix-button--light" href="#start-check">Get Started</a><a className="applix-button" href="#features">Learn More</a></div>
           </div>
@@ -250,7 +250,7 @@ export default function HomePage() {
             {!carouselComplete ? (
               <><h3>{activeSlide[0]}</h3><p>{activeSlide[1]}</p><button type="button" className="applix-button applix-button--primary" onClick={confirmSlide}>{carouselIndex === onboardingSlides.length - 1 ? "Complete start check" : "Yes, I understood"}</button></>
             ) : (
-              <><h3>Start check complete</h3><p>Continue with Google to open Applix and create your controlled 30-day campaign.</p><button type="button" className="applix-button applix-button--primary" onClick={loginWithGoogle} disabled={loading}>{loading ? "Opening" : "Sign in / Sign up"}</button></>
+              <><h3>Start check complete</h3><p>Continue with Google to open Calsie Jobs and create your controlled 30-day campaign.</p><button type="button" className="applix-button applix-button--primary" onClick={loginWithGoogle} disabled={loading}>{loading ? "Opening" : "Sign in / Sign up"}</button></>
             )}
             {status ? <p className="applix-status" role="alert">{status}</p> : null}
           </div>

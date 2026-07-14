@@ -2,7 +2,7 @@ const plans = [
   {
     name: "Starter",
     price: "Free",
-    note: "Try the core Applix workflow before starting a paid campaign.",
+    note: "Try the core Calsie Jobs workflow before starting a paid campaign.",
     features: [
       "Guided profile setup",
       "Resume upload and preferences",
@@ -15,7 +15,7 @@ const plans = [
     featured: false,
   },
   {
-    name: "Applix Pro",
+    name: "Calsie Jobs Pro",
     price: "A$20",
     suffix: "one-time",
     note: "A controlled 30-day application campaign for active job seekers.",
@@ -29,7 +29,7 @@ const plans = [
       "Approval required before sending",
       "Application tracking dashboard",
     ],
-    action: "Choose Applix Pro",
+    action: "Choose Calsie Jobs Pro",
     href: "/payment",
     featured: true,
   },
@@ -83,7 +83,7 @@ export default function PricingSection() {
             Simple, transparent pricing
           </h2>
           <p style={{ margin: "26px auto 0", maxWidth: "760px", fontSize: "clamp(18px, 1.5vw, 22px)", lineHeight: 1.6, color: "#555" }}>
-            Start free, choose the controlled 30-day Applix campaign, or contact us for a custom workflow.
+            Start free, choose the controlled 30-day Calsie Jobs campaign, or contact us for a custom workflow.
           </p>
         </header>
 
