@@ -44,6 +44,21 @@ const onboardingSlides = [
   ["Terms and control", "By continuing, you understand you are responsible for your email account, resume, details, and the applications you approve."],
 ];
 
+const trackerStats = [
+  ["Found", "120"],
+  ["Prepared", "100"],
+  ["Queued", "90"],
+  ["Declined", "10"],
+];
+
+const trackerRows = [
+  ["Harbour Community Care", "Disability Support Worker", "Prepared", "Approve"],
+  ["Northside Health Services", "Community Support Worker", "Queued", "Queued"],
+  ["BrightPath Australia", "Caseworker", "Prepared", "Approve"],
+  ["Civic Support Network", "Family Support Worker", "Found", "Review"],
+  ["CareBridge Group", "Youth Support Worker", "Declined", "Declined"],
+];
+
 export default function HomePage() {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [carouselComplete, setCarouselComplete] = useState(false);
@@ -107,40 +122,54 @@ export default function HomePage() {
             <p className="applix-hero-copy"><strong>The best opportunities start with being seen.</strong><br />Because the right resume means nothing if the right person never sees it.</p>
             <div className="applix-hero-actions">
               <a className="applix-button applix-button--primary" href="#start-check">Get Started</a>
-              <a className="applix-button" href="#how-it-works">See How It Works</a>
+              <button type="button" className="applix-button" onClick={loginWithGoogle} disabled={loading}>{loading ? "Opening" : "Log in"}</button>
             </div>
             <p className="applix-supporting-line">Up to 720 approved applications over a 30-day campaign.</p>
             {status ? <p className="applix-status" role="alert">{status}</p> : null}
           </div>
 
-          <div className="applix-product-panel" aria-label="Applix workflow preview">
-            <div className="applix-panel-topbar">
-              <div className="applix-panel-title"><strong>Application workflow</strong><span>Today&apos;s matched roles</span></div>
-              <span className="applix-panel-pill">Human approval on</span>
+          <div className="applix-tracker-preview" aria-label="Example Applix application tracker">
+            <div className="applix-tracker-head">
+              <div>
+                <span className="applix-tracker-kicker">AI mission control</span>
+                <h2>Application tracker</h2>
+              </div>
+              <span className="applix-tracker-live"><i /> Active campaign</span>
             </div>
-            <div className="applix-match-list">
-              {[
-                ["94%", "Product Analyst", "Resume draft ready", "Review"],
-                ["88%", "Operations Coordinator", "Email generated", "Approve"],
-                ["82%", "Customer Success Associate", "Preferences matched", "Queue"],
-              ].map(([score, title, copy, state]) => (
-                <div className="applix-match-row" key={title}>
-                  <span className="applix-match-score">{score}</span>
-                  <div className="applix-row-copy"><strong>{title}</strong><span>{copy}</span></div>
-                  <span className="applix-row-status">{state}</span>
+
+            <div className="applix-tracker-campaign">
+              <strong>Support Worker / Community Services Campaign</strong>
+              <span>Sydney NSW · Full-time and part-time roles</span>
+            </div>
+
+            <div className="applix-tracker-stats">
+              {trackerStats.map(([label, value]) => (
+                <div key={label}><span>{label}</span><strong>{value}</strong></div>
+              ))}
+            </div>
+
+            <div className="applix-tracker-toolbar">
+              <div><span className="is-active">All</span><span>Day 1</span></div>
+              <p>Example campaign activity</p>
+            </div>
+
+            <div className="applix-tracker-table" role="table" aria-label="Example tracked jobs">
+              <div className="applix-tracker-row applix-tracker-row--head" role="row">
+                <span>Company</span><span>Opportunity</span><span>Status</span><span>Review</span>
+              </div>
+              {trackerRows.map(([company, role, rowStatus, action]) => (
+                <div className="applix-tracker-row" role="row" key={`${company}-${role}`}>
+                  <span><strong>{company}</strong><small>Sydney, NSW</small></span>
+                  <span>{role}</span>
+                  <span><b className={`tracker-status tracker-status--${rowStatus.toLowerCase()}`}>{rowStatus}</b></span>
+                  <span><button type="button" tabIndex={-1}>{action}</button></span>
                 </div>
               ))}
             </div>
-            <div className="applix-workflow-list">
-              {[
-                ["1", "Match role", "Check fit against your profile and preferences."],
-                ["2", "Tailor materials", "Prepare resume and email drafts for the role."],
-                ["3", "Approve send", "One approved application can move forward each hour."],
-              ].map(([number, title, copy]) => (
-                <div className="applix-workflow-item" key={number}>
-                  <span>{number}</span><div><strong>{title}</strong><small>{copy}</small></div>
-                </div>
-              ))}
+
+            <div className="applix-tracker-foot">
+              <span>Showing 5 of 120 opportunities</span>
+              <strong>Search → Tailor → Approve → Send</strong>
             </div>
           </div>
         </div>
