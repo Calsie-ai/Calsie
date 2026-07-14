@@ -2,14 +2,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 type Row = Record<string, any>;
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://bnshgtrqbfuphhhdgccs.supabase.co";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ||
+  "https://bnshgtrqbfuphhhdgccs.supabase.co";
 
 function env(name: string) {
   return Deno.env.get(name) || "";
 }
 
 function firstSecretKey() {
-  const direct = env("SUPABASE_SERVICE_ROLE_KEY") || env("SERVICE_ROLE_KEY") || env("APPLIX_SERVICE_ROLE_KEY");
+  const direct = env("SUPABASE_SERVICE_ROLE_KEY") || env("SERVICE_ROLE_KEY") ||
+    env("APPLIX_SERVICE_ROLE_KEY");
   if (direct) return direct;
 
   const modern = env("SUPABASE_SECRET_KEYS");
@@ -17,8 +19,13 @@ function firstSecretKey() {
 
   try {
     const parsed = JSON.parse(modern);
-    if (Array.isArray(parsed)) return parsed[0]?.secret_key || parsed[0]?.key || parsed[0] || "";
-    if (typeof parsed === "object" && parsed !== null) return parsed.secret_key || parsed.key || String(Object.values(parsed)[0] || "");
+    if (Array.isArray(parsed)) {
+      return parsed[0]?.secret_key || parsed[0]?.key || parsed[0] || "";
+    }
+    if (typeof parsed === "object" && parsed !== null) {
+      return parsed.secret_key || parsed.key ||
+        String(Object.values(parsed)[0] || "");
+    }
   } catch {
     return modern;
   }
@@ -30,7 +37,8 @@ const SUPABASE_SERVICE_ROLE_KEY = firstSecretKey();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -53,7 +61,8 @@ function safeLimit(value: unknown, fallback = 100) {
 }
 
 function bearer(req: Request) {
-  return (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  return (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "")
+    .trim();
 }
 
 async function resolveCaller(req: Request, body: Row) {
@@ -64,7 +73,9 @@ async function resolveCaller(req: Request, body: Row) {
   }
 
   const userClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    global: { headers: { Authorization: req.headers.get("authorization") || "" } },
+    global: {
+      headers: { Authorization: req.headers.get("authorization") || "" },
+    },
     auth: { persistSession: false },
   });
 
@@ -92,48 +103,87 @@ async function callFunction(name: string, body: Row) {
     payload = { raw: text };
   }
 
-  return { ok: response.ok && !payload?.error, status: response.status, payload };
+  return {
+    ok: response.ok && !payload?.error,
+    status: response.status,
+    payload,
+  };
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
   try {
-    if (req.method !== "POST") return reply({ ok: false, error: "Use POST" }, 405);
+    if (req.method !== "POST") {
+      return reply({ ok: false, error: "Use POST" }, 405);
+    }
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return reply({
         ok: false,
-        error: "Missing Supabase service role configuration. Add SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEYS in Edge Function secrets.",
+        error:
+          "Missing Supabase service role configuration. Add SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEYS in Edge Function secrets.",
       }, 500);
     }
 
     const input = (await req.json().catch(() => ({}))) as Row;
     const campaignId = txt(input.campaign_id);
-    if (!campaignId) return reply({ ok: false, error: "campaign_id is required" }, 400);
+    if (!campaignId) {
+      return reply({ ok: false, error: "campaign_id is required" }, 400);
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
 
     const caller = await resolveCaller(req, input);
-    if (!caller.userId && !caller.internal) return reply({ ok: false, error: "Please sign in again." }, 401);
+    if (!caller.userId && !caller.internal) {
+      return reply({ ok: false, error: "Please sign in again." }, 401);
+    }
 
-    let campaignQuery = supabase.from("campaigns").select("*").eq("id", campaignId);
-    if (!caller.internal && caller.userId) campaignQuery = campaignQuery.eq("user_id", caller.userId);
+    let campaignQuery = supabase.from("campaigns").select("*").eq(
+      "id",
+      campaignId,
+    );
+    if (!caller.internal && caller.userId) {
+      campaignQuery = campaignQuery.eq("user_id", caller.userId);
+    }
 
     const campaignResult = await campaignQuery.maybeSingle();
-    if (!campaignResult) return reply({ ok: false, error: "Campaign query returned undefined" }, 500);
-    if (campaignResult.error) return reply({ ok: false, error: campaignResult.error.message }, 500);
+    if (!campaignResult) {
+      return reply(
+        { ok: false, error: "Campaign query returned undefined" },
+        500,
+      );
+    }
+    if (campaignResult.error) {
+      return reply({ ok: false, error: campaignResult.error.message }, 500);
+    }
 
     const campaign = campaignResult.data;
-    if (!campaign?.id) return reply({ ok: false, error: "Campaign not found for this user", campaign_id: campaignId }, 404);
+    if (!campaign?.id) {
+      return reply({
+        ok: false,
+        error: "Campaign not found for this user",
+        campaign_id: campaignId,
+      }, 404);
+    }
 
-    const userIdentifier = txt(campaign.user_id) || txt(caller.userId) || txt(input.user_id);
-    if (!userIdentifier) return reply({ ok: false, error: "Campaign has no user_id. Production requires a real user." }, 400);
+    const userIdentifier = txt(campaign.user_id) || txt(caller.userId) ||
+      txt(input.user_id);
+    if (!userIdentifier) {
+      return reply({
+        ok: false,
+        error: "Campaign has no user_id. Production requires a real user.",
+      }, 400);
+    }
 
     const resultsLimit = safeLimit(input.results_limit, 100);
     const queueLimit = safeLimit(
-      input.queue_limit || input.target_email_count || campaign.outreach?.target_email_count || campaign.outreach?.daily_cap || campaign.outreach?.daily_email_limit || 100,
+      input.queue_limit || input.target_email_count ||
+        campaign.outreach?.target_email_count || campaign.outreach?.daily_cap ||
+        campaign.outreach?.daily_email_limit || 100,
       100,
     );
     const minLeadScore = Number(input.min_lead_score ?? 70);
@@ -166,13 +216,19 @@ Deno.serve(async (req) => {
 
     const queueResult = await supabase
       .from("outreach_queue")
-      .select("id,campaign_lead_id,status,review_status,recipient_company,subject,created_at")
+      .select(
+        "id,campaign_lead_id,status,review_status,recipient_company,subject,created_at",
+      )
       .eq("campaign_id", campaignId)
       .order("created_at", { ascending: false })
       .limit(queueLimit);
 
-    if (!queueResult) return reply({ ok: false, error: "Queue query returned undefined" }, 500);
-    if (queueResult.error) return reply({ ok: false, error: queueResult.error.message }, 500);
+    if (!queueResult) {
+      return reply({ ok: false, error: "Queue query returned undefined" }, 500);
+    }
+    if (queueResult.error) {
+      return reply({ ok: false, error: queueResult.error.message }, 500);
+    }
 
     const queueRows = queueResult.data || [];
     const queueIds = queueRows.map((row: Row) => row.id).filter(Boolean);
@@ -203,20 +259,24 @@ Deno.serve(async (req) => {
       .eq("campaign_id", campaignId)
       .eq("review_status", "ready_for_review");
 
+    const now = new Date().toISOString();
     const campaignUpdate = await supabase
       .from("campaigns")
       .update({
-        status: "launched",
-        updated_at: new Date().toISOString(),
+        status: "active",
+        updated_at: now,
         outreach: {
           ...(campaign.outreach || {}),
+          active: true,
+          scheduled: true,
+          started_at: campaign.outreach?.started_at || now,
           mode: "production",
           test_mode: false,
           agent_status: "ready_for_review",
           last_production_launch: {
-            launched_at: new Date().toISOString(),
+            launched_at: now,
             function: "launch-applix-campaign",
-            version: "production_launcher_v2_secret_keys",
+            version: "production_launcher_v3_active_lifecycle",
             scraper_ok: scraper.ok,
             scraper_status: scraper.status,
             generator_ok: generator.ok,
@@ -230,23 +290,46 @@ Deno.serve(async (req) => {
           },
         },
       })
-      .eq("id", campaignId);
+      .eq("id", campaignId)
+      .select("id,status,outreach")
+      .maybeSingle();
 
-    const errors = [
-      ...(scraper.ok ? [] : [`run-outscraper-campaigns failed: ${JSON.stringify(scraper.payload).slice(0, 800)}`]),
-      ...(generator.ok ? [] : [`generate-outreach-drafts failed: ${JSON.stringify(generator.payload).slice(0, 800)}`]),
+    const lifecycleError = campaignUpdate.error?.message ||
+      (!campaignUpdate.data?.id
+        ? "Campaign lifecycle update returned no row"
+        : null);
+    const stageErrors = [
+      ...(scraper.ok ? [] : [
+        `run-outscraper-campaigns failed: ${
+          JSON.stringify(scraper.payload).slice(0, 800)
+        }`,
+      ]),
+      ...(generator.ok ? [] : [
+        `generate-outreach-drafts failed: ${
+          JSON.stringify(generator.payload).slice(0, 800)
+        }`,
+      ]),
       ...(queuePatchError ? [`Queue patch failed: ${queuePatchError}`] : []),
-      ...(campaignUpdate.error ? [`Campaign update failed: ${campaignUpdate.error.message}`] : []),
     ];
+    const errors = [
+      ...stageErrors,
+      ...(lifecycleError ? [`Campaign update failed: ${lifecycleError}`] : []),
+    ];
+    const lifecycleOk = !lifecycleError;
 
     return reply({
-      ok: errors.length === 0,
+      ok: lifecycleOk,
+      lifecycle_ok: lifecycleOk,
+      pipeline_ok: stageErrors.length === 0,
       function: "launch-applix-campaign",
-      version: "production_launcher_v2_secret_keys",
+      version: "production_launcher_v3_active_lifecycle",
       production_mode: true,
       test_mode: false,
       sends_emails_now: false,
       campaign_id: campaignId,
+      campaign_status: campaignUpdate.data?.status || campaign.status,
+      outreach_started_at: campaignUpdate.data?.outreach?.started_at ||
+        campaign.outreach?.started_at || null,
       user_identifier: userIdentifier,
       scraper_ok: scraper.ok,
       scraper_status: scraper.status,
@@ -272,12 +355,12 @@ Deno.serve(async (req) => {
         next_step: "User reviews and approves drafts before sending.",
       },
       errors,
-    }, errors.length ? 207 : 200);
+    }, lifecycleError ? 500 : stageErrors.length ? 207 : 200);
   } catch (error) {
     return reply({
       ok: false,
       function: "launch-applix-campaign",
-      version: "production_launcher_v2_secret_keys",
+      version: "production_launcher_v3_active_lifecycle",
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : null,
     }, 500);

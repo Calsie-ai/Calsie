@@ -3,13 +3,25 @@ import { createClient } from "supabase";
 
 type Row = Record<string, any>;
 
+const FUNCTION_NAME = "applix-daily-job-fetcher";
+const BLOCKED_STATUSES = [
+  "paused",
+  "inactive",
+  "archived",
+  "disabled",
+  "completed",
+];
+const ELIGIBLE_STATUSES = ["launched", "scheduled", "active"];
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
 
 function json(body: unknown, status = 200) {
@@ -60,59 +72,95 @@ function minutesBetween(dateIso: string | null, now = new Date()) {
 
 function campaignStartedAt(campaign: Row) {
   const outreach = parseJsonIfNeeded(campaign.outreach);
-  return text(outreach.started_at) || text(outreach.created_at) || text(campaign.created_at);
+  const startedAt = text(outreach.started_at);
+  return {
+    value: startedAt || text(campaign.created_at),
+    source: startedAt
+      ? "outreach.started_at"
+      : "campaign.created_at_legacy_fallback",
+  };
 }
 
 function isScheduledAndActive(campaign: Row) {
   const outreach = parseJsonIfNeeded(campaign.outreach);
   const campaignStatus = text(campaign.status)?.toLowerCase() || "";
   const outreachStatus = text(outreach.status)?.toLowerCase() || "";
-
+  const lifecycleEligible = ELIGIBLE_STATUSES.includes(campaignStatus);
+  const blockedStatus = BLOCKED_STATUSES.includes(campaignStatus) ||
+    BLOCKED_STATUSES.includes(outreachStatus);
   const scheduled = bool(outreach.scheduled, false) ||
     bool(outreach.cron_enabled, false) ||
     bool(outreach.schedule_enabled, false) ||
     outreachStatus === "scheduled" ||
     campaignStatus === "scheduled";
+  const active = bool(outreach.active, lifecycleEligible) && !blockedStatus;
 
-  const active = bool(outreach.active, true) &&
-    !["paused", "inactive", "archived", "disabled", "completed"].includes(campaignStatus) &&
-    !["paused", "inactive", "archived", "disabled", "completed"].includes(outreachStatus);
+  let reason = "eligible";
+  if (blockedStatus) reason = "campaign_status_blocks_scheduling";
+  else if (!lifecycleEligible) reason = "campaign_lifecycle_not_eligible";
+  else if (!scheduled) reason = "campaign_not_scheduled";
+  else if (!active) reason = "campaign_not_active";
 
-  return scheduled && active;
+  return {
+    eligible: lifecycleEligible && scheduled && active && !blockedStatus,
+    reason,
+    campaign_status: campaignStatus || null,
+    outreach_status: outreachStatus || null,
+    outreach_active: bool(outreach.active, lifecycleEligible),
+    outreach_scheduled: scheduled,
+  };
 }
 
 async function callFunction(functionName: string, payload: Row) {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/${functionName}`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const rawText = await response.text().catch(() => "");
-  let body: unknown = rawText;
   try {
-    body = rawText ? JSON.parse(rawText) : {};
-  } catch {
-    body = { raw: rawText };
-  }
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/${functionName}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      },
+    );
 
-  return { ok: response.ok, status: response.status, payload: body };
+    const rawText = await response.text().catch(() => "");
+    let body: unknown = rawText;
+    try {
+      body = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      body = { raw: rawText };
+    }
+
+    const stageBody = parseJsonIfNeeded(body);
+    return {
+      ok: response.ok && stageBody.ok !== false && !stageBody.error,
+      status: response.status,
+      payload: body,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      payload: {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
 }
 
 async function saveRunSummary(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   campaign: Row,
   summary: Row,
-  markFetchedAt: boolean,
+  fetchedAt: string | null,
 ) {
   const outreach = parseJsonIfNeeded(campaign.outreach);
   const nextOutreach = {
     ...outreach,
     last_daily_fetch_result: summary,
-    ...(markFetchedAt ? { last_daily_fetch_at: new Date().toISOString() } : {}),
+    ...(fetchedAt ? { last_daily_fetch_at: fetchedAt } : {}),
   };
 
   const update = await supabase
@@ -121,59 +169,79 @@ async function saveRunSummary(
     .eq("id", campaign.id);
 
   if (update.error) throw new Error(update.error.message);
+  campaign.outreach = nextOutreach;
 }
 
 async function scheduleDraftsHourly(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   campaignId: string,
   limit: number,
+  hourlyCap: number,
 ) {
   const { data, error } = await supabase
     .from("outreach_queue")
     .select("id,scheduled_send_at,created_at")
     .eq("campaign_id", campaignId)
-    .eq("status", "draft")
-    .eq("review_status", "ready_for_review")
+    .eq("status", "queued")
+    .eq("review_status", "approved")
     .is("scheduled_send_at", null)
     .order("created_at", { ascending: true })
     .limit(limit);
 
   if (error) throw new Error(error.message);
 
-  const drafts = data || [];
+  const drafts = (data || []) as Row[];
   const now = new Date();
   let scheduledCount = 0;
 
   for (let i = 0; i < drafts.length; i += 1) {
-    const scheduledSendAt = new Date(now.getTime() + i * 60 * 60 * 1000).toISOString();
+    const hourSlot = Math.floor(i / hourlyCap);
+    const scheduledSendAt = new Date(now.getTime() + hourSlot * 60 * 60 * 1000)
+      .toISOString();
     const update = await supabase
       .from("outreach_queue")
       .update({
         scheduled_send_at: scheduledSendAt,
-        send_window: "hourly_review",
+        send_window: "hourly_approved",
         updated_at: new Date().toISOString(),
       })
-      .eq("id", drafts[i].id);
+      .eq("id", drafts[i].id)
+      .eq("review_status", "approved");
 
     if (update.error) throw new Error(update.error.message);
     scheduledCount += 1;
   }
 
-  return { scheduled_count: scheduledCount, first_due_at: scheduledCount ? now.toISOString() : null };
+  return {
+    ok: true,
+    scheduled_count: scheduledCount,
+    hourly_cap: hourlyCap,
+    approval_required: true,
+    first_due_at: scheduledCount ? now.toISOString() : null,
+  };
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
   try {
-    if (req.method !== "POST") return json({ ok: false, error: "Use POST" }, 405);
+    if (req.method !== "POST") {
+      return json({ ok: false, error: "Use POST" }, 405);
+    }
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !CRON_SECRET) {
-      return json({ ok: false, error: "Missing daily fetcher configuration" }, 500);
+      return json(
+        { ok: false, error: "Missing daily fetcher configuration" },
+        500,
+      );
     }
 
     const authHeader = req.headers.get("authorization") || "";
     const cronHeader = req.headers.get("x-cron-secret") || "";
-    const bearerSecret = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const bearerSecret = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : "";
     if (cronHeader !== CRON_SECRET && bearerSecret !== CRON_SECRET) {
       return json({ ok: false, error: "Unauthorized" }, 401);
     }
@@ -181,6 +249,9 @@ serve(async (req) => {
     const input = await req.json().catch(() => ({}));
     const onlyCampaignId = text(input.campaign_id);
     const force = bool(input.force, false);
+    const inspectOnly = bool(input.inspect_only, false);
+    const triggerSource = text(input.source) ||
+      (onlyCampaignId ? "manual_campaign_request" : "scheduled_request");
     const now = new Date();
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -189,104 +260,304 @@ serve(async (req) => {
 
     let query = supabase
       .from("campaigns")
-      .select("id,user_id,status,outreach,created_at")
-      .in("status", ["scheduled", "active"]);
+      .select("id,user_id,status,outreach,search,created_at");
 
     if (onlyCampaignId) query = query.eq("id", onlyCampaignId);
+    else query = query.in("status", ELIGIBLE_STATUSES);
 
     const { data: campaigns, error } = await query;
     if (error) throw new Error(error.message);
 
     const results: Row[] = [];
+    let eligibleCount = 0;
+    let executedCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+    let wouldExecuteCount = 0;
 
     for (const campaign of campaigns || []) {
       const outreach = parseJsonIfNeeded(campaign.outreach);
+      const search = parseJsonIfNeeded(campaign.search);
+      const eligibility = isScheduledAndActive(campaign);
       const baseSummary: Row = {
-        runner: "applix-daily-job-fetcher",
+        runner: FUNCTION_NAME,
         campaign_id: campaign.id,
-        scheduled_run: true,
+        scheduled_run: bool(input.scheduled_run, !onlyCampaignId),
+        inspect_only: inspectOnly,
+        trigger_source: triggerSource,
+        campaign_status: eligibility.campaign_status,
+        outreach_status: eligibility.outreach_status,
       };
 
-      if (!isScheduledAndActive(campaign)) continue;
-
-      const startedAt = campaignStartedAt(campaign);
-      const ageMinutes = minutesBetween(startedAt, now);
-      if (!Number.isFinite(ageMinutes) || ageMinutes > 30 * 24 * 60) {
-        const summary = { ...baseSummary, ok: false, skipped: true, reason: "campaign exceeded 30 day duration" };
-        await saveRunSummary(supabase, campaign, summary, false);
-        results.push(summary);
-        continue;
-      }
-
-      const minutesSinceDailyFetch = minutesBetween(text(outreach.last_daily_fetch_at), now);
-      if (!force && minutesSinceDailyFetch < 20 * 60) {
-        const summary = {
+      if (!eligibility.eligible) {
+        const summary: Row = {
           ...baseSummary,
-          ok: false,
+          ok: true,
           skipped: true,
-          reason: "daily fetch already ran in the last 20 hours",
-          minutes_since_daily_fetch: Math.floor(minutesSinceDailyFetch),
+          reason: "campaign_not_scheduled_or_active",
+          eligibility,
         };
-        await saveRunSummary(supabase, campaign, summary, false);
+        if (!inspectOnly) {
+          try {
+            await saveRunSummary(supabase, campaign, summary, null);
+          } catch (saveError) {
+            summary.ok = false;
+            summary.error = `Failed to store skip result: ${
+              saveError instanceof Error ? saveError.message : String(saveError)
+            }`;
+            failedCount += 1;
+          }
+        }
+        skippedCount += 1;
         results.push(summary);
         continue;
       }
 
-      const dailyJobLimit = Math.max(1, Math.min(24, numberValue(outreach.daily_job_limit || outreach.daily_cap, 24)));
-      const postedWithinHours = Math.max(1, Math.min(168, numberValue(outreach.posted_within_hours, 24)));
+      eligibleCount += 1;
+      const startedAt = campaignStartedAt(campaign);
+      const ageMinutes = minutesBetween(startedAt.value, now);
+      const minutesSinceDailyFetch = minutesBetween(
+        text(outreach.last_daily_fetch_at),
+        now,
+      );
+      let timingReason: string | null = null;
+
+      if (!Number.isFinite(ageMinutes) || ageMinutes > 30 * 24 * 60) {
+        timingReason = "campaign_exceeded_30_day_duration";
+      } else if (!force && minutesSinceDailyFetch < 20 * 60) {
+        timingReason = "daily_fetch_already_ran_within_20_hours";
+      }
+
+      if (timingReason) {
+        const summary: Row = {
+          ...baseSummary,
+          ok: true,
+          skipped: true,
+          reason: timingReason,
+          eligibility,
+          campaign_started_at: startedAt.value,
+          campaign_started_at_source: startedAt.source,
+          campaign_age_minutes: Number.isFinite(ageMinutes)
+            ? Math.floor(ageMinutes)
+            : null,
+          minutes_since_daily_fetch: Number.isFinite(minutesSinceDailyFetch)
+            ? Math.floor(minutesSinceDailyFetch)
+            : null,
+        };
+        if (!inspectOnly) {
+          try {
+            await saveRunSummary(supabase, campaign, summary, null);
+          } catch (saveError) {
+            summary.ok = false;
+            summary.error = `Failed to store skip result: ${
+              saveError instanceof Error ? saveError.message : String(saveError)
+            }`;
+            failedCount += 1;
+          }
+        }
+        skippedCount += 1;
+        results.push(summary);
+        continue;
+      }
+
+      const dailyJobLimit = Math.max(
+        1,
+        Math.min(
+          24,
+          numberValue(
+            search.daily_job_limit || outreach.daily_job_limit ||
+              outreach.daily_cap,
+            24,
+          ),
+        ),
+      );
+      const postedWithinHours = Math.max(
+        1,
+        Math.min(
+          168,
+          numberValue(outreach.posted_within_hours, 24),
+        ),
+      );
+      const hourlyCap = Math.max(
+        1,
+        Math.min(
+          24,
+          numberValue(outreach.hourly_cap || outreach.hourly_email_limit, 1),
+        ),
+      );
       const userId = text(campaign.user_id);
 
-      const outscraperJobs = await callFunction("outscraper-jobs", {
-        campaign_id: campaign.id,
-        user_id: userId,
-        scheduled_run: true,
-        force_refresh: true,
-        results_limit: dailyJobLimit,
-        posted_within_hours: postedWithinHours,
-      });
+      if (inspectOnly) {
+        wouldExecuteCount += 1;
+        results.push({
+          ...baseSummary,
+          ok: true,
+          inspected: true,
+          skipped: false,
+          would_run: true,
+          reason: "eligible",
+          eligibility,
+          campaign_started_at: startedAt.value,
+          campaign_started_at_source: startedAt.source,
+          daily_job_limit: dailyJobLimit,
+          posted_within_hours: postedWithinHours,
+          hourly_cap: hourlyCap,
+        });
+        continue;
+      }
 
-      let enrichJobEmails = { ok: false, status: 424, payload: { ok: false, skipped: true, reason: "outscraper-jobs failed" } };
-      let generateJobOutreachDrafts = { ok: false, status: 424, payload: { ok: false, skipped: true, reason: "previous pipeline step failed" } };
-      let draftSchedule = { scheduled_count: 0, first_due_at: null as string | null };
+      executedCount += 1;
+      let fetchedAt: string | null = null;
 
-      if (outscraperJobs.ok) {
-        enrichJobEmails = await callFunction("enrich-job-emails", {
+      try {
+        const fetchStage = await callFunction("outscraper-jobs", {
           campaign_id: campaign.id,
           user_id: userId,
-          limit: dailyJobLimit,
+          scheduled_run: true,
+          force_refresh: true,
+          results_limit: dailyJobLimit,
+          posted_within_hours: postedWithinHours,
         });
+
+        let enrichmentStage: Row = {
+          ok: false,
+          skipped: true,
+          reason: "job_fetch_failed",
+        };
+        let draftGenerationStage: Row = {
+          ok: false,
+          skipped: true,
+          reason: "job_fetch_failed",
+        };
+        let schedulingStage: Row = {
+          ok: false,
+          skipped: true,
+          reason: "job_fetch_failed",
+        };
+
+        if (fetchStage.ok) {
+          fetchedAt = new Date().toISOString();
+          await saveRunSummary(supabase, campaign, {
+            ...baseSummary,
+            ok: true,
+            in_progress: true,
+            daily_job_limit: dailyJobLimit,
+            last_daily_fetch_at: fetchedAt,
+            fetch: fetchStage,
+            enrichment: { ok: false, pending: true },
+            draft_generation: { ok: false, pending: true },
+            scheduling: { ok: false, pending: true },
+          }, fetchedAt);
+
+          enrichmentStage = await callFunction("enrich-job-emails", {
+            campaign_id: campaign.id,
+            user_id: userId,
+            limit: dailyJobLimit,
+          });
+
+          if (enrichmentStage.ok) {
+            draftGenerationStage = await callFunction(
+              "generate-job-outreach-drafts",
+              {
+                campaign_id: campaign.id,
+                user_id: userId,
+                limit: dailyJobLimit,
+              },
+            );
+          } else {
+            draftGenerationStage = {
+              ok: false,
+              skipped: true,
+              reason: "enrichment_failed",
+            };
+          }
+
+          if (draftGenerationStage.ok) {
+            try {
+              schedulingStage = await scheduleDraftsHourly(
+                supabase,
+                campaign.id,
+                dailyJobLimit,
+                hourlyCap,
+              );
+            } catch (scheduleError) {
+              schedulingStage = {
+                ok: false,
+                error: scheduleError instanceof Error
+                  ? scheduleError.message
+                  : String(scheduleError),
+              };
+            }
+          } else {
+            schedulingStage = {
+              ok: false,
+              skipped: true,
+              reason: "draft_generation_failed",
+            };
+          }
+        }
+
+        const pipelineOk = fetchStage.ok && enrichmentStage.ok &&
+          draftGenerationStage.ok && schedulingStage.ok;
+        const summary = {
+          ...baseSummary,
+          ok: pipelineOk,
+          fetch_completed: fetchStage.ok,
+          pipeline_ok: pipelineOk,
+          skipped: false,
+          daily_job_limit: dailyJobLimit,
+          posted_within_hours: postedWithinHours,
+          hourly_cap: hourlyCap,
+          last_daily_fetch_at: fetchedAt,
+          fetch: fetchStage,
+          enrichment: enrichmentStage,
+          draft_generation: draftGenerationStage,
+          scheduling: schedulingStage,
+        };
+
+        await saveRunSummary(supabase, campaign, summary, fetchedAt);
+        if (!pipelineOk) failedCount += 1;
+        results.push(summary);
+      } catch (campaignError) {
+        const summary: Row = {
+          ...baseSummary,
+          ok: false,
+          skipped: false,
+          last_daily_fetch_at: fetchedAt,
+          error: campaignError instanceof Error
+            ? campaignError.message
+            : String(campaignError),
+        };
+        failedCount += 1;
+        try {
+          await saveRunSummary(supabase, campaign, summary, fetchedAt);
+        } catch (saveError) {
+          summary.summary_save_error = saveError instanceof Error
+            ? saveError.message
+            : String(saveError);
+        }
+        results.push(summary);
       }
-
-      if (outscraperJobs.ok && enrichJobEmails.ok) {
-        generateJobOutreachDrafts = await callFunction("generate-job-outreach-drafts", {
-          campaign_id: campaign.id,
-          user_id: userId,
-          limit: dailyJobLimit,
-        });
-      }
-
-      if (outscraperJobs.ok && enrichJobEmails.ok && generateJobOutreachDrafts.ok) {
-        draftSchedule = await scheduleDraftsHourly(supabase, campaign.id, dailyJobLimit);
-      }
-
-      const ok = outscraperJobs.ok && enrichJobEmails.ok && generateJobOutreachDrafts.ok;
-      const summary = {
-        ...baseSummary,
-        ok,
-        daily_job_limit: dailyJobLimit,
-        posted_within_hours: postedWithinHours,
-        outscraper_jobs: outscraperJobs,
-        enrich_job_emails: enrichJobEmails,
-        generate_job_outreach_drafts: generateJobOutreachDrafts,
-        draft_schedule: draftSchedule,
-      };
-
-      await saveRunSummary(supabase, campaign, summary, ok);
-      results.push(summary);
     }
 
-    return json({ ok: true, function: "applix-daily-job-fetcher", campaign_count: results.length, results });
+    return json({
+      ok: true,
+      function: FUNCTION_NAME,
+      inspect_only: inspectOnly,
+      trigger_source: triggerSource,
+      campaigns_queried: campaigns?.length || 0,
+      eligible_count: eligibleCount,
+      executed_count: executedCount,
+      would_execute_count: wouldExecuteCount,
+      skipped_count: skippedCount,
+      failed_count: failedCount,
+      results,
+    });
   } catch (error) {
-    return json({ ok: false, function: "applix-daily-job-fetcher", error: error instanceof Error ? error.message : String(error) }, 500);
+    return json({
+      ok: false,
+      function: FUNCTION_NAME,
+      error: error instanceof Error ? error.message : String(error),
+    }, 500);
   }
 });
