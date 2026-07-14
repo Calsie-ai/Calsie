@@ -68,14 +68,25 @@ async function updateRun(supabase: ReturnType<typeof createClient>, runId: strin
   return result.data as Row;
 }
 
-async function upsertRun(supabase: ReturnType<typeof createClient>, campaignId: string, input: Row) {
+async function loadOrCreateRun(supabase: ReturnType<typeof createClient>, campaignId: string, input: Row) {
   const runDate = text(input.run_date) || new Date().toISOString().slice(0, 10);
   const runType = text(input.run_type) || "daily_catalogue";
   const trigger = text(input.trigger) || "manual_test";
 
-  const result = await supabase
+  const existing = await supabase
     .from("orchestrator_runs")
-    .upsert({
+    .select("*")
+    .eq("campaign_id", campaignId)
+    .eq("run_date", runDate)
+    .eq("run_type", runType)
+    .maybeSingle();
+
+  if (existing.error) throw new Error(existing.error.message);
+  if (existing.data?.id) return existing.data as Row;
+
+  const inserted = await supabase
+    .from("orchestrator_runs")
+    .insert({
       campaign_id: campaignId,
       run_date: runDate,
       run_type: runType,
@@ -85,13 +96,27 @@ async function upsertRun(supabase: ReturnType<typeof createClient>, campaignId: 
       counters: {},
       stage_results: {},
       last_error: null,
-    }, { onConflict: "campaign_id,run_date,run_type", ignoreDuplicates: false })
+    })
     .select("*")
     .maybeSingle();
 
-  if (result.error) throw new Error(result.error.message);
-  if (!result.data?.id) throw new Error("Unable to create or load orchestrator run");
-  return result.data as Row;
+  if (inserted.error) {
+    if (inserted.error.code === "23505") {
+      const raced = await supabase
+        .from("orchestrator_runs")
+        .select("*")
+        .eq("campaign_id", campaignId)
+        .eq("run_date", runDate)
+        .eq("run_type", runType)
+        .maybeSingle();
+      if (raced.error) throw new Error(raced.error.message);
+      if (raced.data?.id) return raced.data as Row;
+    }
+    throw new Error(inserted.error.message);
+  }
+
+  if (!inserted.data?.id) throw new Error("Unable to create or load orchestrator run");
+  return inserted.data as Row;
 }
 
 Deno.serve(async (req) => {
@@ -123,7 +148,7 @@ Deno.serve(async (req) => {
     if (campaignResult.error) return reply({ ok: false, error: campaignResult.error.message }, 500);
     if (!campaignResult.data) return reply({ ok: false, error: "Campaign not found" }, 404);
 
-    const run = await upsertRun(supabase, campaignId, input);
+    const run = await loadOrCreateRun(supabase, campaignId, input);
     const runId = run.id as string;
     const existingStage = text(run.current_stage) || "queued";
     const terminal = ["completed", "ready_for_review"].includes(existingStage);
@@ -141,6 +166,7 @@ Deno.serve(async (req) => {
       status: "running",
       current_stage: "compiling_search_plan",
       started_at: run.started_at || new Date().toISOString(),
+      completed_at: null,
       heartbeat_at: new Date().toISOString(),
       last_error: null,
     });
