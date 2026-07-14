@@ -68,7 +68,7 @@ export default function WorkspacePanelsLive(props: Props) {
       <header>
         <p>Templates</p>
         <h1>Browse templates</h1>
-        <span>Choose a campaign template created in the Applix admin panel.</span>
+        <span>Choose a campaign template created in the Calsie Jobs admin panel.</span>
       </header>
 
       {selected ? (

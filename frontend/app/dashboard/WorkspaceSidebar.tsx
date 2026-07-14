@@ -35,7 +35,10 @@ export default function WorkspaceSidebar({
 
   return (
     <aside className="workspace-sidebar">
-      <div className="workspace-brand"><img src="/applix-logo.svg" alt="" /><strong>Applix</strong></div>
+      <div className="workspace-brand" aria-label="Calsie Jobs">
+        <img src="/applix-logo.svg" alt="" />
+        <strong>Calsie | Jobs</strong>
+      </div>
       <p className="workspace-label">Workspace</p>
       <nav>{primary.map(navButton)}</nav>
       <p className="workspace-label">Campaign</p>

@@ -14,6 +14,7 @@ import "./dashboard-template-browser.css";
 import "./tracker-editorial.css";
 import "./auth-theme.css";
 import "./admin-theme.css";
+import "./calsie-jobs-brand.css";
 
 export const metadata: Metadata = {
   title: "Calsie | Jobs",
