@@ -50,9 +50,9 @@ export default function AppFooter() {
           }}
         >
           <div style={{ maxWidth: "330px" }}>
-            <a href="#top" aria-label="Applix home" style={{ display: "inline-flex", alignItems: "center", gap: "12px", fontSize: "22px", fontWeight: 900 }}>
+            <a href="#top" aria-label="Calsie Jobs home" style={{ display: "inline-flex", alignItems: "center", gap: "12px", fontSize: "22px", fontWeight: 900 }}>
               <img src="/applix-logo.svg" alt="" style={{ width: "38px", height: "38px", objectFit: "contain" }} />
-              <span>Applix</span>
+              <span>Calsie | Jobs</span>
             </a>
             <p style={{ margin: "18px 0 0", color: "#555", fontSize: "15px", lineHeight: 1.65 }}>
               AI-powered job application support that helps people move faster while keeping every important decision in their hands.
@@ -112,7 +112,7 @@ export default function AppFooter() {
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", gap: "24px", flexWrap: "wrap", marginTop: "34px", paddingTop: "22px", borderTop: "1px solid rgba(17,17,17,0.42)", color: "#666", fontSize: "12px" }}>
-          <span>© 2026 Applix. All rights reserved.</span>
+          <span>© 2026 Calsie Jobs. All rights reserved.</span>
           <div style={{ display: "flex", gap: "18px" }}>
             <a href="/privacy">Privacy</a>
             <a href="/terms">Terms</a>
