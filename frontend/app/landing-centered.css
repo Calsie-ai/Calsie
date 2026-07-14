@@ -50,6 +50,10 @@
   justify-content: center;
 }
 
+.applix-landing .applix-hero-actions button.applix-button {
+  min-width: 112px;
+}
+
 .applix-landing .applix-status {
   display: inline-block;
   text-align: left;
@@ -58,6 +62,242 @@
 .applix-landing .applix-product-panel {
   width: min(100%, 760px);
   text-align: left;
+}
+
+.applix-landing .applix-tracker-preview {
+  width: min(100%, 1120px);
+  margin-top: clamp(24px, 4vw, 48px);
+  overflow: hidden;
+  border: 1px solid rgba(17, 17, 17, .13);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .88);
+  color: var(--applix-black);
+  text-align: left;
+  box-shadow: 0 24px 70px rgba(86, 30, 44, .13);
+}
+
+.applix-landing .applix-tracker-head,
+.applix-landing .applix-tracker-campaign,
+.applix-landing .applix-tracker-toolbar,
+.applix-landing .applix-tracker-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.applix-landing .applix-tracker-head {
+  padding: 22px 24px 16px;
+}
+
+.applix-landing .applix-tracker-kicker {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--applix-accent);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.applix-landing .applix-tracker-head h2 {
+  margin: 0;
+  font-size: clamp(23px, 3vw, 36px);
+  letter-spacing: -.045em;
+}
+
+.applix-landing .applix-tracker-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: #fff0f2;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.applix-landing .applix-tracker-live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--applix-accent);
+  box-shadow: 0 0 0 5px rgba(255, 105, 125, .12);
+}
+
+.applix-landing .applix-tracker-campaign {
+  padding: 13px 24px;
+  border-top: 1px solid rgba(0, 0, 0, .08);
+  border-bottom: 1px solid rgba(0, 0, 0, .08);
+  background: #fff8f9;
+}
+
+.applix-landing .applix-tracker-campaign strong {
+  font-size: 14px;
+}
+
+.applix-landing .applix-tracker-campaign span {
+  color: var(--applix-muted);
+  font-size: 12px;
+}
+
+.applix-landing .applix-tracker-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 1px solid rgba(0, 0, 0, .08);
+}
+
+.applix-landing .applix-tracker-stats > div {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 17px 12px;
+  border-right: 1px solid rgba(0, 0, 0, .08);
+}
+
+.applix-landing .applix-tracker-stats > div:last-child {
+  border-right: 0;
+}
+
+.applix-landing .applix-tracker-stats span {
+  color: var(--applix-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.applix-landing .applix-tracker-stats strong {
+  font-size: clamp(21px, 3vw, 31px);
+  line-height: 1;
+}
+
+.applix-landing .applix-tracker-stats > div:first-child strong {
+  color: var(--applix-accent);
+}
+
+.applix-landing .applix-tracker-toolbar {
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(0, 0, 0, .08);
+}
+
+.applix-landing .applix-tracker-toolbar > div {
+  display: flex;
+  gap: 7px;
+}
+
+.applix-landing .applix-tracker-toolbar span {
+  padding: 7px 10px;
+  border: 1px solid rgba(0, 0, 0, .09);
+  border-radius: 7px;
+  background: white;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.applix-landing .applix-tracker-toolbar span.is-active {
+  border-color: var(--applix-accent);
+  background: var(--applix-accent);
+}
+
+.applix-landing .applix-tracker-toolbar p {
+  margin: 0;
+  color: var(--applix-muted);
+  font-size: 11px;
+}
+
+.applix-landing .applix-tracker-table {
+  padding: 0 18px;
+}
+
+.applix-landing .applix-tracker-row {
+  display: grid;
+  grid-template-columns: 1.35fr 1.45fr .7fr .65fr;
+  align-items: center;
+  min-width: 700px;
+  border-bottom: 1px solid rgba(0, 0, 0, .07);
+}
+
+.applix-landing .applix-tracker-row > span {
+  padding: 13px 12px;
+  font-size: 12px;
+}
+
+.applix-landing .applix-tracker-row > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.applix-landing .applix-tracker-row small {
+  color: var(--applix-muted);
+  font-size: 10px;
+}
+
+.applix-landing .applix-tracker-row--head {
+  color: var(--applix-muted);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.applix-landing .applix-tracker-row--head > span {
+  font-size: 9px;
+}
+
+.applix-landing .tracker-status {
+  display: inline-flex;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: #e5f6e9;
+  color: #255b33;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.applix-landing .tracker-status--queued {
+  background: #fff4d6;
+  color: #72550c;
+}
+
+.applix-landing .tracker-status--declined {
+  background: #f3f3f3;
+  color: #666;
+}
+
+.applix-landing .tracker-status--found {
+  background: #e8eefc;
+  color: #344d89;
+}
+
+.applix-landing .applix-tracker-row button {
+  min-width: 68px;
+  border: 1px solid rgba(0, 0, 0, .14);
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: #fff;
+  color: var(--applix-black);
+  font-size: 10px;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.applix-landing .applix-tracker-row button:not(:disabled) {
+  box-shadow: none;
+}
+
+.applix-landing .applix-tracker-foot {
+  padding: 15px 24px 18px;
+  color: var(--applix-muted);
+  font-size: 11px;
+}
+
+.applix-landing .applix-tracker-foot strong {
+  color: var(--applix-black);
+  font-size: 11px;
 }
 
 .applix-landing .applix-section-header {
@@ -141,6 +381,36 @@ body:has(.applix-landing),
   box-shadow: 0 18px 50px rgba(0, 0, 0, .08);
 }
 
+@media (max-width: 760px) {
+  .applix-landing .applix-tracker-preview {
+    border-radius: 16px;
+  }
+
+  .applix-landing .applix-tracker-head,
+  .applix-landing .applix-tracker-campaign,
+  .applix-landing .applix-tracker-toolbar,
+  .applix-landing .applix-tracker-foot {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .applix-landing .applix-tracker-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .applix-landing .applix-tracker-stats > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .applix-landing .applix-tracker-stats > div:nth-child(-n+2) {
+    border-bottom: 1px solid rgba(0, 0, 0, .08);
+  }
+
+  .applix-landing .applix-tracker-table {
+    overflow-x: auto;
+  }
+}
+
 @media (max-width: 640px) {
   .applix-landing .applix-hero-grid,
   .applix-landing .applix-philosophy-panel,
@@ -159,5 +429,15 @@ body:has(.applix-landing),
 
   .applix-landing .applix-hero h1::after {
     font-size: clamp(14px, 4.4vw, 18px);
+  }
+
+  .applix-landing .applix-tracker-head {
+    padding: 18px;
+  }
+
+  .applix-landing .applix-tracker-campaign,
+  .applix-landing .applix-tracker-foot {
+    padding-left: 18px;
+    padding-right: 18px;
   }
 }
