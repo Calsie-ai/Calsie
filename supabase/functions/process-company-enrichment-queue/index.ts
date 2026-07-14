@@ -5,8 +5,11 @@ type Row = Record<string, any>;
 
 const FUNCTION_NAME = "process-company-enrichment-queue";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || Deno.env.get("APPLIX_SERVICE_ROLE_KEY") || "";
-const CRON_SECRET = Deno.env.get("CRON_SECRET") || Deno.env.get("APPLIX_CRON_SECRET") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  Deno.env.get("SERVICE_ROLE_KEY") || Deno.env.get("APPLIX_SERVICE_ROLE_KEY") ||
+  "";
+const CRON_SECRET = Deno.env.get("CRON_SECRET") ||
+  Deno.env.get("APPLIX_CRON_SECRET") || "";
 const MAX_WORKER_LIMIT = 1;
 const ENRICH_TIMEOUT_MS = 55_000;
 const DRAFT_TIMEOUT_MS = 45_000;
@@ -14,7 +17,8 @@ const DRAFT_TIMEOUT_MS = 45_000;
 const corsHeaders = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "POST, OPTIONS",
-  "access-control-allow-headers": "authorization, x-client-info, apikey, content-type, x-applix-cron-secret, x-cron-secret, cron-secret",
+  "access-control-allow-headers":
+    "authorization, x-client-info, apikey, content-type, x-applix-cron-secret, x-cron-secret, cron-secret",
 };
 
 const BLOCKED_EMAIL_PARTS = [
@@ -58,14 +62,16 @@ function isInternalAuthorized(req: Request) {
   const xCronSecret = req.headers.get("x-cron-secret") || "";
   const plainCronSecret = req.headers.get("cron-secret") || "";
 
-  if (SUPABASE_SERVICE_ROLE_KEY && token === SUPABASE_SERVICE_ROLE_KEY) return true;
+  if (SUPABASE_SERVICE_ROLE_KEY && token === SUPABASE_SERVICE_ROLE_KEY) {
+    return true;
+  }
 
   return Boolean(
     CRON_SECRET &&
       (token === CRON_SECRET ||
         xApplixCronSecret === CRON_SECRET ||
         xCronSecret === CRON_SECRET ||
-        plainCronSecret === CRON_SECRET)
+        plainCronSecret === CRON_SECRET),
   );
 }
 
@@ -84,17 +90,23 @@ function normaliseDomain(value: unknown): string | null {
   if (!raw) return null;
   try {
     const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    return new URL(withProtocol).hostname.toLowerCase().replace(/^www\./, "") || null;
+    return new URL(withProtocol).hostname.toLowerCase().replace(/^www\./, "") ||
+      null;
   } catch {
-    return raw.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] || null;
+    return raw.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "")
+      .split("/")[0] || null;
   }
 }
 
-function emailDomainMatchesWebsite(email: string | null, website: string | null) {
+function emailDomainMatchesWebsite(
+  email: string | null,
+  website: string | null,
+) {
   const domain = email?.split("@")[1]?.toLowerCase() || null;
   const websiteDomain = normaliseDomain(website);
   if (!domain || !websiteDomain) return false;
-  return domain === websiteDomain || domain.endsWith(`.${websiteDomain}`) || websiteDomain.endsWith(`.${domain}`);
+  return domain === websiteDomain || domain.endsWith(`.${websiteDomain}`) ||
+    websiteDomain.endsWith(`.${domain}`);
 }
 
 function isReusablePoolRow(row: Row) {
@@ -102,7 +114,11 @@ function isReusablePoolRow(row: Row) {
   if (!email) return false;
   if (txt(row.status).toLowerCase() !== "active") return false;
   if (Number(row.confidence || 0) < 70) return false;
-  if (row.company_website_url && !emailDomainMatchesWebsite(email, row.company_website_url) && Number(row.confidence || 0) < 90) return false;
+  if (
+    row.company_website_url &&
+    !emailDomainMatchesWebsite(email, row.company_website_url) &&
+    Number(row.confidence || 0) < 90
+  ) return false;
   return true;
 }
 
@@ -110,25 +126,34 @@ async function invokeFunction(name: string, payload: Row, timeoutMs: number) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/${name}`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
+    const response = await fetch(
+      `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1/${name}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
       },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
+    );
 
     const body = await response.json().catch(() => ({}));
     if (!response.ok || body?.ok === false) {
-      throw new Error(`${name} failed: ${txt(body?.error || response.statusText, "Unknown function error")}`);
+      throw new Error(
+        `${name} failed: ${
+          txt(body?.error || response.statusText, "Unknown function error")
+        }`,
+      );
     }
     return body as Row;
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error(`${name} timed out after ${Math.round(timeoutMs / 1000)} seconds`);
+      throw new Error(
+        `${name} timed out after ${Math.round(timeoutMs / 1000)} seconds`,
+      );
     }
     throw error;
   } finally {
@@ -136,7 +161,7 @@ async function invokeFunction(name: string, payload: Row, timeoutMs: number) {
   }
 }
 
-async function findPoolContact(supabase: ReturnType<typeof createClient>, normalizedCompany: string) {
+async function findPoolContact(supabase: any, normalizedCompany: string) {
   const { data, error } = await supabase
     .from("company_contacts_pool")
     .select("*")
@@ -151,14 +176,21 @@ async function findPoolContact(supabase: ReturnType<typeof createClient>, normal
   return (data || [])
     .map((row: Row) => ({ ...row, email: cleanEmail(row.email) }))
     .filter(isReusablePoolRow)
-    .sort((a: Row, b: Row) => Number(b.confidence || 0) - Number(a.confidence || 0))[0] || null;
+    .sort((a: Row, b: Row) =>
+      Number(b.confidence || 0) - Number(a.confidence || 0)
+    )[0] || null;
 }
 
-async function unlockStaleProcessingRows(supabase: ReturnType<typeof createClient>) {
+async function unlockStaleProcessingRows(supabase: any) {
   const staleBefore = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   const { error, count } = await supabase
     .from("company_enrichment_queue")
-    .update({ status: "pending", locked_at: null, locked_by: null, updated_at: new Date().toISOString() }, { count: "exact" })
+    .update({
+      status: "pending",
+      locked_at: null,
+      locked_by: null,
+      updated_at: new Date().toISOString(),
+    }, { count: "exact" })
     .eq("status", "processing")
     .lt("locked_at", staleBefore);
 
@@ -166,7 +198,34 @@ async function unlockStaleProcessingRows(supabase: ReturnType<typeof createClien
   return Number(count || 0);
 }
 
-async function loadQueueMappings(supabase: ReturnType<typeof createClient>, queueRow: Row) {
+async function countQueueState(supabase: any) {
+  const now = new Date().toISOString();
+  const [due, pending, processing] = await Promise.all([
+    supabase
+      .from("company_enrichment_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .lte("available_at", now),
+    supabase
+      .from("company_enrichment_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("company_enrichment_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "processing"),
+  ]);
+
+  const error = due.error || pending.error || processing.error;
+  if (error) throw new Error(error.message);
+  return {
+    due: Number(due.count || 0),
+    pending: Number(pending.count || 0),
+    processing: Number(processing.count || 0),
+  };
+}
+
+async function loadQueueMappings(supabase: any, queueRow: Row) {
   const { data, error } = await supabase
     .from("company_enrichment_queue_jobs")
     .select("id,queue_id,job_id,user_id,campaign_id,status")
@@ -176,7 +235,9 @@ async function loadQueueMappings(supabase: ReturnType<typeof createClient>, queu
   if (error) throw new Error(error.message);
   if ((data || []).length > 0) return data || [];
 
-  const legacyJobIds = Array.isArray(queueRow.job_ids) ? queueRow.job_ids.filter(Boolean) : [];
+  const legacyJobIds = Array.isArray(queueRow.job_ids)
+    ? queueRow.job_ids.filter(Boolean)
+    : [];
   return legacyJobIds.map((jobId: string) => ({
     id: null,
     queue_id: queueRow.id,
@@ -187,19 +248,29 @@ async function loadQueueMappings(supabase: ReturnType<typeof createClient>, queu
   }));
 }
 
-async function incrementPoolContact(supabase: ReturnType<typeof createClient>, row: Row, count: number) {
+async function incrementPoolContact(supabase: any, row: Row, count: number) {
   const now = new Date().toISOString();
   const { error } = await supabase
     .from("company_contacts_pool")
-    .update({ use_count: Number(row.use_count || 0) + count, last_used_at: now, updated_at: now })
+    .update({
+      use_count: Number(row.use_count || 0) + count,
+      last_used_at: now,
+      updated_at: now,
+    })
     .eq("id", row.id);
   if (error) throw new Error(error.message);
 }
 
-async function updateMappedJobsWithPoolContact(supabase: ReturnType<typeof createClient>, mappings: Row[], poolRow: Row) {
+async function updateMappedJobsWithPoolContact(
+  supabase: any,
+  mappings: Row[],
+  poolRow: Row,
+) {
   const email = cleanEmail(poolRow.email);
   if (!email) return 0;
-  const jobIds = [...new Set(mappings.map((mapping) => mapping.job_id).filter(Boolean))];
+  const jobIds = [
+    ...new Set(mappings.map((mapping) => mapping.job_id).filter(Boolean)),
+  ];
   if (!jobIds.length) return 0;
 
   const now = new Date().toISOString();
@@ -226,25 +297,35 @@ async function updateMappedJobsWithPoolContact(supabase: ReturnType<typeof creat
   return jobIds.length;
 }
 
-async function createNotification(supabase: ReturnType<typeof createClient>, userId: string, campaignId: string, draftsReady: number) {
+async function createNotification(
+  supabase: any,
+  userId: string,
+  campaignId: string,
+  draftsReady: number,
+) {
   await supabase.from("user_notifications").insert({
     user_id: userId,
     campaign_id: campaignId,
     type: "company_enrichment_completed",
     title: "Applications ready for review",
-    message: `Applix prepared ${draftsReady} applications. Please review and approve before sending.`,
+    message:
+      `Applix prepared ${draftsReady} applications. Please review and approve before sending.`,
     metadata: { drafts_ready: draftsReady },
   });
 }
 
-async function generateDraftsForMappings(supabase: ReturnType<typeof createClient>, mappings: Row[]) {
-  const byUserCampaign = new Map<string, { userId: string; campaignId: string; count: number }>();
+async function generateDraftsForMappings(supabase: any, mappings: Row[]) {
+  const byUserCampaign = new Map<
+    string,
+    { userId: string; campaignId: string; count: number }
+  >();
   for (const mapping of mappings) {
     const userId = txt(mapping.user_id);
     const campaignId = txt(mapping.campaign_id);
     if (!userId || !campaignId) continue;
     const key = `${userId}:${campaignId}`;
-    const existing = byUserCampaign.get(key) || { userId, campaignId, count: 0 };
+    const existing = byUserCampaign.get(key) ||
+      { userId, campaignId, count: 0 };
     existing.count += 1;
     byUserCampaign.set(key, existing);
   }
@@ -260,12 +341,14 @@ async function generateDraftsForMappings(supabase: ReturnType<typeof createClien
     }, DRAFT_TIMEOUT_MS);
     const created = Number(result.draft_created_count || 0);
     draftsReady += created;
-    if (created > 0) await createNotification(supabase, item.userId, item.campaignId, created);
+    if (created > 0) {
+      await createNotification(supabase, item.userId, item.campaignId, created);
+    }
   }
   return draftsReady;
 }
 
-async function markMappingsCompleted(supabase: ReturnType<typeof createClient>, mappings: Row[]) {
+async function markMappingsCompleted(supabase: any, mappings: Row[]) {
   const mappingIds = mappings.map((mapping) => mapping.id).filter(Boolean);
   if (!mappingIds.length) return;
   const { error } = await supabase
@@ -275,22 +358,32 @@ async function markMappingsCompleted(supabase: ReturnType<typeof createClient>, 
   if (error) throw new Error(error.message);
 }
 
-async function markCompleted(supabase: ReturnType<typeof createClient>, queueId: string) {
+async function markCompleted(supabase: any, queueId: string) {
   const now = new Date().toISOString();
   const { error } = await supabase
     .from("company_enrichment_queue")
-    .update({ status: "completed", processed_at: now, updated_at: now, locked_at: null, locked_by: null, last_error: null })
+    .update({
+      status: "completed",
+      processed_at: now,
+      updated_at: now,
+      locked_at: null,
+      locked_by: null,
+      last_error: null,
+    })
     .eq("id", queueId);
   if (error) throw new Error(error.message);
 }
 
-async function markRetryOrFailed(supabase: ReturnType<typeof createClient>, row: Row, message: string) {
+async function markRetryOrFailed(supabase: any, row: Row, message: string) {
   const attempts = Number(row.attempts || 0) + 1;
   const maxAttempts = Number(row.max_attempts || 3);
   const failed = attempts >= maxAttempts;
-  const backoffMinutes = message.includes("timed out") ? 5 : Math.min(240, Math.max(15, attempts * 15));
+  const backoffMinutes = message.includes("timed out")
+    ? 5
+    : Math.min(240, Math.max(15, attempts * 15));
   const now = new Date();
-  const availableAt = new Date(now.getTime() + backoffMinutes * 60 * 1000).toISOString();
+  const availableAt = new Date(now.getTime() + backoffMinutes * 60 * 1000)
+    .toISOString();
 
   const { error } = await supabase
     .from("company_enrichment_queue")
@@ -308,7 +401,7 @@ async function markRetryOrFailed(supabase: ReturnType<typeof createClient>, row:
   return failed ? "failed" : "retried";
 }
 
-async function claimRows(supabase: ReturnType<typeof createClient>, workerId: string) {
+async function claimRows(supabase: any, workerId: string) {
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("company_enrichment_queue")
@@ -322,11 +415,20 @@ async function claimRows(supabase: ReturnType<typeof createClient>, workerId: st
   if (error) throw new Error(error.message);
 
   const claimed: Row[] = [];
-  for (const row of (data || []).filter((item: Row) => Number(item.attempts || 0) < Number(item.max_attempts || 3))) {
+  for (
+    const row of (data || []).filter((item: Row) =>
+      Number(item.attempts || 0) < Number(item.max_attempts || 3)
+    )
+  ) {
     if (claimed.length >= MAX_WORKER_LIMIT) break;
     const update = await supabase
       .from("company_enrichment_queue")
-      .update({ status: "processing", locked_at: now, locked_by: workerId, updated_at: now })
+      .update({
+        status: "processing",
+        locked_at: now,
+        locked_by: workerId,
+        updated_at: now,
+      })
       .eq("id", row.id)
       .eq("status", "pending")
       .select("*")
@@ -338,9 +440,14 @@ async function claimRows(supabase: ReturnType<typeof createClient>, workerId: st
   return claimed;
 }
 
-async function processRow(supabase: ReturnType<typeof createClient>, row: Row, limits: { emailFinderCallsRemaining: number }) {
+async function processRow(
+  supabase: any,
+  row: Row,
+  limits: { emailFinderCallsRemaining: number },
+) {
   const mappings = await loadQueueMappings(supabase, row);
-  const firstJobId = mappings.map((mapping) => mapping.job_id).filter(Boolean)[0];
+  const firstJobId =
+    mappings.map((mapping: Row) => mapping.job_id).filter(Boolean)[0];
 
   let pool = await findPoolContact(supabase, row.normalized_company);
   let enrichTimedOut = false;
@@ -361,7 +468,9 @@ async function processRow(supabase: ReturnType<typeof createClient>, row: Row, l
       }, ENRICH_TIMEOUT_MS);
 
       if (Number(enrichResult.provider_missing || 0) > 0) {
-        throw new Error("Website search provider missing; retry after WEBSITE_SEARCH_API_URL and WEBSITE_SEARCH_API_KEY are configured.");
+        throw new Error(
+          "Website search provider missing; retry after WEBSITE_SEARCH_API_URL and WEBSITE_SEARCH_API_KEY are configured.",
+        );
       }
       if (Number(enrichResult.failed || 0) > 0) {
         throw new Error("enrich-job-emails failed for queued company.");
@@ -385,7 +494,11 @@ async function processRow(supabase: ReturnType<typeof createClient>, row: Row, l
     emailFound = true;
     websiteFound = Boolean(pool.company_website_url);
     poolReused = true;
-    updatedJobs = await updateMappedJobsWithPoolContact(supabase, mappings, pool);
+    updatedJobs = await updateMappedJobsWithPoolContact(
+      supabase,
+      mappings,
+      pool,
+    );
     draftsReady = await generateDraftsForMappings(supabase, mappings);
   }
 
@@ -393,32 +506,65 @@ async function processRow(supabase: ReturnType<typeof createClient>, row: Row, l
     await markMappingsCompleted(supabase, mappings);
     await markCompleted(supabase, row.id);
   }
-  return { status: "completed", poolReused, emailFound, websiteFound, updatedJobs, draftsReady };
+  return {
+    status: "completed",
+    poolReused,
+    emailFound,
+    websiteFound,
+    updatedJobs,
+    draftsReady,
+  };
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: corsHeaders });
+  }
 
   try {
-    if (req.method !== "POST") return json({ ok: false, error: "Use POST." }, 405);
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return json({ ok: false, error: "Missing Supabase service role configuration." }, 500);
-    if (!isInternalAuthorized(req)) return json({ ok: false, error: "Unauthorized." }, 401);
+    if (req.method !== "POST") {
+      return json({ ok: false, error: "Use POST." }, 405);
+    }
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return json({
+        ok: false,
+        error: "Missing Supabase service role configuration.",
+      }, 500);
+    }
+    if (!isInternalAuthorized(req)) {
+      return json({ ok: false, error: "Unauthorized." }, 401);
+    }
 
     const input = await req.json().catch(() => ({}));
-    const maxEmailFinderCalls = Math.max(0, Math.min(1, Number(input.max_email_finder_calls ?? 1)));
-    const workerId = txt(input.lock_id, `${FUNCTION_NAME}-${crypto.randomUUID()}`);
+    const maxEmailFinderCalls = Math.max(
+      0,
+      Math.min(1, Number(input.max_email_finder_calls ?? 1)),
+    );
+    const workerId = txt(
+      input.lock_id,
+      `${FUNCTION_NAME}-${crypto.randomUUID()}`,
+    );
+    const triggerSource = txt(input.source || input.trigger, "direct");
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-    const stale_unlocked = await unlockStaleProcessingRows(supabase);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false },
+    });
+    const staleUnlocked = await unlockStaleProcessingRows(supabase);
+    const before = await countQueueState(supabase);
     const rows = await claimRows(supabase, workerId);
     const limits = { emailFinderCallsRemaining: maxEmailFinderCalls };
 
-    const summary = {
+    const summary: Row = {
       ok: true,
       function: FUNCTION_NAME,
+      trigger_source: triggerSource,
+      worker_id: workerId,
+      lease_managed_by: "drain-company-enrichment-queue",
       requested_limit_ignored: input.limit ?? null,
       hard_limit: MAX_WORKER_LIMIT,
-      stale_unlocked,
+      stale_unlocked: staleUnlocked,
+      queue_rows_due: before.due,
+      queue_rows_claimed: rows.length,
       claimed: rows.length,
       pool_reused: 0,
       website_found: 0,
@@ -428,6 +574,7 @@ serve(async (req) => {
       retried: 0,
       drafts_ready: 0,
       updated_jobs: 0,
+      errors: [],
     };
 
     for (const row of rows) {
@@ -440,14 +587,24 @@ serve(async (req) => {
         summary.drafts_ready += Number(result.draftsReady || 0);
         summary.updated_jobs += Number(result.updatedJobs || 0);
       } catch (error) {
-        const action = await markRetryOrFailed(supabase, row, error instanceof Error ? error.message : String(error));
+        const message = error instanceof Error ? error.message : String(error);
+        const action = await markRetryOrFailed(supabase, row, message);
         if (action === "failed") summary.failed += 1;
         else summary.retried += 1;
+        summary.errors.push({ queue_id: row.id, action, error: message });
       }
     }
 
+    const after = await countQueueState(supabase);
+    summary.pending_after_run = after.pending;
+    summary.pending_due_after_run = after.due;
+    summary.processing_after_run = after.processing;
     return json(summary);
   } catch (error) {
-    return json({ ok: false, function: FUNCTION_NAME, error: error instanceof Error ? error.message : String(error) }, 500);
+    return json({
+      ok: false,
+      function: FUNCTION_NAME,
+      error: error instanceof Error ? error.message : String(error),
+    }, 500);
   }
 });
