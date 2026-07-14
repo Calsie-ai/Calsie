@@ -41,7 +41,6 @@ async function callFunction(name: string, body: Row) {
     },
     body: JSON.stringify(body),
   });
-
   const raw = await response.text().catch(() => "");
   let payload: Row = {};
   try {
@@ -49,12 +48,7 @@ async function callFunction(name: string, body: Row) {
   } catch {
     payload = { raw };
   }
-
-  return {
-    ok: response.ok && payload.ok !== false,
-    status: response.status,
-    payload,
-  };
+  return { ok: response.ok && payload.ok !== false, status: response.status, payload };
 }
 
 async function updateRun(supabase: ReturnType<typeof createClient>, runId: string, patch: Row) {
@@ -72,7 +66,6 @@ async function loadOrCreateRun(supabase: ReturnType<typeof createClient>, campai
   const runDate = text(input.run_date) || new Date().toISOString().slice(0, 10);
   const runType = text(input.run_type) || "daily_catalogue";
   const trigger = text(input.trigger) || "manual_test";
-
   const existing = await supabase
     .from("orchestrator_runs")
     .select("*")
@@ -80,42 +73,21 @@ async function loadOrCreateRun(supabase: ReturnType<typeof createClient>, campai
     .eq("run_date", runDate)
     .eq("run_type", runType)
     .maybeSingle();
-
   if (existing.error) throw new Error(existing.error.message);
   if (existing.data?.id) return existing.data as Row;
 
-  const inserted = await supabase
-    .from("orchestrator_runs")
-    .insert({
-      campaign_id: campaignId,
-      run_date: runDate,
-      run_type: runType,
-      trigger,
-      status: "queued",
-      current_stage: "queued",
-      counters: {},
-      stage_results: {},
-      last_error: null,
-    })
-    .select("*")
-    .maybeSingle();
-
-  if (inserted.error) {
-    if (inserted.error.code === "23505") {
-      const raced = await supabase
-        .from("orchestrator_runs")
-        .select("*")
-        .eq("campaign_id", campaignId)
-        .eq("run_date", runDate)
-        .eq("run_type", runType)
-        .maybeSingle();
-      if (raced.error) throw new Error(raced.error.message);
-      if (raced.data?.id) return raced.data as Row;
-    }
-    throw new Error(inserted.error.message);
-  }
-
-  if (!inserted.data?.id) throw new Error("Unable to create or load orchestrator run");
+  const inserted = await supabase.from("orchestrator_runs").insert({
+    campaign_id: campaignId,
+    run_date: runDate,
+    run_type: runType,
+    trigger,
+    status: "queued",
+    current_stage: "queued",
+    counters: {},
+    stage_results: {},
+  }).select("*").maybeSingle();
+  if (inserted.error) throw new Error(inserted.error.message);
+  if (!inserted.data?.id) throw new Error("Unable to create orchestrator run");
   return inserted.data as Row;
 }
 
@@ -132,10 +104,7 @@ Deno.serve(async (req) => {
     const dryRun = input.dry_run !== false;
     const allowedCampaignId = text(input.allowed_campaign_id);
     if (!dryRun && allowedCampaignId !== campaignId) {
-      return reply({
-        ok: false,
-        error: "Non-dry-run execution requires allowed_campaign_id to exactly equal campaign_id",
-      }, 400);
+      return reply({ ok: false, error: "Non-dry-run execution requires allowed_campaign_id to exactly equal campaign_id" }, 400);
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
@@ -144,24 +113,11 @@ Deno.serve(async (req) => {
       .select("id,user_id,name,location,target_business_type,search,filters,outreach,status,created_at")
       .eq("id", campaignId)
       .maybeSingle();
-
-    if (campaignResult.error) return reply({ ok: false, error: campaignResult.error.message }, 500);
+    if (campaignResult.error) throw new Error(campaignResult.error.message);
     if (!campaignResult.data) return reply({ ok: false, error: "Campaign not found" }, 404);
 
     const run = await loadOrCreateRun(supabase, campaignId, input);
     const runId = run.id as string;
-    const existingStage = text(run.current_stage) || "queued";
-    const terminal = ["completed", "ready_for_review"].includes(existingStage);
-    if (terminal && input.force_restart !== true) {
-      return reply({
-        ok: true,
-        resumed: false,
-        skipped: true,
-        reason: `Run is already at terminal stage ${existingStage}`,
-        run,
-      });
-    }
-
     await updateRun(supabase, runId, {
       status: "running",
       current_stage: "compiling_search_plan",
@@ -177,161 +133,143 @@ Deno.serve(async (req) => {
       catalogue_age_days: safeInteger(input.catalogue_age_days, 30, 1, 30),
       minimum_match_score: safeInteger(input.minimum_match_score, 70, 0, 100),
     });
-
-    if (!compiler.ok) {
-      await updateRun(supabase, runId, {
-        status: "needs_attention",
-        current_stage: "failed",
-        last_error: JSON.stringify(compiler.payload).slice(0, 2000),
-        stage_results: { ...(run.stage_results || {}), compile_search_plan: compiler },
-      });
-      return reply({ ok: false, stage: "compiling_search_plan", run_id: runId, result: compiler }, 500);
-    }
-
+    if (!compiler.ok) throw new Error(`compile-campaign-search-plan failed: ${JSON.stringify(compiler.payload).slice(0, 1200)}`);
     const plan = compiler.payload.plan as Row;
+
     await updateRun(supabase, runId, {
       current_stage: "checking_catalogue",
       search_plan: plan,
-      stage_results: { ...(run.stage_results || {}), compile_search_plan: compiler.payload },
+      stage_results: { compile_search_plan: compiler.payload },
       heartbeat_at: new Date().toISOString(),
     });
 
-    const matcher = await callFunction("match-campaign-jobs", {
+    const firstMatch = await callFunction("match-campaign-jobs", {
       campaign_id: campaignId,
       orchestrator_run_id: runId,
       search_plan: plan,
-      limit: safeInteger(input.catalogue_scan_limit, 300, 1, 500),
+      limit: safeInteger(input.catalogue_scan_limit, 500, 1, 500),
     });
+    if (!firstMatch.ok) throw new Error(`Initial catalogue match failed: ${JSON.stringify(firstMatch.payload).slice(0, 1200)}`);
 
-    if (!matcher.ok) {
-      await updateRun(supabase, runId, {
-        status: "needs_attention",
-        current_stage: "failed",
-        last_error: JSON.stringify(matcher.payload).slice(0, 2000),
-        stage_results: {
-          ...(run.stage_results || {}),
-          compile_search_plan: compiler.payload,
-          catalogue_match: matcher,
-        },
-      });
-      return reply({ ok: false, stage: "checking_catalogue", run_id: runId, result: matcher }, 500);
-    }
-
-    const reusable = Number(matcher.payload.eligible || 0);
     const dailyTarget = Number(plan.daily_target || 24);
-    const shortage = Math.max(0, dailyTarget - reusable);
-    const fetchPool = Math.min(200, Math.max(100, shortage * 5));
-
-    await updateRun(supabase, runId, {
-      current_stage: "calculating_shortage",
-      counters: {
-        catalogue_checked: Number(matcher.payload.catalogue_checked || 0),
-        catalogue_eligible: reusable,
-        catalogue_rejected: Number(matcher.payload.rejected || 0),
-        daily_target: dailyTarget,
-        shortage,
-        planned_fetch_pool: shortage > 0 ? fetchPool : 0,
-      },
-      stage_results: {
-        compile_search_plan: compiler.payload,
-        catalogue_match: matcher.payload,
-      },
-      heartbeat_at: new Date().toISOString(),
-    });
+    const reusableBeforeFetch = Number(firstMatch.payload.eligible || 0);
+    const shortageBeforeFetch = Math.max(0, dailyTarget - reusableBeforeFetch);
+    const fetchPool = shortageBeforeFetch > 0 ? Math.min(200, Math.max(100, shortageBeforeFetch * 5)) : 0;
 
     if (dryRun) {
-      const dryRunState = shortage > 0 ? "fetching_jobs" : "selecting_jobs";
       const finalRun = await updateRun(supabase, runId, {
         status: "partially_completed",
-        current_stage: dryRunState,
+        current_stage: shortageBeforeFetch > 0 ? "fetching_jobs" : "selecting_jobs",
         completed_at: new Date().toISOString(),
+        counters: {
+          daily_target: dailyTarget,
+          catalogue_checked: Number(firstMatch.payload.catalogue_checked || 0),
+          catalogue_eligible: reusableBeforeFetch,
+          catalogue_rejected: Number(firstMatch.payload.rejected || 0),
+          shortage: shortageBeforeFetch,
+          planned_fetch_pool: fetchPool,
+        },
         stage_results: {
           compile_search_plan: compiler.payload,
-          catalogue_match: matcher.payload,
+          catalogue_match_before_fetch: firstMatch.payload,
           shortage_decision: {
             dry_run: true,
-            outscraper_required: shortage > 0,
-            shortage,
-            fetch_pool: shortage > 0 ? fetchPool : 0,
+            outscraper_required: shortageBeforeFetch > 0,
+            shortage: shortageBeforeFetch,
+            fetch_pool: fetchPool,
           },
         },
       });
-
       return reply({
         ok: true,
         function: "calsie-campaign-orchestrator-v2",
-        version: "phase_1_dry_run",
+        version: "phase_2_dry_run",
         dry_run: true,
         production_pipeline_unchanged: true,
         run: finalRun,
       });
     }
 
-    if (shortage > 0) {
-      const waitingRun = await updateRun(supabase, runId, {
-        status: "partially_completed",
+    let fetchResult: Row | null = null;
+    let finalMatch = firstMatch;
+    if (shortageBeforeFetch > 0) {
+      await updateRun(supabase, runId, {
         current_stage: "fetching_jobs",
-        last_error: "Phase 1 stops before external fetching. Enable fetch-job-catalogue-v2 only after Darwin dry-run validation.",
-        completed_at: new Date().toISOString(),
+        heartbeat_at: new Date().toISOString(),
       });
+      const fetched = await callFunction("fetch-job-catalogue-v2", {
+        campaign_id: campaignId,
+        orchestrator_run_id: runId,
+        search_plan: plan,
+        fetch_pool_limit: fetchPool,
+      });
+      if (!fetched.ok) throw new Error(`fetch-job-catalogue-v2 failed: ${JSON.stringify(fetched.payload).slice(0, 1600)}`);
+      fetchResult = fetched.payload;
 
-      return reply({
-        ok: true,
-        function: "calsie-campaign-orchestrator-v2",
-        version: "phase_1_guarded",
-        dry_run: false,
-        run: waitingRun,
-        next_required_stage: "fetch-job-catalogue-v2",
-      }, 202);
+      await updateRun(supabase, runId, {
+        current_stage: "matching_jobs",
+        heartbeat_at: new Date().toISOString(),
+      });
+      finalMatch = await callFunction("match-campaign-jobs", {
+        campaign_id: campaignId,
+        orchestrator_run_id: runId,
+        search_plan: plan,
+        limit: safeInteger(input.catalogue_scan_limit, 500, 1, 500),
+      });
+      if (!finalMatch.ok) throw new Error(`Post-fetch catalogue match failed: ${JSON.stringify(finalMatch.payload).slice(0, 1200)}`);
     }
 
     await updateRun(supabase, runId, {
       current_stage: "selecting_jobs",
       heartbeat_at: new Date().toISOString(),
     });
-
     const selector = await callFunction("select-daily-job-batch", {
       campaign_id: campaignId,
       orchestrator_run_id: runId,
       daily_target: dailyTarget,
     });
+    if (!selector.ok) throw new Error(`select-daily-job-batch failed: ${JSON.stringify(selector.payload).slice(0, 1200)}`);
 
-    if (!selector.ok) {
-      await updateRun(supabase, runId, {
-        status: "needs_attention",
-        current_stage: "failed",
-        last_error: JSON.stringify(selector.payload).slice(0, 2000),
-      });
-      return reply({ ok: false, stage: "selecting_jobs", run_id: runId, result: selector }, 500);
-    }
-
+    const eligibleAfterFetch = Number(finalMatch.payload.eligible || 0);
     const selectedCount = Number(selector.payload.selected_count || 0);
+    const shortageAfterFetch = Math.max(0, dailyTarget - selectedCount);
     const finalRun = await updateRun(supabase, runId, {
       status: selectedCount > 0 ? "waiting_for_enrichment" : "needs_attention",
       current_stage: selectedCount > 0 ? "enrichment_queued" : "failed",
       completed_at: new Date().toISOString(),
-      stage_results: {
-        compile_search_plan: compiler.payload,
-        catalogue_match: matcher.payload,
-        selection: selector.payload,
-      },
       counters: {
-        catalogue_checked: Number(matcher.payload.catalogue_checked || 0),
-        catalogue_eligible: reusable,
-        catalogue_rejected: Number(matcher.payload.rejected || 0),
         daily_target: dailyTarget,
-        shortage: 0,
+        catalogue_checked_before_fetch: Number(firstMatch.payload.catalogue_checked || 0),
+        catalogue_reused: reusableBeforeFetch,
+        shortage_before_fetch: shortageBeforeFetch,
+        planned_fetch_pool: fetchPool,
+        fetched: Number(fetchResult?.fetched_count || 0),
+        normalized: Number(fetchResult?.normalized_count || 0),
+        new_jobs_stored: Number(fetchResult?.new_jobs_stored || 0),
+        existing_jobs_updated: Number(fetchResult?.existing_jobs_updated || 0),
+        duplicates_skipped: Number(fetchResult?.duplicates_skipped || 0),
+        eligible_after_fetch: eligibleAfterFetch,
         selected: selectedCount,
         held_for_later: Number(selector.payload.held_for_later_count || 0),
+        shortage_after_fetch: shortageAfterFetch,
       },
+      stage_results: {
+        compile_search_plan: compiler.payload,
+        catalogue_match_before_fetch: firstMatch.payload,
+        fetch_catalogue: fetchResult,
+        catalogue_match_after_fetch: finalMatch.payload,
+        selection: selector.payload,
+      },
+      last_error: selectedCount > 0 ? null : "No eligible jobs were selected after catalogue fetch and matching",
     });
 
     return reply({
       ok: selectedCount > 0,
       function: "calsie-campaign-orchestrator-v2",
-      version: "phase_1_guarded",
+      version: "phase_2_store_match_select",
       dry_run: false,
       production_pipeline_unchanged: true,
+      enrichment_not_started: true,
       run: finalRun,
       selected_jobs: selector.payload.selected_jobs || [],
       next_required_stage: selectedCount > 0 ? "enqueue-company-enrichment" : null,
@@ -340,7 +278,7 @@ Deno.serve(async (req) => {
     return reply({
       ok: false,
       function: "calsie-campaign-orchestrator-v2",
-      version: "phase_1_guarded",
+      version: "phase_2_store_match_select",
       error: error instanceof Error ? error.message : String(error),
     }, 500);
   }
