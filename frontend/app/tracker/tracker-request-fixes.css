@@ -1,0 +1,10 @@
+html body main.agent-log-shell .approve-button[aria-pressed="true"] {
+  font-size: 0 !important;
+}
+
+html body main.agent-log-shell .approve-button[aria-pressed="true"]::after {
+  content: "Approved";
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
