@@ -6,6 +6,7 @@ import "./tracker-responsive.css";
 import "./tracker-scroll-controls.css";
 import "./tracker-final.css";
 import "./tracker-zoom-final.css";
+import "./tracker-request-fixes.css";
 import TrackerBulkApprove from "./TrackerBulkApprove";
 import TrackerSheetZoom from "./TrackerSheetZoom";
 
