@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-16
 
-This is the main technical context file for Applix. Read this before changing campaign launch, job fetching, AI matching, tracker, enrichment, drafting, Gmail, cron, pause/resume, or sending.
+This is the main technical context file for Applix. Read this before changing campaign launch, job fetching, AI matching, tracker, enrichment, drafting, Gmail, cron, pause/resume, retry logic, or sending.
 
 ## Product rule
 
@@ -10,7 +10,7 @@ This is the main technical context file for Applix. Read this before changing ca
 Find jobs
   -> deterministic filtering
   -> AI judgment
-  -> daily selection
+  -> select up to the user's daily target
   -> user reviews
   -> user approves
   -> prepare application
@@ -20,277 +20,286 @@ Find jobs
   -> user explicitly sends
 ```
 
-Never send automatically merely because a cron, queue, or scheduled worker exists.
+No cron, queue, orchestrator, or campaign launch may send email automatically.
 
-## Current production problem
-
-Two job pipelines currently exist beside each other.
+## Current production architecture
 
 ```text
-LEGACY PIPELINE
-Campaign launch -> Outscraper -> public.jobs -> legacy draft/tracker
-
-NEW PIPELINE
-Campaign -> catalogue -> deterministic match -> AI judge
-         -> daily selection -> campaign tracker -> approval
-         -> enrichment -> draft -> explicit send
+USER
+ |
+ +-- Start Campaign / Find New Jobs Now
+ |       |
+ |       v
+ |   launch-applix-campaign
+ |       |
+ |       v
+ |   calsie-campaign-orchestrator-v3
+ |       |
+ |       +-- compile-campaign-search-plan
+ |       +-- match-campaign-jobs
+ |       +-- controlled fetch attempts
+ |       +-- judge-campaign-jobs
+ |       +-- select-daily-job-batch
+ |       |
+ |       v
+ |   campaign_job_matches
+ |       |
+ |       v
+ |   AI Review Queue
+ |      / \
+ |  Approve Skip
+ |     |     |
+ |     |     +-- user_decision = skipped
+ |     |
+ |     +-- user_decision = approved
+ |             |
+ |             v
+ |     prepare-approved-applications
+ |             |
+ |       email available?
+ |        /          \
+ |      yes          no
+ |       |            |
+ |       |            v
+ |       |    company_enrichment_queue
+ |       |            |
+ |       |            v
+ |       |    process-company-enrichment-queue
+ |       |            |
+ |       +------------+
+ |             |
+ |             v
+ |     generate-job-outreach-drafts
+ |             |
+ |             v
+ |       outreach_queue
+ |             |
+ |             v
+ |     approve-outreach-draft
+ |             |
+ |             v
+ |     send-queued-outreach
+ |             |
+ |             v
+ |         gmail-send
+ |
+ +-- Pause Campaign
+         |
+         +-- scheduler skips campaign
+         +-- orchestrator rejects campaign
+         +-- send functions remain blocked
 ```
 
-The campaign launch page is still wired to the legacy pipeline. This is why a campaign can scrape jobs successfully but produce zero `orchestrator_runs`, zero `campaign_job_matches`, and zero AI-approved tracker jobs.
+## Three-stage daily fetch strategy
 
-## Full live system
+The daily target is the number of final AI-approved jobs shown to the user. It is not the raw provider fetch count.
+
+Default daily target:
 
 ```text
-                             APPLIX LIVE SYSTEM
-================================================================================
-
- USER
-  |
-  +-- Connect Gmail
-  |      |
-  |      +-- connect-gmail
-  |      +-- Google OAuth consent
-  |      +-- gmail-oauth-callback
-  |                   |
-  |                   v
-  |          user_email_authorizations
-  |
-  +-- Create / Start Campaign
-  |      |
-  |      v
-  |   launch-applix-campaign                    CURRENT LEGACY WIRING
-  |      |
-  |      +-- run-outscraper-campaigns
-  |      |        |
-  |      |        +-- outscraper-jobs
-  |      |                  |
-  |      |                  v
-  |      |              public.jobs
-  |      |
-  |      +-- generate-outreach-drafts
-  |                   |
-  |                   v
-  |          old outreach / old tracker
-  |
-  +-- Target production launch
-         |
-         v
-     calsie-campaign-orchestrator-v2
-         |
-         +-- compile-campaign-search-plan
-         |
-         +-- match-campaign-jobs
-         |       |
-         |       +-- enough catalogue jobs? -- yes ------------------+
-         |       |                                                    |
-         |       +-- no -> fetch-job-catalogue-v2                     |
-         |                    |                                       |
-         |                    +-- store/update public.jobs            |
-         |                    +-- match-campaign-jobs again           |
-         |                                                            |
-         +------------------------------------------------------------+
-         |
-         +-- judge-campaign-jobs
-         |       |
-         |       +-- pass
-         |       +-- review
-         |       +-- reject
-         |       +-- reuse cached decision when AI input hash matches
-         |
-         +-- select-daily-job-batch
-                    |
-                    v
-            campaign_job_matches
-                    |
-                    v
-              NEW JOB TRACKER
-                 /       \
-              Approve    Skip
-                 |         |
-                 |         +-- user_decision = skipped
-                 |
-                 +-- user_decision = approved
-                          |
-                          v
-              prepare-approved-applications
-                          |
-                    email available?
-                     /          \
-                   yes          no
-                    |            |
-                    |            v
-                    |   company_enrichment_queue
-                    |            |
-                    |            v
-                    |   drain-company-enrichment-queue
-                    |            |
-                    |            v
-                    |   process-company-enrichment-queue
-                    |            |
-                    |            v
-                    |      enrich-job-emails
-                    |            |
-                    +------------+
-                          |
-                          v
-              generate-job-outreach-drafts
-                          |
-                          v
-                    outreach_queue
-                          |
-                          v
-                approve-outreach-draft
-                          |
-                          v
-                send-queued-outreach
-                          |
-                          v
-                      gmail-send
-                          |
-                          v
-                        GMAIL
+24 selected AI-approved jobs
 ```
 
-## Correct campaign orchestrator flow
+Maximum raw provider request budget:
 
 ```text
-Start Campaign / Find New Jobs Now
-                |
-                v
-calsie-campaign-orchestrator-v2
-                |
-                v
-compile-campaign-search-plan
-                |
-                v
-match-campaign-jobs
-                |
-        enough suitable jobs?
-            /          \
-          yes           no
-           |             |
-           |             v
-           |    fetch-job-catalogue-v2
-           |             |
-           |             v
-           |    match-campaign-jobs again
-           |             |
-           +-------------+
-                |
-                v
-judge-campaign-jobs
-                |
-                v
-select-daily-job-batch
-                |
-                v
-campaign_job_matches
-                |
-                v
-get_review_jobs RPC -> JobSwipeDeck
+Attempt 1: 100
+Attempt 2: 300 additional
+Attempt 3: 700 additional
+Maximum: 1,100 requested raw jobs
 ```
 
-## Tracker flow
+### Full retry diagram
+
+```text
+┌──────────────────────────────────────────────┐
+│ ATTEMPT 1                                    │
+│ Fetch up to 100 raw jobs                     │
+│ Deduplicate                                  │
+│ Deterministic filtering                      │
+│ AI judgment                                  │
+│ Select up to 24                              │
+└──────────────────────┬───────────────────────┘
+                       │
+              Selected jobs < 24?
+                 /            \
+               NO              YES
+               │                │
+               ▼                ▼
+             STOP       ┌──────────────────────┐
+                        │ ATTEMPT 2            │
+                        │ Fetch up to 300 more │
+                        │ Match + AI judge     │
+                        │ Fill remaining quota │
+                        └──────────┬───────────┘
+                                   │
+                          Selected jobs < 24?
+                             /            \
+                           NO              YES
+                           │                │
+                           ▼                ▼
+                         STOP       ┌──────────────────────┐
+                                    │ ATTEMPT 3            │
+                                    │ Fetch up to 700 more │
+                                    │ Match + AI judge     │
+                                    │ Fill remaining quota │
+                                    └──────────┬───────────┘
+                                               │
+                                               ▼
+                                             STOP
+```
+
+### Provider call breakdown
+
+`fetch-job-catalogue-v2` currently accepts a maximum of 200 per call. The 100/300/700 plan is implemented as multiple provider calls:
+
+```text
+Attempt 1
+  -> 1 call x 100
+
+Attempt 2
+  -> 2 calls x 150
+
+Attempt 3
+  -> 4 calls x 175
+```
+
+Each call rotates to another compiled search query. Global job deduplication prevents the same provider job, canonical URL, or company-title-location record from being stored twice.
+
+### Stop conditions
+
+```text
+Stop immediately when:
+
+1. selected_count >= daily_target
+2. attempt_number = 3 and target is still not reached
+3. campaign becomes paused, archived, inactive, stopped, or cancelled
+4. provider returns zero results for an attempt
+5. an attempt produces no usable unique catalogue jobs
+6. provider/API cost guard is reached
+7. an unrecoverable function error occurs
+```
+
+A partial result is allowed:
+
+```text
+Target:   24
+Selected: 17
+Result:   ready_for_review with shortage_after_attempts = 7
+```
+
+Zero selected jobs produces:
+
+```text
+status: needs_attention
+current_stage: failed
+```
+
+## Query rotation
+
+Compiled campaign queries are rotated across provider calls so retries do not simply repeat the same first search.
+
+Example:
+
+```text
+Call 1 -> Caseworker Sydney NSW
+Call 2 -> Community Caseworker Sydney NSW
+Call 3 -> Family Support Caseworker Sydney NSW
+Call 4 -> Youth Caseworker Sydney NSW
+Call 5 -> Housing Caseworker Sydney NSW
+Call 6 -> Domestic Violence Caseworker Sydney NSW
+Call 7 -> Settlement Caseworker Sydney NSW
+```
+
+The provider may still return overlapping jobs. Deduplication remains mandatory.
+
+## Orchestrator counters
+
+Every run should record:
+
+```json
+{
+  "daily_target": 24,
+  "attempts_completed": 3,
+  "attempt_limits": [100, 300, 700],
+  "raw_requested": 1100,
+  "raw_fetched": 684,
+  "normalized": 620,
+  "new_jobs_stored": 430,
+  "existing_jobs_updated": 170,
+  "duplicates_skipped": 20,
+  "deterministic_eligible": 51,
+  "ai_considered": 51,
+  "ai_passed": 27,
+  "selected": 24,
+  "held_for_later": 3,
+  "shortage_after_attempts": 0,
+  "target_reached": true
+}
+```
+
+Each attempt must also be stored in `stage_results.attempts` with fetch calls, matching results, AI results, selection state, and stop reason.
+
+## Function map
+
+### Campaign execution
+
+```text
+launch-applix-campaign
+  -> calsie-campaign-orchestrator-v3
+
+applix-daily-job-fetcher-v2
+  -> calsie-campaign-orchestrator-v3
+```
+
+### Three-stage orchestrator
+
+```text
+calsie-campaign-orchestrator-v3
+  -> compile-campaign-search-plan
+  -> match-campaign-jobs
+  -> fetch-job-catalogue-v2
+  -> judge-campaign-jobs
+  -> select-daily-job-batch
+```
+
+### Review and preparation
 
 ```text
 get_review_jobs RPC
-        |
-        +-- reads campaign_job_matches
-        +-- joins public.jobs
-        +-- returns selected, AI-approved, undecided jobs
-        |
-        v
-JobSwipeDeck
-   /      \
-Approve   Skip
-  |         |
-  +-- decide_campaign_job RPC
-              |
-              +-- approved -> prepare-approved-applications
-              +-- skipped  -> retain as campaign history
-```
+  -> campaign_job_matches
 
-The old application tracker that directly reads user-owned rows from `public.jobs` is legacy history. It must not be presented as the new review queue.
+decide_campaign_job RPC
+  -> approved or skipped
 
-## Company enrichment flow
-
-```text
 prepare-approved-applications
-            |
-            +-- contact in company_contacts_pool?
-            |          |
-            |          +-- yes -> update job and create draft
-            |
-            +-- no -> company_enrichment_queue
-                           |
-                           v
-              drain-company-enrichment-queue
-                           |
-                           v
-             process-company-enrichment-queue
-                           |
-                           v
-                  enrich-job-emails
-                           |
-             +-------------+-------------+
-             |             |             |
-      contact pool   known contacts   website/email discovery
-             |             |             |
-             +-------------+-------------+
-                           |
-                           v
-             generate-job-outreach-drafts
+  -> company contact reuse
+  -> enrichment queue when needed
+  -> draft generation only after approval
 ```
 
-## Draft and Gmail flow
+### Enrichment
 
 ```text
-outreach_queue
-      |
-      v
-User reviews subject, body, recipient and resume
-      |
-      v
-approve-outreach-draft
-      |
-      v
-send-queued-outreach
-      |
-      +-- requires send_now=true or confirm_send=true
-      +-- checks campaign status
-      +-- checks hourly/daily limits
-      |
-      v
-gmail-send
-      |
-      v
-Google Gmail API
+applix-company-enrichment-recovery cron
+  -> drain-company-enrichment-queue
+  -> process-company-enrichment-queue
+  -> enrich-job-emails
 ```
 
-## Gmail OAuth
+### Gmail
 
 ```text
-User clicks Connect Gmail
-          |
-          v
 connect-gmail
-          |
-          v
-Google consent screen
-          |
-          v
-gmail-oauth-callback
-          |
-          v
-user_email_authorizations
-          |
-          v
-gmail-send
+  -> gmail-oauth-callback
+  -> user_email_authorizations
+
+approve-outreach-draft
+  -> send-queued-outreach
+  -> gmail-send
 ```
 
-## Live database cron jobs
-
-### 1. Daily job fetch
+## Daily cron
 
 ```text
 Name:      applix-daily-job-fetch
@@ -299,161 +308,26 @@ UTC:       20:00 daily
 Sydney:    about 6:00 AM AEST / 7:00 AM AEDT
 ```
 
-```text
-pg_cron
-   |
-   v
-dispatch_applix_daily_job_fetch()
-   |
-   +-- reads service credential from Vault
-   |
-   v
-applix-daily-job-fetcher
-```
-
-Current issue: this cron still calls `applix-daily-job-fetcher`, not the new campaign dispatcher/orchestrator. A recent live call returned 401, so its authentication and final responsibility need correction.
-
-Target:
-
-```text
-Daily cron
-   |
-   v
-active-campaign dispatcher
-   |
-   +-- query campaigns where status = active
-   +-- invoke calsie-campaign-orchestrator-v2 once per campaign
-   +-- never run paused/draft/archived/completed campaigns
-```
-
-### 2. Company enrichment recovery
-
-```text
-Name:      applix-company-enrichment-recovery
-Schedule:  */5 * * * *
-Frequency: every 5 minutes
-```
+Target call chain:
 
 ```text
 pg_cron
-   |
-   v
-kick_company_enrichment_drain()
-   |
-   +-- pending due work exists? -- no -> stop
-   |
-   +-- yes
-        |
-        v
-   drain-company-enrichment-queue
-        |
-        v
-   process-company-enrichment-queue
-        |
-        v
-   enrich-job-emails
+  -> dispatch_applix_daily_job_fetch()
+  -> applix-daily-job-fetcher-v2
+  -> active campaigns only
+  -> calsie-campaign-orchestrator-v3
 ```
 
-This cron is appropriate because it enriches data but does not send emails.
-
-## Live Edge Function inventory
-
-### New AI campaign pipeline - keep
+The database dispatcher must send both:
 
 ```text
-calsie-campaign-orchestrator-v2
-compile-campaign-search-plan
-match-campaign-jobs
-fetch-job-catalogue-v2
-judge-campaign-jobs
-select-daily-job-batch
+Authorization: Bearer <service-role token>
+x-applix-cron-secret: <cron secret>
 ```
 
-### Approval, enrichment and drafting - keep
+Never expose either secret in logs, frontend code, or documentation values.
 
-```text
-approve-job-for-outreach
-prepare-approved-applications
-run-company-enrichment-chain
-drain-company-enrichment-queue
-process-company-enrichment-queue
-enrich-job-emails
-generate-job-outreach-drafts
-approve-outreach-draft
-send-queued-outreach
-```
-
-`run-company-enrichment-chain` is a wrapper and must be reviewed because one historical call returned 500 while lower-level functions succeeded.
-
-### Gmail - keep
-
-```text
-connect-gmail
-gmail-oauth-callback
-gmail-send
-```
-
-### Current launch and scheduling - rewire
-
-```text
-launch-applix-campaign
-applix-daily-job-fetcher
-applix-campaign-runner
-applix-agent-orchestrator
-applix-agent-email-scheduler
-applix-hourly-draft-runner
-```
-
-### Legacy or test candidates - inspect before removal
-
-```text
-run-outscraper-campaigns
-generate-outreach-drafts
-outscraper-jobs
-fetch-adzuna-jobs
-launch-applix-test
-gmail-send-test
-bright-responder
-```
-
-These may still support tests or fallback ingestion. Do not delete them until call sites, cron jobs and production logs confirm they are unused.
-
-### Utility
-
-```text
-applix-health
-```
-
-## Pause, resume, refresh and archive behaviour
-
-Pause and refresh are different actions.
-
-```text
-Pause Campaign
-  -> campaigns.status = paused
-  -> scheduled dispatcher skips campaign
-  -> orchestrator rejects execution
-  -> sending remains blocked
-  -> data and history remain
-
-Resume Campaign
-  -> campaigns.status = active
-  -> future scheduled runs resume
-  -> previous AI judgments and decisions remain
-
-Find New Jobs Now
-  -> allowed only for active campaign
-  -> invokes calsie-campaign-orchestrator-v2
-  -> does not delete previous reviewed history
-
-Archive Campaign
-  -> status = archived
-  -> hidden from active campaigns
-  -> no scheduling, processing or sending
-  -> historical records preserved
-```
-
-Required campaign card controls:
+## Pause, resume, refresh, and archive
 
 ```text
 RUNNING
@@ -463,139 +337,120 @@ PAUSED
 [Resume Campaign] [Edit Campaign] [Archive Campaign]
 ```
 
-The orchestrator must explicitly reject non-active statuses. Loading `campaigns.status` without enforcing it is insufficient.
-
-## Database ownership model
-
 ```text
-auth.users
-   |
-   +-- profiles
-   +-- resume_profiles                    preserved account/resume identity
-   +-- campaigns
-          |
-          +-- campaign_resume_sources
-          +-- orchestrator_runs
-          +-- campaign_job_matches
-          +-- company_enrichment_queue
-          +-- outreach_queue
-          +-- notifications/logs
+Pause Campaign
+  -> status = paused
+  -> scheduled dispatcher skips
+  -> orchestrator rejects
+  -> sending blocked
 
-public.jobs                             shared catalogue where possible
-   |
-   +-- campaign_job_matches             campaign-specific state
-   +-- lead_contact_emails
-   +-- company_enrichment_queue_jobs
-   +-- outreach_queue
+Resume Campaign
+  -> status = active
+  -> future scheduled runs resume
+  -> cached AI judgments remain reusable
+
+Find New Jobs Now
+  -> active campaigns only
+  -> unique run_type for same-day manual execution
+  -> uses the same 100/300/700 retry policy
+
+Archive Campaign
+  -> status = archived
+  -> no scheduling, processing, drafting, or sending
+  -> history preserved
 ```
 
-Do not make the global job record itself the source of campaign review state. Campaign-specific filtering, AI judgment, selection and user decisions belong in `campaign_job_matches`.
-
-## Immediate wiring plan
+## Tracker ownership model
 
 ```text
-1. launch-applix-campaign
-   -> create/update campaign only
-   -> call calsie-campaign-orchestrator-v2
-   -> stop calling generate-outreach-drafts during launch
+public.jobs
+  -> shared catalogue record
 
-2. Find New Jobs Now
-   -> call calsie-campaign-orchestrator-v2
-   -> show run stage and counters
+campaign_job_matches
+  -> deterministic result
+  -> AI judgment
+  -> selected_for_campaign
+  -> user decision
+  -> reviewed_at
+```
 
-3. Daily cron
-   -> replace legacy fetch call with active-campaign dispatcher
-   -> dispatcher invokes calsie-campaign-orchestrator-v2
+Do not place campaign-specific review state on the global job record.
 
-4. Tracker
-   -> load get_review_jobs RPC
-   -> display campaign_job_matches queue
-   -> move old public.jobs rows to Legacy History
+Tracker views:
 
-5. Approval
-   -> decide_campaign_job
-   -> prepare-approved-applications
+```text
+AI Review Queue
+  -> selected AI-pass jobs from campaign_job_matches
 
-6. Enrichment
-   -> queue missing-email companies
-   -> five-minute recovery cron drains queue
+Legacy History
+  -> old user-owned public.jobs rows
+```
 
-7. Drafting
-   -> generate-job-outreach-drafts only after approval/email readiness
+## Safety rules
 
-8. Sending
-   -> manual explicit confirmation only
+- Never expose service-role, cron, OAuth, OpenAI, Gmail, or provider secrets.
+- Never send email during campaign launch, fetching, matching, AI judgment, or selection.
+- User approval is required before application preparation.
+- User confirmation is required before Gmail send.
+- Paused, archived, draft, pending, stopped, cancelled, completed, and inactive campaigns must not process or send.
+- Maximum provider request budget is 1,100 raw jobs per campaign run unless a future reviewed configuration changes it.
+- Maximum selected user-facing jobs remains 24 per daily run.
+- Keep v2 orchestrator and original daily worker available until v3 passes production smoke tests.
 
-9. Pause protection
-   -> scheduler skips paused campaigns
-   -> orchestrator rejects paused campaigns
-   -> send function rejects paused campaigns
+## Rollout status
+
+Branch:
+
+```text
+feat/three-stage-job-fetch-retries
+```
+
+Added or changed:
+
+```text
+calsie-campaign-orchestrator-v3
+applix-daily-job-fetcher-v2
+launch-applix-campaign -> v3
+cron dispatcher migration -> daily-job-fetcher-v2
+APPLIX_BUILD_PLAN.md
+```
+
+Rollback path:
+
+```text
+calsie-campaign-orchestrator-v2
+applix-daily-job-fetcher
 ```
 
 ## Required smoke test
 
-Use a fresh controlled campaign with a daily target of 2.
+Use one controlled active campaign with daily target 2.
 
 ```text
-Create campaign
-  -> orchestrator_run created
-  -> search plan compiled
-  -> catalogue checked/fetched
-  -> campaign_job_matches created
-  -> AI rejects false positives
-  -> exactly relevant jobs selected
-  -> tracker displays selected jobs
-  -> approve one
-  -> skip one
-  -> approved job reaches preparation
-  -> email enrichment runs only when needed
-  -> draft appears
-  -> no email sends without explicit confirmation
+1. Start unique manual run
+2. Confirm run uses orchestrator v3
+3. Confirm attempt 1 requests 100
+4. If fewer than 2 selected, confirm attempt 2 requests 300
+5. If still fewer than 2, confirm attempt 3 requests 700
+6. Confirm target stops later attempts
+7. Confirm provider-zero stop works
+8. Confirm paused campaign is rejected
+9. Confirm AI Review Queue shows only selected AI-pass jobs
+10. Approve one and skip one
+11. Confirm preparation/enrichment begins only for approved job
+12. Confirm no email is sent
 ```
 
 Pass criteria:
 
 ```text
-campaign status: active
-orchestrator run: completed or waiting_for_enrichment
-AI judgments: present
-selected jobs: expected count
-tracker: only new selected jobs
-legacy history: separated
-outreach: draft only after approval
-sending: zero until user confirms
+orchestrator run exists
+attempt counters are correct
+target never exceeds 2 in smoke test
+production target remains 24
+selected jobs are relevant
+tracker uses campaign_job_matches
+legacy history remains separate
+no draft before approval
+no send without explicit confirmation
 ```
-
-## Safety rules
-
-- Never expose service-role, cron, OAuth or provider secrets.
-- Internal-only AI judge calls require service-role authorization.
-- Paused, draft, pending, archived, stopped, cancelled and completed campaigns must not process or send.
-- `send-queued-outreach` must not be autonomous.
-- User approval is required before application preparation.
-- User confirmation is required before Gmail send.
-- Keep global catalogue data separate from campaign-specific decisions.
-- Do not delete legacy functions until all call sites and cron jobs are accounted for.
-
-## Definition of the target production architecture
-
-```text
-Campaign launch or manual refresh
-              |
-              v
-calsie-campaign-orchestrator-v2
-              |
-              v
-AI-approved campaign review queue
-              |
-              v
-User approval
-              |
-              v
-Prepare -> enrich -> draft
-              |
-              v
-User review and explicit Gmail send
-```
-
-This is the architecture new work should move toward.
