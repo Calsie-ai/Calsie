@@ -31,7 +31,7 @@ function integer(value: unknown, fallback: number, min: number, max: number) {
 async function callOrchestrator(campaignId: string, input: Row) {
   const runType = text(input.run_type) || "daily_catalogue";
   const trigger = text(input.trigger) || "campaign_launch";
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/calsie-campaign-orchestrator-v2`, {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/calsie-campaign-orchestrator-v3`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -125,6 +125,7 @@ Deno.serve(async (req) => {
           ran_at: new Date().toISOString(),
           ok: orchestrator.ok,
           status: orchestrator.status,
+          orchestrator: "calsie-campaign-orchestrator-v3",
           run_type: text(input.run_type) || "daily_catalogue",
         },
       },
@@ -133,7 +134,7 @@ Deno.serve(async (req) => {
     return reply({
       ok: orchestrator.ok,
       function: "launch-applix-campaign",
-      version: "ai_orchestrator_wiring_v2",
+      version: "three_stage_orchestrator_wiring_v1",
       campaign_id: campaignId,
       campaign_status: lifecycle.data.status,
       sends_emails_now: false,
@@ -144,7 +145,7 @@ Deno.serve(async (req) => {
     return reply({
       ok: false,
       function: "launch-applix-campaign",
-      version: "ai_orchestrator_wiring_v2",
+      version: "three_stage_orchestrator_wiring_v1",
       error: error instanceof Error ? error.message : String(error),
     }, 500);
   }
