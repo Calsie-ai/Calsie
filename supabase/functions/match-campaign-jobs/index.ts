@@ -13,12 +13,15 @@ function reply(body: unknown, status = 200) {
 }
 
 function text(value: unknown) {
-  if (value === undefined || value === null) return "";
-  return String(value).trim();
+  return value == null ? "" : String(value).trim();
 }
 
 function normalized(value: unknown) {
-  return text(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  return text(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function list(value: unknown): string[] {
@@ -33,9 +36,24 @@ function freshDate(job: Row) {
   return job.posted_at || job.fetched_at || job.created_at || null;
 }
 
+function locationMatches(jobLocation: unknown, campaignLocation: unknown) {
+  const location = normalized(jobLocation);
+  const targetLocation = normalized(campaignLocation);
+
+  if (!targetLocation) return true;
+  if (!location) return false;
+  if (location.includes(targetLocation) || targetLocation.includes(location)) return true;
+
+  // Campaigns targeting Sydney commonly receive suburb-level locations such as
+  // Parramatta NSW, Blacktown NSW, Auburn NSW, or North Sydney NSW.
+  const targetIsSydneyNsw = targetLocation.includes("sydney") && targetLocation.includes("nsw");
+  if (targetIsSydneyNsw && location.includes("nsw")) return true;
+
+  return false;
+}
+
 function evaluate(job: Row, plan: Row) {
   const title = normalized(job.title);
-  const location = normalized(job.location);
   const description = normalized(job.description);
   const jobType = normalized(job.job_type);
   const includeTitles = list(plan.include_titles);
@@ -47,25 +65,38 @@ function evaluate(job: Row, plan: Row) {
 
   const freshnessSource = freshDate(job);
   if (!freshnessSource) rejectionReasons.push("missing_freshness_date");
+
   const freshness = freshnessSource ? new Date(freshnessSource) : null;
-  if (freshness && Number.isNaN(freshness.getTime())) rejectionReasons.push("invalid_freshness_date");
-  if (freshness && freshness.getTime() < Date.now() - Number(plan.catalogue_age_days || 30) * 86400000) {
+  if (freshness && Number.isNaN(freshness.getTime())) {
+    rejectionReasons.push("invalid_freshness_date");
+  }
+  if (
+    freshness &&
+    freshness.getTime() < Date.now() - Number(plan.catalogue_age_days || 30) * 86400000
+  ) {
     rejectionReasons.push("older_than_catalogue_window");
   }
+
   if (["expired", "closed", "invalid"].includes(text(job.catalogue_status).toLowerCase())) {
     rejectionReasons.push(`catalogue_${text(job.catalogue_status).toLowerCase()}`);
   }
 
-  if (targetLocation && !location.includes(targetLocation) && !targetLocation.includes(location)) {
+  if (!locationMatches(job.location, plan.location)) {
     rejectionReasons.push("location_mismatch");
   }
 
-  if (containsPhrase(title, excludeTitles)) rejectionReasons.push("excluded_title");
+  if (containsPhrase(title, excludeTitles)) {
+    rejectionReasons.push("excluded_title");
+  }
 
-  const includedTitle = includeTitles.length === 0 || containsPhrase(title, includeTitles);
+  const targetRole = normalized(plan.target_role);
+  const includedTitle =
+    containsPhrase(title, includeTitles) ||
+    Boolean(targetRole && title.includes(targetRole));
+
   if (!includedTitle) rejectionReasons.push("title_family_mismatch");
 
-  if (rejectionReasons.length > 0) {
+  if (rejectionReasons.length) {
     return {
       filter_status: "rejected",
       match_score: 0,
@@ -79,45 +110,46 @@ function evaluate(job: Row, plan: Row) {
     };
   }
 
-  let titleScore = 0;
-  if (containsPhrase(title, includeTitles)) {
-    titleScore = 40;
-    matchedRules.push("included_title");
-  } else if (normalized(plan.target_role) && title.includes(normalized(plan.target_role))) {
-    titleScore = 32;
-    matchedRules.push("target_role_title");
-  }
+  const titleScore = containsPhrase(title, includeTitles) ? 40 : 32;
+  matchedRules.push(containsPhrase(title, includeTitles) ? "included_title" : "target_role_title");
 
   const locationScore = targetLocation ? 20 : 10;
   if (targetLocation) matchedRules.push("location_match");
 
-  let experienceScore = 15;
-  if (/senior|lead|principal|manager|director|head|chief|cfo|controller/.test(title)) {
-    experienceScore = 0;
-  } else {
-    matchedRules.push("entry_or_unspecified_seniority");
-  }
+  const experienceScore = /senior|lead|principal|manager|director|head|chief|cfo|controller/.test(title)
+    ? 0
+    : 15;
+  if (experienceScore) matchedRules.push("entry_or_unspecified_seniority");
 
-  let descriptionScore = 0;
-  const roleTokens = [...includeTitles, text(plan.target_role)]
+  const roleTokens = [
+    ...includeTitles,
+    text(plan.target_role),
+    ...list(plan.description_keywords),
+  ]
     .flatMap((value) => normalized(value).split(" "))
     .filter((value) => value.length >= 4);
-  const uniqueTokens = [...new Set(roleTokens)];
-  const descriptionHits = uniqueTokens.filter((token) => description.includes(token)).length;
-  if (descriptionHits > 0) {
-    descriptionScore = Math.min(15, 5 + descriptionHits * 2);
-    matchedRules.push("description_relevance");
-  }
+
+  const descriptionHits = [...new Set(roleTokens)].filter((token) =>
+    description.includes(token)
+  ).length;
+
+  const descriptionScore = descriptionHits
+    ? Math.min(15, 5 + descriptionHits * 2)
+    : 0;
+  if (descriptionScore) matchedRules.push("description_relevance");
 
   let jobTypeScore = 10;
-  if (requiredJobTypes.length > 0) {
+  if (requiredJobTypes.length) {
     jobTypeScore = requiredJobTypes.some((required) => jobType.includes(required)) ? 10 : 0;
-    if (jobTypeScore > 0) matchedRules.push("job_type_match");
+    if (jobTypeScore) matchedRules.push("job_type_match");
   }
 
-  const matchScore = titleScore + locationScore + experienceScore + descriptionScore + jobTypeScore;
+  const matchScore =
+    titleScore + locationScore + experienceScore + descriptionScore + jobTypeScore;
+  const eligible = matchScore >= Number(plan.minimum_match_score || 70);
+
   return {
-    filter_status: matchScore >= Number(plan.minimum_match_score || 70) ? "eligible" : "rejected",
+    filter_status: eligible ? "eligible" : "rejected",
     match_score: matchScore,
     title_score: titleScore,
     location_score: locationScore,
@@ -125,60 +157,123 @@ function evaluate(job: Row, plan: Row) {
     description_score: descriptionScore,
     job_type_score: jobTypeScore,
     matched_rules: matchedRules,
-    rejection_reasons: matchScore >= Number(plan.minimum_match_score || 70) ? [] : ["below_minimum_score"],
+    rejection_reasons: eligible ? [] : ["below_minimum_score"],
   };
 }
 
 Deno.serve(async (req) => {
   try {
     if (req.method !== "POST") return reply({ ok: false, error: "Use POST" }, 405);
-    if (!SUPABASE_URL || !SERVICE_KEY) return reply({ ok: false, error: "Missing Supabase service configuration" }, 500);
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      return reply({ ok: false, error: "Missing Supabase service configuration" }, 500);
+    }
     if ((req.headers.get("authorization") || "") !== `Bearer ${SERVICE_KEY}`) {
       return reply({ ok: false, error: "Service-role authorization required" }, 401);
     }
 
-    const input = await req.json().catch(() => ({})) as Row;
+    const input = (await req.json().catch(() => ({}))) as Row;
     const campaignId = text(input.campaign_id);
     const runId = text(input.orchestrator_run_id);
     const plan = input.search_plan as Row;
-    if (!campaignId || !runId || !plan) return reply({ ok: false, error: "campaign_id, orchestrator_run_id and search_plan are required" }, 400);
 
+    if (!campaignId || !runId || !plan) {
+      return reply(
+        {
+          ok: false,
+          error: "campaign_id, orchestrator_run_id and search_plan are required",
+        },
+        400,
+      );
+    }
+
+    const requestedIds = list(input.job_ids);
     const limit = Math.max(1, Math.min(500, Number(input.limit || 300)));
     const ageDays = Math.max(1, Math.min(30, Number(plan.catalogue_age_days || 30)));
     const cutoff = new Date(Date.now() - ageDays * 86400000).toISOString();
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
-    const jobsResult = await supabase
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false },
+    });
+
+    let query = supabase
       .from("jobs")
-      .select("id,title,company,location,description,job_type,posted_at,fetched_at,created_at,expires_at,catalogue_status,source,apply_url")
+      .select(
+        "id,title,company,location,description,job_type,posted_at,fetched_at,created_at,expires_at,catalogue_status,source,apply_url",
+      )
       .is("user_id", null)
       .is("campaign_id", null)
-      .not("catalogue_status", "in", "(expired,closed,invalid)")
-      .or(`posted_at.gte.${cutoff},and(posted_at.is.null,fetched_at.gte.${cutoff}),and(posted_at.is.null,fetched_at.is.null,created_at.gte.${cutoff})`)
-      .limit(limit);
+      .not("catalogue_status", "in", "(expired,closed,invalid)");
 
+    if (requestedIds.length) {
+      query = query.in("id", requestedIds);
+    } else {
+      query = query
+        .or(
+          `posted_at.gte.${cutoff},and(posted_at.is.null,fetched_at.gte.${cutoff}),and(posted_at.is.null,fetched_at.is.null,created_at.gte.${cutoff})`,
+        )
+        .limit(limit);
+    }
+
+    const jobsResult = await query;
     if (jobsResult.error) return reply({ ok: false, error: jobsResult.error.message }, 500);
 
-    const evaluated = (jobsResult.data || []).map((job: Row) => ({ job, result: evaluate(job, plan) }));
+    const evaluated = (jobsResult.data || []).map((job: Row) => ({
+      job,
+      result: evaluate(job, plan),
+    }));
+
     let eligible = 0;
     let rejected = 0;
+    const eligibleJobIds: string[] = [];
+    const rejectedJobIds: string[] = [];
 
     for (const item of evaluated) {
-      if (item.result.filter_status === "eligible") eligible += 1;
-      else rejected += 1;
+      if (item.result.filter_status === "eligible") {
+        eligible += 1;
+        eligibleJobIds.push(item.job.id);
+      } else {
+        rejected += 1;
+        rejectedJobIds.push(item.job.id);
+      }
 
-      const upsert = await supabase.from("campaign_job_matches").upsert({
+      const existing = await supabase
+        .from("campaign_job_matches")
+        .select("ai_status,filter_status,selected_for_campaign,selected_at")
+        .eq("campaign_id", campaignId)
+        .eq("job_id", item.job.id)
+        .maybeSingle();
+
+      if (existing.error) return reply({ ok: false, error: existing.error.message }, 500);
+
+      const hasCompletedAi = existing.data?.ai_status === "completed";
+      const payload: Row = {
         campaign_id: campaignId,
         job_id: item.job.id,
         orchestrator_run_id: runId,
         ...item.result,
-        selected_for_campaign: false,
-        selected_at: null,
+        selected_for_campaign: Boolean(existing.data?.selected_for_campaign),
+        selected_at: existing.data?.selected_at || null,
         last_evaluated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      }, { onConflict: "campaign_id,job_id" });
+      };
 
-      if (upsert.error) return reply({ ok: false, error: upsert.error.message, job_id: item.job.id }, 500);
+      if (hasCompletedAi) {
+        payload.filter_status = existing.data?.filter_status || item.result.filter_status;
+      } else {
+        payload.ai_status = item.result.filter_status === "eligible" ? "pending" : "skipped";
+        payload.ai_last_error = null;
+      }
+
+      const upsert = await supabase
+        .from("campaign_job_matches")
+        .upsert(payload, { onConflict: "campaign_id,job_id" });
+
+      if (upsert.error) {
+        return reply(
+          { ok: false, error: upsert.error.message, job_id: item.job.id },
+          500,
+        );
+      }
     }
 
     return reply({
@@ -186,11 +281,21 @@ Deno.serve(async (req) => {
       function: "match-campaign-jobs",
       campaign_id: campaignId,
       orchestrator_run_id: runId,
+      requested_job_count: requestedIds.length,
       catalogue_checked: evaluated.length,
       eligible,
       rejected,
+      eligible_job_ids: eligibleJobIds,
+      rejected_job_ids: rejectedJobIds,
     });
   } catch (error) {
-    return reply({ ok: false, function: "match-campaign-jobs", error: error instanceof Error ? error.message : String(error) }, 500);
+    return reply(
+      {
+        ok: false,
+        function: "match-campaign-jobs",
+        error: error instanceof Error ? error.message : String(error),
+      },
+      500,
+    );
   }
 });

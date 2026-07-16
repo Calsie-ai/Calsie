@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 type JobCard = {
+  match_id?: string;
   id: string;
   campaign_id: string | null;
   title: string | null;
@@ -44,15 +45,26 @@ export default function JobSwipeDeck({ initialJobs }: Props) {
     if (!job || busy) return;
     setBusy(true);
 
-    const { error } = await supabase
-      .from("jobs")
-      .update({
-        status: decision,
-        state: decision,
-        user_decision: decision,
-        reviewed_at: new Date().toISOString(),
-      })
-      .eq("id", job.id);
+    if (!job.campaign_id) {
+      setBusy(false);
+      alert("Campaign information is missing for this job.");
+      return;
+    }
+
+    const { data: updated, error } = await supabase.rpc(
+      "decide_campaign_job",
+      {
+        p_campaign_id: job.campaign_id,
+        p_job_id: job.id,
+        p_decision: decision,
+      }
+    );
+
+    if (!error && updated !== true) {
+      setBusy(false);
+      alert("This job could not be updated or is no longer available.");
+      return;
+    }
 
     setBusy(false);
     setDragX(0);

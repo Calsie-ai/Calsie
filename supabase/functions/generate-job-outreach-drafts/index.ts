@@ -156,27 +156,81 @@ Deno.serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    let query = supabase
-      .from("jobs")
-      .select("id,campaign_id,email_contact_id,extracted_email,company,title,user_id,apply_method,email_extraction_status,status,user_decision")
-      .not("extracted_email", "is", null)
-      .eq("apply_method", "email")
-      .eq("email_extraction_status", "found")
-      .not("company", "is", null)
-      .not("title", "is", null)
-      .order("created_at", { ascending: true })
-      .limit(queryLimit);
+    let candidates: Row[] = [];
 
-    if (campaignId) query = query.eq("campaign_id", campaignId);
-    if (userId) query = query.eq("user_id", userId);
-    if (jobId) query = query.eq("id", jobId);
+    if (onlyApproved && campaignId) {
+      let matchQuery = supabase
+        .from("campaign_job_matches")
+        .select(
+          "campaign_id,user_decision,reviewed_at,jobs!inner(id,email_contact_id,extracted_email,company,title,apply_method,email_extraction_status)"
+        )
+        .eq("campaign_id", campaignId)
+        .eq("selected_for_campaign", true)
+        .eq("ai_status", "completed")
+        .eq("ai_verdict", "pass")
+        .eq("filter_status", "eligible")
+        .eq("user_decision", "approved")
+        .order("reviewed_at", { ascending: true })
+        .limit(queryLimit);
 
-    const { data: jobs, error } = await query;
-    if (error) throw new Error(error.message);
+      if (jobId) {
+        matchQuery = matchQuery.eq("job_id", jobId);
+      }
 
-    const candidates = (jobs || [])
-      .filter((job) => (onlyApproved ? isApprovedJob(job) : true))
-      .slice(0, jobId ? 1 : limit);
+      const { data: matches, error } = await matchQuery;
+      if (error) throw new Error(error.message);
+
+      candidates = (matches || [])
+        .map((row: Row) => {
+          const joinedJob = Array.isArray(row.jobs)
+            ? row.jobs[0]
+            : row.jobs;
+
+          if (!joinedJob) return null;
+
+          return {
+            ...joinedJob,
+            campaign_id: row.campaign_id,
+            user_id: userId || null,
+            status: "approved",
+            user_decision: row.user_decision,
+            reviewed_at: row.reviewed_at,
+          };
+        })
+        .filter(Boolean)
+        .filter((job: Row) => (
+          Boolean(cleanEmail(job.extracted_email)) &&
+          job.apply_method === "email" &&
+          job.email_extraction_status === "found" &&
+          Boolean(text(job.company)) &&
+          Boolean(text(job.title))
+        ))
+        .slice(0, jobId ? 1 : limit) as Row[];
+    } else {
+      let query = supabase
+        .from("jobs")
+        .select("id,campaign_id,email_contact_id,extracted_email,company,title,user_id,apply_method,email_extraction_status,status,user_decision")
+        .not("extracted_email", "is", null)
+        .eq("apply_method", "email")
+        .eq("email_extraction_status", "found")
+        .not("company", "is", null)
+        .not("title", "is", null)
+        .order("created_at", { ascending: true })
+        .limit(queryLimit);
+
+      if (campaignId) query = query.eq("campaign_id", campaignId);
+      if (userId) query = query.eq("user_id", userId);
+      if (jobId) query = query.eq("id", jobId);
+
+      const { data: jobs, error } = await query;
+      if (error) throw new Error(error.message);
+
+      candidates = (jobs || [])
+        .filter((job) => (
+          onlyApproved ? isApprovedJob(job) : true
+        ))
+        .slice(0, jobId ? 1 : limit);
+    }
 
     const duplicateJobIds = await existingDraftJobIds(
       supabase,

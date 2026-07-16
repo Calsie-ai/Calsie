@@ -334,17 +334,41 @@ serve(async (req) => {
     if (campaign.error) throw new Error(campaign.error.message);
     if (!campaign.data) return json({ ok: false, function: FUNCTION_NAME, error: "Campaign not found" }, 404);
 
-    const jobsResult = await supabase
-      .from("jobs")
-      .select("*")
+    const matchesResult = await supabase
+      .from("campaign_job_matches")
+      .select("campaign_id,user_decision,reviewed_at,jobs!inner(*)")
       .eq("campaign_id", campaignId)
-      .eq("user_id", authData.user.id)
-      .or("status.eq.approved,user_decision.eq.approved")
-      .order("created_at", { ascending: true })
+      .eq("selected_for_campaign", true)
+      .eq("ai_status", "completed")
+      .eq("ai_verdict", "pass")
+      .eq("filter_status", "eligible")
+      .eq("user_decision", "approved")
+      .order("reviewed_at", { ascending: true })
       .limit(limit);
-    if (jobsResult.error) throw new Error(jobsResult.error.message);
 
-    const approvedJobs = (jobsResult.data || []).filter(isApprovedJob);
+    if (matchesResult.error) {
+      throw new Error(matchesResult.error.message);
+    }
+
+    const approvedJobs = (matchesResult.data || [])
+      .map((row: Row) => {
+        const joinedJob = Array.isArray(row.jobs)
+          ? row.jobs[0]
+          : row.jobs;
+
+        if (!joinedJob) return null;
+
+        return {
+          ...joinedJob,
+          campaign_id: row.campaign_id,
+          user_id: authData.user.id,
+          status: "approved",
+          user_decision: row.user_decision,
+          reviewed_at: row.reviewed_at,
+        };
+      })
+      .filter(Boolean)
+      .filter(isApprovedJob) as Row[];
     const alreadyReady = approvedJobs.filter(isEmailReady).length;
     const missingEmailJobs = approvedJobs.filter((job: Row) => !isEmailReady(job));
     const groups = buildCompanyGroups(missingEmailJobs);

@@ -3,26 +3,20 @@ import { cookies } from "next/headers";
 
 export async function getReviewJobs(campaignId?: string) {
   const supabase = createServerComponentClient({ cookies });
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) return [];
 
-  let query = supabase
-    .from("jobs")
-    .select("id,campaign_id,title,company,location,source,apply_url,extracted_email,description,status,created_at")
-    .eq("user_id", user.id)
-    .in("status", ["new", "review", "pending_review"])
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  if (campaignId) query = query.eq("campaign_id", campaignId);
-
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc("get_review_jobs", {
+    p_campaign_id: campaignId || null,
+    p_limit: 100,
+  });
 
   if (error) {
-    console.error("Could not load review jobs", error.message);
+    console.error("Could not load AI-approved review jobs", error.message);
     return [];
   }
 
