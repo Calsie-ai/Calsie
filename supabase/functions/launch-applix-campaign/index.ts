@@ -29,6 +29,8 @@ function integer(value: unknown, fallback: number, min: number, max: number) {
 }
 
 async function callOrchestrator(campaignId: string, input: Row) {
+  const runType = text(input.run_type) || "daily_catalogue";
+  const trigger = text(input.trigger) || "campaign_launch";
   const response = await fetch(`${SUPABASE_URL}/functions/v1/calsie-campaign-orchestrator-v2`, {
     method: "POST",
     headers: {
@@ -39,7 +41,8 @@ async function callOrchestrator(campaignId: string, input: Row) {
       campaign_id: campaignId,
       allowed_campaign_id: campaignId,
       dry_run: false,
-      trigger: "campaign_launch",
+      run_type: runType,
+      trigger,
       daily_target: integer(input.daily_job_limit ?? input.results_limit, 24, 1, 24),
       catalogue_age_days: integer(input.catalogue_age_days, 30, 1, 30),
       minimum_match_score: integer(input.minimum_match_score ?? input.min_lead_score, 70, 0, 100),
@@ -122,6 +125,7 @@ Deno.serve(async (req) => {
           ran_at: new Date().toISOString(),
           ok: orchestrator.ok,
           status: orchestrator.status,
+          run_type: text(input.run_type) || "daily_catalogue",
         },
       },
     }).eq("id", campaignId);
@@ -129,7 +133,7 @@ Deno.serve(async (req) => {
     return reply({
       ok: orchestrator.ok,
       function: "launch-applix-campaign",
-      version: "ai_orchestrator_wiring_v1",
+      version: "ai_orchestrator_wiring_v2",
       campaign_id: campaignId,
       campaign_status: lifecycle.data.status,
       sends_emails_now: false,
@@ -140,7 +144,7 @@ Deno.serve(async (req) => {
     return reply({
       ok: false,
       function: "launch-applix-campaign",
-      version: "ai_orchestrator_wiring_v1",
+      version: "ai_orchestrator_wiring_v2",
       error: error instanceof Error ? error.message : String(error),
     }, 500);
   }
