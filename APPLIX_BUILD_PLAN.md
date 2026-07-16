@@ -1,661 +1,601 @@
-Applix Build Plan
-This roadmap defines the next product flow for Applix after the editable resume test.
-
-Product vision
-Applix should become a job-hunting assistant that can:
-
-Show swipe-style job cards.
-Let the user skip, save, or apply to jobs.
-Generate a tailored resume and cover email.
-Let the user edit the resume before applying.
-Open a Gmail draft or email app during the early test stage.
-Track prepared and sent applications.
-Keep searching for new jobs when the user reaches the end of matches.
-Later integrate Google OAuth/Gmail API for draft creation and one-button send.
-Current milestone
-Milestone 0 — Editable resume self-test
-Status: in progress.
-
-Current flow:
-
-Create resume
--> Edit resume directly inside preview
--> Save edits
--> Download PDF
--> Open email/Gmail manually
-Success criteria:
-
-User can create an AI resume draft.
-User can edit visible resume fields.
-Edited resume appears correctly in PDF/download flow.
-User can prepare an email manually.
-Milestone 1 — Swipe card job flow
-Goal: Make the matching page feel like a simple job-card swiping experience.
-
-User actions:
-
-Swipe left / Skip
-Swipe right / Save
-Apply / Create Resume
-Next job
-Previous job
-Job card should show:
-
-Job title
-Company
-Location
-Match percentage
-Application method badge
-Hiring email badge if available
-Key hints
-Apply URL if available
-Recommended UI buttons:
-
-[Skip]
-[Save]
-[Apply]
-Database table:
-
-create table if not exists job_interactions (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid,
-  job_id uuid,
-  action text,
-  created_at timestamptz default now()
-);
-Action values:
-
-viewed
-skipped
-saved
-resume_created
-application_prepared
-sent
-failed
-Success criteria:
-
-User can move through jobs with card actions.
-Actions can be saved to Supabase.
-Saved/skipped jobs are remembered.
-Milestone 2 — End-of-jobs search state
-Goal: When the user reaches the last job, Applix should not feel empty. It should become an active hunter.
-
-End screen copy:
-
-Applix is hunting for more jobs.
-
-We are checking public job gateways, company career pages, hiring emails, and application links.
-
-You can come back in a few minutes, refresh now, or ask Applix to email you when jobs are ready.
-Buttons:
-
-[Refresh jobs now]
-[Find jobs with emails]
-[Notify me by email]
-Database table:
-
-create table if not exists job_search_requests (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid,
-  email text,
-  role text,
-  location text,
-  status text default 'pending',
-  results_count int default 0,
-  notify_email boolean default false,
-  created_at timestamptz default now(),
-  completed_at timestamptz
-);
-Status values:
-
-pending
-scraping
-completed
-failed
-Success criteria:
-
-Last-card state appears cleanly.
-User can request a refresh.
-User can request email notification later.
-Search requests are saved.
-Milestone 3 — Render Python scraper
-Goal: Create a lightweight Render-hosted scraper/gateway service.
-
-Important Render free-tier behaviour:
-
-Free web services may sleep after inactivity.
-First request after sleep can be slow.
-Scraper should run on request, not constantly.
-Store results in Supabase, not Render local storage.
-Render service structure:
-
-applix-scraper/
-  main.py
-  requirements.txt
-  render.yaml
-Scraper endpoint:
-
-GET /scrape?role=support%20worker&location=Sydney&limit=10&preferEmail=true
-Response shape:
-
-{
-  "ok": true,
-  "role": "support worker",
-  "location": "Sydney",
-  "jobs": [
-    {
-      "title": "Disability Support Worker",
-      "company": "Example Care",
-      "location": "Sydney NSW",
-      "sourceWebsite": "Company careers page",
-      "applyUrl": "https://example.com/careers",
-      "hiringEmail": "careers@example.com",
-      "contactConfidence": "high",
-      "applicationMethod": "email",
-      "hints": ["NDIS Worker Check", "First Aid"],
-      "detectedKeywords": ["NDIS", "support worker"],
-      "rawSnippet": "Short source summary",
-      "scrapedAt": "2026-05-23T00:00:00Z"
-    }
-  ]
-}
-Success criteria:
-
-Render scraper returns job gateway data.
-Errors do not break Applix.
-Scraper favours public company career pages and direct hiring emails.
-Milestone 4 — Supabase job gateway storage
-Goal: Store scraped/refreshed jobs in Supabase so the user can come back later.
-
-Database table:
-
-create table if not exists jobs_gateway (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid,
-  title text,
-  company text,
-  location text,
-  source_website text,
-  apply_url text,
-  hiring_email text,
-  contact_confidence text default 'unknown',
-  application_method text default 'unknown',
-  hints jsonb default '[]',
-  detected_keywords jsonb default '[]',
-  raw_snippet text,
-  requested_role text,
-  requested_location text,
-  scraped_at timestamptz default now(),
-  refreshed_at timestamptz default now(),
-  created_at timestamptz default now()
-);
-Application methods:
-
-email
-apply_link
-career_page
-job_board
-unknown
-Ranking order:
-
-1. Email found
-2. Direct company apply link
-3. Career page
-4. Job board only
-5. Unknown source
-Success criteria:
-
-Refreshed jobs save to Supabase.
-Jobs with hiring emails appear first.
-Applix can reload stored results.
-Milestone 5 — Application kit
-Goal: Turn a job into a prepared application.
-
-Application kit includes:
-
-Tailored resume
-Cover email
-Subject line
-Employer email
-Apply link
-Job hints used
-Manual send/checklist buttons
-Early test buttons:
-
-[Download Resume PDF]
-[Open Gmail Draft]
-[Copy Email]
-[Mark as Applied]
-Success criteria:
-
-User can create a complete application package.
-User can manually apply without Gmail API.
-User can mark job as applied.
-Milestone 6 — Application tracker
-Goal: Remember every prepared/sent application.
-
-Database table:
-
-create table if not exists applications (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid,
-  job_id uuid,
-  employer_email text,
-  subject text,
-  email_body text,
-  resume_url text,
-  status text default 'prepared',
-  sent_at timestamptz,
-  created_at timestamptz default now()
-);
-Statuses:
-
-prepared
-draft_created
-sent
-failed
-follow_up_needed
-rejected
-interview
-hired
-Success criteria:
-
-User can see prepared and sent applications.
-Manual applications can be marked as applied.
-Later Gmail sends can update this table automatically.
-Milestone 7 — Google OAuth and Gmail draft integration
-Goal: Integrate with Google after the manual self-test works.
-
-Recommended order:
-
-1. Gmail web/mailto manual flow
-2. Google OAuth connection
-3. Create Gmail draft
-4. Send saved Gmail draft
-5. One-button send after confirmation
-Important rule:
-
-Do not send blindly. Always preview or confirm before sending.
-
-One-button apply confirmation screen:
-
-Ready to apply?
-
-Job: Disability Support Worker
-Company: ABC Care Services
-Sending to: careers@example.com
-Attached: Tailored resume PDF
-
-[Edit]
-[Save Draft]
-[Send Application]
-Success criteria:
-
-User can connect Google.
-Applix can create a Gmail draft.
-Later, Applix can send after explicit confirmation.
-Immediate build order
-Implement in this order:
-
-1. Test editable resume.
-2. Add swipe-style buttons and interaction tracking.
-3. Add end-of-jobs screen.
-4. Add Refresh jobs and Find jobs with emails buttons.
-5. Add Render scraper skeleton.
-6. Add Supabase SQL migration notes.
-7. Add Next.js API route to call Render scraper.
-8. Save refreshed jobs to Supabase.
-9. Rank email jobs first.
-10. Add application kit screen.
-11. Add manual Gmail/mailto flow.
-12. Add application tracker.
-13. Start Google OAuth/Gmail draft work.
-14. Add one-button send after Google approval.
-Next coding step
-Start with Milestone 1:
-
-Add card action states:
-- skipped
-- saved
-- apply/resume_created
-
-Then add an end-of-list state that launches the refresh flow.
-
----
-
-Production Action Build Plan — Pool, Queue, Cron, and Safe Sending
-Last updated: 2026-07-09
-
-This section documents the current production action plan after the company contact pool, enrichment queue, cron worker, and send-safety work.
-
-Core production rule:
-
-Find jobs -> user approves -> prepare applications -> enrich missing emails -> create drafts -> user reviews -> user confirms send
-
-Applix must not automatically send emails just because a queue, cron, or GitHub Action exists.
-
-Current backend status
-
-Completed:
-
-- company_contacts_pool exists as a reusable employer contact cache.
-- company_enrichment_queue exists for company-level enrichment work.
-- company_enrichment_queue_jobs maps each queue row back to each user, campaign, and job.
-- prepare-approved-applications prepares approved jobs by checking the pool first and queuing missing-email companies.
-- process-company-enrichment-queue processes company enrichment safely.
-- generate-job-outreach-drafts creates draft outreach rows by default.
-- send-queued-outreach sends only when explicitly confirmed.
-- Sending safety guard is deployed.
-- Autonomous sending from GitHub Actions or cron is blocked unless the request includes send_now=true or confirm_send=true.
-- Paused, draft, pending, stopped, cancelled, archived, and inactive campaigns are protected from sending.
-- Daily and hourly send limits remain enforced.
-
-Current safety rules
-
-- process-company-enrichment-queue is safe for cron.
-- send-queued-outreach must not be scheduled as an autonomous GitHub Action or cron.
-- send-queued-outreach requires explicit confirmation:
-
-{
-  "send_now": true
-}
-
-or:
-
-{
-  "confirm_send": true
-}
-
-Without one of those fields, the function returns a safe skip response and does not send.
-
-Production flow
-
-1. Job approval
-
-User approves one or more jobs from the website.
-
-Approval should update the job to something equivalent to:
-
-user_decision = approved
-
-or:
-
-status = approved
-
-2. Prepare applications
-
-Frontend should call:
-
-POST /functions/v1/prepare-approved-applications
-
-with body:
-
-{
-  "campaign_id": "<campaign-id>",
-  "limit": 25
-}
-
-This function:
-
-- confirms the logged-in user owns the campaign,
-- loads approved jobs,
-- checks company_contacts_pool,
-- updates jobs immediately when pool contact exists,
-- queues missing companies into company_enrichment_queue,
-- creates drafts for already-ready jobs.
-
-3. Enrichment cron
-
-Only this function should run automatically:
-
-process-company-enrichment-queue
-
-Cron body:
-
-{
-  "limit": 5,
-  "max_email_finder_calls": 5
-}
-
-The function currently hard-caps itself internally to 1 company per run, even when the request sends limit: 5.
-
-This prevents:
-
-- Supabase idle timeout,
-- worker resource limit errors,
-- accidental multi-company expensive requests,
-- stuck processing rows.
-
-4. Draft creation
-
-When an email is found or reused from pool, the worker updates the jobs and calls draft generation.
-
-Draft rows should appear in:
-
+# APPLIX BUILD PLAN
+
+Last updated: 2026-07-16
+
+This is the main technical context file for Applix. Read this before changing campaign launch, job fetching, AI matching, tracker, enrichment, drafting, Gmail, cron, pause/resume, or sending.
+
+## Product rule
+
+```text
+Find jobs
+  -> deterministic filtering
+  -> AI judgment
+  -> daily selection
+  -> user reviews
+  -> user approves
+  -> prepare application
+  -> enrich missing company email
+  -> generate draft
+  -> user reviews draft
+  -> user explicitly sends
+```
+
+Never send automatically merely because a cron, queue, or scheduled worker exists.
+
+## Current production problem
+
+Two job pipelines currently exist beside each other.
+
+```text
+LEGACY PIPELINE
+Campaign launch -> Outscraper -> public.jobs -> legacy draft/tracker
+
+NEW PIPELINE
+Campaign -> catalogue -> deterministic match -> AI judge
+         -> daily selection -> campaign tracker -> approval
+         -> enrichment -> draft -> explicit send
+```
+
+The campaign launch page is still wired to the legacy pipeline. This is why a campaign can scrape jobs successfully but produce zero `orchestrator_runs`, zero `campaign_job_matches`, and zero AI-approved tracker jobs.
+
+## Full live system
+
+```text
+                             APPLIX LIVE SYSTEM
+================================================================================
+
+ USER
+  |
+  +-- Connect Gmail
+  |      |
+  |      +-- connect-gmail
+  |      +-- Google OAuth consent
+  |      +-- gmail-oauth-callback
+  |                   |
+  |                   v
+  |          user_email_authorizations
+  |
+  +-- Create / Start Campaign
+  |      |
+  |      v
+  |   launch-applix-campaign                    CURRENT LEGACY WIRING
+  |      |
+  |      +-- run-outscraper-campaigns
+  |      |        |
+  |      |        +-- outscraper-jobs
+  |      |                  |
+  |      |                  v
+  |      |              public.jobs
+  |      |
+  |      +-- generate-outreach-drafts
+  |                   |
+  |                   v
+  |          old outreach / old tracker
+  |
+  +-- Target production launch
+         |
+         v
+     calsie-campaign-orchestrator-v2
+         |
+         +-- compile-campaign-search-plan
+         |
+         +-- match-campaign-jobs
+         |       |
+         |       +-- enough catalogue jobs? -- yes ------------------+
+         |       |                                                    |
+         |       +-- no -> fetch-job-catalogue-v2                     |
+         |                    |                                       |
+         |                    +-- store/update public.jobs            |
+         |                    +-- match-campaign-jobs again           |
+         |                                                            |
+         +------------------------------------------------------------+
+         |
+         +-- judge-campaign-jobs
+         |       |
+         |       +-- pass
+         |       +-- review
+         |       +-- reject
+         |       +-- reuse cached decision when AI input hash matches
+         |
+         +-- select-daily-job-batch
+                    |
+                    v
+            campaign_job_matches
+                    |
+                    v
+              NEW JOB TRACKER
+                 /       \
+              Approve    Skip
+                 |         |
+                 |         +-- user_decision = skipped
+                 |
+                 +-- user_decision = approved
+                          |
+                          v
+              prepare-approved-applications
+                          |
+                    email available?
+                     /          \
+                   yes          no
+                    |            |
+                    |            v
+                    |   company_enrichment_queue
+                    |            |
+                    |            v
+                    |   drain-company-enrichment-queue
+                    |            |
+                    |            v
+                    |   process-company-enrichment-queue
+                    |            |
+                    |            v
+                    |      enrich-job-emails
+                    |            |
+                    +------------+
+                          |
+                          v
+              generate-job-outreach-drafts
+                          |
+                          v
+                    outreach_queue
+                          |
+                          v
+                approve-outreach-draft
+                          |
+                          v
+                send-queued-outreach
+                          |
+                          v
+                      gmail-send
+                          |
+                          v
+                        GMAIL
+```
+
+## Correct campaign orchestrator flow
+
+```text
+Start Campaign / Find New Jobs Now
+                |
+                v
+calsie-campaign-orchestrator-v2
+                |
+                v
+compile-campaign-search-plan
+                |
+                v
+match-campaign-jobs
+                |
+        enough suitable jobs?
+            /          \
+          yes           no
+           |             |
+           |             v
+           |    fetch-job-catalogue-v2
+           |             |
+           |             v
+           |    match-campaign-jobs again
+           |             |
+           +-------------+
+                |
+                v
+judge-campaign-jobs
+                |
+                v
+select-daily-job-batch
+                |
+                v
+campaign_job_matches
+                |
+                v
+get_review_jobs RPC -> JobSwipeDeck
+```
+
+## Tracker flow
+
+```text
+get_review_jobs RPC
+        |
+        +-- reads campaign_job_matches
+        +-- joins public.jobs
+        +-- returns selected, AI-approved, undecided jobs
+        |
+        v
+JobSwipeDeck
+   /      \
+Approve   Skip
+  |         |
+  +-- decide_campaign_job RPC
+              |
+              +-- approved -> prepare-approved-applications
+              +-- skipped  -> retain as campaign history
+```
+
+The old application tracker that directly reads user-owned rows from `public.jobs` is legacy history. It must not be presented as the new review queue.
+
+## Company enrichment flow
+
+```text
+prepare-approved-applications
+            |
+            +-- contact in company_contacts_pool?
+            |          |
+            |          +-- yes -> update job and create draft
+            |
+            +-- no -> company_enrichment_queue
+                           |
+                           v
+              drain-company-enrichment-queue
+                           |
+                           v
+             process-company-enrichment-queue
+                           |
+                           v
+                  enrich-job-emails
+                           |
+             +-------------+-------------+
+             |             |             |
+      contact pool   known contacts   website/email discovery
+             |             |             |
+             +-------------+-------------+
+                           |
+                           v
+             generate-job-outreach-drafts
+```
+
+## Draft and Gmail flow
+
+```text
 outreach_queue
+      |
+      v
+User reviews subject, body, recipient and resume
+      |
+      v
+approve-outreach-draft
+      |
+      v
+send-queued-outreach
+      |
+      +-- requires send_now=true or confirm_send=true
+      +-- checks campaign status
+      +-- checks hourly/daily limits
+      |
+      v
+gmail-send
+      |
+      v
+Google Gmail API
+```
 
-The safe draft state is:
+## Gmail OAuth
 
-status = queued
-review_status = draft or approved depending UI review flow
+```text
+User clicks Connect Gmail
+          |
+          v
+connect-gmail
+          |
+          v
+Google consent screen
+          |
+          v
+gmail-oauth-callback
+          |
+          v
+user_email_authorizations
+          |
+          v
+gmail-send
+```
 
-The user must review before sending.
+## Live database cron jobs
 
-5. Manual send only
+### 1. Daily job fetch
 
-Sending should only happen from a user action in the website.
+```text
+Name:      applix-daily-job-fetch
+Schedule:  0 20 * * *
+UTC:       20:00 daily
+Sydney:    about 6:00 AM AEST / 7:00 AM AEDT
+```
 
-The manual send button should call:
+```text
+pg_cron
+   |
+   v
+dispatch_applix_daily_job_fetch()
+   |
+   +-- reads service credential from Vault
+   |
+   v
+applix-daily-job-fetcher
+```
 
-POST /functions/v1/send-queued-outreach
+Current issue: this cron still calls `applix-daily-job-fetcher`, not the new campaign dispatcher/orchestrator. A recent live call returned 401, so its authentication and final responsibility need correction.
 
-with:
+Target:
 
-{
-  "queue_id": "<outreach-queue-id>",
-  "send_now": true
-}
+```text
+Daily cron
+   |
+   v
+active-campaign dispatcher
+   |
+   +-- query campaigns where status = active
+   +-- invoke calsie-campaign-orchestrator-v2 once per campaign
+   +-- never run paused/draft/archived/completed campaigns
+```
 
-or:
+### 2. Company enrichment recovery
 
-{
-  "queue_id": "<outreach-queue-id>",
-  "confirm_send": true
-}
+```text
+Name:      applix-company-enrichment-recovery
+Schedule:  */5 * * * *
+Frequency: every 5 minutes
+```
 
-Do not schedule this function.
+```text
+pg_cron
+   |
+   v
+kick_company_enrichment_drain()
+   |
+   +-- pending due work exists? -- no -> stop
+   |
+   +-- yes
+        |
+        v
+   drain-company-enrichment-queue
+        |
+        v
+   process-company-enrichment-queue
+        |
+        v
+   enrich-job-emails
+```
 
-Cron setup
+This cron is appropriate because it enriches data but does not send emails.
 
-The cron should call only:
+## Live Edge Function inventory
 
+### New AI campaign pipeline - keep
+
+```text
+calsie-campaign-orchestrator-v2
+compile-campaign-search-plan
+match-campaign-jobs
+fetch-job-catalogue-v2
+judge-campaign-jobs
+select-daily-job-batch
+```
+
+### Approval, enrichment and drafting - keep
+
+```text
+approve-job-for-outreach
+prepare-approved-applications
+run-company-enrichment-chain
+drain-company-enrichment-queue
 process-company-enrichment-queue
+enrich-job-emails
+generate-job-outreach-drafts
+approve-outreach-draft
+send-queued-outreach
+```
 
-Recommended schedule:
+`run-company-enrichment-chain` is a wrapper and must be reviewed because one historical call returned 500 while lower-level functions succeeded.
 
-* * * * *
+### Gmail - keep
 
-That means every minute.
+```text
+connect-gmail
+gmail-oauth-callback
+gmail-send
+```
 
-Recommended SQL shape:
+### Current launch and scheduling - rewire
 
-select cron.schedule(
-  'process-company-enrichment-queue-every-minute',
-  '* * * * *',
-  $$
-  select net.http_post(
-    url := 'https://bnshgtrqbfuphhhdgccs.supabase.co/functions/v1/process-company-enrichment-queue',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'x-cron-secret', '<CRON_SECRET>'
-    ),
-    body := jsonb_build_object(
-      'limit', 5,
-      'max_email_finder_calls', 5
-    )
-  );
-  $$
-);
+```text
+launch-applix-campaign
+applix-daily-job-fetcher
+applix-campaign-runner
+applix-agent-orchestrator
+applix-agent-email-scheduler
+applix-hourly-draft-runner
+```
 
-Do not paste real secrets into GitHub, frontend code, or public chat.
+### Legacy or test candidates - inspect before removal
 
-GitHub Actions rule
+```text
+run-outscraper-campaigns
+generate-outreach-drafts
+outscraper-jobs
+fetch-adzuna-jobs
+launch-applix-test
+gmail-send-test
+bright-responder
+```
 
-Keep this workflow disabled for now:
+These may still support tests or fallback ingestion. Do not delete them until call sites, cron jobs and production logs confirm they are unused.
 
-Send queued outreach
+### Utility
 
-Reason:
+```text
+applix-health
+```
 
-- it is for sending,
-- sending must be manual for now,
-- backend is protected, but the safest product rule is no autonomous email sending.
+## Pause, resume, refresh and archive behaviour
 
-The GitHub Action can be revisited later after there is a clear user-controlled scheduling setting.
+Pause and refresh are different actions.
 
-Campaign pause rule
+```text
+Pause Campaign
+  -> campaigns.status = paused
+  -> scheduled dispatcher skips campaign
+  -> orchestrator rejects execution
+  -> sending remains blocked
+  -> data and history remain
 
-Campaigns with these statuses should not send:
+Resume Campaign
+  -> campaigns.status = active
+  -> future scheduled runs resume
+  -> previous AI judgments and decisions remain
 
-paused
-pause
-stopped
-cancelled
-canceled
-archived
-draft
-pending
+Find New Jobs Now
+  -> allowed only for active campaign
+  -> invokes calsie-campaign-orchestrator-v2
+  -> does not delete previous reviewed history
 
-A paused campaign can still keep historical jobs and drafts, but sending must be blocked.
+Archive Campaign
+  -> status = archived
+  -> hidden from active campaigns
+  -> no scheduling, processing or sending
+  -> historical records preserved
+```
 
-Recommended user-facing statuses:
+Required campaign card controls:
 
-draft
-active
-paused
-completed
+```text
+RUNNING
+[Find New Jobs Now] [Edit Campaign] [Pause Campaign] [...]
 
-Frontend work still needed
+PAUSED
+[Resume Campaign] [Edit Campaign] [Archive Campaign]
+```
 
-A. Confirm prepare button wiring
+The orchestrator must explicitly reject non-active statuses. Loading `campaigns.status` without enforcing it is insufficient.
 
-The website must include a button or action such as:
+## Database ownership model
 
-Prepare approved applications
+```text
+auth.users
+   |
+   +-- profiles
+   +-- resume_profiles                    preserved account/resume identity
+   +-- campaigns
+          |
+          +-- campaign_resume_sources
+          +-- orchestrator_runs
+          +-- campaign_job_matches
+          +-- company_enrichment_queue
+          +-- outreach_queue
+          +-- notifications/logs
 
-It should call prepare-approved-applications with the signed-in user's JWT.
+public.jobs                             shared catalogue where possible
+   |
+   +-- campaign_job_matches             campaign-specific state
+   +-- lead_contact_emails
+   +-- company_enrichment_queue_jobs
+   +-- outreach_queue
+```
 
-Success response should show counts:
+Do not make the global job record itself the source of campaign review state. Campaign-specific filtering, AI judgment, selection and user decisions belong in `campaign_job_matches`.
 
-- approved jobs seen,
-- pool hits,
-- queued companies,
-- jobs updated from pool,
-- drafts created.
+## Immediate wiring plan
 
-B. Manual send button
+```text
+1. launch-applix-campaign
+   -> create/update campaign only
+   -> call calsie-campaign-orchestrator-v2
+   -> stop calling generate-outreach-drafts during launch
 
-The website send button must send with explicit confirmation:
+2. Find New Jobs Now
+   -> call calsie-campaign-orchestrator-v2
+   -> show run stage and counters
 
-{
-  "queue_id": "<id>",
-  "send_now": true
-}
+3. Daily cron
+   -> replace legacy fetch call with active-campaign dispatcher
+   -> dispatcher invokes calsie-campaign-orchestrator-v2
 
-or:
+4. Tracker
+   -> load get_review_jobs RPC
+   -> display campaign_job_matches queue
+   -> move old public.jobs rows to Legacy History
 
-{
-  "queue_id": "<id>",
-  "confirm_send": true
-}
+5. Approval
+   -> decide_campaign_job
+   -> prepare-approved-applications
 
-Do not call send-queued-outreach without that confirmation field.
+6. Enrichment
+   -> queue missing-email companies
+   -> five-minute recovery cron drains queue
 
-C. Pause campaign button
+7. Drafting
+   -> generate-job-outreach-drafts only after approval/email readiness
 
-The frontend should support:
+8. Sending
+   -> manual explicit confirmation only
 
-Pause campaign
-Resume campaign
+9. Pause protection
+   -> scheduler skips paused campaigns
+   -> orchestrator rejects paused campaigns
+   -> send function rejects paused campaigns
+```
 
-Pause should set:
+## Required smoke test
 
-campaigns.status = paused
+Use a fresh controlled campaign with a daily target of 2.
 
-Resume should set:
+```text
+Create campaign
+  -> orchestrator_run created
+  -> search plan compiled
+  -> catalogue checked/fetched
+  -> campaign_job_matches created
+  -> AI rejects false positives
+  -> exactly relevant jobs selected
+  -> tracker displays selected jobs
+  -> approve one
+  -> skip one
+  -> approved job reaches preparation
+  -> email enrichment runs only when needed
+  -> draft appears
+  -> no email sends without explicit confirmation
+```
 
-campaigns.status = active
+Pass criteria:
 
-The backend send function already respects paused status.
+```text
+campaign status: active
+orchestrator run: completed or waiting_for_enrichment
+AI judgments: present
+selected jobs: expected count
+tracker: only new selected jobs
+legacy history: separated
+outreach: draft only after approval
+sending: zero until user confirms
+```
 
-Verification checklist
+## Safety rules
 
-Backend checks
+- Never expose service-role, cron, OAuth or provider secrets.
+- Internal-only AI judge calls require service-role authorization.
+- Paused, draft, pending, archived, stopped, cancelled and completed campaigns must not process or send.
+- `send-queued-outreach` must not be autonomous.
+- User approval is required before application preparation.
+- User confirmation is required before Gmail send.
+- Keep global catalogue data separate from campaign-specific decisions.
+- Do not delete legacy functions until all call sites and cron jobs are accounted for.
 
-Check cron exists:
+## Definition of the target production architecture
 
-select jobid, schedule, active, jobname
-from cron.job
-where jobname = 'process-company-enrichment-queue-every-minute';
+```text
+Campaign launch or manual refresh
+              |
+              v
+calsie-campaign-orchestrator-v2
+              |
+              v
+AI-approved campaign review queue
+              |
+              v
+User approval
+              |
+              v
+Prepare -> enrich -> draft
+              |
+              v
+User review and explicit Gmail send
+```
 
-Check enrichment queue:
-
-select company_name, status, attempts, last_error, processed_at, updated_at
-from public.company_enrichment_queue
-order by updated_at desc
-limit 20;
-
-Check drafts:
-
-select recipient_company, recipient_email, status, review_status, scheduled_send_at, created_at
-from public.outreach_queue
-order by created_at desc
-limit 20;
-
-Check autonomous send protection:
-
-curl -X POST "https://bnshgtrqbfuphhhdgccs.supabase.co/functions/v1/send-queued-outreach" \
-  -H "x-cron-secret: $APPLIX_CRON_SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{}'
-
-Expected response:
-
-{
-  "ok": true,
-  "function": "send-queued-outreach",
-  "send_skipped": true,
-  "reason": "explicit_send_required"
-}
-
-Website checks
-
-1. Open a campaign.
-2. Approve one Needs email job.
-3. Trigger Prepare approved applications.
-4. Confirm company appears in company_enrichment_queue if no pool hit exists.
-5. Wait for cron to process.
-6. Confirm draft appears in outreach_queue if email is found.
-7. Confirm email does not send until manual send button sends send_now=true.
-
-Merge checklist
-
-Before merging the branch into main:
-
-- Confirm Vercel preview passes.
-- Confirm Supabase functions were deployed from the branch.
-- Confirm migration files do not insert unsupported lead_contact_emails.status = 'blocked' values.
-- Keep Send queued outreach GitHub Action disabled.
-- Rotate exposed service role and cron secrets before real public users.
-- Confirm frontend prepare button is wired.
-- Confirm manual send button includes send_now=true or confirm_send=true.
-
-Current decision
-
-The backend engine is ready for controlled testing.
-
-The next product task is frontend confirmation:
-
-Approve job -> prepare approved applications -> queue/enrich -> draft appears -> manual send only
-
-Do not enable autonomous send workflows until Applix has a user-controlled sending schedule and clear pause/resume controls.
+This is the architecture new work should move toward.
