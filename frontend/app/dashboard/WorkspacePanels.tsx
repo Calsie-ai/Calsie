@@ -24,6 +24,7 @@ export default function WorkspacePanels({
   onResumeUpload,
   onConnectGmail,
   onToggleCampaign,
+  onFindJobsNow,
 }: {
   active: WorkspaceTab;
   campaign: CampaignRecord | null;
@@ -36,6 +37,7 @@ export default function WorkspacePanels({
   onResumeUpload: (file: File) => void;
   onConnectGmail: () => void;
   onToggleCampaign: () => void;
+  onFindJobsNow: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<CampaignTemplate | null>(null);
@@ -229,7 +231,7 @@ export default function WorkspacePanels({
         <header>
           <p>Campaign</p>
           <h1>Set up campaign</h1>
-          <span>Review the campaign you selected from Browse Templates.</span>
+          <span>Pause controls scheduling. Find New Jobs Now runs a separate AI search while the campaign is active.</span>
         </header>
         <div className="workspace-plan">
           <div><b>24</b><span>jobs per day</span></div>
@@ -241,11 +243,17 @@ export default function WorkspacePanels({
           <h3>{campaign?.name || "No campaign selected"}</h3>
           <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Choose and review a campaign from Browse Templates first."}</p>
           <div className="workspace-actions">
+            {running && (
+              <button className="workspace-secondary" onClick={onFindJobsNow} disabled={busy || !campaign}>
+                {busy ? "Finding jobs..." : "Find New Jobs Now"}
+              </button>
+            )}
             <button className="workspace-primary" onClick={onToggleCampaign} disabled={busy || !campaign}>
-              {running ? "Pause Campaign" : "Start Campaign"}
+              {running ? "Pause Campaign" : paused ? "Resume Campaign" : "Start Campaign"}
             </button>
           </div>
         </div>
+        {message && <div className="workspace-message">{message}</div>}
       </section>
     );
   }
@@ -257,7 +265,7 @@ export default function WorkspacePanels({
           <div>
             <p>AI mission control</p>
             <h1>Application tracker</h1>
-            <span>Follow the campaign pipeline, review applications, and download your records here.</span>
+            <span>Review AI-approved jobs separately from legacy application history.</span>
           </div>
           <span className={`workspace-status-pill ${statusClass}`}><i /> {statusText}</span>
         </header>
@@ -285,9 +293,16 @@ export default function WorkspacePanels({
       <div className="workspace-card">
         <h3>{campaign?.name || "Set up your first campaign"}</h3>
         <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Browse templates, upload your resume, connect Gmail, and start."}</p>
-        <button className="workspace-primary" onClick={onToggleCampaign} disabled={busy || !campaign}>
-          {running ? "Pause Campaign" : "Start Campaign"}
-        </button>
+        <div className="workspace-actions">
+          {running && (
+            <button className="workspace-secondary" onClick={onFindJobsNow} disabled={busy || !campaign}>
+              {busy ? "Finding jobs..." : "Find New Jobs Now"}
+            </button>
+          )}
+          <button className="workspace-primary" onClick={onToggleCampaign} disabled={busy || !campaign}>
+            {running ? "Pause Campaign" : paused ? "Resume Campaign" : "Start Campaign"}
+          </button>
+        </div>
       </div>
     </section>
   );

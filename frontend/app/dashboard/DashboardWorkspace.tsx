@@ -110,7 +110,7 @@ export default function DashboardWorkspace() {
       if (isCampaignRunning(campaign.status)) {
         const { error } = await supabase.from("campaigns").update({ status: "paused", outreach: { ...(campaign.outreach || {}), active: false, paused_at: new Date().toISOString() } }).eq("id", campaign.id);
         if (error) throw error;
-        setCampaign({ ...campaign, status: "paused" }); setMessage("Campaign paused.");
+        setCampaign({ ...campaign, status: "paused", outreach: { ...(campaign.outreach || {}), active: false } }); setMessage("Campaign paused.");
       } else {
         if (!resumeReady || !gmailReady) throw new Error("Upload your resume and connect Gmail first.");
         const { data } = await supabase.auth.getSession();
@@ -118,13 +118,40 @@ export default function DashboardWorkspace() {
         const response = await fetch("/api/applix/schedule-campaign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_token: token, campaign_id: campaign.id, enabled: true }) });
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || "Could not start campaign.");
-        setCampaign({ ...campaign, status: "launched" }); setMessage("Campaign started.");
+        setCampaign({ ...campaign, status: "active", outreach: { ...(campaign.outreach || {}), active: true, scheduled: true } });
+        setMessage("Campaign started. AI matching is running; no email was sent.");
       }
     } catch (error) { setMessage(error instanceof Error ? error.message : "Campaign action failed."); }
     finally { setBusy(false); }
   }
 
+  async function findJobsNow() {
+    if (!campaign || !isCampaignRunning(campaign.status)) {
+      setMessage("Resume the campaign before finding new jobs.");
+      return;
+    }
+    setBusy(true); setMessage("");
+    try {
+      const supabase = getSupabaseClient();
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Please sign in again.");
+      const response = await fetch("/api/applix/run-campaign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_token: token, campaign_id: campaign.id }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) throw new Error(result.error || "Could not find new jobs.");
+      setMessage("Job search completed. Open the tracker to review AI-approved jobs. No email was sent.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not find new jobs.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function logout() { const supabase = getSupabaseClient(); await supabase.auth.signOut(); router.replace("/"); }
 
-  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanelsLive active={active} campaign={campaign} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onToggleCampaign={() => void toggleCampaign()} /></div></main>;
+  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanelsLive active={active} campaign={campaign} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onToggleCampaign={() => void toggleCampaign()} onFindJobsNow={() => void findJobsNow()} /></div></main>;
 }
