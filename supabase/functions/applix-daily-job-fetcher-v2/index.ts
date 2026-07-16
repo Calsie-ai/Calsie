@@ -18,7 +18,12 @@ function authorized(req: Request) {
 async function run(campaignId: string, target: number) {
   const response = await fetch(`${URL}/functions/v1/calsie-campaign-orchestrator-v3`, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-applix-cron-secret": SECRET },
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${KEY}`,
+      apikey: KEY,
+      "x-applix-cron-secret": SECRET,
+    },
     body: JSON.stringify({ campaign_id: campaignId, allowed_campaign_id: campaignId, dry_run: false, run_type: "daily_catalogue", trigger: "scheduled_daily", daily_target: target }),
   });
   const raw = await response.text().catch(() => "");
@@ -49,6 +54,6 @@ serve(async (req) => {
       executed++; const outcome = await run(campaign.id, target); if (!outcome.ok) failed++; results.push({ campaign_id: campaign.id, ...outcome });
       await admin.from("campaigns").update({ updated_at: new Date().toISOString(), outreach: { ...outreach, last_daily_fetch_at: new Date().toISOString(), last_daily_fetch_result: { ok: outcome.ok, status: outcome.status, orchestrator: "calsie-campaign-orchestrator-v3", attempt_limits: [100, 300, 700] } } }).eq("id", campaign.id);
     }
-    return json({ ok: failed === 0, function: "applix-daily-job-fetcher-v2", version: "three_stage_dispatcher_v1", campaigns_queried: campaigns.data?.length || 0, executed_count: executed, skipped_count: skipped, failed_count: failed, results }, failed === 0 ? 200 : 207);
+    return json({ ok: failed === 0, function: "applix-daily-job-fetcher-v2", version: "three_stage_dispatcher_v2_auth", campaigns_queried: campaigns.data?.length || 0, executed_count: executed, skipped_count: skipped, failed_count: failed, results }, failed === 0 ? 200 : 207);
   } catch (error) { return json({ ok: false, function: "applix-daily-job-fetcher-v2", error: error instanceof Error ? error.message : String(error) }, 500); }
 });
