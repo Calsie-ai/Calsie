@@ -121,14 +121,18 @@ export default function DashboardWorkspace() {
     try {
       const supabase = getSupabaseClient();
       if (isCampaignRunning(campaign.status)) {
-        const { error } = await supabase.from("campaigns").update({ status: "paused", outreach: { ...(campaign.outreach || {}), active: false, paused_at: new Date().toISOString() } }).eq("id", campaign.id);
-        if (error) throw error; setCampaign({ ...campaign, status: "paused", outreach: { ...(campaign.outreach || {}), active: false } }); setMessage("Campaign paused.");
+        const { data: updated, error } = await supabase.from("campaigns").update({ status: "paused", outreach: { ...(campaign.outreach || {}), active: false, paused_at: new Date().toISOString() } }).eq("id", campaign.id).select("id,name,location,target_business_type,search,outreach,status,created_at").single();
+        if (error) throw error;
+        setCampaign(updated as CampaignRecord);
+        setMessage("Campaign paused.");
       } else {
         if (!resumeReady || !gmailReady) throw new Error("Upload your resume and connect Gmail first.");
         const { data } = await supabase.auth.getSession(); const token = data.session?.access_token;
         const response = await fetch("/api/applix/schedule-campaign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_token: token, campaign_id: campaign.id, enabled: true }) });
         const result = await response.json(); if (!response.ok || !result.ok) throw new Error(result.error || "Could not start campaign.");
-        setCampaign({ ...campaign, status: "active", outreach: { ...(campaign.outreach || {}), active: true, scheduled: true } }); setMessage("Campaign started. AI matching is running; no email was sent.");
+        if (result.campaign) setCampaign(result.campaign as CampaignRecord);
+        else setCampaign({ ...campaign, status: "active", outreach: { ...(campaign.outreach || {}), ...(result.outreach || {}), active: true, scheduled: true } });
+        setMessage("Campaign started. AI matching is running; no email was sent.");
       }
     } catch (error) { setMessage(error instanceof Error ? error.message : "Campaign action failed."); }
     finally { setBusy(false); }

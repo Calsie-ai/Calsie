@@ -2,6 +2,8 @@
 
 import { campaignLocation, campaignRole, type CampaignRecord, type CampaignTemplate } from "./workspace-data";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 type Props = {
   campaign: CampaignRecord | null;
   purchasedTemplate?: CampaignTemplate | null;
@@ -13,13 +15,38 @@ type Props = {
   onOpenTracker: () => void;
 };
 
+function positiveInteger(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function textValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function campaignTiming(campaign: CampaignRecord | null) {
+  const outreach = campaign?.outreach || {};
+  const totalDays = positiveInteger(outreach.campaign_days, 30);
+  const dailyJobLimit = positiveInteger(outreach.daily_job_limit, 24);
+  const hasStarted = Boolean(campaign && ["active", "scheduled", "launched", "paused"].includes(campaign.status));
+  const savedStart = textValue(outreach.started_at) || textValue(outreach.launched_at) || textValue(outreach.scheduled_at);
+  const startValue = savedStart || (hasStarted ? campaign?.created_at || null : null);
+  const startTime = startValue ? Date.parse(startValue) : Number.NaN;
+  const elapsedDays = Number.isFinite(startTime) ? Math.floor(Math.max(0, Date.now() - startTime) / DAY_MS) : 0;
+  const currentDay = hasStarted ? Math.min(totalDays, elapsedDays + 1) : 0;
+
+  return { totalDays, dailyJobLimit, currentDay, hasStarted };
+}
+
 export default function OverviewDashboard({ campaign, purchasedTemplate, resumeReady, resumeName, gmailReady, approvedCount, passedCount, onOpenTracker }: Props) {
   const status = campaign?.status || "Not configured";
-  const campaignLabel = ["active", "scheduled", "launched"].includes(status) ? "Active" : status === "paused" ? "Paused" : "Not set";
+  const campaignLabel = ["active", "scheduled", "launched"].includes(status) ? "Active" : status === "paused" ? "Paused" : status === "draft" ? "Draft" : "Not set";
   const title = purchasedTemplate?.title || campaign?.name || "No template selected";
   const role = purchasedTemplate?.role || campaignRole(campaign);
   const location = purchasedTemplate?.location || campaignLocation(campaign);
   const description = purchasedTemplate?.description || "Choose a template to create your job campaign.";
+  const timing = campaignTiming(campaign);
+  const dayLabel = timing.hasStarted ? `Day ${timing.currentDay} of ${timing.totalDays}` : "Not started";
 
   return (
     <section className="canva-overview">
@@ -32,8 +59,8 @@ export default function OverviewDashboard({ campaign, purchasedTemplate, resumeR
       <div className="canva-status-grid">
         <article><strong>Resume</strong><small>{resumeReady ? resumeName || "Resume ready" : "Resume missing"}</small></article>
         <article><strong>AI Email Send</strong><small>{gmailReady ? "Email connected" : "Email not connected"}</small></article>
-        <article><strong>Campaign</strong><small>{campaignLabel}<br />{campaign ? "Your campaign is ready" : "No campaign yet"}</small></article>
-        <article><strong>Plan</strong><small>{campaign ? "Campaign selected" : "Not selected"}</small></article>
+        <article><strong>Campaign</strong><small>{campaignLabel}</small></article>
+        <article><strong>Plan</strong><small>{campaign ? `${timing.dailyJobLimit} jobs/day · ${timing.totalDays} days` : "Not selected"}</small></article>
       </div>
 
       <section className="canva-service-card">
@@ -41,9 +68,9 @@ export default function OverviewDashboard({ campaign, purchasedTemplate, resumeR
         <h2>{role}</h2>
         <p>{role} · {location}</p>
         <div className="canva-metrics-row">
-          <button type="button" className="canva-metric canva-metric-pass">Passed : {passedCount}</button>
-          <button type="button" className="canva-metric canva-metric-smash">Smashed : {approvedCount}</button>
-          <button type="button" className="canva-metric canva-metric-tracker" onClick={onOpenTracker}>Tracker <span>✓</span></button>
+          <button type="button" className="canva-metric canva-metric-pass"><strong>Passed: {passedCount}</strong></button>
+          <button type="button" className="canva-metric canva-metric-smash"><strong>Smashed: {approvedCount}</strong></button>
+          <div className="canva-metric canva-metric-day" aria-label={dayLabel}><strong>{dayLabel}</strong></div>
         </div>
       </section>
 
