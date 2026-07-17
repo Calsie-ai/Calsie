@@ -12,6 +12,7 @@ export default function DashboardWorkspace() {
   const [active, setActive] = useState<WorkspaceTab>("overview");
   const [campaign, setCampaign] = useState<CampaignRecord | null>(null);
   const [approvedCount, setApprovedCount] = useState(0);
+  const [passedCount, setPassedCount] = useState(0);
   const [resumeReady, setResumeReady] = useState(false);
   const [resumeName, setResumeName] = useState("");
   const [gmailReady, setGmailReady] = useState(false);
@@ -22,9 +23,7 @@ export default function DashboardWorkspace() {
     void load();
     const receiveTrackerCounts = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      if (event.data?.type === "applix-tracker-counts") {
-        setApprovedCount(Number(event.data.approvedCount || 0));
-      }
+      if (event.data?.type === "applix-tracker-counts") setApprovedCount(Number(event.data.approvedCount || 0));
     };
     window.addEventListener("message", receiveTrackerCounts);
     return () => window.removeEventListener("message", receiveTrackerCounts);
@@ -47,8 +46,10 @@ export default function DashboardWorkspace() {
     if (latestCampaign?.id) {
       const { data } = await supabase.rpc("get_campaign_tracker_counts", { p_campaign_id: latestCampaign.id });
       setApprovedCount(Number(data?.[0]?.approved_count || 0));
+      setPassedCount(Number(data?.[0]?.passed_count || 0));
     } else {
       setApprovedCount(0);
+      setPassedCount(0);
     }
   }
 
@@ -63,29 +64,13 @@ export default function DashboardWorkspace() {
         name: `${template.title} Campaign`,
         location: template.location,
         target_business_type: template.role,
-        search: {
-          target_role: template.role,
-          target_location: template.location,
-          query_terms: template.queryTerms,
-          include_title_terms: template.includeTitleTerms,
-          exclude_title_terms: template.excludeTitleTerms,
-          description_keywords: template.descriptionKeywords,
-          job_types: template.jobTypes,
-          posted_within_days: template.postedWithinDays,
-          fetch_frequency: "daily",
-          campaign_days: 30,
-          daily_job_limit: 24,
-          template_id: template.id,
-        },
+        search: { target_role: template.role, target_location: template.location, query_terms: template.queryTerms, include_title_terms: template.includeTitleTerms, exclude_title_terms: template.excludeTitleTerms, description_keywords: template.descriptionKeywords, job_types: template.jobTypes, posted_within_days: template.postedWithinDays, fetch_frequency: "daily", campaign_days: 30, daily_job_limit: 24, template_id: template.id },
         filters: { location: template.location, job_types: template.jobTypes, posted_within_days: template.postedWithinDays },
         outreach: CAMPAIGN_PLAN,
         status: "draft",
       }).select("id,name,location,target_business_type,search,outreach,status,created_at").single();
       if (error) throw error;
-      setCampaign(created as CampaignRecord);
-      setApprovedCount(0);
-      setMessage(`${template.title} campaign added.`);
-      setActive("campaign");
+      setCampaign(created as CampaignRecord); setApprovedCount(0); setPassedCount(0); setMessage(`${template.title} campaign added.`); setActive("campaign");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not use template."); }
     finally { setBusy(false); }
   }
@@ -93,16 +78,13 @@ export default function DashboardWorkspace() {
   async function uploadResume(file: File) {
     setBusy(true); setMessage("");
     try {
-      const supabase = getSupabaseClient();
-      const { data } = await supabase.auth.getUser();
+      const supabase = getSupabaseClient(); const { data } = await supabase.auth.getUser();
       if (!data.user) throw new Error("Please sign in again.");
-      const ext = file.name.split(".").pop() || "pdf";
-      const path = `${data.user.id}/master-source.${ext}`;
+      const ext = file.name.split(".").pop() || "pdf"; const path = `${data.user.id}/master-source.${ext}`;
       const { error: storageError } = await supabase.storage.from("resumes").upload(path, file, { upsert: true, contentType: file.type || "application/octet-stream" });
       if (storageError) throw storageError;
       const { error } = await supabase.from("resume_profiles").upsert({ profile_id: data.user.id, resume_file_path: path, resume_file_name: file.name, resume_file_type: file.type || ext }, { onConflict: "profile_id" });
-      if (error) throw error;
-      setResumeReady(true); setResumeName(file.name); setMessage("Resume updated.");
+      if (error) throw error; setResumeReady(true); setResumeName(file.name); setMessage("Resume updated.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not update resume."); }
     finally { setBusy(false); }
   }
@@ -110,13 +92,10 @@ export default function DashboardWorkspace() {
   async function connectGmail() {
     setBusy(true); setMessage("");
     try {
-      const supabase = getSupabaseClient();
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
+      const supabase = getSupabaseClient(); const { data } = await supabase.auth.getSession(); const token = data.session?.access_token;
       if (!token) throw new Error("Please sign in again.");
       const response = await fetch("/api/applix/connect-gmail", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_token: token, return_to: `${window.location.origin}/dashboard` }) });
-      const result = await response.json();
-      if (!response.ok || !result.authorization_url) throw new Error(result.error || "Could not connect Gmail.");
+      const result = await response.json(); if (!response.ok || !result.authorization_url) throw new Error(result.error || "Could not connect Gmail.");
       window.location.href = result.authorization_url;
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not connect Gmail."); setBusy(false); }
   }
@@ -128,49 +107,32 @@ export default function DashboardWorkspace() {
       const supabase = getSupabaseClient();
       if (isCampaignRunning(campaign.status)) {
         const { error } = await supabase.from("campaigns").update({ status: "paused", outreach: { ...(campaign.outreach || {}), active: false, paused_at: new Date().toISOString() } }).eq("id", campaign.id);
-        if (error) throw error;
-        setCampaign({ ...campaign, status: "paused", outreach: { ...(campaign.outreach || {}), active: false } }); setMessage("Campaign paused.");
+        if (error) throw error; setCampaign({ ...campaign, status: "paused", outreach: { ...(campaign.outreach || {}), active: false } }); setMessage("Campaign paused.");
       } else {
         if (!resumeReady || !gmailReady) throw new Error("Upload your resume and connect Gmail first.");
-        const { data } = await supabase.auth.getSession();
-        const token = data.session?.access_token;
+        const { data } = await supabase.auth.getSession(); const token = data.session?.access_token;
         const response = await fetch("/api/applix/schedule-campaign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_token: token, campaign_id: campaign.id, enabled: true }) });
-        const result = await response.json();
-        if (!response.ok || !result.ok) throw new Error(result.error || "Could not start campaign.");
-        setCampaign({ ...campaign, status: "active", outreach: { ...(campaign.outreach || {}), active: true, scheduled: true } });
-        setMessage("Campaign started. AI matching is running; no email was sent.");
+        const result = await response.json(); if (!response.ok || !result.ok) throw new Error(result.error || "Could not start campaign.");
+        setCampaign({ ...campaign, status: "active", outreach: { ...(campaign.outreach || {}), active: true, scheduled: true } }); setMessage("Campaign started. AI matching is running; no email was sent.");
       }
     } catch (error) { setMessage(error instanceof Error ? error.message : "Campaign action failed."); }
     finally { setBusy(false); }
   }
 
   async function findJobsNow() {
-    if (!campaign || !isCampaignRunning(campaign.status)) {
-      setMessage("Resume the campaign before finding new jobs.");
-      return;
-    }
+    if (!campaign || !isCampaignRunning(campaign.status)) { setMessage("Resume the campaign before finding new jobs."); return; }
     setBusy(true); setMessage("");
     try {
-      const supabase = getSupabaseClient();
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
+      const supabase = getSupabaseClient(); const { data } = await supabase.auth.getSession(); const token = data.session?.access_token;
       if (!token) throw new Error("Please sign in again.");
-      const response = await fetch("/api/applix/run-campaign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: token, campaign_id: campaign.id }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result.ok) throw new Error(result.error || "Could not find new jobs.");
+      const response = await fetch("/api/applix/run-campaign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_token: token, campaign_id: campaign.id }) });
+      const result = await response.json().catch(() => ({})); if (!response.ok || !result.ok) throw new Error(result.error || "Could not find new jobs.");
       setMessage("Job search completed. Open the tracker to review AI-approved jobs. No email was sent.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not find new jobs.");
-    } finally {
-      setBusy(false);
-    }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not find new jobs."); }
+    finally { setBusy(false); }
   }
 
   async function logout() { const supabase = getSupabaseClient(); await supabase.auth.signOut(); router.replace("/"); }
 
-  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} approvedCount={approvedCount} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanelsLive active={active} campaign={campaign} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onToggleCampaign={() => void toggleCampaign()} onFindJobsNow={() => void findJobsNow()} /></div></main>;
+  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} approvedCount={approvedCount} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanelsLive active={active} campaign={campaign} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} approvedCount={approvedCount} passedCount={passedCount} onOpenTracker={() => setActive("tracker")} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onToggleCampaign={() => void toggleCampaign()} onFindJobsNow={() => void findJobsNow()} /></div></main>;
 }
