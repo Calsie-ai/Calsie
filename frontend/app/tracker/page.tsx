@@ -24,6 +24,7 @@ type ReviewJob = {
   source: string | null;
   apply_url: string | null;
   description: string | null;
+  status: string | null;
   created_at: string | null;
   ai_role_relevance_score?: number | null;
 };
@@ -78,13 +79,28 @@ export default function TrackerPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const summary = useMemo(() => ({
-    waiting: reviewJobs.length,
-    selected: selectedIds.length,
-    legacy: legacyJobs.length,
-  }), [reviewJobs, selectedIds, legacyJobs]);
+  const pendingJobs = useMemo(
+    () => reviewJobs.filter((job) => job.status !== "approved"),
+    [reviewJobs],
+  );
+  const approvedJobs = useMemo(
+    () => reviewJobs.filter((job) => job.status === "approved"),
+    [reviewJobs],
+  );
+  const summary = useMemo(
+    () => ({ waiting: pendingJobs.length, approved: approvedJobs.length, legacy: legacyJobs.length }),
+    [pendingJobs.length, approvedJobs.length, legacyJobs.length],
+  );
+  const allSelected = pendingJobs.length > 0 && selectedIds.length === pendingJobs.length;
 
-  const allSelected = reviewJobs.length > 0 && selectedIds.length === reviewJobs.length;
+  function publishCounts(approvedCount: number) {
+    if (window.parent !== window) {
+      window.parent.postMessage(
+        { type: "applix-tracker-counts", approvedCount },
+        window.location.origin,
+      );
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -104,21 +120,22 @@ export default function TrackerPage() {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-
       if (campaignResult.error) throw campaignResult.error;
+
       const latestCampaign = campaignResult.data as Campaign | null;
       setCampaign(latestCampaign);
 
+      let loadedReviewJobs: ReviewJob[] = [];
       if (latestCampaign?.id) {
         const reviewResult = await supabase.rpc("get_review_jobs", {
           p_campaign_id: latestCampaign.id,
           p_limit: 100,
         });
         if (reviewResult.error) throw reviewResult.error;
-        setReviewJobs((reviewResult.data || []) as ReviewJob[]);
-      } else {
-        setReviewJobs([]);
+        loadedReviewJobs = (reviewResult.data || []) as ReviewJob[];
       }
+      setReviewJobs(loadedReviewJobs);
+      publishCounts(loadedReviewJobs.filter((job) => job.status === "approved").length);
 
       const legacyResult = await supabase
         .from("jobs")
@@ -126,7 +143,6 @@ export default function TrackerPage() {
         .eq("user_id", auth.data.user.id)
         .order("created_at", { ascending: false })
         .limit(500);
-
       if (legacyResult.error) throw legacyResult.error;
       setLegacyJobs((legacyResult.data || []) as LegacyJob[]);
       setSelectedIds([]);
@@ -158,7 +174,6 @@ export default function TrackerPage() {
       },
       body: JSON.stringify({ campaign_id: campaignId, limit: 25 }),
     });
-
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload?.ok === false) {
       throw new Error(payload?.error || "Application preparation failed.");
@@ -168,29 +183,34 @@ export default function TrackerPage() {
 
   async function recordDecision(job: ReviewJob, decision: Decision) {
     const supabase = getSupabaseClient();
-    const decisionResult = await supabase.rpc("decide_campaign_job", {
-      p_campaign_id: job.campaign_id,
-      p_job_id: job.id,
+    const result = await supabase.rpc("decide_campaign_job", {
+      p_match_id: job.match_id,
       p_decision: decision,
     });
-    if (decisionResult.error) throw decisionResult.error;
-    if (decisionResult.data !== true) throw new Error(`${job.title || "Job"} is no longer available for review.`);
+    if (result.error) throw result.error;
+    if (result.data !== true) throw new Error(`${job.title || "Job"} is no longer available for review.`);
   }
 
   async function decide(job: ReviewJob, decision: Decision) {
-    if (busyId || bulkBusy) return;
+    if (busyId || bulkBusy || job.status === "approved") return;
     setBusyId(job.id);
     setMessage("");
     setError("");
     try {
       await recordDecision(job, decision);
-      setReviewJobs((current) => current.filter((item) => item.id !== job.id));
       setSelectedIds((current) => current.filter((id) => id !== job.id));
 
       if (decision === "skipped") {
+        setReviewJobs((current) => current.filter((item) => item.id !== job.id));
         setMessage("Passed. This job is out of your queue.");
         return;
       }
+
+      const nextJobs = reviewJobs.map((item) =>
+        item.id === job.id ? { ...item, status: "approved", created_at: new Date().toISOString() } : item,
+      );
+      setReviewJobs(nextJobs);
+      publishCounts(nextJobs.filter((item) => item.status === "approved").length);
 
       const supabase = getSupabaseClient();
       const session = await supabase.auth.getSession();
@@ -211,7 +231,7 @@ export default function TrackerPage() {
   }
 
   async function decideSelected(decision: Decision) {
-    const jobs = reviewJobs.filter((job) => selectedIds.includes(job.id));
+    const jobs = pendingJobs.filter((job) => selectedIds.includes(job.id));
     if (!jobs.length || bulkBusy || busyId) return;
     setBulkBusy(true);
     setMessage("");
@@ -219,20 +239,26 @@ export default function TrackerPage() {
     try {
       for (const job of jobs) await recordDecision(job, decision);
       const decidedIds = new Set(jobs.map((job) => job.id));
-      setReviewJobs((current) => current.filter((job) => !decidedIds.has(job.id)));
       setSelectedIds([]);
 
       if (decision === "skipped") {
+        setReviewJobs((current) => current.filter((job) => !decidedIds.has(job.id)));
         setMessage(`${jobs.length} jobs passed.`);
         return;
       }
+
+      const nextJobs = reviewJobs.map((job) =>
+        decidedIds.has(job.id) ? { ...job, status: "approved", created_at: new Date().toISOString() } : job,
+      );
+      setReviewJobs(nextJobs);
+      publishCounts(nextJobs.filter((job) => job.status === "approved").length);
 
       const supabase = getSupabaseClient();
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
       if (!token) throw new Error("Please sign in again.");
       await prepareApprovedApplications(jobs[0].campaign_id, token);
-      setMessage(`${jobs.length} jobs smashed and moved to application preparation.`);
+      setMessage(`${jobs.length} jobs smashed and added to your tracker.`);
     } catch (bulkError) {
       setError(messageFrom(bulkError, "Could not complete the bulk decision."));
       await load();
@@ -246,7 +272,7 @@ export default function TrackerPage() {
   }
 
   function toggleAll() {
-    setSelectedIds(allSelected ? [] : reviewJobs.map((job) => job.id));
+    setSelectedIds(allSelected ? [] : pendingJobs.map((job) => job.id));
   }
 
   return (
@@ -270,12 +296,12 @@ export default function TrackerPage() {
 
         <section className={styles.summary}>
           <div className={styles.summaryCard}><span>Jobs awaiting review</span><strong>{summary.waiting}</strong></div>
-          <div className={styles.summaryCard}><span>Rows selected</span><strong>{summary.selected}</strong></div>
+          <div className={styles.summaryCard}><span>Approved tracker</span><strong>{summary.approved}</strong></div>
           <div className={styles.summaryCard}><span>Application history</span><strong>{summary.legacy}</strong></div>
         </section>
 
         <div className={styles.tabs}>
-          <button onClick={() => setTab("review")} className={`${styles.tab} ${tab === "review" ? styles.activeTab : ""}`}>Approve Jobs</button>
+          <button onClick={() => setTab("review")} className={`${styles.tab} ${tab === "review" ? styles.activeTab : ""}`}>Review & Tracker</button>
           <button onClick={() => setTab("history")} className={`${styles.tab} ${tab === "history" ? styles.activeTab : ""}`}>Application History</button>
         </div>
 
@@ -285,7 +311,7 @@ export default function TrackerPage() {
         {tab === "review" && (
           <section>
             <div className={styles.toolbar}>
-              <span className={styles.toolbarLabel}>{reviewJobs.length} AI-approved jobs · {selectedIds.length} selected</span>
+              <span className={styles.toolbarLabel}>{pendingJobs.length} waiting · {approvedJobs.length} approved · {selectedIds.length} selected</span>
               <div className={styles.toolbarRight}>
                 <button className={styles.skipSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("skipped")}>Pass selected</button>
                 <button className={styles.approveSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("approved")}>{bulkBusy ? "Working..." : "Smash selected"}</button>
@@ -298,30 +324,49 @@ export default function TrackerPage() {
                   <thead>
                     <tr>
                       <th className={styles.rowNumber}>#</th>
-                      <th className={styles.checkColumn}><input aria-label="Select all jobs" type="checkbox" checked={allSelected} onChange={toggleAll} /></th>
+                      <th className={styles.checkColumn}><input aria-label="Select all waiting jobs" type="checkbox" checked={allSelected} onChange={toggleAll} /></th>
                       <th className={styles.scoreColumn}>AI score</th>
                       <th className={styles.titleColumn}>Job title</th>
                       <th className={styles.companyColumn}>Company</th>
                       <th className={styles.locationColumn}>Location</th>
-                      <th className={styles.dateColumn}>Added</th>
+                      <th className={styles.dateColumn}>Updated</th>
                       <th className={styles.linkColumn}>Job post</th>
-                      <th className={styles.actionColumn}>Your move</th>
+                      <th className={styles.actionColumn}>Tracker status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reviewJobs.map((job, index) => {
+                      const approved = job.status === "approved";
                       const selected = selectedIds.includes(job.id);
+                      const rowClass = approved ? styles.approvedRow : selected ? styles.selectedRow : "";
                       return (
-                        <tr key={job.match_id || job.id} className={selected ? styles.selectedRow : ""}>
+                        <tr key={job.match_id || job.id} className={rowClass}>
                           <td className={styles.rowNumber}>{index + 1}</td>
-                          <td className={styles.checkColumn}><input aria-label={`Select ${job.title || "job"}`} type="checkbox" checked={selected} onChange={() => toggleSelected(job.id)} /></td>
+                          <td className={styles.checkColumn}>
+                            <input
+                              aria-label={approved ? `${job.title || "Job"} approved` : `Select ${job.title || "job"}`}
+                              type="checkbox"
+                              checked={approved || selected}
+                              disabled={approved}
+                              onChange={() => toggleSelected(job.id)}
+                            />
+                          </td>
                           <td><span className={styles.score}>{job.ai_role_relevance_score ?? "Fit"}</span></td>
                           <td className={styles.titleCell} title={job.description || ""}><strong>{job.title || "Untitled job"}</strong><small>{shortDescription(job.description)}</small></td>
                           <td className={styles.companyCell}><strong>{job.company || "Unknown company"}</strong><small>{job.source || "Source not saved"}</small></td>
                           <td>{job.location || "—"}</td>
                           <td>{formatDate(job.created_at)}</td>
                           <td>{job.apply_url ? <a className={styles.openLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td>
-                          <td><div className={styles.actions}><button className={styles.skip} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "skipped")}>Pass</button><button className={styles.approve} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "approved")}>{busyId === job.id ? "..." : "Smash"}</button></div></td>
+                          <td>
+                            {approved ? (
+                              <span className={styles.approvedBadge}>✓ Smashed</span>
+                            ) : (
+                              <div className={styles.actions}>
+                                <button className={styles.skip} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "skipped")}>Pass</button>
+                                <button className={styles.approve} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "approved")}>{busyId === job.id ? "..." : "Smash"}</button>
+                              </div>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
@@ -330,8 +375,8 @@ export default function TrackerPage() {
               </div>
             ) : (
               <div className={styles.empty}>
-                <h2>{loading ? "Loading review queue..." : "No jobs waiting for approval"}</h2>
-                <p>Refresh the campaign to run catalogue matching and AI review.</p>
+                <h2>{loading ? "Loading tracker..." : "No jobs in the tracker yet"}</h2>
+                <p>Refresh the campaign to run matching and AI review.</p>
               </div>
             )}
           </section>

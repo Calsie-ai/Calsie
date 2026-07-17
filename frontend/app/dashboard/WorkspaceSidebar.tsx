@@ -19,12 +19,14 @@ export default function WorkspaceSidebar({
   active,
   setActive,
   running,
+  approvedCount,
   onToggleCampaign,
   onLogout,
 }: {
   active: WorkspaceTab;
   setActive: (tab: WorkspaceTab) => void;
   running: boolean;
+  approvedCount: number;
   onToggleCampaign: () => void;
   onLogout: () => void;
 }) {
@@ -51,7 +53,7 @@ export default function WorkspaceSidebar({
         type="button"
       >
         <span>✓</span>
-        <b>Approve Jobs<small>Review AI-matched jobs</small></b>
+        <b>Tracker<small>{approvedCount} approved job{approvedCount === 1 ? "" : "s"}</small></b>
       </button>
       <div className="workspace-sidebar-bottom">
         <button onClick={() => window.location.assign("/support")}><span>?</span><b>Help</b></button>

@@ -11,13 +11,24 @@ export default function DashboardWorkspace() {
   const router = useRouter();
   const [active, setActive] = useState<WorkspaceTab>("overview");
   const [campaign, setCampaign] = useState<CampaignRecord | null>(null);
+  const [approvedCount, setApprovedCount] = useState(0);
   const [resumeReady, setResumeReady] = useState(false);
   const [resumeName, setResumeName] = useState("");
   const [gmailReady, setGmailReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load();
+    const receiveTrackerCounts = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "applix-tracker-counts") {
+        setApprovedCount(Number(event.data.approvedCount || 0));
+      }
+    };
+    window.addEventListener("message", receiveTrackerCounts);
+    return () => window.removeEventListener("message", receiveTrackerCounts);
+  }, []);
 
   async function load() {
     const supabase = getSupabaseClient();
@@ -28,10 +39,17 @@ export default function DashboardWorkspace() {
       supabase.from("resume_profiles").select("id,resume_file_name").eq("profile_id", userData.user.id).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("user_email_authorizations").select("status").eq("user_identifier", userData.user.email || userData.user.id).eq("provider", "google").maybeSingle(),
     ]);
-    setCampaign(((campaigns || [])[0] as CampaignRecord) || null);
+    const latestCampaign = (((campaigns || [])[0] as CampaignRecord) || null);
+    setCampaign(latestCampaign);
     setResumeReady(Boolean(resume?.id));
     setResumeName(resume?.resume_file_name || "");
     setGmailReady(gmail?.status === "connected");
+    if (latestCampaign?.id) {
+      const { data } = await supabase.rpc("get_campaign_tracker_counts", { p_campaign_id: latestCampaign.id });
+      setApprovedCount(Number(data?.[0]?.approved_count || 0));
+    } else {
+      setApprovedCount(0);
+    }
   }
 
   async function useTemplate(template: CampaignTemplate) {
@@ -65,6 +83,7 @@ export default function DashboardWorkspace() {
       }).select("id,name,location,target_business_type,search,outreach,status,created_at").single();
       if (error) throw error;
       setCampaign(created as CampaignRecord);
+      setApprovedCount(0);
       setMessage(`${template.title} campaign added.`);
       setActive("campaign");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not use template."); }
@@ -153,5 +172,5 @@ export default function DashboardWorkspace() {
 
   async function logout() { const supabase = getSupabaseClient(); await supabase.auth.signOut(); router.replace("/"); }
 
-  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanelsLive active={active} campaign={campaign} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onToggleCampaign={() => void toggleCampaign()} onFindJobsNow={() => void findJobsNow()} /></div></main>;
+  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} approvedCount={approvedCount} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanelsLive active={active} campaign={campaign} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onToggleCampaign={() => void toggleCampaign()} onFindJobsNow={() => void findJobsNow()} /></div></main>;
 }
