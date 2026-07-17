@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import WorkspaceSidebar from "./WorkspaceSidebar";
-import WorkspacePanelsLive from "./WorkspacePanelsLive";
+import WorkspacePanelsLive, { mapTemplate } from "./WorkspacePanelsLive";
 import { CAMPAIGN_PLAN, isCampaignRunning, type CampaignRecord, type CampaignTemplate, type WorkspaceTab } from "./workspace-data";
 
 export default function DashboardWorkspace() {
   const router = useRouter();
   const [active, setActive] = useState<WorkspaceTab>("overview");
   const [campaign, setCampaign] = useState<CampaignRecord | null>(null);
+  const [purchasedTemplate, setPurchasedTemplate] = useState<CampaignTemplate | null>(null);
   const [approvedCount, setApprovedCount] = useState(0);
   const [passedCount, setPassedCount] = useState(0);
   const [resumeReady, setResumeReady] = useState(false);
@@ -43,6 +44,15 @@ export default function DashboardWorkspace() {
     setResumeReady(Boolean(resume?.id));
     setResumeName(resume?.resume_file_name || "");
     setGmailReady(gmail?.status === "connected");
+
+    const templateId = latestCampaign?.search?.template_id;
+    if (templateId) {
+      const { data: template } = await supabase.from("campaign_templates").select("id,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days").eq("id", templateId).maybeSingle();
+      setPurchasedTemplate(template ? mapTemplate(template) : null);
+    } else {
+      setPurchasedTemplate(null);
+    }
+
     if (latestCampaign?.id) {
       const { data } = await supabase.rpc("get_campaign_tracker_counts", { p_campaign_id: latestCampaign.id });
       setApprovedCount(Number(data?.[0]?.approved_count || 0));
@@ -70,7 +80,12 @@ export default function DashboardWorkspace() {
         status: "draft",
       }).select("id,name,location,target_business_type,search,outreach,status,created_at").single();
       if (error) throw error;
-      setCampaign(created as CampaignRecord); setApprovedCount(0); setPassedCount(0); setMessage(`${template.title} campaign added.`); setActive("campaign");
+      setCampaign(created as CampaignRecord);
+      setPurchasedTemplate(template);
+      setApprovedCount(0);
+      setPassedCount(0);
+      setMessage(`${template.title} campaign added.`);
+      setActive("overview");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not use template."); }
     finally { setBusy(false); }
   }
@@ -134,5 +149,5 @@ export default function DashboardWorkspace() {
 
   async function logout() { const supabase = getSupabaseClient(); await supabase.auth.signOut(); router.replace("/"); }
 
-  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} approvedCount={approvedCount} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanelsLive active={active} campaign={campaign} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} approvedCount={approvedCount} passedCount={passedCount} onOpenTracker={() => setActive("tracker")} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onToggleCampaign={() => void toggleCampaign()} onFindJobsNow={() => void findJobsNow()} /></div></main>;
+  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} approvedCount={approvedCount} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanelsLive active={active} campaign={campaign} purchasedTemplate={purchasedTemplate} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} approvedCount={approvedCount} passedCount={passedCount} onOpenTracker={() => setActive("tracker")} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onToggleCampaign={() => void toggleCampaign()} onFindJobsNow={() => void findJobsNow()} /></div></main>;
 }
