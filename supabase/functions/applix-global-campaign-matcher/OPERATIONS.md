@@ -1,0 +1,1 @@
+The worker processes at most 100 campaigns per invocation and defaults to 25. Repeated invocations are safe because runs are uniquely keyed by campaign, run date and run type.
