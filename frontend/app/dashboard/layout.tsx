@@ -4,6 +4,7 @@ import "./workspace-contrast.css";
 import "./workspace-tracker.css";
 import "./workspace-final.css";
 import "./overview-order.css";
+import "./gmail-consent.css";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return children;
