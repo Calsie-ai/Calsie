@@ -1,0 +1,1 @@
+The daily fetch is global. It is not repeated per campaign or per user.
