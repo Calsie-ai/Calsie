@@ -116,9 +116,10 @@
 }
 
 .activeTab {
+  border-color: #ff5575;
   background: #111;
-  color: #fff;
-  border-color: #111;
+  color: #ff5575;
+  box-shadow: 0 -5px 18px rgba(255, 85, 117, .22);
 }
 
 .notice,
@@ -179,6 +180,7 @@
   border: 1px solid #ff5575;
   background: #ff6f8b;
   color: #111;
+  box-shadow: 0 8px 18px rgba(255, 85, 117, .22);
 }
 
 .skipSelected {
@@ -197,7 +199,7 @@
 
 .sheet {
   width: 100%;
-  min-width: 1120px;
+  min-width: 1000px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
@@ -242,9 +244,9 @@
 
 .checkColumn { width: 42px; text-align: center !important; }
 .scoreColumn { width: 72px; }
-.titleColumn { width: 220px; }
-.companyColumn { width: 170px; }
-.locationColumn { width: 150px; }
+.titleColumn { width: 230px; }
+.companyColumn { width: 180px; }
+.locationColumn { width: 155px; }
 .emailColumn { width: 128px; }
 .dateColumn { width: 135px; }
 .linkColumn { width: 86px; }
@@ -309,8 +311,18 @@
   font-weight: 900;
 }
 
-.approve { border: 1px solid #ff5575; background: #ff6f8b; color: #111; }
-.skip { border: 1px solid #c9c9c9; background: #f4f4f4; color: #444; }
+.approve {
+  border: 1px solid #ff5575;
+  background: #ff6f8b;
+  color: #111;
+  box-shadow: 0 6px 14px rgba(255, 85, 117, .18);
+}
+
+.skip {
+  border: 1px solid #c9c9c9;
+  background: #f4f4f4;
+  color: #444;
+}
 
 .empty {
   border: 1px solid #d8d8d8;
