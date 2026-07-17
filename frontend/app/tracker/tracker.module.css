@@ -235,6 +235,14 @@
   background: #fff1f4;
 }
 
+.approvedRow td {
+  background: #ecf9f0;
+}
+
+.approvedRow:hover td {
+  background: #e2f5e8 !important;
+}
+
 .rowNumber {
   width: 42px;
   text-align: center;
@@ -322,6 +330,20 @@
   border: 1px solid #c9c9c9;
   background: #f4f4f4;
   color: #444;
+}
+
+.approvedBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  border: 1px solid #9bd6ae;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #dff5e6;
+  color: #176438;
+  font-size: 11px;
+  font-weight: 950;
 }
 
 .empty {
