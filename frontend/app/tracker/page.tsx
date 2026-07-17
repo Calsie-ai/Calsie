@@ -23,12 +23,9 @@ type ReviewJob = {
   location: string | null;
   source: string | null;
   apply_url: string | null;
-  extracted_email: string | null;
   description: string | null;
-  status: string | null;
   created_at: string | null;
   ai_role_relevance_score?: number | null;
-  ai_reason?: string | null;
 };
 
 type LegacyJob = {
@@ -191,7 +188,7 @@ export default function TrackerPage() {
       setSelectedIds((current) => current.filter((id) => id !== job.id));
 
       if (decision === "skipped") {
-        setMessage("Job skipped.");
+        setMessage("Passed. This job is out of your queue.");
         return;
       }
 
@@ -202,8 +199,8 @@ export default function TrackerPage() {
       const prepared = await prepareApprovedApplications(job.campaign_id, token);
       setMessage(
         prepared.queued_companies > 0
-          ? `Approved. ${prepared.queued_companies} company contact${prepared.queued_companies === 1 ? " is" : "s are"} being enriched.`
-          : `Approved. ${prepared.drafts_created || 0} draft${prepared.drafts_created === 1 ? " is" : "s are"} ready for review.`,
+          ? `Smashed. ${prepared.queued_companies} company contact${prepared.queued_companies === 1 ? " is" : "s are"} being enriched.`
+          : `Smashed. ${prepared.drafts_created || 0} draft${prepared.drafts_created === 1 ? " is" : "s are"} ready for review.`,
       );
     } catch (decisionError) {
       setError(messageFrom(decisionError, "Could not save the decision."));
@@ -226,7 +223,7 @@ export default function TrackerPage() {
       setSelectedIds([]);
 
       if (decision === "skipped") {
-        setMessage(`${jobs.length} jobs skipped.`);
+        setMessage(`${jobs.length} jobs passed.`);
         return;
       }
 
@@ -235,7 +232,7 @@ export default function TrackerPage() {
       const token = session.data.session?.access_token;
       if (!token) throw new Error("Please sign in again.");
       await prepareApprovedApplications(jobs[0].campaign_id, token);
-      setMessage(`${jobs.length} jobs approved and moved to application preparation.`);
+      setMessage(`${jobs.length} jobs smashed and moved to application preparation.`);
     } catch (bulkError) {
       setError(messageFrom(bulkError, "Could not complete the bulk decision."));
       await load();
@@ -288,12 +285,10 @@ export default function TrackerPage() {
         {tab === "review" && (
           <section>
             <div className={styles.toolbar}>
-              <div className={styles.toolbarLeft}>
-                <span className={styles.toolbarLabel}>{reviewJobs.length} AI-approved jobs · {selectedIds.length} selected</span>
-              </div>
+              <span className={styles.toolbarLabel}>{reviewJobs.length} AI-approved jobs · {selectedIds.length} selected</span>
               <div className={styles.toolbarRight}>
-                <button className={styles.skipSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("skipped")}>Skip selected</button>
-                <button className={styles.approveSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("approved")}>{bulkBusy ? "Working..." : "Approve selected"}</button>
+                <button className={styles.skipSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("skipped")}>Pass selected</button>
+                <button className={styles.approveSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("approved")}>{bulkBusy ? "Working..." : "Smash selected"}</button>
               </div>
             </div>
 
@@ -308,10 +303,9 @@ export default function TrackerPage() {
                       <th className={styles.titleColumn}>Job title</th>
                       <th className={styles.companyColumn}>Company</th>
                       <th className={styles.locationColumn}>Location</th>
-                      <th className={styles.emailColumn}>Employer email</th>
                       <th className={styles.dateColumn}>Added</th>
                       <th className={styles.linkColumn}>Job post</th>
-                      <th className={styles.actionColumn}>Decision</th>
+                      <th className={styles.actionColumn}>Your move</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -321,14 +315,13 @@ export default function TrackerPage() {
                         <tr key={job.match_id || job.id} className={selected ? styles.selectedRow : ""}>
                           <td className={styles.rowNumber}>{index + 1}</td>
                           <td className={styles.checkColumn}><input aria-label={`Select ${job.title || "job"}`} type="checkbox" checked={selected} onChange={() => toggleSelected(job.id)} /></td>
-                          <td><span className={styles.score}>{job.ai_role_relevance_score ?? "Pass"}</span></td>
+                          <td><span className={styles.score}>{job.ai_role_relevance_score ?? "Fit"}</span></td>
                           <td className={styles.titleCell} title={job.description || ""}><strong>{job.title || "Untitled job"}</strong><small>{shortDescription(job.description)}</small></td>
                           <td className={styles.companyCell}><strong>{job.company || "Unknown company"}</strong><small>{job.source || "Source not saved"}</small></td>
                           <td>{job.location || "—"}</td>
-                          <td>{job.extracted_email ? <span className={styles.emailFound}>Found</span> : <span className={styles.emailPending}>After approval</span>}</td>
                           <td>{formatDate(job.created_at)}</td>
                           <td>{job.apply_url ? <a className={styles.openLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td>
-                          <td><div className={styles.actions}><button className={styles.skip} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "skipped")}>Skip</button><button className={styles.approve} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "approved")}>{busyId === job.id ? "..." : "Approve"}</button></div></td>
+                          <td><div className={styles.actions}><button className={styles.skip} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "skipped")}>Pass</button><button className={styles.approve} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "approved")}>{busyId === job.id ? "..." : "Smash"}</button></div></td>
                         </tr>
                       );
                     })}
