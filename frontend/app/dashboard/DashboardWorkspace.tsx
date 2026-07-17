@@ -61,7 +61,7 @@ export default function DashboardWorkspace() {
       if (!data.user) throw new Error("Please sign in again.");
       const { data: created, error } = await supabase.from("campaigns").insert({
         user_id: data.user.id,
-        name: `${template.title} Campaign`,
+        name: template.campaignName || `${template.title} Campaign`,
         location: template.location,
         target_business_type: template.role,
         search: { target_role: template.role, target_location: template.location, query_terms: template.queryTerms, include_title_terms: template.includeTitleTerms, exclude_title_terms: template.excludeTitleTerms, description_keywords: template.descriptionKeywords, job_types: template.jobTypes, posted_within_days: template.postedWithinDays, fetch_frequency: "daily", campaign_days: 30, daily_job_limit: 24, template_id: template.id },

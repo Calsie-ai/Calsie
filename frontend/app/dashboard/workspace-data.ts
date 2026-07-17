@@ -26,6 +26,8 @@ export type CampaignRecord = {
 export type CampaignTemplate = {
   id: string;
   title: string;
+  campaignName?: string;
+  imageUrl?: string | null;
   role: string;
   location: string;
   description: string;
