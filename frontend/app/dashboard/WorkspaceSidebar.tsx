@@ -1,6 +1,7 @@
 "use client";
 
 import type { WorkspaceTab } from "./workspace-data";
+import styles from "./WorkspaceSidebar.module.css";
 
 const primary: Array<[WorkspaceTab, string, string]> = [
   ["overview", "Overview", "⌂"],
@@ -44,6 +45,14 @@ export default function WorkspaceSidebar({
       <p className="workspace-label">Campaign</p>
       <nav>{campaign.map(navButton)}</nav>
       <button className="workspace-campaign-toggle" onClick={onToggleCampaign}>{running ? "Pause Campaign" : "Start Campaign"}</button>
+      <button
+        className={`${styles.approveJobs} ${active === "tracker" ? styles.active : ""}`}
+        onClick={() => setActive("tracker")}
+        type="button"
+      >
+        <span>✓</span>
+        <b>Approve Jobs<small>Review AI-matched jobs</small></b>
+      </button>
       <div className="workspace-sidebar-bottom">
         <button onClick={() => window.location.assign("/support")}><span>?</span><b>Help</b></button>
         <button onClick={onLogout}><span>↪</span><b>Log out</b></button>

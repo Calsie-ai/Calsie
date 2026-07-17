@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
+import styles from "./tracker.module.css";
 
 type Campaign = {
   id: string;
@@ -26,6 +27,8 @@ type ReviewJob = {
   description: string | null;
   status: string | null;
   created_at: string | null;
+  ai_role_relevance_score?: number | null;
+  ai_reason?: string | null;
 };
 
 type LegacyJob = {
@@ -39,35 +42,52 @@ type LegacyJob = {
 };
 
 type Tab = "review" | "history";
+type Decision = "approved" | "skipped";
 
 function messageFrom(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object" && "message" in error) return String((error as { message?: unknown }).message || fallback);
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message?: unknown }).message || fallback);
+  }
   return fallback;
 }
 
 function formatDate(value: string | null) {
   if (!value) return "Not recorded";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function shortDescription(value: string | null) {
+  const clean = (value || "No description saved.").replace(/\s+/g, " ").trim();
+  return clean.length > 95 ? `${clean.slice(0, 92)}...` : clean;
 }
 
 export default function TrackerPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("review");
+  const searchParams = useSearchParams();
+  const embedded = searchParams.get("embedded") === "1";
+  const requestedView = searchParams.get("view");
+  const [tab, setTab] = useState<Tab>(requestedView === "history" ? "history" : "review");
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [reviewJobs, setReviewJobs] = useState<ReviewJob[]>([]);
   const [legacyJobs, setLegacyJobs] = useState<LegacyJob[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const summary = useMemo(() => ({
     waiting: reviewJobs.length,
+    selected: selectedIds.length,
     legacy: legacyJobs.length,
-    approvedLegacy: legacyJobs.filter((job) => ["approved", "queued", "applied"].includes((job.status || "").toLowerCase())).length,
-  }), [reviewJobs, legacyJobs]);
+  }), [reviewJobs, selectedIds, legacyJobs]);
+
+  const allSelected = reviewJobs.length > 0 && selectedIds.length === reviewJobs.length;
 
   async function load() {
     setLoading(true);
@@ -112,6 +132,7 @@ export default function TrackerPage() {
 
       if (legacyResult.error) throw legacyResult.error;
       setLegacyJobs((legacyResult.data || []) as LegacyJob[]);
+      setSelectedIds([]);
     } catch (loadError) {
       setError(messageFrom(loadError, "Could not load the tracker."));
       setReviewJobs([]);
@@ -142,34 +163,39 @@ export default function TrackerPage() {
     });
 
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload?.ok === false) throw new Error(payload?.error || "Application preparation failed.");
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.error || "Application preparation failed.");
+    }
     return payload;
   }
 
-  async function decide(job: ReviewJob, decision: "approved" | "skipped") {
-    if (busyId) return;
+  async function recordDecision(job: ReviewJob, decision: Decision) {
+    const supabase = getSupabaseClient();
+    const decisionResult = await supabase.rpc("decide_campaign_job", {
+      p_campaign_id: job.campaign_id,
+      p_job_id: job.id,
+      p_decision: decision,
+    });
+    if (decisionResult.error) throw decisionResult.error;
+    if (decisionResult.data !== true) throw new Error(`${job.title || "Job"} is no longer available for review.`);
+  }
+
+  async function decide(job: ReviewJob, decision: Decision) {
+    if (busyId || bulkBusy) return;
     setBusyId(job.id);
     setMessage("");
     setError("");
-
     try {
-      const supabase = getSupabaseClient();
-      const decisionResult = await supabase.rpc("decide_campaign_job", {
-        p_campaign_id: job.campaign_id,
-        p_job_id: job.id,
-        p_decision: decision,
-      });
-
-      if (decisionResult.error) throw decisionResult.error;
-      if (decisionResult.data !== true) throw new Error("This job is no longer available for review.");
-
+      await recordDecision(job, decision);
       setReviewJobs((current) => current.filter((item) => item.id !== job.id));
+      setSelectedIds((current) => current.filter((id) => id !== job.id));
 
       if (decision === "skipped") {
         setMessage("Job skipped.");
         return;
       }
 
+      const supabase = getSupabaseClient();
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
       if (!token) throw new Error("Please sign in again.");
@@ -187,81 +213,144 @@ export default function TrackerPage() {
     }
   }
 
-  return (
-    <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-8">
-      <div className="mx-auto max-w-7xl">
-        <header className="flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link href="/dashboard" className="text-sm font-bold text-pink-300">← Back to dashboard</Link>
-            <h1 className="mt-3 text-3xl font-black">Application tracker</h1>
-            <p className="mt-2 text-sm text-white/60">
-              {campaign ? `${campaign.name || campaign.target_business_type || "Campaign"} · ${campaign.location || "Location not set"}` : "No campaign selected"}
-            </p>
-          </div>
-          <button onClick={() => void load()} disabled={loading} className="rounded-xl border border-white/15 px-4 py-2 text-sm font-bold disabled:opacity-50">
-            {loading ? "Loading..." : "Reload"}
-          </button>
-        </header>
+  async function decideSelected(decision: Decision) {
+    const jobs = reviewJobs.filter((job) => selectedIds.includes(job.id));
+    if (!jobs.length || bulkBusy || busyId) return;
+    setBulkBusy(true);
+    setMessage("");
+    setError("");
+    try {
+      for (const job of jobs) await recordDecision(job, decision);
+      const decidedIds = new Set(jobs.map((job) => job.id));
+      setReviewJobs((current) => current.filter((job) => !decidedIds.has(job.id)));
+      setSelectedIds([]);
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><span className="text-sm text-white/50">AI jobs waiting</span><strong className="mt-2 block text-3xl">{summary.waiting}</strong></div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><span className="text-sm text-white/50">Legacy history</span><strong className="mt-2 block text-3xl">{summary.legacy}</strong></div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><span className="text-sm text-white/50">Legacy approved/queued</span><strong className="mt-2 block text-3xl">{summary.approvedLegacy}</strong></div>
+      if (decision === "skipped") {
+        setMessage(`${jobs.length} jobs skipped.`);
+        return;
+      }
+
+      const supabase = getSupabaseClient();
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (!token) throw new Error("Please sign in again.");
+      await prepareApprovedApplications(jobs[0].campaign_id, token);
+      setMessage(`${jobs.length} jobs approved and moved to application preparation.`);
+    } catch (bulkError) {
+      setError(messageFrom(bulkError, "Could not complete the bulk decision."));
+      await load();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  }
+
+  function toggleAll() {
+    setSelectedIds(allSelected ? [] : reviewJobs.map((job) => job.id));
+  }
+
+  return (
+    <main className={`${styles.shell} ${embedded ? styles.embedded : ""}`}>
+      <div className={styles.page}>
+        {!embedded && (
+          <header className={styles.header}>
+            <div>
+              <Link href="/dashboard" className={styles.backLink}>← Back to dashboard</Link>
+              <p className={styles.eyebrow}>AI mission control</p>
+              <h1>Application tracker</h1>
+              <p className={styles.subtitle}>
+                {campaign ? `${campaign.name || campaign.target_business_type || "Campaign"} · ${campaign.location || "Location not set"}` : "No campaign selected"}
+              </p>
+            </div>
+            <button onClick={() => void load()} disabled={loading} className={styles.reload}>
+              {loading ? "Loading..." : "Reload"}
+            </button>
+          </header>
+        )}
+
+        <section className={styles.summary}>
+          <div className={styles.summaryCard}><span>Jobs awaiting review</span><strong>{summary.waiting}</strong></div>
+          <div className={styles.summaryCard}><span>Rows selected</span><strong>{summary.selected}</strong></div>
+          <div className={styles.summaryCard}><span>Application history</span><strong>{summary.legacy}</strong></div>
         </section>
 
-        <div className="mt-6 flex gap-2 rounded-2xl border border-white/10 bg-white/5 p-2">
-          <button onClick={() => setTab("review")} className={`flex-1 rounded-xl px-4 py-3 text-sm font-black ${tab === "review" ? "bg-pink-500" : "text-white/60"}`}>AI Review Queue</button>
-          <button onClick={() => setTab("history")} className={`flex-1 rounded-xl px-4 py-3 text-sm font-black ${tab === "history" ? "bg-pink-500" : "text-white/60"}`}>Legacy History</button>
+        <div className={styles.tabs}>
+          <button onClick={() => setTab("review")} className={`${styles.tab} ${tab === "review" ? styles.activeTab : ""}`}>Approve Jobs</button>
+          <button onClick={() => setTab("history")} className={`${styles.tab} ${tab === "history" ? styles.activeTab : ""}`}>Application History</button>
         </div>
 
-        {message && <p className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-sm text-emerald-200">{message}</p>}
-        {error && <p className="mt-4 rounded-xl border border-rose-400/20 bg-rose-400/10 p-3 text-sm text-rose-200">{error}</p>}
+        {message && <p className={styles.notice}>{message}</p>}
+        {error && <p className={styles.error}>{error}</p>}
 
         {tab === "review" && (
-          <section className="mt-6 space-y-4">
-            {!loading && reviewJobs.length === 0 && (
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-10 text-center">
-                <h2 className="text-2xl font-black">No AI-approved jobs waiting</h2>
-                <p className="mt-2 text-sm text-white/60">Start or refresh the campaign to run catalogue matching and AI judgment.</p>
+          <section>
+            <div className={styles.toolbar}>
+              <div className={styles.toolbarLeft}>
+                <span className={styles.toolbarLabel}>{reviewJobs.length} AI-approved jobs · {selectedIds.length} selected</span>
+              </div>
+              <div className={styles.toolbarRight}>
+                <button className={styles.skipSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("skipped")}>Skip selected</button>
+                <button className={styles.approveSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("approved")}>{bulkBusy ? "Working..." : "Approve selected"}</button>
+              </div>
+            </div>
+
+            {reviewJobs.length > 0 ? (
+              <div className={styles.sheetWrap}>
+                <table className={styles.sheet}>
+                  <thead>
+                    <tr>
+                      <th className={styles.rowNumber}>#</th>
+                      <th className={styles.checkColumn}><input aria-label="Select all jobs" type="checkbox" checked={allSelected} onChange={toggleAll} /></th>
+                      <th className={styles.scoreColumn}>AI score</th>
+                      <th className={styles.titleColumn}>Job title</th>
+                      <th className={styles.companyColumn}>Company</th>
+                      <th className={styles.locationColumn}>Location</th>
+                      <th className={styles.emailColumn}>Employer email</th>
+                      <th className={styles.dateColumn}>Added</th>
+                      <th className={styles.linkColumn}>Job post</th>
+                      <th className={styles.actionColumn}>Decision</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reviewJobs.map((job, index) => {
+                      const selected = selectedIds.includes(job.id);
+                      return (
+                        <tr key={job.match_id || job.id} className={selected ? styles.selectedRow : ""}>
+                          <td className={styles.rowNumber}>{index + 1}</td>
+                          <td className={styles.checkColumn}><input aria-label={`Select ${job.title || "job"}`} type="checkbox" checked={selected} onChange={() => toggleSelected(job.id)} /></td>
+                          <td><span className={styles.score}>{job.ai_role_relevance_score ?? "Pass"}</span></td>
+                          <td className={styles.titleCell} title={job.description || ""}><strong>{job.title || "Untitled job"}</strong><small>{shortDescription(job.description)}</small></td>
+                          <td className={styles.companyCell}><strong>{job.company || "Unknown company"}</strong><small>{job.source || "Source not saved"}</small></td>
+                          <td>{job.location || "—"}</td>
+                          <td>{job.extracted_email ? <span className={styles.emailFound}>Found</span> : <span className={styles.emailPending}>After approval</span>}</td>
+                          <td>{formatDate(job.created_at)}</td>
+                          <td>{job.apply_url ? <a className={styles.openLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td>
+                          <td><div className={styles.actions}><button className={styles.skip} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "skipped")}>Skip</button><button className={styles.approve} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "approved")}>{busyId === job.id ? "..." : "Approve"}</button></div></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className={styles.empty}>
+                <h2>{loading ? "Loading review queue..." : "No jobs waiting for approval"}</h2>
+                <p>Refresh the campaign to run catalogue matching and AI review.</p>
               </div>
             )}
-            {reviewJobs.map((job) => (
-              <article key={job.match_id || job.id} className="rounded-3xl border border-white/10 bg-white/5 p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="max-w-3xl">
-                    <div className="text-xs font-bold uppercase tracking-[0.2em] text-pink-300">AI approved · {job.source || "Job source"}</div>
-                    <h2 className="mt-3 text-2xl font-black">{job.title || "Untitled job"}</h2>
-                    <p className="mt-1 text-lg font-bold text-white/80">{job.company || "Unknown company"}</p>
-                    <p className="mt-1 text-sm text-white/50">{job.location || "Location not listed"} · {formatDate(job.created_at)}</p>
-                    <p className="mt-4 line-clamp-5 text-sm leading-6 text-white/65">{job.description || "No description saved."}</p>
-                    <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full bg-white/10 px-3 py-1">{job.extracted_email ? "Employer email found" : "Email enrichment after approval"}</span>
-                      {job.apply_url && <a href={job.apply_url} target="_blank" rel="noreferrer" className="rounded-full bg-white/10 px-3 py-1 text-pink-200">Open job post</a>}
-                    </div>
-                  </div>
-                  <div className="grid min-w-52 grid-cols-2 gap-2">
-                    <button disabled={busyId === job.id} onClick={() => void decide(job, "skipped")} className="rounded-xl border border-white/15 px-4 py-3 font-black disabled:opacity-50">Skip</button>
-                    <button disabled={busyId === job.id} onClick={() => void decide(job, "approved")} className="rounded-xl bg-pink-500 px-4 py-3 font-black disabled:opacity-50">{busyId === job.id ? "Working..." : "Approve"}</button>
-                  </div>
-                </div>
-              </article>
-            ))}
           </section>
         )}
 
         {tab === "history" && (
-          <section className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/5">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-white/10 bg-white/5 text-white/50"><tr><th className="p-4">Company</th><th className="p-4">Job</th><th className="p-4">Location</th><th className="p-4">Status</th><th className="p-4">Added</th><th className="p-4">Link</th></tr></thead>
-                <tbody>
-                  {legacyJobs.map((job) => (
-                    <tr key={job.id} className="border-b border-white/5"><td className="p-4 font-bold">{job.company || "Unknown"}</td><td className="p-4">{job.title || "Untitled"}</td><td className="p-4 text-white/60">{job.location || "—"}</td><td className="p-4"><span className="rounded-full bg-white/10 px-3 py-1">{job.status || "new"}</span></td><td className="p-4 text-white/60">{formatDate(job.created_at)}</td><td className="p-4">{job.apply_url ? <a href={job.apply_url} target="_blank" rel="noreferrer" className="text-pink-300">Open</a> : "—"}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {!loading && legacyJobs.length === 0 && <p className="p-8 text-center text-white/60">No legacy history for this account.</p>}
+          <section className={styles.historyWrap}>
+            <table className={styles.sheet}>
+              <thead><tr><th className={styles.rowNumber}>#</th><th className={styles.companyColumn}>Company</th><th className={styles.titleColumn}>Job title</th><th className={styles.locationColumn}>Location</th><th>Status</th><th className={styles.dateColumn}>Added</th><th className={styles.linkColumn}>Link</th></tr></thead>
+              <tbody>{legacyJobs.map((job, index) => <tr key={job.id}><td className={styles.rowNumber}>{index + 1}</td><td className={styles.companyCell}><strong>{job.company || "Unknown"}</strong></td><td className={styles.titleCell}><strong>{job.title || "Untitled"}</strong></td><td>{job.location || "—"}</td><td>{job.status || "new"}</td><td>{formatDate(job.created_at)}</td><td>{job.apply_url ? <a className={styles.openLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td></tr>)}</tbody>
+            </table>
+            {!loading && legacyJobs.length === 0 && <div className={styles.empty}><h2>No application history yet</h2></div>}
           </section>
         )}
       </div>
