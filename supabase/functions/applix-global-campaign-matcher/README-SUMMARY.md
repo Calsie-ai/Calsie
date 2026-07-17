@@ -1,0 +1,1 @@
+Shared catalogue matching with fresh jobs first and verified contact-pool fallback only for remaining quota.

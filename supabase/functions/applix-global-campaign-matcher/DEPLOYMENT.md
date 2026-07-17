@@ -1,0 +1,1 @@
+Deploy with the same Supabase secrets already used by the existing orchestrator functions. The matcher is an internal cron worker and must not be exposed to unauthenticated browser calls.

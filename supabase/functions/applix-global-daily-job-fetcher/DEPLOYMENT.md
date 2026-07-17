@@ -1,0 +1,1 @@
+Deploy both Edge Functions, then update the existing daily cron dispatcher to call `applix-global-daily-job-fetcher`. After the fetch, schedule `applix-global-campaign-matcher` every few minutes until it returns `claimed: 0`. Keep the previous orchestrator deployed but remove it from the active daily cron path.

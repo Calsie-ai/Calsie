@@ -1,0 +1,1 @@
+Invoke after the global fetch and continue in small batches. The claim function prevents the same campaign and Sydney date from being processed twice.

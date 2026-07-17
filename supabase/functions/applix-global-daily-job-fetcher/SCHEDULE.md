@@ -1,0 +1,1 @@
+Run at 6:00 a.m. Australia/Sydney. Do not use a fixed UTC offset because Sydney daylight-saving time changes during the year.

@@ -1,0 +1,1 @@
+One completed batch is allowed per Sydney calendar date. Existing jobs are refreshed and duplicates are skipped.

@@ -1,0 +1,1 @@
+This function accepts only the configured service-role bearer token or cron secret. It does not accept end-user JWTs for scheduled execution.
