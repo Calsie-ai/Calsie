@@ -9,15 +9,28 @@ import type { CampaignTemplate } from "./workspace-data";
 type BaseProps = ComponentProps<typeof WorkspacePanels>;
 type Props = BaseProps & { approvedCount: number; passedCount: number; onOpenTracker: () => void };
 type Row = {
-  id: string; title: string; role: string; location: string; description: string; category: string;
-  query_terms: string[]; include_title_terms: string[]; exclude_title_terms: string[];
-  description_keywords: string[]; job_types: string[]; posted_within_days: number;
+  id: string;
+  title: string;
+  campaign_name: string;
+  image_url: string | null;
+  role: string;
+  location: string;
+  description: string;
+  category: string;
+  query_terms: string[];
+  include_title_terms: string[];
+  exclude_title_terms: string[];
+  description_keywords: string[];
+  job_types: string[];
+  posted_within_days: number;
 };
 
 function mapTemplate(row: Row): CampaignTemplate {
   return {
     id: row.id,
     title: row.title,
+    campaignName: row.campaign_name || `${row.title} Campaign`,
+    imageUrl: row.image_url,
     role: row.role,
     location: row.location,
     description: row.description,
@@ -46,7 +59,7 @@ export default function WorkspacePanelsLive(props: Props) {
     const supabase = getSupabaseClient();
     void supabase
       .from("campaign_templates")
-      .select("id,title,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days")
+      .select("id,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days")
       .eq("is_active", true)
       .order("updated_at", { ascending: false })
       .then(({ data, error }) => {
@@ -60,7 +73,7 @@ export default function WorkspacePanelsLive(props: Props) {
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return templates.filter((item) => !needle || `${item.title} ${item.role} ${item.category} ${item.description}`.toLowerCase().includes(needle));
+    return templates.filter((item) => !needle || `${item.title} ${item.campaignName} ${item.role} ${item.category} ${item.description}`.toLowerCase().includes(needle));
   }, [query, templates]);
 
   if (props.active === "overview") {
@@ -70,16 +83,51 @@ export default function WorkspacePanelsLive(props: Props) {
   if (props.active !== "templates") return <WorkspacePanels {...props} />;
 
   return (
-    <section>
-      <header><p>Templates</p><h1>Browse templates</h1><span>Choose a campaign template created in the Calsie Jobs admin panel.</span></header>
+    <section className="template-browser-canva">
+      <header className="template-browser-head">
+        <p>Templates</p>
+        <h1>Browse templates</h1>
+        <span>Choose a ready-made campaign template. You can review it before adding it.</span>
+      </header>
+
       {selected ? (
-        <div className="workspace-template-review">
-          <div className="workspace-template-review-heading"><div><small>{selected.category}</small><h2>{selected.title}</h2><p>{selected.description}</p></div><button className="workspace-secondary" onClick={() => setSelected(null)}>Back to templates</button></div>
-          <div className="workspace-template-review-summary"><strong>Search recipe</strong><span>{selected.queryTerms.length} search phrases</span><span>{selected.includeTitleTerms.length} accepted title rules</span><span>{selected.excludeTitleTerms.length} blocked title rules</span><span>Jobs from the last {selected.postedWithinDays} days</span></div>
-          <div className="workspace-actions"><button className="workspace-primary" disabled={props.busy} onClick={() => props.onUseTemplate(selected)}>{props.busy ? "Adding template..." : "Use this template"}</button></div>
+        <div className="template-review-canva">
+          <button className="workspace-secondary" onClick={() => setSelected(null)}>← Back to templates</button>
+          <p className="template-category">{selected.category}</p>
+          <h2>{selected.title}</h2>
+          {selected.imageUrl && <img src={selected.imageUrl} alt="" />}
+          <p>{selected.description}</p>
+          <div className="template-review-meta">
+            <span>Campaign: {selected.campaignName || selected.title}</span>
+            <span>Role: {selected.role}</span>
+            <span>Location: {selected.location}</span>
+          </div>
+          <div className="workspace-actions">
+            <button className="workspace-primary" disabled={props.busy} onClick={() => props.onUseTemplate(selected)}>
+              {props.busy ? "Adding template..." : "Use this template"}
+            </button>
+          </div>
         </div>
       ) : (
-        <><input className="workspace-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search templates or job roles" />{loading && <div className="workspace-message">Loading templates...</div>}{error && <div className="workspace-message">Could not load templates: {error}</div>}<div className="workspace-template-grid">{visible.map((item) => <article key={item.id}><small>{item.category}</small><h3>{item.title}</h3><p>{item.description}</p><button type="button" onClick={() => setSelected(item)}>Review template</button></article>)}</div>{!loading && !error && visible.length === 0 && <div className="workspace-message">No active templates match this search.</div>}</>
+        <>
+          <label className="template-search-label" htmlFor="template-search">Search templates or job roles</label>
+          <input id="template-search" className="workspace-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search templates or job roles" />
+          {loading && <div className="workspace-message">Loading templates...</div>}
+          {error && <div className="workspace-message">Could not load templates: {error}</div>}
+          <div className="template-canva-grid">
+            {visible.map((item) => (
+              <article className="template-canva-card" key={item.id}>
+                <span className="template-category">{item.category}</span>
+                <h3>{item.title}</h3>
+                {item.imageUrl ? <img className="template-canva-image" src={item.imageUrl} alt="" /> : <div className="template-canva-image template-canva-placeholder">Add a photo from Admin</div>}
+                <p>{item.description}</p>
+                <small>{item.role} · {item.location}</small>
+                <button type="button" onClick={() => setSelected(item)}>Review template →</button>
+              </article>
+            ))}
+          </div>
+          {!loading && !error && visible.length === 0 && <div className="workspace-message">No active templates match this search.</div>}
+        </>
       )}
     </section>
   );
