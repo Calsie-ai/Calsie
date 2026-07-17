@@ -1,13 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 type Row = Record<string, any>;
-const VERSION = "global_daily_100_v1";
+const VERSION = "global_daily_100_v2";
 const URL = Deno.env.get("SUPABASE_URL") || "";
 const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("APPLIX_SERVICE_ROLE_KEY") || "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
 const OUTSCRAPER_KEY = Deno.env.get("OUTSCRAPER_API_KEY") || "";
 const OUTSCRAPER_URL = Deno.env.get("OUTSCRAPER_JOBS_API_URL") || "https://api.outscraper.cloud/indeed-search";
 const INDEED_URL = Deno.env.get("OUTSCRAPER_INDEED_BASE_URL") || "https://au.indeed.com/jobs";
+const DAILY_CAP = 100;
 
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body, null, 2), { status, headers: { "content-type": "application/json" } });
 const text = (v: unknown) => v == null ? "" : String(v).trim();
@@ -16,7 +17,7 @@ const uniq = (values: unknown[]) => [...new Set(values.map(text).filter(Boolean)
 const authorised = (req: Request) => {
   const bearer = text(req.headers.get("authorization")).replace(/^Bearer\s+/i, "");
   const header = text(req.headers.get("x-applix-cron-secret"));
-  return Boolean(CRON_SECRET && (header === CRON_SECRET || bearer === CRON_SECRET)) || Boolean(KEY && bearer === KEY);
+  return Boolean(KEY && bearer === KEY) || Boolean(CRON_SECRET && (header === CRON_SECRET || bearer === CRON_SECRET));
 };
 const sydneyParts = () => {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Sydney", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
@@ -34,13 +35,14 @@ const rowsFrom = (payload: unknown): Row[] => {
   for (const key of ["data", "results", "jobs"]) if (Array.isArray(p?.[key])) return flatten(p[key]);
   return [];
 };
-const isoDate = (v: unknown) => { const d = new Date(text(v)); return Number.isNaN(d.getTime()) ? null : d.toISOString(); };
+const isoDate = (v: unknown) => { const raw = text(v); if (!raw) return null; const d = new Date(raw); return Number.isNaN(d.getTime()) ? null : d.toISOString(); };
 
 Deno.serve(async (req) => {
   try {
     if (req.method !== "POST") return reply({ ok: false, error: "Use POST" }, 405);
     if (!URL || !KEY || !CRON_SECRET || !OUTSCRAPER_KEY) return reply({ ok: false, error: "Missing configuration" }, 500);
     if (!authorised(req)) return reply({ ok: false, error: "Unauthorized" }, 401);
+
     const input = await req.json().catch(() => ({})) as Row;
     const force = input.force === true;
     const clock = sydneyParts();
@@ -58,21 +60,21 @@ Deno.serve(async (req) => {
       if (created.error) throw new Error(created.error.message);
       runId = created.data.id;
     } else {
-      await db.from("job_fetch_runs").update({ status: "started", error_message: null, finished_at: null }).eq("id", runId);
+      const reset = await db.from("job_fetch_runs").update({ status: "started", error_message: null, finished_at: null }).eq("id", runId);
+      if (reset.error) throw new Error(reset.error.message);
     }
 
-    const templates = await db.from("campaign_templates").select("id,query_terms,location,is_active").eq("is_active", true).order("updated_at", { ascending: false }).limit(50);
+    const templates = await db.from("campaign_templates").select("query_terms").eq("is_active", true).order("updated_at", { ascending: false }).limit(50);
     if (templates.error) throw new Error(templates.error.message);
-    const queryTerms = uniq((templates.data || []).flatMap((t: Row) => Array.isArray(t.query_terms) ? t.query_terms : [])).slice(0, 12);
-    const queries = queryTerms.length ? queryTerms : ["jobs"];
+    const terms = uniq((templates.data || []).flatMap((t: Row) => Array.isArray(t.query_terms) ? t.query_terms : [])).slice(0, 10);
+    const query = terms.length ? terms.map((term) => `(${term})`).join(" OR ") : "jobs";
+
+    const indeed = new URL(INDEED_URL);
+    indeed.searchParams.set("q", query);
+    indeed.searchParams.set("l", "Australia");
     const provider = new URL(OUTSCRAPER_URL);
-    for (const term of queries) {
-      const indeed = new URL(INDEED_URL);
-      indeed.searchParams.set("q", term);
-      indeed.searchParams.set("l", "Australia");
-      provider.searchParams.append("query", indeed.toString());
-    }
-    provider.searchParams.set("limit", "100");
+    provider.searchParams.set("query", indeed.toString());
+    provider.searchParams.set("limit", String(DAILY_CAP));
     provider.searchParams.set("async", "false");
 
     const response = await fetch(provider, { headers: { "X-API-KEY": OUTSCRAPER_KEY } });
@@ -81,15 +83,17 @@ Deno.serve(async (req) => {
     if (!response.ok) throw new Error(`Outscraper failed ${response.status}: ${JSON.stringify(payload).slice(0, 1000)}`);
 
     const now = new Date().toISOString();
-    const sourceRows = rowsFrom(payload).slice(0, 100);
+    const sourceRows = rowsFrom(payload).slice(0, DAILY_CAP);
     let inserted = 0, updated = 0, duplicates = 0;
     const seen = new Set<string>();
+
     for (const r of sourceRows) {
       const title = text(r.title || r.displayTitle || r.job_title || r.position || r.role);
       const company = text(r.company || r.company_name || r.employer || r.organization);
       const location = text(r.formattedLocation || r.location || [r.city, r.state].filter(Boolean).join(" "));
       const applyUrl = text(r.viewJobLink || r.apply_url || r.job_url || r.url || r.link);
       if (!title && !company && !applyUrl) continue;
+
       const sourceJobId = text(r.source_job_id || r.job_id || r.id || r.indeed_job_id || r.jobKey || r.jobkey || r.job_key) || null;
       const canonicalUrl = canonical(applyUrl);
       const globalKey = [norm(company), norm(title), norm(location)].join("|");
@@ -99,23 +103,28 @@ Deno.serve(async (req) => {
 
       let found: Row | null = null;
       if (sourceJobId) {
-        const q = await db.from("jobs").select("id").eq("source", "outscraper_indeed").eq("source_job_id", sourceJobId).maybeSingle(); if (q.error) throw new Error(q.error.message); found = q.data;
+        const q = await db.from("jobs").select("id").eq("source", "outscraper_indeed").eq("source_job_id", sourceJobId).maybeSingle();
+        if (q.error) throw new Error(q.error.message); found = q.data;
       }
       if (!found && canonicalUrl) {
-        const q = await db.from("jobs").select("id").is("user_id", null).is("campaign_id", null).eq("canonical_apply_url", canonicalUrl).maybeSingle(); if (q.error) throw new Error(q.error.message); found = q.data;
+        const q = await db.from("jobs").select("id").is("user_id", null).is("campaign_id", null).eq("canonical_apply_url", canonicalUrl).maybeSingle();
+        if (q.error) throw new Error(q.error.message); found = q.data;
       }
       if (!found && globalKey) {
-        const q = await db.from("jobs").select("id").is("user_id", null).is("campaign_id", null).eq("global_dedupe_key", globalKey).maybeSingle(); if (q.error) throw new Error(q.error.message); found = q.data;
+        const q = await db.from("jobs").select("id").is("user_id", null).is("campaign_id", null).eq("global_dedupe_key", globalKey).maybeSingle();
+        if (q.error) throw new Error(q.error.message); found = q.data;
       }
+
       const job = {
         user_id: null, campaign_id: null, source: "outscraper_indeed", source_job_id: sourceJobId,
         title: title || null, normalized_title: norm(title) || null, company: company || null, normalized_company: norm(company) || null,
         location: location || null, country: "au", description: text(r.snippet || r.description || r.summary || r.job_description) || null,
         apply_url: applyUrl || null, canonical_apply_url: canonicalUrl, posted_at: isoDate(r.pubDate || r.createDate || r.posted_at || r.posted_date || r.date_posted || r.date),
         fetched_at: now, last_seen_at: now, expires_at: new Date(Date.now() + 30 * 86400000).toISOString(), status: "new", catalogue_status: "active",
-        search_query: queries.join(" | "), raw_payload: r, global_dedupe_key: globalKey || null,
+        search_query: query, raw_payload: r, global_dedupe_key: globalKey || null,
         job_dedupe_key: [canonicalUrl || "", norm(company), norm(title), norm(location)].join("|"), fetch_run_id: runId,
       };
+
       if (found?.id) {
         const q = await db.from("jobs").update(job).eq("id", found.id); if (q.error) throw new Error(q.error.message); updated++;
       } else {
@@ -123,9 +132,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    const done = await db.from("job_fetch_runs").update({ status: "completed", jobs_found: sourceRows.length, jobs_inserted: inserted, jobs_updated: updated, finished_at: now, metadata: { mode: "global_daily_100", timezone: "Australia/Sydney", query_terms: queries, duplicates_skipped: duplicates, provider_status: response.status } }).eq("id", runId).select("*").single();
+    const done = await db.from("job_fetch_runs").update({ status: "completed", jobs_found: sourceRows.length, jobs_inserted: inserted, jobs_updated: updated, finished_at: now, metadata: { mode: "global_daily_100", timezone: "Australia/Sydney", daily_cap: DAILY_CAP, query, duplicates_skipped: duplicates, provider_status: response.status } }).eq("id", runId).select("*").single();
     if (done.error) throw new Error(done.error.message);
-    return reply({ ok: true, function: "applix-global-daily-job-fetcher", version: VERSION, run: done.data, sends_emails_now: false });
+
+    return reply({ ok: true, function: "applix-global-daily-job-fetcher", version: VERSION, daily_cap: DAILY_CAP, run: done.data, sends_emails_now: false });
   } catch (error) {
     return reply({ ok: false, function: "applix-global-daily-job-fetcher", version: VERSION, error: error instanceof Error ? error.message : String(error) }, 500);
   }
