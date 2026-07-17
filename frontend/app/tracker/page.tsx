@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import styles from "./tracker.module.css";
@@ -42,6 +42,10 @@ type LegacyJob = {
 type Tab = "review" | "history";
 type Decision = "approved" | "skipped";
 
+const MIN_SHEET_ZOOM = 70;
+const MAX_SHEET_ZOOM = 130;
+const SHEET_ZOOM_STEP = 10;
+
 function messageFrom(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
   if (error && typeof error === "object" && "message" in error) {
@@ -78,27 +82,20 @@ export default function TrackerPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [sheetZoom, setSheetZoom] = useState(100);
 
-  const pendingJobs = useMemo(
-    () => reviewJobs.filter((job) => job.status !== "approved"),
-    [reviewJobs],
-  );
-  const approvedJobs = useMemo(
-    () => reviewJobs.filter((job) => job.status === "approved"),
-    [reviewJobs],
-  );
+  const pendingJobs = useMemo(() => reviewJobs.filter((job) => job.status !== "approved"), [reviewJobs]);
+  const approvedJobs = useMemo(() => reviewJobs.filter((job) => job.status === "approved"), [reviewJobs]);
   const summary = useMemo(
     () => ({ waiting: pendingJobs.length, approved: approvedJobs.length, legacy: legacyJobs.length }),
     [pendingJobs.length, approvedJobs.length, legacyJobs.length],
   );
   const allSelected = pendingJobs.length > 0 && selectedIds.length === pendingJobs.length;
+  const sheetStyle = { "--sheet-zoom": sheetZoom / 100 } as CSSProperties;
 
   function publishCounts(approvedCount: number) {
     if (window.parent !== window) {
-      window.parent.postMessage(
-        { type: "applix-tracker-counts", approvedCount },
-        window.location.origin,
-      );
+      window.parent.postMessage({ type: "applix-tracker-counts", approvedCount }, window.location.origin);
     }
   }
 
@@ -275,6 +272,13 @@ export default function TrackerPage() {
     setSelectedIds(allSelected ? [] : pendingJobs.map((job) => job.id));
   }
 
+  function zoomSheet(direction: "in" | "out") {
+    setSheetZoom((current) => {
+      const next = current + (direction === "in" ? SHEET_ZOOM_STEP : -SHEET_ZOOM_STEP);
+      return Math.min(MAX_SHEET_ZOOM, Math.max(MIN_SHEET_ZOOM, next));
+    });
+  }
+
   return (
     <main className={`${styles.shell} ${embedded ? styles.embedded : ""}`}>
       <div className={styles.page}>
@@ -295,14 +299,21 @@ export default function TrackerPage() {
         )}
 
         <section className={styles.summary}>
-          <div className={styles.summaryCard}><span>Jobs awaiting review</span><strong>{summary.waiting}</strong></div>
-          <div className={styles.summaryCard}><span>Approved tracker</span><strong>{summary.approved}</strong></div>
-          <div className={styles.summaryCard}><span>Application history</span><strong>{summary.legacy}</strong></div>
+          <div className={styles.summaryCard}><span>Jobs awaiting review</span><strong>{summary.waiting}</strong><small>Needs your decision</small></div>
+          <div className={styles.summaryCard}><span>Approved tracker</span><strong>{summary.approved}</strong><small>Marked to apply</small></div>
+          <div className={styles.summaryCard}><span>Application history</span><strong>{summary.legacy}</strong><small>Total applications</small></div>
         </section>
 
-        <div className={styles.tabs}>
-          <button onClick={() => setTab("review")} className={`${styles.tab} ${tab === "review" ? styles.activeTab : ""}`}>Review & Tracker</button>
-          <button onClick={() => setTab("history")} className={`${styles.tab} ${tab === "history" ? styles.activeTab : ""}`}>Application History</button>
+        <div className={styles.trackerNav}>
+          <div className={styles.tabs}>
+            <button onClick={() => setTab("review")} className={`${styles.tab} ${tab === "review" ? styles.activeTab : ""}`}>Review & Tracker</button>
+            <button onClick={() => setTab("history")} className={`${styles.tab} ${tab === "history" ? styles.activeTab : ""}`}>Application History</button>
+          </div>
+          <div className={styles.zoomControls} aria-label="Tracker sheet zoom controls">
+            <button type="button" onClick={() => zoomSheet("out")} disabled={sheetZoom <= MIN_SHEET_ZOOM} aria-label="Zoom tracker sheet out">−</button>
+            <button type="button" className={styles.zoomValue} onClick={() => setSheetZoom(100)} aria-label="Reset tracker sheet zoom to 100 percent">{sheetZoom}%</button>
+            <button type="button" onClick={() => zoomSheet("in")} disabled={sheetZoom >= MAX_SHEET_ZOOM} aria-label="Zoom tracker sheet in">+</button>
+          </div>
         </div>
 
         {message && <p className={styles.notice}>{message}</p>}
@@ -320,58 +331,60 @@ export default function TrackerPage() {
 
             {reviewJobs.length > 0 ? (
               <div className={styles.sheetWrap}>
-                <table className={styles.sheet}>
-                  <thead>
-                    <tr>
-                      <th className={styles.rowNumber}>#</th>
-                      <th className={styles.checkColumn}><input aria-label="Select all waiting jobs" type="checkbox" checked={allSelected} onChange={toggleAll} /></th>
-                      <th className={styles.scoreColumn}>AI score</th>
-                      <th className={styles.titleColumn}>Job title</th>
-                      <th className={styles.companyColumn}>Company</th>
-                      <th className={styles.locationColumn}>Location</th>
-                      <th className={styles.dateColumn}>Updated</th>
-                      <th className={styles.linkColumn}>Job post</th>
-                      <th className={styles.actionColumn}>Tracker status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reviewJobs.map((job, index) => {
-                      const approved = job.status === "approved";
-                      const selected = selectedIds.includes(job.id);
-                      const rowClass = approved ? styles.approvedRow : selected ? styles.selectedRow : "";
-                      return (
-                        <tr key={job.match_id || job.id} className={rowClass}>
-                          <td className={styles.rowNumber}>{index + 1}</td>
-                          <td className={styles.checkColumn}>
-                            <input
-                              aria-label={approved ? `${job.title || "Job"} approved` : `Select ${job.title || "job"}`}
-                              type="checkbox"
-                              checked={approved || selected}
-                              disabled={approved}
-                              onChange={() => toggleSelected(job.id)}
-                            />
-                          </td>
-                          <td><span className={styles.score}>{job.ai_role_relevance_score ?? "Fit"}</span></td>
-                          <td className={styles.titleCell} title={job.description || ""}><strong>{job.title || "Untitled job"}</strong><small>{shortDescription(job.description)}</small></td>
-                          <td className={styles.companyCell}><strong>{job.company || "Unknown company"}</strong><small>{job.source || "Source not saved"}</small></td>
-                          <td>{job.location || "—"}</td>
-                          <td>{formatDate(job.created_at)}</td>
-                          <td>{job.apply_url ? <a className={styles.openLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td>
-                          <td>
-                            {approved ? (
-                              <span className={styles.approvedBadge}>✓ Smashed</span>
-                            ) : (
-                              <div className={styles.actions}>
-                                <button className={styles.skip} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "skipped")}>Pass</button>
-                                <button className={styles.approve} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "approved")}>{busyId === job.id ? "..." : "Smash"}</button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className={styles.sheetCanvas} style={sheetStyle}>
+                  <table className={styles.sheet}>
+                    <thead>
+                      <tr>
+                        <th className={styles.rowNumber}>#</th>
+                        <th className={styles.checkColumn}><input aria-label="Select all waiting jobs" type="checkbox" checked={allSelected} onChange={toggleAll} /></th>
+                        <th className={styles.scoreColumn}>AI score</th>
+                        <th className={styles.titleColumn}>Job title</th>
+                        <th className={styles.companyColumn}>Company</th>
+                        <th className={styles.locationColumn}>Location</th>
+                        <th className={styles.dateColumn}>Updated</th>
+                        <th className={styles.linkColumn}>Job post</th>
+                        <th className={styles.actionColumn}>Tracker status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reviewJobs.map((job, index) => {
+                        const approved = job.status === "approved";
+                        const selected = selectedIds.includes(job.id);
+                        const rowClass = approved ? styles.approvedRow : selected ? styles.selectedRow : "";
+                        return (
+                          <tr key={job.match_id || job.id} className={rowClass}>
+                            <td className={styles.rowNumber}>{index + 1}</td>
+                            <td className={styles.checkColumn}>
+                              <input
+                                aria-label={approved ? `${job.title || "Job"} approved` : `Select ${job.title || "job"}`}
+                                type="checkbox"
+                                checked={approved || selected}
+                                disabled={approved}
+                                onChange={() => toggleSelected(job.id)}
+                              />
+                            </td>
+                            <td><span className={styles.score}>{job.ai_role_relevance_score ?? "Fit"}</span></td>
+                            <td className={styles.titleCell} title={job.description || ""}><strong>{job.title || "Untitled job"}</strong><small>{shortDescription(job.description)}</small></td>
+                            <td className={styles.companyCell}><strong>{job.company || "Unknown company"}</strong><small>{job.source || "Source not saved"}</small></td>
+                            <td>{job.location || "—"}</td>
+                            <td>{formatDate(job.created_at)}</td>
+                            <td>{job.apply_url ? <a className={styles.openLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td>
+                            <td>
+                              {approved ? (
+                                <span className={styles.approvedBadge}>✓ Smashed</span>
+                              ) : (
+                                <div className={styles.actions}>
+                                  <button className={styles.skip} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "skipped")}>Pass</button>
+                                  <button className={styles.approve} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "approved")}>{busyId === job.id ? "..." : "Smash"}</button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : (
               <div className={styles.empty}>
@@ -384,10 +397,12 @@ export default function TrackerPage() {
 
         {tab === "history" && (
           <section className={styles.historyWrap}>
-            <table className={styles.sheet}>
-              <thead><tr><th className={styles.rowNumber}>#</th><th className={styles.companyColumn}>Company</th><th className={styles.titleColumn}>Job title</th><th className={styles.locationColumn}>Location</th><th>Status</th><th className={styles.dateColumn}>Added</th><th className={styles.linkColumn}>Link</th></tr></thead>
-              <tbody>{legacyJobs.map((job, index) => <tr key={job.id}><td className={styles.rowNumber}>{index + 1}</td><td className={styles.companyCell}><strong>{job.company || "Unknown"}</strong></td><td className={styles.titleCell}><strong>{job.title || "Untitled"}</strong></td><td>{job.location || "—"}</td><td>{job.status || "new"}</td><td>{formatDate(job.created_at)}</td><td>{job.apply_url ? <a className={styles.openLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td></tr>)}</tbody>
-            </table>
+            <div className={styles.sheetCanvas} style={sheetStyle}>
+              <table className={styles.sheet}>
+                <thead><tr><th className={styles.rowNumber}>#</th><th className={styles.companyColumn}>Company</th><th className={styles.titleColumn}>Job title</th><th className={styles.locationColumn}>Location</th><th>Status</th><th className={styles.dateColumn}>Added</th><th className={styles.linkColumn}>Link</th></tr></thead>
+                <tbody>{legacyJobs.map((job, index) => <tr key={job.id}><td className={styles.rowNumber}>{index + 1}</td><td className={styles.companyCell}><strong>{job.company || "Unknown"}</strong></td><td className={styles.titleCell}><strong>{job.title || "Untitled"}</strong></td><td>{job.location || "—"}</td><td>{job.status || "new"}</td><td>{formatDate(job.created_at)}</td><td>{job.apply_url ? <a className={styles.openLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td></tr>)}</tbody>
+              </table>
+            </div>
             {!loading && legacyJobs.length === 0 && <div className={styles.empty}><h2>No application history yet</h2></div>}
           </section>
         )}
