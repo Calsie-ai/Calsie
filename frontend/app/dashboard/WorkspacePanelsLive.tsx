@@ -7,7 +7,7 @@ import WorkspacePanels from "./WorkspacePanels";
 import type { CampaignTemplate } from "./workspace-data";
 
 type BaseProps = ComponentProps<typeof WorkspacePanels>;
-type Props = BaseProps & { approvedCount: number; passedCount: number; onOpenTracker: () => void };
+type Props = BaseProps & { approvedCount: number; passedCount: number; purchasedTemplate?: CampaignTemplate | null; onOpenTracker: () => void };
 
 type Row = {
   id: string;
@@ -26,7 +26,7 @@ type Row = {
   posted_within_days: number;
 };
 
-function mapTemplate(row: Row): CampaignTemplate {
+export function mapTemplate(row: Row): CampaignTemplate {
   return {
     id: row.id,
     title: row.title,
@@ -78,7 +78,7 @@ export default function WorkspacePanelsLive(props: Props) {
   }, [query, templates]);
 
   if (props.active === "overview") {
-    return <OverviewDashboard campaign={props.campaign} resumeReady={props.resumeReady} resumeName={props.resumeName} gmailReady={props.gmailReady} approvedCount={props.approvedCount} passedCount={props.passedCount} onOpenTracker={props.onOpenTracker} />;
+    return <OverviewDashboard campaign={props.campaign} purchasedTemplate={props.purchasedTemplate} resumeReady={props.resumeReady} resumeName={props.resumeName} gmailReady={props.gmailReady} approvedCount={props.approvedCount} passedCount={props.passedCount} onOpenTracker={props.onOpenTracker} />;
   }
 
   if (props.active !== "templates") return <WorkspacePanels {...props} />;
@@ -94,41 +94,24 @@ export default function WorkspacePanelsLive(props: Props) {
       {selected ? (
         <div className="template-review-canva">
           <button className="template-review-back" onClick={() => setSelected(null)}>← Back to templates</button>
-
           <div className="template-review-hero">
             <div className="template-review-copy">
               <p className="template-category">{selected.category}</p>
               <h2>{selected.title}</h2>
               <p className="template-review-description">{selected.description}</p>
-              <div className="template-review-usage">
-                <strong>Ready-made campaign</strong>
-                <span>{selected.campaignName || selected.title}</span>
-              </div>
+              <div className="template-review-usage"><strong>Ready-made campaign</strong><span>{selected.campaignName || selected.title}</span></div>
             </div>
             {selected.imageUrl ? <img src={selected.imageUrl} alt={selected.title} /> : <div className="template-review-image-placeholder">Add a template photo from Admin</div>}
           </div>
-
           <section className="template-recipe-card">
             <div><span>Search recipe</span><strong>Every Day Job Portal Search</strong></div>
             <div><span>Target role</span><strong>{selected.role}</strong></div>
             <div><span>Location</span><strong>{selected.location}</strong></div>
             <div><span>Posted within</span><strong>{selected.postedWithinDays} days</strong></div>
           </section>
-
           <div className="template-review-checkout">
-            <div>
-              <span>Campaign template</span>
-              <strong>{selected.campaignName || selected.title}</strong>
-              <small>Login and template browsing are free.</small>
-            </div>
-            <div className="template-service-price" aria-label="Service price 99 Australian dollars">
-              <span>Service price</span>
-              <strong>$99</strong>
-              <small>AUD</small>
-            </div>
-            <button className="workspace-primary" disabled={props.busy} onClick={() => props.onUseTemplate(selected)}>
-              {props.busy ? "Preparing campaign..." : "Use this template"}
-            </button>
+            <div><span>Campaign template</span><strong>{selected.campaignName || selected.title}</strong><small>Login and template browsing are free.</small></div>
+            <button className="workspace-primary" disabled={props.busy} onClick={() => props.onUseTemplate(selected)}>{props.busy ? "Preparing campaign..." : "Use this template"}</button>
           </div>
         </div>
       ) : (
@@ -140,11 +123,9 @@ export default function WorkspacePanelsLive(props: Props) {
           <div className="template-canva-grid">
             {visible.map((item) => (
               <article className="template-canva-card" key={item.id}>
-                <span className="template-category">{item.category}</span>
-                <h3>{item.title}</h3>
+                <span className="template-category">{item.category}</span><h3>{item.title}</h3>
                 {item.imageUrl ? <img className="template-canva-image" src={item.imageUrl} alt={item.title} /> : <div className="template-canva-image template-canva-placeholder">Add a photo from Admin</div>}
-                <p>{item.description}</p>
-                <small>{item.role} · {item.location}</small>
+                <p>{item.description}</p><small>{item.role} · {item.location}</small>
                 <button type="button" onClick={() => setSelected(item)}>Review template →</button>
               </article>
             ))}
