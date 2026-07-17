@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import "./tracker-sheet.css";
 import "./tracker-polish.css";
 import "./tracker-compact.css";
@@ -12,10 +12,10 @@ import TrackerSheetZoom from "./TrackerSheetZoom";
 
 export default function TrackerLayout({ children }: { children: ReactNode }) {
   return (
-    <>
+    <Suspense fallback={<main aria-busy="true" aria-label="Loading application tracker" />}>
       {children}
       <TrackerBulkApprove />
       <TrackerSheetZoom />
-    </>
+    </Suspense>
   );
 }
