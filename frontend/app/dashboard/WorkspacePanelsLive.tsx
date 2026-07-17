@@ -8,6 +8,7 @@ import type { CampaignTemplate } from "./workspace-data";
 
 type BaseProps = ComponentProps<typeof WorkspacePanels>;
 type Props = BaseProps & { approvedCount: number; passedCount: number; onOpenTracker: () => void };
+
 type Row = {
   id: string;
   title: string;
@@ -24,22 +25,6 @@ type Row = {
   job_types: string[];
   posted_within_days: number;
 };
-
-type Plan = {
-  id: "starter" | "growth" | "scale";
-  name: string;
-  price: number;
-  approvedJobs: number;
-  dailyLimit: number;
-  description: string;
-  featured?: boolean;
-};
-
-const PLANS: Plan[] = [
-  { id: "starter", name: "Starter", price: 29, approvedJobs: 100, dailyLimit: 10, description: "A focused first campaign for testing your job search." },
-  { id: "growth", name: "Growth", price: 59, approvedJobs: 300, dailyLimit: 20, description: "More daily opportunities with room to review and refine.", featured: true },
-  { id: "scale", name: "Scale", price: 97, approvedJobs: 720, dailyLimit: 24, description: "The full 30-day campaign for maximum job visibility." },
-];
 
 function mapTemplate(row: Row): CampaignTemplate {
   return {
@@ -64,7 +49,6 @@ export default function WorkspacePanelsLive(props: Props) {
   const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<CampaignTemplate | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<Plan["id"]>("growth");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -93,8 +77,6 @@ export default function WorkspacePanelsLive(props: Props) {
     return templates.filter((item) => !needle || `${item.title} ${item.campaignName} ${item.role} ${item.category} ${item.description}`.toLowerCase().includes(needle));
   }, [query, templates]);
 
-  const activePlan = PLANS.find((plan) => plan.id === selectedPlan) || PLANS[1];
-
   if (props.active === "overview") {
     return <OverviewDashboard campaign={props.campaign} resumeReady={props.resumeReady} resumeName={props.resumeName} gmailReady={props.gmailReady} approvedCount={props.approvedCount} passedCount={props.passedCount} onOpenTracker={props.onOpenTracker} />;
   }
@@ -106,7 +88,7 @@ export default function WorkspacePanelsLive(props: Props) {
       <header className="template-browser-head">
         <p>Templates</p>
         <h1>{selected ? "Template details" : "Browse templates"}</h1>
-        <span>{selected ? "Review the campaign recipe and choose a plan before continuing." : "Choose a ready-made campaign template. You can review it before adding it."}</span>
+        <span>{selected ? "Review the campaign recipe before continuing." : "Choose a ready-made campaign template. You can review it before adding it."}</span>
       </header>
 
       {selected ? (
@@ -127,65 +109,20 @@ export default function WorkspacePanelsLive(props: Props) {
           </div>
 
           <section className="template-recipe-card">
-            <div>
-              <span>Search recipe</span>
-              <strong>Every Day Job Portal Search</strong>
-            </div>
-            <div>
-              <span>Target role</span>
-              <strong>{selected.role}</strong>
-            </div>
-            <div>
-              <span>Location</span>
-              <strong>{selected.location}</strong>
-            </div>
-            <div>
-              <span>Posted within</span>
-              <strong>{selected.postedWithinDays} days</strong>
-            </div>
-          </section>
-
-          <section className="template-pricing-section">
-            <div className="template-pricing-heading">
-              <div>
-                <span>Choose your campaign</span>
-                <h3>Simple pricing for this template</h3>
-              </div>
-              <p>Stripe checkout will be connected here later. Selecting a plan currently only prepares the campaign.</p>
-            </div>
-
-            <div className="template-pricing-grid">
-              {PLANS.map((plan) => (
-                <button
-                  type="button"
-                  key={plan.id}
-                  className={`template-price-card${selectedPlan === plan.id ? " is-selected" : ""}${plan.featured ? " is-featured" : ""}`}
-                  onClick={() => setSelectedPlan(plan.id)}
-                >
-                  {plan.featured && <span className="template-price-badge">Most popular</span>}
-                  <strong>{plan.name}</strong>
-                  <div className="template-price"><span>$</span>{plan.price}<small>AUD</small></div>
-                  <p>{plan.description}</p>
-                  <ul>
-                    <li>Up to {plan.approvedJobs} approved jobs</li>
-                    <li>Up to {plan.dailyLimit} prepared jobs per day</li>
-                    <li>30-day campaign tracker</li>
-                    <li>Pass or Smash review control</li>
-                  </ul>
-                  <span className="template-price-select">{selectedPlan === plan.id ? "Selected ✓" : "Select plan"}</span>
-                </button>
-              ))}
-            </div>
+            <div><span>Search recipe</span><strong>Every Day Job Portal Search</strong></div>
+            <div><span>Target role</span><strong>{selected.role}</strong></div>
+            <div><span>Location</span><strong>{selected.location}</strong></div>
+            <div><span>Posted within</span><strong>{selected.postedWithinDays} days</strong></div>
           </section>
 
           <div className="template-review-checkout">
             <div>
-              <span>Selected plan</span>
-              <strong>{activePlan.name} · ${activePlan.price} AUD</strong>
-              <small>Payment is not charged yet.</small>
+              <span>Campaign template</span>
+              <strong>{selected.campaignName || selected.title}</strong>
+              <small>Login and template browsing are free. Service pricing will be shown separately later.</small>
             </div>
             <button className="workspace-primary" disabled={props.busy} onClick={() => props.onUseTemplate(selected)}>
-              {props.busy ? "Preparing campaign..." : `Use this template · $${activePlan.price}`}
+              {props.busy ? "Preparing campaign..." : "Use this template"}
             </button>
           </div>
         </div>
@@ -203,7 +140,7 @@ export default function WorkspacePanelsLive(props: Props) {
                 {item.imageUrl ? <img className="template-canva-image" src={item.imageUrl} alt={item.title} /> : <div className="template-canva-image template-canva-placeholder">Add a photo from Admin</div>}
                 <p>{item.description}</p>
                 <small>{item.role} · {item.location}</small>
-                <button type="button" onClick={() => { setSelectedPlan("growth"); setSelected(item); }}>Review template →</button>
+                <button type="button" onClick={() => setSelected(item)}>Review template →</button>
               </article>
             ))}
           </div>
