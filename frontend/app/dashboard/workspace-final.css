@@ -27,12 +27,6 @@ html body main.applix-workspace .workspace-tracker-heading .workspace-status-pil
   color: #333 !important;
 }
 
-html body main.applix-workspace .workspace-tracker-heading > div > span {
-  color: #5b5b5b !important;
-  opacity: 1 !important;
-  text-shadow: none !important;
-}
-
 html body main.applix-workspace .workspace-privacy-row {
   display: flex;
   justify-content: flex-start;
