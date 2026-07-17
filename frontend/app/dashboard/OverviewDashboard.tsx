@@ -26,7 +26,7 @@ export default function OverviewDashboard({ campaign, resumeReady, resumeName, g
         <article><strong>Resume</strong><small>{resumeReady ? resumeName || "Resume ready" : "Resume missing"}</small></article>
         <article><strong>AI Email Send</strong><small>{gmailReady ? "Email connected" : "Email not connected"}</small></article>
         <article><strong>Campaign</strong><small>{campaignLabel}<br />{campaign ? "Your campaign is ready" : "No campaign yet"}</small></article>
-        <article><strong>Plan</strong><small>PRO</small></article>
+        <article className="canva-price-card"><strong>Plan</strong><b>$99</b><small>AUD service</small></article>
       </div>
 
       <section className="canva-service-card">
