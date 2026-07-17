@@ -162,7 +162,7 @@ export async function POST(req: Request) {
         apikey: SUPABASE_ANON_KEY,
         Prefer: "return=representation",
       },
-      body: JSON.stringify({ outreach: nextOutreach }),
+      body: JSON.stringify({ status: "active", outreach: nextOutreach }),
     });
 
     const campaignData = await campaignPatchResponse.json().catch(() => null);
