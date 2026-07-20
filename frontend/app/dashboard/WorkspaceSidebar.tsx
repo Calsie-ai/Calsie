@@ -26,13 +26,21 @@ export default function WorkspaceSidebar({
 }) {
   const campaign: Array<[WorkspaceTab, string, string]> = [
     ["campaign", "Set Up Campaign", "+"],
-    ["approve", "Approve Jobs", "✓"],
+    ["approve", "SMASH OR PASS", "✓"],
     ["tracker", `Application Tracker${approvedCount ? ` (${approvedCount})` : ""}`, "◎"],
   ];
 
   const navButton = ([tab, label, icon]: [WorkspaceTab, string, string]) => (
     <button key={tab} className={active === tab ? "is-active" : ""} onClick={() => setActive(tab)}>
-      <span>{icon}</span><b>{label}</b>
+      <span>{icon}</span>
+      <b>
+        {tab === "approve" ? (
+          <>
+            <i style={{ color: "#ff5575", fontStyle: "normal" }}>SMASH</i>{" "}
+            <i style={{ color: "#ffffff", fontStyle: "normal" }}>OR PASS</i>
+          </>
+        ) : label}
+      </b>
     </button>
   );
 
