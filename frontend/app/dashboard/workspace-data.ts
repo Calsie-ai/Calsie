@@ -40,6 +40,12 @@ export type CampaignTemplate = {
   descriptionKeywords: string[];
   jobTypes: string[];
   postedWithinDays: number;
+  priceAmount?: number;
+  compareAtPriceAmount?: number | null;
+  currency?: string;
+  priceLabel?: string;
+  pricingFeatures?: string[];
+  paymentRequired?: boolean;
 };
 
 export const CAMPAIGN_PLAN = {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ComponentProps } from "react";
+import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import OverviewDashboard from "./OverviewDashboard";
 import WorkspacePanels from "./WorkspacePanels";
@@ -24,6 +25,12 @@ type Row = {
   description_keywords: string[];
   job_types: string[];
   posted_within_days: number;
+  price_amount: number;
+  compare_at_price_amount: number | null;
+  currency: string;
+  price_label: string;
+  pricing_features: string[];
+  payment_required: boolean;
 };
 
 export function mapTemplate(row: Row): CampaignTemplate {
@@ -42,10 +49,21 @@ export function mapTemplate(row: Row): CampaignTemplate {
     descriptionKeywords: row.description_keywords || [],
     jobTypes: row.job_types || [],
     postedWithinDays: row.posted_within_days || 30,
+    priceAmount: row.price_amount || 0,
+    compareAtPriceAmount: row.compare_at_price_amount,
+    currency: row.currency || "aud",
+    priceLabel: row.price_label || "one-time",
+    pricingFeatures: row.pricing_features || [],
+    paymentRequired: row.payment_required !== false,
   };
 }
 
+function formatMoney(amount: number, currency = "aud") {
+  return new Intl.NumberFormat("en-AU", { style: "currency", currency: currency.toUpperCase(), maximumFractionDigits: amount % 100 === 0 ? 0 : 2 }).format(amount / 100);
+}
+
 export default function WorkspacePanelsLive(props: Props) {
+  const router = useRouter();
   const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<CampaignTemplate | null>(null);
@@ -60,7 +78,7 @@ export default function WorkspacePanelsLive(props: Props) {
     const supabase = getSupabaseClient();
     void supabase
       .from("campaign_templates")
-      .select("id,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days")
+      .select("id,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required")
       .eq("is_active", true)
       .order("updated_at", { ascending: false })
       .then(({ data, error }) => {
@@ -94,21 +112,13 @@ export default function WorkspacePanelsLive(props: Props) {
         <header className="workspace-tracker-heading">
           <div>
             <p>{approvalMode ? "Approval queue" : "Calsie tracker"}</p>
-            {approvalMode ? (
-              <h1><span style={{ color: "#ff5f78" }}>SMASH</span> <span style={{ color: "#111" }}>OR PASS</span></h1>
-            ) : (
-              <h1>Application tracker</h1>
-            )}
+            {approvalMode ? <h1><span style={{ color: "#ff5f78" }}>SMASH</span> <span style={{ color: "#111" }}>OR PASS</span></h1> : <h1>Application tracker</h1>}
             <span>{approvalMode ? "Review matched jobs and choose Pass or Smash." : "Only jobs you Smash are added to this tracker."}</span>
           </div>
           <span className={`workspace-status-pill ${statusClass}`}><i /> {statusText}</span>
         </header>
         <div className="workspace-tracker-frame-wrap">
-          <iframe
-            className="workspace-tracker-frame"
-            src={`/tracker?embedded=1&view=${approvalMode ? "review" : "tracker"}`}
-            title={approvalMode ? "Applix job approval queue" : "Applix application tracker"}
-          />
+          <iframe className="workspace-tracker-frame" src={`/tracker?embedded=1&view=${approvalMode ? "review" : "tracker"}`} title={approvalMode ? "Applix job approval queue" : "Applix application tracker"} />
         </div>
       </section>
     );
@@ -121,7 +131,7 @@ export default function WorkspacePanelsLive(props: Props) {
       <header className="template-browser-head">
         <p>Templates</p>
         <h1>{selected ? "Template details" : "Browse templates"}</h1>
-        <span>{selected ? "Review the campaign recipe before continuing." : "Choose a ready-made campaign template. You can review it before adding it."}</span>
+        <span>{selected ? "Review the campaign, price, and included features before checkout." : "Login and browsing are free. Pricing appears only after you choose a template."}</span>
       </header>
 
       {selected ? (
@@ -142,17 +152,20 @@ export default function WorkspacePanelsLive(props: Props) {
             <div><span>Location</span><strong>{selected.location}</strong></div>
             <div><span>Posted within</span><strong>{selected.postedWithinDays} days</strong></div>
           </section>
+          <section style={{ border: "1px solid #ddd", padding: 18, marginTop: 18 }}>
+            <h3 style={{ marginTop: 0 }}>Included with this template</h3>
+            <div style={{ display: "grid", gap: 9 }}>
+              {(selected.pricingFeatures || []).map((feature) => <div key={feature}>✓ {feature}</div>)}
+            </div>
+          </section>
           <div className="template-review-checkout">
             <div><span>Campaign template</span><strong>{selected.campaignName || selected.title}</strong><small>Login and template browsing are free.</small></div>
-            <section
-              aria-label="Launch price reduced from 92 dollars to 49 dollars"
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: "14px", marginLeft: "auto", whiteSpace: "nowrap" }}
-            >
-              <div style={{ color: "#ff3f4f", fontSize: "30px", fontWeight: 950, lineHeight: 1, textDecoration: "line-through", textDecorationThickness: "3px" }}>$92</div>
-              <div style={{ color: "#111", fontSize: "22px", fontWeight: 500, lineHeight: 1 }}>for now</div>
-              <div style={{ color: "#2f8f2f", fontSize: "30px", fontWeight: 950, lineHeight: 1 }}>$49</div>
+            <section aria-label="Template price" style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 12, marginLeft: "auto", whiteSpace: "nowrap" }}>
+              {selected.compareAtPriceAmount ? <div style={{ color: "#ff3f4f", fontSize: 24, fontWeight: 900, textDecoration: "line-through" }}>{formatMoney(selected.compareAtPriceAmount, selected.currency)}</div> : null}
+              <div style={{ color: "#2f8f2f", fontSize: 30, fontWeight: 950 }}>{formatMoney(selected.priceAmount || 0, selected.currency)}</div>
+              <div style={{ color: "#555", fontSize: 14, fontWeight: 700 }}>{selected.priceLabel}</div>
             </section>
-            <button className="workspace-primary" disabled={props.busy} onClick={() => props.onUseTemplate(selected)}>{props.busy ? "Preparing campaign..." : "Use this template"}</button>
+            <button className="workspace-primary" onClick={() => router.push(`/payment?template=${encodeURIComponent(selected.id)}`)}>{selected.paymentRequired === false ? "Use free template" : "Continue to checkout"}</button>
           </div>
         </div>
       ) : (
