@@ -47,7 +47,7 @@ export default function DashboardWorkspace() {
 
     const templateId = latestCampaign?.search?.template_id;
     if (templateId) {
-      const { data: template } = await supabase.from("campaign_templates").select("id,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days").eq("id", templateId).maybeSingle();
+      const { data: template } = await supabase.from("campaign_templates").select("id,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required").eq("id", templateId).maybeSingle();
       setPurchasedTemplate(template ? mapTemplate(template) : null);
     } else {
       setPurchasedTemplate(null);
