@@ -1,57 +1,10 @@
-const plans = [
-  {
-    name: "Starter",
-    price: "Free",
-    note: "Try the core Calsie Jobs workflow before starting a paid campaign.",
-    features: [
-      "Guided profile setup",
-      "Resume upload and preferences",
-      "Limited job matching",
-      "Application tracking",
-      "Review before applying",
-    ],
-    action: "Start free",
-    href: "#start-check",
-    featured: false,
-  },
-  {
-    name: "Calsie Jobs Pro",
-    price: "A$20",
-    suffix: "one-time",
-    note: "A controlled 30-day application campaign for active job seekers.",
-    features: [
-      "2-minute guided setup",
-      "Up to 24 applications per day",
-      "One approved application per hour",
-      "Up to 720 applications in 30 days",
-      "AI-tailored resume drafts",
-      "AI-written application emails",
-      "Approval required before sending",
-      "Application tracking dashboard",
-    ],
-    action: "Choose Calsie Jobs Pro",
-    href: "/payment",
-    featured: true,
-  },
-  {
-    name: "Custom",
-    price: "Let’s talk",
-    note: "For organisations, employment services, and larger hiring-support programs.",
-    features: [
-      "Custom campaign limits",
-      "Team or participant workflows",
-      "Tailored onboarding",
-      "Priority implementation support",
-      "Custom integrations",
-      "Reporting requirements",
-    ],
-    action: "Contact us",
-    href: "/contact",
-    featured: false,
-  },
-];
-
 export default function PricingSection() {
+  const steps = [
+    ["1", "Create your account", "Login and account creation are free."],
+    ["2", "Browse templates", "Review roles, campaign settings, photos, and included features without paying."],
+    ["3", "Choose a template", "The exact admin-managed price appears only for the campaign template you select."],
+  ];
+
   return (
     <section
       id="pricing"
@@ -59,83 +12,40 @@ export default function PricingSection() {
       style={{
         background: "#ffebed",
         color: "#111111",
-        padding: "120px 32px 132px",
+        padding: "110px 32px 120px",
         scrollMarginTop: "88px",
-        fontFamily: "inherit",
         borderTop: "1px solid rgba(17,17,17,0.08)",
         borderBottom: "1px solid rgba(17,17,17,0.08)",
       }}
     >
-      <div style={{ width: "min(1380px, 100%)", margin: "0 auto" }}>
-        <header style={{ textAlign: "center", maxWidth: "900px", margin: "0 auto 70px" }}>
+      <div style={{ width: "min(1180px, 100%)", margin: "0 auto" }}>
+        <header style={{ textAlign: "center", maxWidth: 880, margin: "0 auto 64px" }}>
           <p className="applix-eyebrow" style={{ margin: "0 0 18px" }}>Pricing</p>
-          <h2
-            id="pricing-title"
-            style={{
-              margin: 0,
-              fontSize: "clamp(52px, 6vw, 82px)",
-              lineHeight: 0.98,
-              fontWeight: 800,
-              letterSpacing: "-0.055em",
-              fontFamily: "inherit",
-            }}
-          >
-            Simple, transparent pricing
+          <h2 id="pricing-title" style={{ margin: 0, fontSize: "clamp(48px, 6vw, 78px)", lineHeight: .98, fontWeight: 800, letterSpacing: "-.055em" }}>
+            Browse first. Pay only for the template you choose.
           </h2>
-          <p style={{ margin: "26px auto 0", maxWidth: "760px", fontSize: "clamp(18px, 1.5vw, 22px)", lineHeight: 1.6, color: "#555" }}>
-            Start free, choose the controlled 30-day Calsie Jobs campaign, or contact us for a custom workflow.
+          <p style={{ margin: "26px auto 0", maxWidth: 760, fontSize: "clamp(18px, 1.5vw, 22px)", lineHeight: 1.6, color: "#555" }}>
+            Calsie Jobs does not ask for payment during login. Each campaign template has its own price and included features, managed from the admin panel.
           </p>
         </header>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", alignItems: "stretch", maxWidth: "1280px", margin: "0 auto" }}>
-          {plans.map((plan) => (
-            <article
-              key={plan.name}
-              style={{
-                position: "relative",
-                display: "flex",
-                flexDirection: "column",
-                minHeight: "690px",
-                padding: plan.featured ? "42px 38px 38px" : "52px 38px 38px",
-                border: plan.featured ? "1px solid #111111" : "1px solid rgba(17,17,17,0.2)",
-                background: plan.featured ? "#111111" : "#ffffff",
-                color: plan.featured ? "#ffffff" : "#111111",
-                transform: plan.featured ? "translateY(-18px)" : "none",
-                boxShadow: plan.featured ? "0 30px 80px rgba(0,0,0,0.2)" : "none",
-                zIndex: plan.featured ? 2 : 1,
-              }}
-            >
-              {plan.featured ? (
-                <span style={{ alignSelf: "flex-start", marginBottom: "28px", padding: "8px 12px", border: "1px solid rgba(255,255,255,0.72)", fontSize: "12px", fontWeight: 800, textTransform: "uppercase" }}>
-                  Most popular
-                </span>
-              ) : null}
-
-              <p style={{ margin: 0, fontSize: "18px", fontWeight: 800 }}>{plan.name}</p>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "10px", margin: "22px 0 18px" }}>
-                <strong style={{ fontSize: plan.price.length > 7 ? "50px" : "68px", lineHeight: 1, fontWeight: 800 }}>{plan.price}</strong>
-                {plan.suffix ? <span style={{ opacity: 0.72, fontSize: "16px" }}>{plan.suffix}</span> : null}
-              </div>
-              <p style={{ margin: 0, minHeight: "92px", fontSize: "17px", lineHeight: 1.65, opacity: 0.76 }}>{plan.note}</p>
-
-              <div style={{ display: "grid", gap: "18px", margin: "38px 0" }}>
-                {plan.features.map((feature) => (
-                  <div key={feature} style={{ display: "flex", gap: "13px", alignItems: "flex-start", fontSize: "16px", lineHeight: 1.5 }}>
-                    <span aria-hidden="true" style={{ fontWeight: 900 }}>✓</span>
-                    <span>{feature}</span>
-                  </div>
-                ))}
-              </div>
-
-              <a className="applix-button applix-button--primary" href={plan.href} style={{ marginTop: "auto", minHeight: "58px", width: "100%", fontSize: "14px", textTransform: "uppercase" }}>
-                {plan.action}
-              </a>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 0, maxWidth: 1080, margin: "0 auto" }}>
+          {steps.map(([number, title, body]) => (
+            <article key={number} style={{ minHeight: 310, padding: 34, border: "1px solid rgba(17,17,17,.22)", background: "#fff", display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: ".12em" }}>STEP {number}</span>
+              <h3 style={{ fontSize: 30, margin: "28px 0 14px" }}>{title}</h3>
+              <p style={{ color: "#555", lineHeight: 1.7 }}>{body}</p>
             </article>
           ))}
         </div>
 
-        <p style={{ margin: "34px auto 0", textAlign: "center", color: "#666", fontSize: "15px" }}>
-          Prices are shown in Australian dollars. Applications require your approval and are limited to one send per hour.
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 42 }}>
+          <a className="applix-button applix-button--primary" href="/login?next=/dashboard" style={{ minHeight: 58, paddingInline: 34, textTransform: "uppercase" }}>
+            Login and browse free
+          </a>
+        </div>
+        <p style={{ margin: "24px auto 0", textAlign: "center", color: "#666", fontSize: 15 }}>
+          Prices are shown in Australian dollars on the selected template checkout page.
         </p>
       </div>
     </section>
