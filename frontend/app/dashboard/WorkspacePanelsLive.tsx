@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import OverviewDashboard from "./OverviewDashboard";
 import WorkspacePanels from "./WorkspacePanels";
-import type { CampaignTemplate } from "./workspace-data";
+import { isCampaignRunning, type CampaignTemplate } from "./workspace-data";
 
 type BaseProps = ComponentProps<typeof WorkspacePanels>;
 type Props = BaseProps & { approvedCount: number; passedCount: number; purchasedTemplate?: CampaignTemplate | null; onOpenTracker: () => void };
@@ -79,6 +79,35 @@ export default function WorkspacePanelsLive(props: Props) {
 
   if (props.active === "overview") {
     return <OverviewDashboard campaign={props.campaign} purchasedTemplate={props.purchasedTemplate} resumeReady={props.resumeReady} resumeName={props.resumeName} gmailReady={props.gmailReady} approvedCount={props.approvedCount} passedCount={props.passedCount} onOpenTracker={props.onOpenTracker} />;
+  }
+
+  if (props.active === "approve" || props.active === "tracker") {
+    const approvalMode = props.active === "approve";
+    const status = props.campaign?.status || "Not configured";
+    const running = isCampaignRunning(status);
+    const paused = status === "paused";
+    const statusClass = running ? "is-running" : paused ? "is-paused" : "is-idle";
+    const statusText = running ? "Campaign running" : paused ? "Paused" : status;
+
+    return (
+      <section className="workspace-tracker-section">
+        <header className="workspace-tracker-heading">
+          <div>
+            <p>{approvalMode ? "Approval queue" : "Calsie tracker"}</p>
+            <h1>{approvalMode ? "Approve jobs" : "Application tracker"}</h1>
+            <span>{approvalMode ? "Review matched jobs and choose Pass or Smash." : "Only jobs you Smash are added to this tracker."}</span>
+          </div>
+          <span className={`workspace-status-pill ${statusClass}`}><i /> {statusText}</span>
+        </header>
+        <div className="workspace-tracker-frame-wrap">
+          <iframe
+            className="workspace-tracker-frame"
+            src={`/tracker?embedded=1&view=${approvalMode ? "review" : "tracker"}`}
+            title={approvalMode ? "Applix job approval queue" : "Applix application tracker"}
+          />
+        </div>
+      </section>
+    );
   }
 
   if (props.active !== "templates") return <WorkspacePanels {...props} />;

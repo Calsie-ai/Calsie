@@ -1,7 +1,7 @@
 .shell {
   min-height: 100vh;
   padding: 16px;
-  background: #f2f2ee;
+  background: #fbfaf8;
   color: #111;
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -9,7 +9,7 @@
 .embedded {
   min-height: 100vh;
   padding: 0;
-  background: #f2f2ee;
+  background: #fffafc;
 }
 
 .page {
@@ -20,8 +20,8 @@
 .embedded .page {
   width: 100%;
   min-height: 100vh;
-  padding-bottom: 16px;
-  background: #f2f2ee;
+  padding-bottom: 12px;
+  background: #fffafc;
 }
 
 .header {
@@ -83,24 +83,16 @@
 
 .summaryCard {
   min-height: 86px;
-  border: 1px solid #d1d1cc;
-  border-top: 3px solid #e85b76;
+  border: 1px solid #d7d2d3;
+  border-top: 3px solid #fb6c7e;
   border-radius: 7px;
   padding: 13px 15px;
   background: #fff;
 }
 
-.summaryCard:nth-child(2) {
-  border-top-color: #4f9d69;
-}
-
-.summaryCard:nth-child(3) {
-  border-top-color: #7660b9;
-}
-
 .summaryCard span {
   display: block;
-  color: #5d5d5d;
+  color: #555;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .05em;
@@ -124,12 +116,13 @@
 
 .trackerNav {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-height: 44px;
-  border: 1px solid #111;
-  background: #111;
+  border: 1px solid #d8d2d4;
+  border-bottom: 2px solid #fb6c7e;
+  background: #fff;
 }
 
 .tabs {
@@ -140,19 +133,19 @@
 .tab {
   min-height: 42px;
   border: 0;
-  border-right: 1px solid #373737;
+  border-right: 1px solid #e4dfe0;
   border-radius: 0;
   padding: 0 16px;
   background: #fff;
-  color: #555;
+  color: #666;
   font-size: 11px;
   font-weight: 900;
 }
 
 .activeTab {
-  background: #17151a;
-  color: #ff7185;
-  box-shadow: inset 0 3px #ff7185;
+  background: #fff0f4;
+  color: #c82f50;
+  box-shadow: inset 0 3px #fb6c7e;
 }
 
 .zoomControls {
@@ -165,16 +158,16 @@
 .zoomControls button {
   min-width: 32px;
   height: 30px;
-  border: 1px solid #5c5c5c;
+  border: 1px solid #d3cbcd;
   border-radius: 5px;
-  background: #242424;
-  color: #fff;
+  background: #fff;
+  color: #222;
   font-size: 13px;
   font-weight: 900;
 }
 
 .zoomControls button:hover:not(:disabled) {
-  border-color: #ff8b9c;
+  border-color: #fb6c7e;
 }
 
 .zoomControls button:disabled {
@@ -183,8 +176,8 @@
 
 .zoomControls .zoomValue {
   min-width: 56px;
-  border-color: #ff8b9c;
-  background: #fff;
+  border-color: #f7a7b2;
+  background: #fff5f7;
   color: #c72c52;
 }
 
@@ -215,7 +208,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 9px 11px;
-  border: 1px solid #cfcfca;
+  border: 1px solid #ddd6d8;
   border-top: 0;
   background: #fff;
 }
@@ -244,13 +237,13 @@
 
 .approveSelected {
   border: 1px solid #e94f6d;
-  background: #ff7185;
+  background: #fb6c7e;
   color: #111;
 }
 
 .skipSelected {
-  border: 1px solid #c7c7c2;
-  background: #f2f2ef;
+  border: 1px solid #cfc9ca;
+  background: #f8f6f6;
   color: #333;
 }
 
@@ -262,8 +255,8 @@
 .sheetWrap,
 .historyWrap {
   overflow: auto;
-  max-height: min(62vh, 680px);
-  border: 1px solid #cfcfca;
+  max-height: min(66vh, 720px);
+  border: 1px solid #ddd6d8;
   border-top: 0;
   background: #fff;
 }
@@ -277,7 +270,7 @@
 
 .sheet {
   width: 100%;
-  min-width: 1050px;
+  min-width: 1040px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
@@ -287,8 +280,8 @@
 
 .sheet th,
 .sheet td {
-  border-right: 1px solid #d8d8d4;
-  border-bottom: 1px solid #d8d8d4;
+  border-right: 1px solid #eadfe2;
+  border-bottom: 1px solid #eadfe2;
   padding: 8px 9px;
   vertical-align: middle;
   color: #222;
@@ -298,40 +291,32 @@
   position: sticky;
   top: 0;
   z-index: 3;
-  background: #deded9;
-  color: #2f2f2f;
+  background: #fb6c7e;
+  color: #151515;
   text-align: left;
   font-size: 10px;
   font-weight: 900;
-  letter-spacing: .05em;
+  letter-spacing: .04em;
   text-transform: uppercase;
 }
 
 .sheet tbody tr:nth-child(even) td {
-  background: #fafaf8;
+  background: #fff8fb;
 }
 
 .sheet tbody tr:hover td {
-  background: #fff1f4;
+  background: #fff0f4;
 }
 
 .selectedRow td {
-  background: #fff1f4 !important;
-}
-
-.approvedRow td {
-  background: #eaf6ed !important;
-}
-
-.approvedRow:hover td {
-  background: #e1f1e5 !important;
+  background: #fff0f4 !important;
 }
 
 .rowNumber {
   width: 42px;
   text-align: center;
   color: #6f6f6f !important;
-  background: #ecece8 !important;
+  background: #f7f2f3 !important;
 }
 
 .checkColumn {
@@ -343,12 +328,14 @@
 .titleColumn { width: 230px; }
 .companyColumn { width: 180px; }
 .locationColumn { width: 155px; }
-.dateColumn { width: 140px; }
-.linkColumn { width: 86px; }
+.dateColumn { width: 150px; }
+.linkColumn { width: 100px; }
 .actionColumn { width: 165px; }
+.descriptionColumn { width: 430px; }
 
 .titleCell strong,
-.companyCell strong {
+.companyCell strong,
+.descriptionCell strong {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -356,7 +343,8 @@
 }
 
 .titleCell small,
-.companyCell small {
+.companyCell small,
+.descriptionCell small {
   display: block;
   margin-top: 4px;
   overflow: hidden;
@@ -377,17 +365,25 @@
   font-weight: 900;
 }
 
-.openLink {
+.openLink,
+.cleanLink {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 28px;
-  border: 1px solid #d68091;
+  border: 1px solid #e7a4af;
   border-radius: 5px;
   padding: 0 9px;
   color: #a92548;
   font-weight: 900;
   text-decoration: none;
+}
+
+.cleanLink {
+  border: 0;
+  padding: 0;
+  color: #3a86d7;
+  justify-content: flex-start;
 }
 
 .actions {
@@ -407,39 +403,69 @@
 
 .approve {
   border: 1px solid #e94f6d;
-  background: #ff7185;
+  background: #fb6c7e;
   color: #111;
 }
 
 .skip {
-  border: 1px solid #c7c7c2;
-  background: #f2f2ef;
+  border: 1px solid #cfc9ca;
+  background: #f8f6f6;
   color: #444;
 }
 
-.approvedBadge {
-  display: inline-flex;
+.trackerSheetSection {
+  border: 1px solid #2c292a;
+  background: #fff8fb;
+}
+
+.trackerTitleRow {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-width: 78px;
-  border: 1px solid #91c4a0;
-  border-radius: 999px;
-  padding: 6px 9px;
-  background: #dff0e4;
-  color: #176438;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid #e3d8db;
+  background: #fff8fb;
+}
+
+.trackerTitleRow strong {
+  font-size: 24px;
+  font-style: italic;
+  letter-spacing: -.03em;
+}
+
+.trackerTitleRow span {
+  color: #666;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
+}
+
+.trackerSheetSection .historyWrap {
+  border: 0;
+}
+
+.trackerSheet {
+  min-width: 900px;
+}
+
+.trackerSheet td {
+  height: 42px;
+  color: #5a4b91;
 }
 
 .empty {
-  min-height: 220px;
+  min-height: 230px;
   display: grid;
   place-content: center;
-  border: 1px solid #cfcfca;
+  border: 1px solid #ddd6d8;
   border-top: 0;
   padding: 34px 20px;
-  background: #ecece8;
+  background: #fffafc;
   text-align: center;
+}
+
+.trackerSheetSection .empty {
+  border: 0;
 }
 
 .empty h2 {
@@ -454,14 +480,34 @@
   font-size: 12px;
 }
 
+.embedded .summary,
+.embedded .trackerNav {
+  display: none;
+}
+
+.embedded .notice,
+.embedded .error {
+  margin: 8px 10px;
+}
+
+.embedded .toolbar {
+  border-top: 1px solid #ddd6d8;
+}
+
+.embedded .trackerSheetSection {
+  margin: 0;
+}
+
 @media (max-width: 760px) {
   .shell { padding: 10px; }
+  .embedded { padding: 0; }
   .header { align-items: stretch; flex-direction: column; }
   .summary { grid-template-columns: 1fr; }
   .trackerNav { align-items: stretch; flex-direction: column; gap: 0; }
   .tabs { overflow-x: auto; }
-  .zoomControls { justify-content: flex-end; border-top: 1px solid #333; }
+  .zoomControls { justify-content: flex-end; border-top: 1px solid #e4dfe0; }
   .toolbar { align-items: flex-start; flex-direction: column; }
   .toolbarRight { width: 100%; }
   .approveSelected, .skipSelected { flex: 1; }
+  .trackerTitleRow { align-items: flex-start; flex-direction: column; justify-content: center; gap: 4px; }
 }

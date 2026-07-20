@@ -4,6 +4,7 @@ export type WorkspaceTab =
   | "resume"
   | "gmail"
   | "campaign"
+  | "approve"
   | "tracker";
 
 export type CampaignRecord = {

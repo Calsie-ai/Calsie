@@ -39,7 +39,7 @@ type LegacyJob = {
   created_at: string | null;
 };
 
-type Tab = "review" | "history";
+type Tab = "review" | "tracker" | "history";
 type Decision = "approved" | "skipped";
 
 const MIN_SHEET_ZOOM = 70;
@@ -64,7 +64,12 @@ function formatDate(value: string | null) {
 
 function shortDescription(value: string | null) {
   const clean = (value || "No description saved.").replace(/\s+/g, " ").trim();
-  return clean.length > 95 ? `${clean.slice(0, 92)}...` : clean;
+  return clean.length > 110 ? `${clean.slice(0, 107)}...` : clean;
+}
+
+function initialTab(value: string | null): Tab {
+  if (value === "tracker" || value === "history") return value;
+  return "review";
 }
 
 export default function TrackerPage() {
@@ -72,7 +77,7 @@ export default function TrackerPage() {
   const searchParams = useSearchParams();
   const embedded = searchParams.get("embedded") === "1";
   const requestedView = searchParams.get("view");
-  const [tab, setTab] = useState<Tab>(requestedView === "history" ? "history" : "review");
+  const [tab, setTab] = useState<Tab>(initialTab(requestedView));
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [reviewJobs, setReviewJobs] = useState<ReviewJob[]>([]);
   const [legacyJobs, setLegacyJobs] = useState<LegacyJob[]>([]);
@@ -199,7 +204,7 @@ export default function TrackerPage() {
 
       if (decision === "skipped") {
         setReviewJobs((current) => current.filter((item) => item.id !== job.id));
-        setMessage("Passed. This job is out of your queue.");
+        setMessage("Passed. This job was removed from the approval queue.");
         return;
       }
 
@@ -216,9 +221,10 @@ export default function TrackerPage() {
       const prepared = await prepareApprovedApplications(job.campaign_id, token);
       setMessage(
         prepared.queued_companies > 0
-          ? `Smashed. ${prepared.queued_companies} company contact${prepared.queued_companies === 1 ? " is" : "s are"} being enriched.`
-          : `Smashed. ${prepared.drafts_created || 0} draft${prepared.drafts_created === 1 ? " is" : "s are"} ready for review.`,
+          ? `Smashed. Added to your tracker while ${prepared.queued_companies} company contact${prepared.queued_companies === 1 ? " is" : "s are"} enriched.`
+          : `Smashed. Added to your tracker with ${prepared.drafts_created || 0} draft${prepared.drafts_created === 1 ? "" : "s"} ready.`,
       );
+      if (!embedded) setTab("tracker");
     } catch (decisionError) {
       setError(messageFrom(decisionError, "Could not save the decision."));
       await load();
@@ -240,12 +246,13 @@ export default function TrackerPage() {
 
       if (decision === "skipped") {
         setReviewJobs((current) => current.filter((job) => !decidedIds.has(job.id)));
-        setMessage(`${jobs.length} jobs passed.`);
+        setMessage(`${jobs.length} jobs passed and removed from the approval queue.`);
         return;
       }
 
+      const now = new Date().toISOString();
       const nextJobs = reviewJobs.map((job) =>
-        decidedIds.has(job.id) ? { ...job, status: "approved", created_at: new Date().toISOString() } : job,
+        decidedIds.has(job.id) ? { ...job, status: "approved", created_at: now } : job,
       );
       setReviewJobs(nextJobs);
       publishCounts(nextJobs.filter((job) => job.status === "approved").length);
@@ -256,6 +263,7 @@ export default function TrackerPage() {
       if (!token) throw new Error("Please sign in again.");
       await prepareApprovedApplications(jobs[0].campaign_id, token);
       setMessage(`${jobs.length} jobs smashed and added to your tracker.`);
+      if (!embedded) setTab("tracker");
     } catch (bulkError) {
       setError(messageFrom(bulkError, "Could not complete the bulk decision."));
       await load();
@@ -286,8 +294,8 @@ export default function TrackerPage() {
           <header className={styles.header}>
             <div>
               <Link href="/dashboard" className={styles.backLink}>← Back to dashboard</Link>
-              <p className={styles.eyebrow}>AI mission control</p>
-              <h1>Application tracker</h1>
+              <p className={styles.eyebrow}>Calsie jobs</p>
+              <h1>{tab === "review" ? "Approve jobs" : tab === "tracker" ? "Application tracker" : "Application history"}</h1>
               <p className={styles.subtitle}>
                 {campaign ? `${campaign.name || campaign.target_business_type || "Campaign"} · ${campaign.location || "Location not set"}` : "No campaign selected"}
               </p>
@@ -299,14 +307,15 @@ export default function TrackerPage() {
         )}
 
         <section className={styles.summary}>
-          <div className={styles.summaryCard}><span>Jobs awaiting review</span><strong>{summary.waiting}</strong><small>Needs your decision</small></div>
-          <div className={styles.summaryCard}><span>Approved tracker</span><strong>{summary.approved}</strong><small>Marked to apply</small></div>
-          <div className={styles.summaryCard}><span>Application history</span><strong>{summary.legacy}</strong><small>Total applications</small></div>
+          <div className={styles.summaryCard}><span>Awaiting approval</span><strong>{summary.waiting}</strong><small>Choose Pass or Smash</small></div>
+          <div className={styles.summaryCard}><span>Tracker</span><strong>{summary.approved}</strong><small>Added after Smash</small></div>
+          <div className={styles.summaryCard}><span>Application history</span><strong>{summary.legacy}</strong><small>Total application records</small></div>
         </section>
 
         <div className={styles.trackerNav}>
           <div className={styles.tabs}>
-            <button onClick={() => setTab("review")} className={`${styles.tab} ${tab === "review" ? styles.activeTab : ""}`}>Review & Tracker</button>
+            <button onClick={() => setTab("review")} className={`${styles.tab} ${tab === "review" ? styles.activeTab : ""}`}>Approve Jobs</button>
+            <button onClick={() => setTab("tracker")} className={`${styles.tab} ${tab === "tracker" ? styles.activeTab : ""}`}>Tracker</button>
             <button onClick={() => setTab("history")} className={`${styles.tab} ${tab === "history" ? styles.activeTab : ""}`}>Application History</button>
           </div>
           <div className={styles.zoomControls} aria-label="Tracker sheet zoom controls">
@@ -322,14 +331,14 @@ export default function TrackerPage() {
         {tab === "review" && (
           <section>
             <div className={styles.toolbar}>
-              <span className={styles.toolbarLabel}>{pendingJobs.length} waiting · {approvedJobs.length} approved · {selectedIds.length} selected</span>
+              <span className={styles.toolbarLabel}>{pendingJobs.length} awaiting approval · {selectedIds.length} selected</span>
               <div className={styles.toolbarRight}>
                 <button className={styles.skipSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("skipped")}>Pass selected</button>
                 <button className={styles.approveSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("approved")}>{bulkBusy ? "Working..." : "Smash selected"}</button>
               </div>
             </div>
 
-            {reviewJobs.length > 0 ? (
+            {pendingJobs.length > 0 ? (
               <div className={styles.sheetWrap}>
                 <div className={styles.sheetCanvas} style={sheetStyle}>
                   <table className={styles.sheet}>
@@ -341,44 +350,23 @@ export default function TrackerPage() {
                         <th className={styles.titleColumn}>Job title</th>
                         <th className={styles.companyColumn}>Company</th>
                         <th className={styles.locationColumn}>Location</th>
-                        <th className={styles.dateColumn}>Updated</th>
                         <th className={styles.linkColumn}>Job post</th>
-                        <th className={styles.actionColumn}>Tracker status</th>
+                        <th className={styles.actionColumn}>Decision</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {reviewJobs.map((job, index) => {
-                        const approved = job.status === "approved";
+                      {pendingJobs.map((job, index) => {
                         const selected = selectedIds.includes(job.id);
-                        const rowClass = approved ? styles.approvedRow : selected ? styles.selectedRow : "";
                         return (
-                          <tr key={job.match_id || job.id} className={rowClass}>
+                          <tr key={job.match_id || job.id} className={selected ? styles.selectedRow : ""}>
                             <td className={styles.rowNumber}>{index + 1}</td>
-                            <td className={styles.checkColumn}>
-                              <input
-                                aria-label={approved ? `${job.title || "Job"} approved` : `Select ${job.title || "job"}`}
-                                type="checkbox"
-                                checked={approved || selected}
-                                disabled={approved}
-                                onChange={() => toggleSelected(job.id)}
-                              />
-                            </td>
+                            <td className={styles.checkColumn}><input aria-label={`Select ${job.title || "job"}`} type="checkbox" checked={selected} onChange={() => toggleSelected(job.id)} /></td>
                             <td><span className={styles.score}>{job.ai_role_relevance_score ?? "Fit"}</span></td>
                             <td className={styles.titleCell} title={job.description || ""}><strong>{job.title || "Untitled job"}</strong><small>{shortDescription(job.description)}</small></td>
                             <td className={styles.companyCell}><strong>{job.company || "Unknown company"}</strong><small>{job.source || "Source not saved"}</small></td>
                             <td>{job.location || "—"}</td>
-                            <td>{formatDate(job.created_at)}</td>
                             <td>{job.apply_url ? <a className={styles.openLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td>
-                            <td>
-                              {approved ? (
-                                <span className={styles.approvedBadge}>✓ Smashed</span>
-                              ) : (
-                                <div className={styles.actions}>
-                                  <button className={styles.skip} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "skipped")}>Pass</button>
-                                  <button className={styles.approve} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "approved")}>{busyId === job.id ? "..." : "Smash"}</button>
-                                </div>
-                              )}
-                            </td>
+                            <td><div className={styles.actions}><button className={styles.skip} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "skipped")}>Pass</button><button className={styles.approve} disabled={busyId === job.id || bulkBusy} onClick={() => void decide(job, "approved")}>{busyId === job.id ? "..." : "Smash"}</button></div></td>
                           </tr>
                         );
                       })}
@@ -387,10 +375,28 @@ export default function TrackerPage() {
                 </div>
               </div>
             ) : (
-              <div className={styles.empty}>
-                <h2>{loading ? "Loading tracker..." : "No jobs in the tracker yet"}</h2>
-                <p>Refresh the campaign to run matching and AI review.</p>
+              <div className={styles.empty}><h2>{loading ? "Loading approval queue..." : "No jobs awaiting approval"}</h2><p>New AI-matched jobs will appear here for Pass or Smash.</p></div>
+            )}
+          </section>
+        )}
+
+        {tab === "tracker" && (
+          <section className={styles.trackerSheetSection}>
+            <div className={styles.trackerTitleRow}>
+              <strong>CALSIE TRACKER</strong>
+              <span>{approvedJobs.length} smashed job{approvedJobs.length === 1 ? "" : "s"}</span>
+            </div>
+            {approvedJobs.length > 0 ? (
+              <div className={styles.historyWrap}>
+                <div className={styles.sheetCanvas} style={sheetStyle}>
+                  <table className={`${styles.sheet} ${styles.trackerSheet}`}>
+                    <thead><tr><th className={styles.companyColumn}>Company</th><th className={styles.linkColumn}>URL</th><th className={styles.descriptionColumn}>Description</th><th className={styles.dateColumn}>Smashed at</th></tr></thead>
+                    <tbody>{approvedJobs.map((job) => <tr key={job.match_id || job.id}><td className={styles.companyCell}><strong>{job.company || "Unknown company"}</strong></td><td>{job.apply_url ? <a className={styles.cleanLink} href={job.apply_url} target="_blank" rel="noreferrer">Open job</a> : "—"}</td><td className={styles.descriptionCell}><strong>{job.title || "Untitled job"}</strong><small>{shortDescription(job.description)}</small></td><td>{formatDate(job.created_at)}</td></tr>)}</tbody>
+                  </table>
+                </div>
               </div>
+            ) : (
+              <div className={styles.empty}><h2>{loading ? "Loading tracker..." : "No smashed jobs in the tracker yet"}</h2><p>Jobs appear here only after you press Smash in Approve Jobs.</p></div>
             )}
           </section>
         )}
@@ -400,7 +406,7 @@ export default function TrackerPage() {
             <div className={styles.sheetCanvas} style={sheetStyle}>
               <table className={styles.sheet}>
                 <thead><tr><th className={styles.rowNumber}>#</th><th className={styles.companyColumn}>Company</th><th className={styles.titleColumn}>Job title</th><th className={styles.locationColumn}>Location</th><th>Status</th><th className={styles.dateColumn}>Added</th><th className={styles.linkColumn}>Link</th></tr></thead>
-                <tbody>{legacyJobs.map((job, index) => <tr key={job.id}><td className={styles.rowNumber}>{index + 1}</td><td className={styles.companyCell}><strong>{job.company || "Unknown"}</strong></td><td className={styles.titleCell}><strong>{job.title || "Untitled"}</strong></td><td>{job.location || "—"}</td><td>{job.status || "new"}</td><td>{formatDate(job.created_at)}</td><td>{job.apply_url ? <a className={styles.openLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td></tr>)}</tbody>
+                <tbody>{legacyJobs.map((job, index) => <tr key={job.id}><td className={styles.rowNumber}>{index + 1}</td><td className={styles.companyCell}><strong>{job.company || "Unknown"}</strong></td><td className={styles.titleCell}><strong>{job.title || "Untitled"}</strong></td><td>{job.location || "—"}</td><td>{job.status || "new"}</td><td>{formatDate(job.created_at)}</td><td>{job.apply_url ? <a className={styles.cleanLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td></tr>)}</tbody>
               </table>
             </div>
             {!loading && legacyJobs.length === 0 && <div className={styles.empty}><h2>No application history yet</h2></div>}
