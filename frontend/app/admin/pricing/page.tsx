@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../../lib/supabaseClient";
 
@@ -167,7 +167,7 @@ export default function AdminPricingPage() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   shell: { minHeight: "100vh", padding: 28, background: "#fffafa", color: "#111", fontFamily: "Arial, Helvetica, sans-serif" },
   header: { maxWidth: 1200, margin: "0 auto 22px" },
   eyebrow: { margin: "0 0 8px", color: "#ff5757", fontSize: 11, fontWeight: 900, letterSpacing: ".14em", textTransform: "uppercase" },
