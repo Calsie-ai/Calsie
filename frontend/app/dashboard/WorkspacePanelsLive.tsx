@@ -144,6 +144,14 @@ export default function WorkspacePanelsLive(props: Props) {
           </section>
           <div className="template-review-checkout">
             <div><span>Campaign template</span><strong>{selected.campaignName || selected.title}</strong><small>Login and template browsing are free.</small></div>
+            <section
+              aria-label="Launch price reduced from 92 dollars to 49 dollars"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: "14px", marginLeft: "auto", whiteSpace: "nowrap" }}
+            >
+              <div style={{ color: "#ff3f4f", fontSize: "30px", fontWeight: 950, lineHeight: 1, textDecoration: "line-through", textDecorationThickness: "3px" }}>$92</div>
+              <div style={{ color: "#111", fontSize: "22px", fontWeight: 500, lineHeight: 1 }}>for now</div>
+              <div style={{ color: "#2f8f2f", fontSize: "30px", fontWeight: 950, lineHeight: 1 }}>$49</div>
+            </section>
             <button className="workspace-primary" disabled={props.busy} onClick={() => props.onUseTemplate(selected)}>{props.busy ? "Preparing campaign..." : "Use this template"}</button>
           </div>
         </div>
