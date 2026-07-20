@@ -1,225 +1,119 @@
-export default function PaymentPage() {
-  const included = [
-    "2-minute guided setup",
-    "Up to 100 opportunities per day",
-    "Up to 1,000 opportunities across 10 days",
-    "AI-tailored resume drafts",
-    "AI-written application emails",
-    "Application tracking dashboard",
-  ];
+"use client";
 
-  const controls = [
-    "Review before anything moves forward",
-    "Approve the jobs you want",
-    "Keep your existing resume details",
-    "Track prepared and applied roles",
-    "Use guided or automated workflow",
-    "Support available when needed",
-  ];
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { getSupabaseClient } from "../../lib/supabaseClient";
+
+type TemplateCheckout = {
+  id: string;
+  title: string;
+  campaign_name: string;
+  role: string;
+  location: string;
+  description: string;
+  price_amount: number;
+  compare_at_price_amount: number | null;
+  currency: string;
+  price_label: string;
+  pricing_features: string[];
+  payment_required: boolean;
+};
+
+function money(amount: number, currency = "aud") {
+  return new Intl.NumberFormat("en-AU", { style: "currency", currency: currency.toUpperCase(), maximumFractionDigits: amount % 100 === 0 ? 0 : 2 }).format(amount / 100);
+}
+
+function CheckoutContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const templateId = searchParams.get("template") || "";
+  const [template, setTemplate] = useState<TemplateCheckout | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => { void load(); }, [templateId]);
+
+  async function load() {
+    setLoading(true);
+    setMessage("");
+    try {
+      const supabase = getSupabaseClient();
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) {
+        router.replace(`/login?next=${encodeURIComponent(`/payment?template=${templateId}`)}`);
+        return;
+      }
+      if (!templateId) {
+        setMessage("Choose a template from Browse Templates before opening checkout.");
+        return;
+      }
+      const { data, error } = await supabase
+        .from("campaign_templates")
+        .select("id,title,campaign_name,role,location,description,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required")
+        .eq("id", templateId)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("This template is unavailable.");
+      setTemplate(data as TemplateCheckout);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load checkout.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <main className="applix-landing" id="top">
       <header className="applix-header">
         <div className="applix-container applix-header-inner">
-          <a className="applix-brand" href="/" aria-label="Applix home">
-            <img src="/applix-logo.svg" alt="" />
-            <span>Applix</span>
-          </a>
-          <nav className="applix-nav" aria-label="Payment navigation">
-            <a href="/#features">Features</a>
-            <a href="/#how-it-works">How it works</a>
-            <a href="/support">Support</a>
-          </nav>
-          <div className="applix-actions">
-            <a className="applix-button applix-button--subtle" href="/">
-              Back home
-            </a>
-          </div>
+          <a className="applix-brand" href="/" aria-label="Calsie Jobs home"><img src="/applix-logo.svg" alt="" /><span>Calsie | Jobs</span></a>
+          <nav className="applix-nav" aria-label="Checkout navigation"><a href="/dashboard">Dashboard</a><a href="/support">Support</a></nav>
+          <div className="applix-actions"><a className="applix-button applix-button--subtle" href="/dashboard">Back to templates</a></div>
         </div>
       </header>
 
       <section style={{ padding: "72px 20px 88px" }} aria-labelledby="payment-title">
-        <div className="applix-container">
-          <div style={{ textAlign: "center", maxWidth: "720px", margin: "0 auto 44px" }}>
-            <p className="applix-eyebrow">Simple, transparent pricing</p>
-            <h1 id="payment-title" style={{ marginBottom: "12px" }}>
-              One clear Applix plan
-            </h1>
-            <p className="applix-hero-copy" style={{ margin: "0 auto" }}>
-              Everything you need to prepare, review, and track job applications in one controlled workflow.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              alignItems: "stretch",
-              maxWidth: "1120px",
-              margin: "0 auto",
-            }}
-          >
-            <article
-              style={{
-                border: "1px solid rgba(17,17,17,0.18)",
-                padding: "34px 28px 26px",
-                background: "#ffffff",
-                display: "flex",
-                flexDirection: "column",
-                minHeight: "520px",
-              }}
-            >
-              <div>
-                <p className="applix-eyebrow">Included</p>
-                <h2 style={{ fontSize: "30px", margin: "8px 0 8px" }}>Complete workflow</h2>
-                <p style={{ marginTop: 0 }}>
-                  The tools and limits already included in the current Applix plan.
-                </p>
-              </div>
-
-              <div style={{ marginTop: "28px", display: "grid", gap: "16px" }}>
-                {included.map((item) => (
-                  <div key={item} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                    <span aria-hidden="true">✓</span>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-
-              <a
-                className="applix-button"
-                href="/#features"
-                style={{ marginTop: "auto", justifyContent: "center", width: "100%" }}
-              >
-                View features
-              </a>
-            </article>
-
-            <article
-              style={{
-                border: "1px solid #111111",
-                padding: "28px 28px 26px",
-                background: "#111111",
-                color: "#ffffff",
-                display: "flex",
-                flexDirection: "column",
-                minHeight: "560px",
-                transform: "translateY(-14px)",
-                boxShadow: "0 22px 60px rgba(0,0,0,0.18)",
-                position: "relative",
-                zIndex: 2,
-              }}
-            >
-              <div>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    border: "1px solid rgba(255,255,255,0.65)",
-                    padding: "5px 10px",
-                    fontSize: "11px",
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                    marginBottom: "18px",
-                  }}
-                >
-                  Current plan
-                </span>
-                <h2 style={{ fontSize: "30px", margin: "0 0 8px" }}>Applix Plan</h2>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "8px", margin: "8px 0 10px" }}>
-                  <strong style={{ fontSize: "54px", lineHeight: 1 }}>A$20</strong>
-                  <span style={{ opacity: 0.75 }}>AUD</span>
+        <div className="applix-container" style={{ maxWidth: 980 }}>
+          {loading ? <p>Loading template checkout...</p> : null}
+          {message ? <div style={{ padding: 16, border: "1px solid #ff9ca5", background: "#fff0f2", fontWeight: 800 }}>{message}</div> : null}
+          {template ? (
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(300px,.8fr)", gap: 24, alignItems: "start" }}>
+              <article style={{ border: "1px solid #ddd", background: "#fff", padding: 30 }}>
+                <p className="applix-eyebrow">Selected campaign template</p>
+                <h1 id="payment-title" style={{ margin: "8px 0 14px" }}>{template.campaign_name || template.title}</h1>
+                <p style={{ color: "#555", lineHeight: 1.7 }}>{template.description}</p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12, margin: "24px 0" }}>
+                  <div><span style={{ color: "#777" }}>Target role</span><br /><strong>{template.role}</strong></div>
+                  <div><span style={{ color: "#777" }}>Location</span><br /><strong>{template.location}</strong></div>
                 </div>
-                <p style={{ marginTop: 0, opacity: 0.78 }}>
-                  One-time payment for the current 10-day application campaign workflow.
-                </p>
-              </div>
+                <h2>Included features</h2>
+                <div style={{ display: "grid", gap: 12 }}>
+                  {(template.pricing_features || []).map((feature) => <div key={feature}>✓ {feature}</div>)}
+                </div>
+              </article>
 
-              <div style={{ marginTop: "28px", display: "grid", gap: "16px" }}>
-                {included.map((item) => (
-                  <div key={item} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                    <span aria-hidden="true">✓</span>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-
-              <a
-                href="/dashboard"
-                style={{
-                  marginTop: "auto",
-                  width: "100%",
-                  minHeight: "48px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "#ffffff",
-                  color: "#111111",
-                  textDecoration: "none",
-                  fontWeight: 700,
-                  padding: "0 18px",
-                }}
-              >
-                Continue to Applix
-              </a>
-            </article>
-
-            <article
-              style={{
-                border: "1px solid rgba(17,17,17,0.18)",
-                padding: "34px 28px 26px",
-                background: "#ffffff",
-                display: "flex",
-                flexDirection: "column",
-                minHeight: "520px",
-              }}
-            >
-              <div>
-                <p className="applix-eyebrow">Control</p>
-                <h2 style={{ fontSize: "30px", margin: "8px 0 8px" }}>You stay in charge</h2>
-                <p style={{ marginTop: 0 }}>
-                  The plan keeps review, approval, and tracking visible throughout the process.
-                </p>
-              </div>
-
-              <div style={{ marginTop: "28px", display: "grid", gap: "16px" }}>
-                {controls.map((item) => (
-                  <div key={item} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                    <span aria-hidden="true">✓</span>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-
-              <a
-                className="applix-button"
-                href="/support"
-                style={{ marginTop: "auto", justifyContent: "center", width: "100%" }}
-              >
-                Contact support
-              </a>
-            </article>
-          </div>
-
-          <p style={{ textAlign: "center", marginTop: "28px", fontSize: "13px", opacity: 0.68 }}>
-            Stripe checkout is not connected yet. This update changes the page layout only.
-          </p>
+              <aside style={{ border: "1px solid #111", background: "#111", color: "#fff", padding: 28, position: "sticky", top: 24 }}>
+                <p style={{ margin: 0, opacity: .7 }}>Template price</p>
+                <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: 10, margin: "16px 0" }}>
+                  {template.compare_at_price_amount ? <span style={{ textDecoration: "line-through", color: "#ff8b95", fontSize: 24 }}>{money(template.compare_at_price_amount, template.currency)}</span> : null}
+                  <strong style={{ fontSize: 54 }}>{money(template.price_amount, template.currency)}</strong>
+                </div>
+                <p style={{ opacity: .75 }}>{template.price_label}</p>
+                <p style={{ lineHeight: 1.6 }}>Login and browsing were free. Payment is requested only for this selected campaign template.</p>
+                <button type="button" disabled style={{ width: "100%", minHeight: 52, marginTop: 18, background: "#fff", color: "#111", border: 0, fontWeight: 900, opacity: .7 }}>
+                  Secure payment coming next
+                </button>
+                <small style={{ display: "block", marginTop: 12, opacity: .65 }}>No charge is taken yet. Stripe checkout is not connected in this branch.</small>
+              </aside>
+            </div>
+          ) : null}
         </div>
       </section>
-
-      <footer className="applix-footer">
-        <div className="applix-container applix-footer-inner">
-          <div className="applix-footer-brand">
-            <strong>Applix</strong>
-            <p>AI-powered job application support for modern job seekers.</p>
-          </div>
-          <nav className="applix-footer-links" aria-label="Footer navigation">
-            <a href="/privacy">Privacy</a>
-            <a href="/terms">Terms</a>
-            <a href="/contact">Contact</a>
-            <a href="/support">Support</a>
-          </nav>
-        </div>
-      </footer>
     </main>
   );
+}
+
+export default function PaymentPage() {
+  return <Suspense fallback={<main style={{ padding: 40 }}>Loading checkout...</main>}><CheckoutContent /></Suspense>;
 }
