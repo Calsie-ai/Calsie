@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import OverviewDashboard from "./OverviewDashboard";
+import ResumePreviewPanel from "./ResumePreviewPanel";
 import WorkspacePanels from "./WorkspacePanels";
 import { isCampaignRunning, type CampaignTemplate } from "./workspace-data";
 
@@ -97,6 +98,10 @@ export default function WorkspacePanelsLive(props: Props) {
 
   if (props.active === "overview") {
     return <OverviewDashboard campaign={props.campaign} purchasedTemplate={props.purchasedTemplate} resumeReady={props.resumeReady} resumeName={props.resumeName} gmailReady={props.gmailReady} approvedCount={props.approvedCount} passedCount={props.passedCount} onOpenTracker={props.onOpenTracker} />;
+  }
+
+  if (props.active === "resume") {
+    return <ResumePreviewPanel resumeReady={props.resumeReady} resumeName={props.resumeName} busy={props.busy} onResumeUpload={props.onResumeUpload} />;
   }
 
   if (props.active === "approve" || props.active === "tracker") {
