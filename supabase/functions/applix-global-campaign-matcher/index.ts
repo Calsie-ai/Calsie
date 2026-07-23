@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 type Row = Record<string, any>;
 
+const VERSION = "shared_catalogue_mixed_fallback_v3";
 const URL = Deno.env.get("SUPABASE_URL") || "";
 const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("APPLIX_SERVICE_ROLE_KEY") || "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
@@ -78,6 +79,7 @@ Deno.serve(async (req) => {
         ok: true,
         skipped: true,
         function: "applix-global-campaign-matcher",
+        version: VERSION,
         reason: "daily_global_fetch_not_completed",
         run_date: runDate,
         batch_key: batchKey,
@@ -100,6 +102,7 @@ Deno.serve(async (req) => {
       return reply({
         ok: false,
         function: "applix-global-campaign-matcher",
+        version: VERSION,
         error: "Daily fetch completed but no catalogue jobs are linked to its fetch_run_id",
         run_date: runDate,
         fetch_run_id: dailyFetch.data.id,
@@ -117,7 +120,7 @@ Deno.serve(async (req) => {
       return reply({
         ok: true,
         function: "applix-global-campaign-matcher",
-        version: "shared_catalogue_batch_v2",
+        version: VERSION,
         claimed: 0,
         catalogue_jobs: jobIds.length,
         complete_for_now: true,
@@ -162,7 +165,7 @@ Deno.serve(async (req) => {
             .update({
               ai_status: "completed",
               ai_verdict: "pass",
-              ai_model: "deterministic_global_v2",
+              ai_model: "deterministic_global_v3",
               ai_prompt_version: "none",
               ai_confidence: 1,
               ai_reason: "Passed deterministic campaign filters in the shared daily catalogue",
@@ -179,11 +182,12 @@ Deno.serve(async (req) => {
           campaign_id: campaignId,
           orchestrator_run_id: runId,
           daily_target: target,
+          include_company_fallback: true,
         });
 
-        const fresh = Number(selected.selected_count || 0);
-        const fallback = Number(selected.selected_pool_contact_count || 0);
-        const total = Math.min(target, fresh + fallback);
+        const fresh = Number(selected.selected_job_count || 0);
+        const fallback = Number(selected.selected_company_count || 0);
+        const total = Math.min(target, Number(selected.selected_count || fresh + fallback));
         const now = new Date().toISOString();
 
         const finished = await db.from("orchestrator_runs").update({
@@ -196,25 +200,33 @@ Deno.serve(async (req) => {
             catalogue_jobs_considered: jobIds.length,
             deterministic_eligible: Number(matched.eligible || 0),
             selected_jobs: fresh,
-            selected_pool_contacts: fallback,
+            selected_company_opportunities: fallback,
             combined_selected: total,
             shortage_after_fallback: Math.max(0, target - total),
             fallback_used: fallback > 0,
           },
           stage_results: {
-            mode: "shared_global_catalogue",
+            mode: "shared_global_catalogue_mixed_fallback",
             daily_fetch: dailyFetch.data,
             matching: matched,
             final_selection: selected,
           },
           completed_at: now,
           heartbeat_at: now,
-          last_error: total > 0 ? null : "No suitable fresh jobs or unused verified fallback contacts",
+          last_error: total > 0 ? null : "No suitable fresh jobs or unused official provider contacts",
           updated_at: now,
         }).eq("id", runId);
         if (finished.error) throw new Error(finished.error.message);
 
-        results.push({ campaign_id: campaignId, run_id: runId, ok: true, fresh, fallback, total });
+        results.push({
+          campaign_id: campaignId,
+          run_id: runId,
+          ok: true,
+          fresh,
+          fallback,
+          total,
+          target_reached: total >= target,
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const now = new Date().toISOString();
@@ -234,18 +246,19 @@ Deno.serve(async (req) => {
     return reply({
       ok: allOk,
       function: "applix-global-campaign-matcher",
-      version: "shared_catalogue_batch_v2",
+      version: VERSION,
       run_date: runDate,
       fetch_run_id: dailyFetch.data.id,
       claimed: runs.length,
       catalogue_jobs: jobIds.length,
       results,
+      sends_emails_now: false,
     }, allOk ? 200 : 207);
   } catch (error) {
     return reply({
       ok: false,
       function: "applix-global-campaign-matcher",
-      version: "shared_catalogue_batch_v2",
+      version: VERSION,
       error: error instanceof Error ? error.message : String(error),
     }, 500);
   }
