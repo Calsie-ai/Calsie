@@ -17,11 +17,7 @@ function text(value: unknown) {
 }
 
 function normalized(value: unknown) {
-  return text(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return text(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function list(value: unknown): string[] {
@@ -39,17 +35,10 @@ function freshDate(job: Row) {
 function locationMatches(jobLocation: unknown, campaignLocation: unknown) {
   const location = normalized(jobLocation);
   const targetLocation = normalized(campaignLocation);
-
   if (!targetLocation) return true;
   if (!location) return false;
   if (location.includes(targetLocation) || targetLocation.includes(location)) return true;
-
-  // Campaigns targeting Sydney commonly receive suburb-level locations such as
-  // Parramatta NSW, Blacktown NSW, Auburn NSW, or North Sydney NSW.
-  const targetIsSydneyNsw = targetLocation.includes("sydney") && targetLocation.includes("nsw");
-  if (targetIsSydneyNsw && location.includes("nsw")) return true;
-
-  return false;
+  return targetLocation.includes("sydney") && targetLocation.includes("nsw") && location.includes("nsw");
 }
 
 function evaluate(job: Row, plan: Row) {
@@ -65,35 +54,19 @@ function evaluate(job: Row, plan: Row) {
 
   const freshnessSource = freshDate(job);
   if (!freshnessSource) rejectionReasons.push("missing_freshness_date");
-
   const freshness = freshnessSource ? new Date(freshnessSource) : null;
-  if (freshness && Number.isNaN(freshness.getTime())) {
-    rejectionReasons.push("invalid_freshness_date");
-  }
-  if (
-    freshness &&
-    freshness.getTime() < Date.now() - Number(plan.catalogue_age_days || 30) * 86400000
-  ) {
+  if (freshness && Number.isNaN(freshness.getTime())) rejectionReasons.push("invalid_freshness_date");
+  if (freshness && freshness.getTime() < Date.now() - Number(plan.catalogue_age_days || 30) * 86400000) {
     rejectionReasons.push("older_than_catalogue_window");
   }
-
   if (["expired", "closed", "invalid"].includes(text(job.catalogue_status).toLowerCase())) {
     rejectionReasons.push(`catalogue_${text(job.catalogue_status).toLowerCase()}`);
   }
-
-  if (!locationMatches(job.location, plan.location)) {
-    rejectionReasons.push("location_mismatch");
-  }
-
-  if (containsPhrase(title, excludeTitles)) {
-    rejectionReasons.push("excluded_title");
-  }
+  if (!locationMatches(job.location, plan.location)) rejectionReasons.push("location_mismatch");
+  if (containsPhrase(title, excludeTitles)) rejectionReasons.push("excluded_title");
 
   const targetRole = normalized(plan.target_role);
-  const includedTitle =
-    containsPhrase(title, includeTitles) ||
-    Boolean(targetRole && title.includes(targetRole));
-
+  const includedTitle = containsPhrase(title, includeTitles) || Boolean(targetRole && title.includes(targetRole));
   if (!includedTitle) rejectionReasons.push("title_family_mismatch");
 
   if (rejectionReasons.length) {
@@ -112,30 +85,16 @@ function evaluate(job: Row, plan: Row) {
 
   const titleScore = containsPhrase(title, includeTitles) ? 40 : 32;
   matchedRules.push(containsPhrase(title, includeTitles) ? "included_title" : "target_role_title");
-
   const locationScore = targetLocation ? 20 : 10;
   if (targetLocation) matchedRules.push("location_match");
-
-  const experienceScore = /senior|lead|principal|manager|director|head|chief|cfo|controller/.test(title)
-    ? 0
-    : 15;
+  const experienceScore = /senior|lead|principal|manager|director|head|chief|cfo|controller/.test(title) ? 0 : 15;
   if (experienceScore) matchedRules.push("entry_or_unspecified_seniority");
 
-  const roleTokens = [
-    ...includeTitles,
-    text(plan.target_role),
-    ...list(plan.description_keywords),
-  ]
+  const roleTokens = [...includeTitles, text(plan.target_role), ...list(plan.description_keywords)]
     .flatMap((value) => normalized(value).split(" "))
     .filter((value) => value.length >= 4);
-
-  const descriptionHits = [...new Set(roleTokens)].filter((token) =>
-    description.includes(token)
-  ).length;
-
-  const descriptionScore = descriptionHits
-    ? Math.min(15, 5 + descriptionHits * 2)
-    : 0;
+  const descriptionHits = [...new Set(roleTokens)].filter((token) => description.includes(token)).length;
+  const descriptionScore = descriptionHits ? Math.min(15, 5 + descriptionHits * 2) : 0;
   if (descriptionScore) matchedRules.push("description_relevance");
 
   let jobTypeScore = 10;
@@ -144,10 +103,8 @@ function evaluate(job: Row, plan: Row) {
     if (jobTypeScore) matchedRules.push("job_type_match");
   }
 
-  const matchScore =
-    titleScore + locationScore + experienceScore + descriptionScore + jobTypeScore;
+  const matchScore = titleScore + locationScore + experienceScore + descriptionScore + jobTypeScore;
   const eligible = matchScore >= Number(plan.minimum_match_score || 70);
-
   return {
     filter_status: eligible ? "eligible" : "rejected",
     match_score: matchScore,
@@ -164,9 +121,7 @@ function evaluate(job: Row, plan: Row) {
 Deno.serve(async (req) => {
   try {
     if (req.method !== "POST") return reply({ ok: false, error: "Use POST" }, 405);
-    if (!SUPABASE_URL || !SERVICE_KEY) {
-      return reply({ ok: false, error: "Missing Supabase service configuration" }, 500);
-    }
+    if (!SUPABASE_URL || !SERVICE_KEY) return reply({ ok: false, error: "Missing Supabase service configuration" }, 500);
     if ((req.headers.get("authorization") || "") !== `Bearer ${SERVICE_KEY}`) {
       return reply({ ok: false, error: "Service-role authorization required" }, 401);
     }
@@ -175,127 +130,100 @@ Deno.serve(async (req) => {
     const campaignId = text(input.campaign_id);
     const runId = text(input.orchestrator_run_id);
     const plan = input.search_plan as Row;
-
     if (!campaignId || !runId || !plan) {
-      return reply(
-        {
-          ok: false,
-          error: "campaign_id, orchestrator_run_id and search_plan are required",
-        },
-        400,
-      );
+      return reply({ ok: false, error: "campaign_id, orchestrator_run_id and search_plan are required" }, 400);
     }
 
     const requestedIds = list(input.job_ids);
     const limit = Math.max(1, Math.min(500, Number(input.limit || 300)));
     const ageDays = Math.max(1, Math.min(30, Number(plan.catalogue_age_days || 30)));
     const cutoff = new Date(Date.now() - ageDays * 86400000).toISOString();
-
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
-      auth: { persistSession: false },
-    });
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
     let query = supabase
       .from("jobs")
-      .select(
-        "id,title,company,location,description,job_type,posted_at,fetched_at,created_at,expires_at,catalogue_status,source,apply_url",
-      )
+      .select("id,title,company,location,description,job_type,posted_at,fetched_at,created_at,expires_at,catalogue_status,source,apply_url")
       .is("user_id", null)
       .is("campaign_id", null)
       .not("catalogue_status", "in", "(expired,closed,invalid)");
 
-    if (requestedIds.length) {
-      query = query.in("id", requestedIds);
-    } else {
+    if (requestedIds.length) query = query.in("id", requestedIds);
+    else {
       query = query
-        .or(
-          `posted_at.gte.${cutoff},and(posted_at.is.null,fetched_at.gte.${cutoff}),and(posted_at.is.null,fetched_at.is.null,created_at.gte.${cutoff})`,
-        )
+        .or(`posted_at.gte.${cutoff},and(posted_at.is.null,fetched_at.gte.${cutoff}),and(posted_at.is.null,fetched_at.is.null,created_at.gte.${cutoff})`)
         .limit(limit);
     }
 
     const jobsResult = await query;
     if (jobsResult.error) return reply({ ok: false, error: jobsResult.error.message }, 500);
+    const jobs = jobsResult.data || [];
+    const jobIds = jobs.map((job: Row) => job.id);
 
-    const evaluated = (jobsResult.data || []).map((job: Row) => ({
-      job,
-      result: evaluate(job, plan),
-    }));
+    const existingMap = new Map<string, Row>();
+    if (jobIds.length) {
+      const existing = await supabase
+        .from("campaign_job_matches")
+        .select("job_id,ai_status,filter_status,selected_for_campaign,selected_at")
+        .eq("campaign_id", campaignId)
+        .in("job_id", jobIds);
+      if (existing.error) return reply({ ok: false, error: existing.error.message }, 500);
+      for (const row of existing.data || []) existingMap.set(row.job_id, row);
+    }
 
     let eligible = 0;
     let rejected = 0;
     const eligibleJobIds: string[] = [];
     const rejectedJobIds: string[] = [];
+    const now = new Date().toISOString();
 
-    for (const item of evaluated) {
-      if (item.result.filter_status === "eligible") {
+    const rows = jobs.map((job: Row) => {
+      const result = evaluate(job, plan);
+      if (result.filter_status === "eligible") {
         eligible += 1;
-        eligibleJobIds.push(item.job.id);
+        eligibleJobIds.push(job.id);
       } else {
         rejected += 1;
-        rejectedJobIds.push(item.job.id);
+        rejectedJobIds.push(job.id);
       }
 
-      const existing = await supabase
-        .from("campaign_job_matches")
-        .select("ai_status,filter_status,selected_for_campaign,selected_at")
-        .eq("campaign_id", campaignId)
-        .eq("job_id", item.job.id)
-        .maybeSingle();
-
-      if (existing.error) return reply({ ok: false, error: existing.error.message }, 500);
-
-      const hasCompletedAi = existing.data?.ai_status === "completed";
+      const current = existingMap.get(job.id);
       const payload: Row = {
         campaign_id: campaignId,
-        job_id: item.job.id,
+        job_id: job.id,
         orchestrator_run_id: runId,
-        ...item.result,
-        selected_for_campaign: Boolean(existing.data?.selected_for_campaign),
-        selected_at: existing.data?.selected_at || null,
-        last_evaluated_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        ...result,
+        selected_for_campaign: Boolean(current?.selected_for_campaign),
+        selected_at: current?.selected_at || null,
+        last_evaluated_at: now,
+        updated_at: now,
       };
-
-      if (hasCompletedAi) {
-        payload.filter_status = existing.data?.filter_status || item.result.filter_status;
-      } else {
-        payload.ai_status = item.result.filter_status === "eligible" ? "pending" : "skipped";
+      if (current?.ai_status === "completed") payload.filter_status = current.filter_status || result.filter_status;
+      else {
+        payload.ai_status = result.filter_status === "eligible" ? "pending" : "skipped";
         payload.ai_last_error = null;
       }
+      return payload;
+    });
 
-      const upsert = await supabase
-        .from("campaign_job_matches")
-        .upsert(payload, { onConflict: "campaign_id,job_id" });
-
-      if (upsert.error) {
-        return reply(
-          { ok: false, error: upsert.error.message, job_id: item.job.id },
-          500,
-        );
-      }
+    if (rows.length) {
+      const upsert = await supabase.from("campaign_job_matches").upsert(rows, { onConflict: "campaign_id,job_id" });
+      if (upsert.error) return reply({ ok: false, error: upsert.error.message }, 500);
     }
 
     return reply({
       ok: true,
       function: "match-campaign-jobs",
+      version: "bulk_match_v2",
       campaign_id: campaignId,
       orchestrator_run_id: runId,
       requested_job_count: requestedIds.length,
-      catalogue_checked: evaluated.length,
+      catalogue_checked: jobs.length,
       eligible,
       rejected,
       eligible_job_ids: eligibleJobIds,
       rejected_job_ids: rejectedJobIds,
     });
   } catch (error) {
-    return reply(
-      {
-        ok: false,
-        function: "match-campaign-jobs",
-        error: error instanceof Error ? error.message : String(error),
-      },
-      500,
-    );
+    return reply({ ok: false, function: "match-campaign-jobs", error: error instanceof Error ? error.message : String(error) }, 500);
   }
 });
