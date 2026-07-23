@@ -2,9 +2,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 type Row = Record<string, any>;
 
+const VERSION = "mixed_24_opportunities_v1";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("APPLIX_SERVICE_ROLE_KEY") || "";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
+const INTERNAL_SECRET = Deno.env.get("APPLIX_INTERNAL_SECRET") || "";
 const ACTIVE_STATUSES = new Set(["active", "launched", "scheduled"]);
 const ATTEMPTS = [
   { number: 1, calls: [100] },
@@ -35,18 +37,25 @@ function authorized(req: Request) {
 }
 
 async function callFunction(name: string, body: Row) {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    authorization: `Bearer ${SERVICE_KEY}`,
+    apikey: SERVICE_KEY,
+  };
+  if (INTERNAL_SECRET) headers["x-applix-internal-secret"] = INTERNAL_SECRET;
+
   const response = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${SERVICE_KEY}`,
-      apikey: SERVICE_KEY,
-    },
+    headers,
     body: JSON.stringify(body),
   });
   const raw = await response.text().catch(() => "");
   let payload: Row = {};
-  try { payload = raw ? JSON.parse(raw) : {}; } catch { payload = { raw }; }
+  try {
+    payload = raw ? JSON.parse(raw) : {};
+  } catch {
+    payload = { raw };
+  }
   return { ok: response.ok && payload.ok !== false, status: response.status, payload };
 }
 
@@ -74,6 +83,7 @@ async function loadOrCreateRun(supabase: ReturnType<typeof createClient>, campai
     .maybeSingle();
   if (existing.error) throw new Error(existing.error.message);
   if (existing.data?.id) return existing.data as Row;
+
   const inserted = await supabase
     .from("orchestrator_runs")
     .insert({
@@ -88,7 +98,9 @@ async function loadOrCreateRun(supabase: ReturnType<typeof createClient>, campai
     })
     .select("*")
     .maybeSingle();
-  if (inserted.error || !inserted.data?.id) throw new Error(inserted.error?.message || "Unable to create orchestrator run");
+  if (inserted.error || !inserted.data?.id) {
+    throw new Error(inserted.error?.message || "Unable to create orchestrator run");
+  }
   return inserted.data as Row;
 }
 
@@ -98,21 +110,49 @@ function queryPlan(plan: Row, callIndex: number) {
   return { ...plan, queries: [queries[callIndex % queries.length]] };
 }
 
-async function selectJobs(campaignId: string, runId: string, dailyTarget: number) {
+async function selectOpportunities(
+  campaignId: string,
+  runId: string,
+  dailyTarget: number,
+  includeCompanyFallback = false,
+) {
   const selector = await callFunction("select-daily-job-batch", {
     campaign_id: campaignId,
     orchestrator_run_id: runId,
     daily_target: dailyTarget,
+    include_company_fallback: includeCompanyFallback,
   });
-  if (!selector.ok) throw new Error(`select-daily-job-batch failed: ${JSON.stringify(selector.payload).slice(0, 1200)}`);
+  if (!selector.ok) {
+    throw new Error(`select-daily-job-batch failed: ${JSON.stringify(selector.payload).slice(0, 1200)}`);
+  }
   return selector.payload;
 }
 
-async function judgeAndSelect(campaignId: string, runId: string, jobIds: string[], dailyTarget: number) {
+async function judgeAndSelect(
+  supabase: ReturnType<typeof createClient>,
+  campaignId: string,
+  runId: string,
+  jobIds: string[],
+  dailyTarget: number,
+) {
   const uniqueIds = [...new Set(jobIds)];
-  const summary = { considered: 0, judged: 0, cached: 0, passed: 0, reviewed: 0, rejected: 0, failed: 0, batches: [] as Row[] };
-  let selection: Row = await selectJobs(campaignId, runId, dailyTarget);
-  for (let index = 0; index < uniqueIds.length && Number(selection.selected_count || 0) < dailyTarget; index += 50) {
+  const summary = {
+    considered: 0,
+    judged: 0,
+    cached: 0,
+    passed: 0,
+    reviewed: 0,
+    rejected: 0,
+    failed: 0,
+    batches: [] as Row[],
+  };
+  let selection: Row = await selectOpportunities(campaignId, runId, dailyTarget, false);
+
+  for (let index = 0; index < uniqueIds.length && Number(selection.selected_job_count || 0) < dailyTarget; index += 50) {
+    await updateRun(supabase, runId, {
+      current_stage: "judging_live_jobs",
+      heartbeat_at: new Date().toISOString(),
+    });
     const batch = uniqueIds.slice(index, index + 50);
     const judge = await callFunction("judge-campaign-jobs", {
       campaign_id: campaignId,
@@ -127,7 +167,7 @@ async function judgeAndSelect(campaignId: string, runId: string, jobIds: string[
       summary[key as keyof typeof summary] = Number(summary[key as keyof typeof summary] || 0) + Number(judge.payload[key] || 0) as never;
     }
     summary.batches.push(judge.payload);
-    selection = await selectJobs(campaignId, runId, dailyTarget);
+    selection = await selectOpportunities(campaignId, runId, dailyTarget, false);
   }
   return { summary, selection };
 }
@@ -136,7 +176,9 @@ Deno.serve(async (req) => {
   try {
     if (req.method !== "POST") return reply({ ok: false, error: "Use POST" }, 405);
     if (!authorized(req)) return reply({ ok: false, error: "Unauthorized orchestrator request" }, 401);
-    if (!SUPABASE_URL || !SERVICE_KEY) return reply({ ok: false, error: "Missing Supabase service configuration" }, 500);
+    if (!SUPABASE_URL || !SERVICE_KEY || !INTERNAL_SECRET) {
+      return reply({ ok: false, error: "Missing Supabase service or internal function configuration" }, 500);
+    }
 
     const input = await req.json().catch(() => ({})) as Row;
     const campaignId = text(input.campaign_id);
@@ -156,9 +198,17 @@ Deno.serve(async (req) => {
     if (!campaignResult.data) return reply({ ok: false, error: "Campaign not found" }, 404);
 
     const campaignStatus = text(campaignResult.data.status).toLowerCase();
-    const outreach = campaignResult.data.outreach && typeof campaignResult.data.outreach === "object" ? campaignResult.data.outreach : {};
+    const outreach = campaignResult.data.outreach && typeof campaignResult.data.outreach === "object"
+      ? campaignResult.data.outreach
+      : {};
     if (!ACTIVE_STATUSES.has(campaignStatus) || outreach.active === false) {
-      return reply({ ok: false, skipped: true, reason: "campaign_not_active", campaign_id: campaignId, campaign_status: campaignStatus }, 409);
+      return reply({
+        ok: false,
+        skipped: true,
+        reason: "campaign_not_active",
+        campaign_id: campaignId,
+        campaign_status: campaignStatus,
+      }, 409);
     }
 
     const run = await loadOrCreateRun(supabase, campaignId, input);
@@ -179,7 +229,9 @@ Deno.serve(async (req) => {
       catalogue_age_days: integer(input.catalogue_age_days, 30, 1, 30),
       minimum_match_score: integer(input.minimum_match_score, 70, 0, 100),
     });
-    if (!compiler.ok) throw new Error(`compile-campaign-search-plan failed: ${JSON.stringify(compiler.payload).slice(0, 1200)}`);
+    if (!compiler.ok) {
+      throw new Error(`compile-campaign-search-plan failed: ${JSON.stringify(compiler.payload).slice(0, 1200)}`);
+    }
     const plan = compiler.payload.plan as Row;
 
     const initialMatch = await callFunction("match-campaign-jobs", {
@@ -188,7 +240,9 @@ Deno.serve(async (req) => {
       search_plan: plan,
       limit: integer(input.catalogue_scan_limit, 500, 1, 500),
     });
-    if (!initialMatch.ok) throw new Error(`Initial catalogue match failed: ${JSON.stringify(initialMatch.payload).slice(0, 1200)}`);
+    if (!initialMatch.ok) {
+      throw new Error(`Initial catalogue match failed: ${JSON.stringify(initialMatch.payload).slice(0, 1200)}`);
+    }
 
     if (dryRun) {
       const finalRun = await updateRun(supabase, runId, {
@@ -196,25 +250,43 @@ Deno.serve(async (req) => {
         current_stage: "fetching_jobs",
         completed_at: new Date().toISOString(),
         search_plan: plan,
-        counters: { daily_target: dailyTarget, attempt_limits: [100, 300, 700], catalogue_checked: Number(initialMatch.payload.catalogue_checked || 0) },
-        stage_results: { compile_search_plan: compiler.payload, catalogue_match_before_fetch: initialMatch.payload, retry_plan: ATTEMPTS },
+        counters: {
+          daily_target: dailyTarget,
+          attempt_limits: [100, 300, 700],
+          catalogue_checked: Number(initialMatch.payload.catalogue_checked || 0),
+        },
+        stage_results: {
+          compile_search_plan: compiler.payload,
+          catalogue_match_before_fetch: initialMatch.payload,
+          retry_plan: ATTEMPTS,
+        },
       });
-      return reply({ ok: true, function: "calsie-campaign-orchestrator-v3", dry_run: true, run: finalRun });
+      return reply({ ok: true, function: "calsie-campaign-orchestrator-v3", version: VERSION, dry_run: true, run: finalRun });
     }
 
     const attemptResults: Row[] = [];
     const totals = {
-      raw_requested: 0, raw_fetched: 0, normalized: 0, new_jobs_stored: 0,
-      existing_jobs_updated: 0, duplicates_skipped: 0, deterministic_eligible: 0,
-      ai_considered: 0, ai_judged: 0, ai_cached: 0, ai_passed: 0,
-      ai_reviewed: 0, ai_rejected: 0, ai_failed: 0,
+      raw_requested: 0,
+      raw_fetched: 0,
+      normalized: 0,
+      new_jobs_stored: 0,
+      existing_jobs_updated: 0,
+      duplicates_skipped: 0,
+      deterministic_eligible: 0,
+      ai_considered: 0,
+      ai_judged: 0,
+      ai_cached: 0,
+      ai_passed: 0,
+      ai_reviewed: 0,
+      ai_rejected: 0,
+      ai_failed: 0,
     };
     let callIndex = 0;
-    let selection: Row = await selectJobs(campaignId, runId, dailyTarget);
+    let selection: Row = await selectOpportunities(campaignId, runId, dailyTarget, false);
 
     const initialIds = Array.isArray(initialMatch.payload.eligible_job_ids) ? initialMatch.payload.eligible_job_ids : [];
     if (initialIds.length) {
-      const initialJudge = await judgeAndSelect(campaignId, runId, initialIds, dailyTarget);
+      const initialJudge = await judgeAndSelect(supabase, campaignId, runId, initialIds, dailyTarget);
       selection = initialJudge.selection;
       for (const key of ["considered", "judged", "cached", "passed", "reviewed", "rejected", "failed"]) {
         const targetKey = `ai_${key}` as keyof typeof totals;
@@ -222,11 +294,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    let stopReason = Number(selection.selected_count || 0) >= dailyTarget ? "target_reached_from_catalogue" : "maximum_attempts_reached";
+    let stopReason = Number(selection.selected_job_count || 0) >= dailyTarget
+      ? "live_job_target_reached_from_catalogue"
+      : "maximum_attempts_reached";
 
     for (const attempt of ATTEMPTS) {
-      if (Number(selection.selected_count || 0) >= dailyTarget) break;
-      await updateRun(supabase, runId, { current_stage: `fetch_attempt_${attempt.number}`, heartbeat_at: new Date().toISOString() });
+      if (Number(selection.selected_job_count || 0) >= dailyTarget) break;
+      await updateRun(supabase, runId, {
+        current_stage: `fetch_attempt_${attempt.number}`,
+        heartbeat_at: new Date().toISOString(),
+      });
 
       const fetchedIds: string[] = [];
       const fetchCalls: Row[] = [];
@@ -241,7 +318,9 @@ Deno.serve(async (req) => {
           search_plan: fetchPlan,
           fetch_pool_limit: limit,
         });
-        if (!fetched.ok) throw new Error(`fetch-job-catalogue-v2 failed: ${JSON.stringify(fetched.payload).slice(0, 1600)}`);
+        if (!fetched.ok) {
+          throw new Error(`fetch-job-catalogue-v2 failed: ${JSON.stringify(fetched.payload).slice(0, 1600)}`);
+        }
         fetchCalls.push(fetched.payload);
         totals.raw_requested += limit;
         totals.raw_fetched += Number(fetched.payload.fetched_count || 0);
@@ -256,12 +335,22 @@ Deno.serve(async (req) => {
 
       if (attemptFetched === 0) {
         stopReason = "provider_returned_no_results";
-        attemptResults.push({ attempt: attempt.number, requested: attempt.calls.reduce((a, b) => a + b, 0), fetch_calls: fetchCalls, stop_reason: stopReason });
+        attemptResults.push({
+          attempt: attempt.number,
+          requested: attempt.calls.reduce((a, b) => a + b, 0),
+          fetch_calls: fetchCalls,
+          stop_reason: stopReason,
+        });
         break;
       }
       if (attemptNewUnique === 0 && fetchedIds.length === 0) {
         stopReason = "no_new_unique_jobs";
-        attemptResults.push({ attempt: attempt.number, requested: attempt.calls.reduce((a, b) => a + b, 0), fetch_calls: fetchCalls, stop_reason: stopReason });
+        attemptResults.push({
+          attempt: attempt.number,
+          requested: attempt.calls.reduce((a, b) => a + b, 0),
+          fetch_calls: fetchCalls,
+          stop_reason: stopReason,
+        });
         break;
       }
 
@@ -272,13 +361,24 @@ Deno.serve(async (req) => {
         job_ids: [...new Set(fetchedIds)],
         limit: Math.max(1, fetchedIds.length),
       });
-      if (!matched.ok) throw new Error(`Post-fetch match failed: ${JSON.stringify(matched.payload).slice(0, 1200)}`);
+      if (!matched.ok) {
+        throw new Error(`Post-fetch match failed: ${JSON.stringify(matched.payload).slice(0, 1200)}`);
+      }
       totals.deterministic_eligible += Number(matched.payload.eligible || 0);
 
       const eligibleIds = Array.isArray(matched.payload.eligible_job_ids) ? matched.payload.eligible_job_ids : [];
-      let judgment: Row = { considered: 0, judged: 0, cached: 0, passed: 0, reviewed: 0, rejected: 0, failed: 0, batches: [] };
+      let judgment: Row = {
+        considered: 0,
+        judged: 0,
+        cached: 0,
+        passed: 0,
+        reviewed: 0,
+        rejected: 0,
+        failed: 0,
+        batches: [],
+      };
       if (eligibleIds.length) {
-        const judged = await judgeAndSelect(campaignId, runId, eligibleIds, dailyTarget);
+        const judged = await judgeAndSelect(supabase, campaignId, runId, eligibleIds, dailyTarget);
         judgment = judged.summary;
         selection = judged.selection;
         totals.ai_considered += Number(judgment.considered || 0);
@@ -298,20 +398,36 @@ Deno.serve(async (req) => {
         fetch_calls: fetchCalls,
         match: matched.payload,
         ai_judgment: judgment,
-        selection,
+        live_job_selection: selection,
       });
 
-      if (Number(selection.selected_count || 0) >= dailyTarget) {
-        stopReason = "target_reached";
+      if (Number(selection.selected_job_count || 0) >= dailyTarget) {
+        stopReason = "live_job_target_reached";
         break;
       }
     }
 
-    const selectedCount = Number(selection.selected_count || 0);
+    await updateRun(supabase, runId, {
+      current_stage: "filling_company_opportunities",
+      heartbeat_at: new Date().toISOString(),
+    });
+    const finalSelection = await selectOpportunities(campaignId, runId, dailyTarget, true);
+    const selectedCount = Number(finalSelection.selected_count || 0);
+    const selectedJobCount = Number(finalSelection.selected_job_count || 0);
+    const selectedCompanyCount = Number(finalSelection.selected_company_count || 0);
+    if (selectedCount >= dailyTarget) {
+      stopReason = selectedCompanyCount > 0 ? "daily_target_filled_with_company_opportunities" : "live_job_target_reached";
+    } else if (selectedCount > 0 && selectedCompanyCount > 0) {
+      stopReason = "partial_mixed_batch_ready";
+    } else if (selectedCount > 0) {
+      stopReason = "partial_live_job_batch_ready";
+    }
+
     const finalRun = await updateRun(supabase, runId, {
       status: selectedCount > 0 ? "ready_for_review" : "needs_attention",
       current_stage: selectedCount > 0 ? "ready_for_review" : "failed",
       completed_at: new Date().toISOString(),
+      heartbeat_at: new Date().toISOString(),
       search_plan: plan,
       counters: {
         daily_target: dailyTarget,
@@ -319,7 +435,9 @@ Deno.serve(async (req) => {
         attempt_limits: [100, 300, 700],
         ...totals,
         selected: selectedCount,
-        held_for_later: Number(selection.held_for_later_count || 0),
+        selected_live_jobs: selectedJobCount,
+        selected_company_opportunities: selectedCompanyCount,
+        held_for_later: Number(finalSelection.held_for_later_count || 0),
         shortage_after_attempts: Math.max(0, dailyTarget - selectedCount),
         target_reached: selectedCount >= dailyTarget,
       },
@@ -327,28 +445,33 @@ Deno.serve(async (req) => {
         compile_search_plan: compiler.payload,
         catalogue_match_before_fetch: initialMatch.payload,
         attempts: attemptResults,
-        final_selection: selection,
+        final_selection: finalSelection,
         stop_reason: stopReason,
       },
-      last_error: selectedCount > 0 ? null : `No AI-approved jobs were selected; ${stopReason}`,
+      last_error: selectedCount > 0 ? null : `No review opportunities were selected; ${stopReason}`,
     });
 
     return reply({
       ok: selectedCount > 0,
       function: "calsie-campaign-orchestrator-v3",
-      version: "three_stage_100_300_700_v1",
+      version: VERSION,
       dry_run: false,
       run: finalRun,
-      selected_jobs: selection.selected_jobs || [],
+      selected_count: selectedCount,
+      selected_job_count: selectedJobCount,
+      selected_company_count: selectedCompanyCount,
+      selected_jobs: finalSelection.selected_jobs || [],
+      selected_company_opportunities: finalSelection.selected_pool_contacts || [],
       stop_reason: stopReason,
       sends_emails_now: false,
+      creates_drafts_now: false,
       next_required_stage: selectedCount > 0 ? "user_review" : null,
     }, selectedCount > 0 ? 200 : 422);
   } catch (error) {
     return reply({
       ok: false,
       function: "calsie-campaign-orchestrator-v3",
-      version: "three_stage_100_300_700_v1",
+      version: VERSION,
       error: error instanceof Error ? error.message : String(error),
     }, 500);
   }
