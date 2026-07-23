@@ -1,8 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 type Row = Record<string, any>;
+type PoolKey = "disability" | "aged_care";
 
-const VERSION = "mixed_daily_opportunities_v2";
+const VERSION = "template_industry_pools_v3";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("APPLIX_SERVICE_ROLE_KEY") || "";
 const INTERNAL_SECRET = Deno.env.get("APPLIX_INTERNAL_SECRET") || "";
@@ -30,7 +31,7 @@ function isSydneyPostcode(value: unknown) {
   );
 }
 
-function serviceScore(categories: unknown) {
+function disabilityServiceScore(categories: unknown) {
   const joined = list(categories).join(" ").toLowerCase();
   const groups = [
     /daily personal|personal activit|personal care|self care/,
@@ -44,13 +45,22 @@ function serviceScore(categories: unknown) {
   return Math.min(35, groups.filter((pattern) => pattern.test(joined)).length * 7);
 }
 
-function joined(row: Row, key: string) {
-  const value = row[key];
-  return Array.isArray(value) ? value[0] : value;
+function agedCareServiceScore(categories: unknown) {
+  const joined = list(categories).join(" ").toLowerCase();
+  const groups = [
+    /residential aged care|residential care|nursing home/,
+    /home care|in home care|home support/,
+    /personal care|activities of daily living|daily living/,
+    /dementia|memory support/,
+    /respite/,
+    /domestic assistance|household assistance/,
+    /social support|community support|companionship/,
+  ];
+  return Math.min(35, groups.filter((pattern) => pattern.test(joined)).length * 7);
 }
 
 function selectedJob(row: Row) {
-  const job = joined(row, "jobs");
+  const job = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs;
   return {
     review_id: row.id,
     opportunity_type: "live_job",
@@ -66,19 +76,54 @@ function selectedJob(row: Row) {
 }
 
 function selectedCompany(row: Row) {
-  const contact = joined(row, "company_contacts_pool");
+  const contact = row.contact || {};
   return {
     review_id: row.id,
     opportunity_type: "direct_company",
+    pool_key: row.pool_key,
     pool_contact_id: row.contact_id,
-    company_name: contact?.company_name || null,
-    company_website_url: contact?.company_website_url || null,
-    email: contact?.email || null,
-    service_categories: contact?.ndis_service_categories || [],
-    service_postcodes: contact?.service_postcodes || [],
+    company_name: contact.company_name || null,
+    company_website_url: contact.company_website_url || null,
+    email: contact.email || null,
+    service_categories: contact.service_categories || [],
+    service_postcodes: contact.service_postcodes || [],
     total_score: row.total_score ?? null,
     ai_reason: row.ai_reason || null,
   };
+}
+
+function poolTable(poolKey: PoolKey) {
+  return poolKey === "aged_care"
+    ? "aged_care_company_contacts_pool"
+    : "disability_company_contacts_pool";
+}
+
+function normaliseContact(poolKey: PoolKey, row: Row) {
+  return {
+    ...row,
+    service_categories: poolKey === "aged_care"
+      ? list(row.aged_care_service_categories)
+      : list(row.ndis_service_categories),
+    service_postcodes: list(row.service_postcodes),
+  };
+}
+
+async function attachContacts(supabase: ReturnType<typeof createClient>, candidates: Row[]) {
+  const result = candidates.map((candidate) => ({ ...candidate, contact: null as Row | null }));
+  for (const poolKey of ["disability", "aged_care"] as PoolKey[]) {
+    const ids = [...new Set(result.filter((row) => row.pool_key === poolKey).map((row) => row.contact_id).filter(Boolean))];
+    if (!ids.length) continue;
+    const columns = poolKey === "aged_care"
+      ? "id,company_name,company_website_url,email,aged_care_service_categories,service_postcodes"
+      : "id,company_name,company_website_url,email,ndis_service_categories,service_postcodes";
+    const contacts = await supabase.from(poolTable(poolKey)).select(columns).in("id", ids);
+    if (contacts.error) throw new Error(contacts.error.message);
+    const byId = new Map((contacts.data || []).map((row: Row) => [row.id, normaliseContact(poolKey, row)]));
+    for (const candidate of result) {
+      if (candidate.pool_key === poolKey) candidate.contact = byId.get(candidate.contact_id) || null;
+    }
+  }
+  return result.filter((row) => row.contact);
 }
 
 Deno.serve(async (req: Request) => {
@@ -113,6 +158,20 @@ Deno.serve(async (req: Request) => {
       ? campaignResult.data.search as Row
       : {};
     const templateId = text(campaignResult.data.template_id || search.template_id);
+    let poolKey: PoolKey | null = null;
+    if (templateId) {
+      const mapping = await supabase
+        .from("template_company_pool_links")
+        .select("pool_key")
+        .eq("template_id", templateId)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (mapping.error) return reply({ ok: false, error: mapping.error.message }, 500);
+      if (mapping.data?.pool_key === "disability" || mapping.data?.pool_key === "aged_care") {
+        poolKey = mapping.data.pool_key;
+      }
+    }
+
     const runDate = text(runResult.data.run_date);
     const dayStart = `${runDate}T00:00:00.000Z`;
     const dayEnd = new Date(new Date(dayStart).getTime() + 86400000).toISOString();
@@ -133,7 +192,7 @@ Deno.serve(async (req: Request) => {
         .limit(100),
       supabase
         .from("campaign_company_candidates")
-        .select("id,contact_id,total_score,ai_reason,selected_at,company_contacts_pool!inner(company_name,company_website_url,email,ndis_service_categories,service_postcodes)")
+        .select("id,contact_id,pool_key,total_score,ai_reason,selected_at")
         .eq("campaign_id", campaignId)
         .eq("selected_for_campaign", true)
         .gte("selected_at", dayStart)
@@ -145,7 +204,7 @@ Deno.serve(async (req: Request) => {
     if (selectedCompaniesResult.error) return reply({ ok: false, error: selectedCompaniesResult.error.message }, 500);
 
     const alreadyJobs = (selectedJobsResult.data || []) as Row[];
-    const alreadyCompanies = (selectedCompaniesResult.data || []) as Row[];
+    const alreadyCompanies = await attachContacts(supabase, (selectedCompaniesResult.data || []) as Row[]);
     const availableJobSlots = Math.max(0, dailyTarget - alreadyJobs.length - alreadyCompanies.length);
 
     const eligibleResult = await supabase
@@ -192,22 +251,29 @@ Deno.serve(async (req: Request) => {
     let newCompanies: Row[] = [];
     let providerEligibleCount = 0;
 
-    if (includeCompanyFallback && remaining > 0 && templateId) {
-      const [candidateIdsResult, queuedIdsResult, poolResult] = await Promise.all([
-        supabase.from("campaign_company_candidates").select("contact_id").eq("campaign_id", campaignId).limit(10000),
+    if (includeCompanyFallback && remaining > 0 && templateId && poolKey) {
+      const [candidateIdsResult, queuedIdsResult] = await Promise.all([
+        supabase.from("campaign_company_candidates").select("contact_id").eq("campaign_id", campaignId).eq("pool_key", poolKey).limit(10000),
         supabase.from("outreach_queue").select("pool_contact_id").eq("campaign_id", campaignId).not("pool_contact_id", "is", null).limit(10000),
-        supabase
-          .from("company_contacts_pool")
-          .select("id,company_name,company_website_url,email,confidence,last_used_at,use_count,ndis_service_categories,service_states,service_postcodes")
-          .eq("status", "active")
-          .in("quality_status", ["verified", "official_source"])
-          .eq("ndis_active", true)
-          .contains("service_states", ["NSW"])
-          .not("email", "is", null)
-          .limit(5000),
       ]);
       if (candidateIdsResult.error) return reply({ ok: false, error: candidateIdsResult.error.message }, 500);
       if (queuedIdsResult.error) return reply({ ok: false, error: queuedIdsResult.error.message }, 500);
+
+      const columns = poolKey === "aged_care"
+        ? "id,company_name,company_website_url,email,confidence,last_used_at,use_count,aged_care_service_categories,service_states,service_postcodes"
+        : "id,company_name,company_website_url,email,confidence,last_used_at,use_count,ndis_service_categories,service_states,service_postcodes";
+      let poolQuery = supabase
+        .from(poolTable(poolKey))
+        .select(columns)
+        .eq("status", "active")
+        .in("quality_status", ["verified", "official_source"])
+        .contains("service_states", ["NSW"])
+        .not("email", "is", null)
+        .limit(5000);
+      poolQuery = poolKey === "aged_care"
+        ? poolQuery.eq("aged_care_active", true)
+        : poolQuery.eq("ndis_active", true);
+      const poolResult = await poolQuery;
       if (poolResult.error) return reply({ ok: false, error: poolResult.error.message }, 500);
 
       const usedIds = new Set<string>();
@@ -215,19 +281,22 @@ Deno.serve(async (req: Request) => {
       for (const row of queuedIdsResult.data || []) usedIds.add(text(row.pool_contact_id));
 
       const ranked = ((poolResult.data || []) as Row[])
-        .map((contact) => {
-          const postcodes = list(contact.service_postcodes).filter(isSydneyPostcode);
-          const supportScore = serviceScore(contact.ndis_service_categories);
+        .map((rawContact) => {
+          const contact = normaliseContact(poolKey, rawContact);
+          const postcodes = contact.service_postcodes.filter(isSydneyPostcode);
+          const industryScore = poolKey === "aged_care"
+            ? agedCareServiceScore(contact.service_categories)
+            : disabilityServiceScore(contact.service_categories);
           const totalScore = Math.min(100,
-            supportScore +
+            industryScore +
             (postcodes.length ? 30 : 0) +
             (contact.email ? 15 : 0) +
             (contact.company_website_url ? 10 : 0) +
             (contact.last_used_at ? 5 : 10)
           );
-          return { contact, postcodes, supportScore, totalScore };
+          return { contact, postcodes, industryScore, totalScore };
         })
-        .filter((item) => !usedIds.has(text(item.contact.id)) && item.postcodes.length > 0 && item.supportScore > 0)
+        .filter((item) => !usedIds.has(text(item.contact.id)) && item.postcodes.length > 0 && item.industryScore > 0)
         .sort((a, b) =>
           b.totalScore - a.totalScore ||
           Number(a.contact.use_count || 0) - Number(b.contact.use_count || 0) ||
@@ -240,15 +309,18 @@ Deno.serve(async (req: Request) => {
         const rows = chosen.map((item) => ({
           campaign_id: campaignId,
           contact_id: item.contact.id,
+          pool_key: poolKey,
           orchestrator_run_id: runId,
           template_id: templateId,
           opportunity_type: "direct_company",
-          template_score: item.supportScore,
+          template_score: item.industryScore,
           location_score: 30,
-          service_score: item.supportScore,
+          service_score: item.industryScore,
           total_score: item.totalScore,
           location_reason: `Serves Greater Sydney (${item.postcodes.slice(0, 6).join(", ")})`,
-          ai_reason: "NDIS provider serves Greater Sydney and offers support-worker-relevant services. Verified company email available.",
+          ai_reason: poolKey === "aged_care"
+            ? "Aged care provider serves Greater Sydney and offers aged-care-relevant services. Verified company email available."
+            : "Disability provider serves Greater Sydney and offers support-worker-relevant services. Verified company email available.",
           selected_for_campaign: true,
           selected_at: now,
           user_decision: null,
@@ -257,10 +329,10 @@ Deno.serve(async (req: Request) => {
         }));
         const result = await supabase
           .from("campaign_company_candidates")
-          .upsert(rows, { onConflict: "campaign_id,contact_id" })
-          .select("id,contact_id,total_score,ai_reason,selected_at,company_contacts_pool!inner(company_name,company_website_url,email,ndis_service_categories,service_postcodes)");
+          .upsert(rows, { onConflict: "campaign_id,pool_key,contact_id" })
+          .select("id,contact_id,pool_key,total_score,ai_reason,selected_at");
         if (result.error) return reply({ ok: false, error: result.error.message }, 500);
-        newCompanies = (result.data || []) as Row[];
+        newCompanies = await attachContacts(supabase, (result.data || []) as Row[]);
       }
       remaining = Math.max(0, remaining - newCompanies.length);
     }
@@ -273,6 +345,7 @@ Deno.serve(async (req: Request) => {
       version: VERSION,
       campaign_id: campaignId,
       template_id: templateId || null,
+      company_pool_key: poolKey,
       orchestrator_run_id: runId,
       run_date: runDate,
       daily_target: dailyTarget,
