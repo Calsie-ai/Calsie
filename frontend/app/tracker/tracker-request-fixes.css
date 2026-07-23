@@ -8,3 +8,36 @@ html body main.agent-log-shell .approve-button[aria-pressed="true"]::after {
   font-weight: 800;
   line-height: 1;
 }
+
+/* The current tracker table is rendered with CSS-module class names rather than
+   the older agent-log classes above. A max-content wrapper around a 100%-wide
+   fixed-layout table creates a cyclic intrinsic width calculation in the
+   embedded dashboard iframe, pushing the real columns far off-screen. */
+main[class*="shell"] [class*="sheetWrap"],
+main[class*="shell"] [class*="historyWrap"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+}
+
+main[class*="shell"] [class*="sheetCanvas"] {
+  width: 1040px !important;
+  min-width: 1040px !important;
+  max-width: none !important;
+}
+
+main[class*="shell"] table[class*="sheet"] {
+  width: 1040px !important;
+  min-width: 1040px !important;
+  max-width: 1040px !important;
+  table-layout: fixed !important;
+}
+
+@media (max-width: 850px) {
+  main[class*="shell"] [class*="sheetCanvas"],
+  main[class*="shell"] table[class*="sheet"] {
+    width: 920px !important;
+    min-width: 920px !important;
+    max-width: 920px !important;
+  }
+}
