@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
+import { inferAustralianPostcode } from "../../lib/australianPostcode";
 
 type TemplateCheckout = {
   id: string;
@@ -27,11 +28,13 @@ function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const templateId = searchParams.get("template") || "";
+  const postcode = searchParams.get("postcode") || "";
+  const postcodeInfo = inferAustralianPostcode(postcode);
   const [template, setTemplate] = useState<TemplateCheckout | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  useEffect(() => { void load(); }, [templateId]);
+  useEffect(() => { void load(); }, [templateId, postcode]);
 
   async function load() {
     setLoading(true);
@@ -40,11 +43,16 @@ function CheckoutContent() {
       const supabase = getSupabaseClient();
       const { data: authData } = await supabase.auth.getUser();
       if (!authData.user) {
-        router.replace(`/login?next=${encodeURIComponent(`/payment?template=${templateId}`)}`);
+        const next = `/payment?template=${encodeURIComponent(templateId)}&postcode=${encodeURIComponent(postcode)}`;
+        router.replace(`/login?next=${encodeURIComponent(next)}`);
         return;
       }
       if (!templateId) {
         setMessage("Choose a template from Browse Templates before opening checkout.");
+        return;
+      }
+      if (!postcodeInfo.valid) {
+        setMessage("Return to the template and enter a valid Australian postcode before checkout.");
         return;
       }
       const { data, error } = await supabase
@@ -85,7 +93,11 @@ function CheckoutContent() {
                 <p style={{ color: "#555", lineHeight: 1.7 }}>{template.description}</p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12, margin: "24px 0" }}>
                   <div><span style={{ color: "#777" }}>Target role</span><br /><strong>{template.role}</strong></div>
-                  <div><span style={{ color: "#777" }}>Location</span><br /><strong>{template.location}</strong></div>
+                  <div><span style={{ color: "#777" }}>Campaign location</span><br /><strong>{postcodeInfo.label}</strong></div>
+                </div>
+                <div style={{ border: "1px solid #a8d8b4", background: "#f1fbf4", padding: 16, marginBottom: 24 }}>
+                  <strong>Smart local matching enabled</strong>
+                  <p style={{ margin: "7px 0 0", lineHeight: 1.6 }}>Calsie will use postcode {postcodeInfo.postcode} to rank nearby jobs and providers whose service-postcode coverage includes your area.</p>
                 </div>
                 <h2>Included features</h2>
                 <div style={{ display: "grid", gap: 12 }}>
