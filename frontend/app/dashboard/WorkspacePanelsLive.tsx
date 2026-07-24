@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
+import { inferAustralianPostcode, normaliseAustralianPostcode } from "../../lib/australianPostcode";
 import OverviewDashboard from "./OverviewDashboard";
 import ResumePreviewPanel from "./ResumePreviewPanel";
 import WorkspacePanels from "./WorkspacePanels";
@@ -68,6 +69,7 @@ export default function WorkspacePanelsLive(props: Props) {
   const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<CampaignTemplate | null>(null);
+  const [postcode, setPostcode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -95,6 +97,25 @@ export default function WorkspacePanelsLive(props: Props) {
     const needle = query.trim().toLowerCase();
     return templates.filter((item) => !needle || `${item.title} ${item.campaignName} ${item.role} ${item.category} ${item.description}`.toLowerCase().includes(needle));
   }, [query, templates]);
+
+  const postcodeInfo = useMemo(() => inferAustralianPostcode(postcode), [postcode]);
+
+  function openTemplate(item: CampaignTemplate) {
+    setSelected(item);
+    setPostcode("");
+  }
+
+  function continueToCheckout() {
+    if (!selected || !postcodeInfo.valid) return;
+    const params = new URLSearchParams({
+      template: selected.id,
+      postcode: postcodeInfo.postcode,
+      state: postcodeInfo.state,
+      region: postcodeInfo.region,
+      location: postcodeInfo.label,
+    });
+    router.push(`/payment?${params.toString()}`);
+  }
 
   if (props.active === "overview") {
     return <OverviewDashboard campaign={props.campaign} purchasedTemplate={props.purchasedTemplate} resumeReady={props.resumeReady} resumeName={props.resumeName} gmailReady={props.gmailReady} approvedCount={props.approvedCount} passedCount={props.passedCount} onOpenTracker={props.onOpenTracker} />;
@@ -136,7 +157,7 @@ export default function WorkspacePanelsLive(props: Props) {
       <header className="template-browser-head">
         <p>Templates</p>
         <h1>{selected ? "Template details" : "Browse templates"}</h1>
-        <span>{selected ? "Review the campaign, price, and included features before checkout." : "Login and browsing are free. Pricing appears only after you choose a template."}</span>
+        <span>{selected ? "Review the campaign, choose your postcode, and confirm the price before checkout." : "Login and browsing are free. Pricing appears only after you choose a template."}</span>
       </header>
 
       {selected ? (
@@ -154,8 +175,27 @@ export default function WorkspacePanelsLive(props: Props) {
           <section className="template-recipe-card">
             <div><span>Search recipe</span><strong>Every Day Job Portal Search</strong></div>
             <div><span>Target role</span><strong>{selected.role}</strong></div>
-            <div><span>Location</span><strong>{selected.location}</strong></div>
+            <div><span>Location</span><strong>{postcodeInfo.valid ? postcodeInfo.label : "Choose postcode below"}</strong></div>
             <div><span>Posted within</span><strong>{selected.postedWithinDays} days</strong></div>
+          </section>
+          <section style={{ border: "1px solid #ddd", padding: 18, marginTop: 18 }}>
+            <h3 style={{ marginTop: 0 }}>Choose campaign location</h3>
+            <label htmlFor="campaign-postcode" style={{ display: "grid", gap: 7, maxWidth: 420 }}>
+              <strong>Australian postcode</strong>
+              <input
+                id="campaign-postcode"
+                inputMode="numeric"
+                autoComplete="postal-code"
+                maxLength={4}
+                value={postcode}
+                onChange={(event) => setPostcode(normaliseAustralianPostcode(event.target.value))}
+                placeholder="Example: 2141"
+                style={{ minHeight: 48, border: "1px solid #bbb", padding: "0 14px", fontSize: 16, fontWeight: 800 }}
+              />
+            </label>
+            {postcode.length > 0 && !postcodeInfo.valid ? <p style={{ color: "#a12a38", fontWeight: 800, marginBottom: 0 }}>Enter a valid 4-digit Australian postcode.</p> : null}
+            {postcodeInfo.valid ? <p style={{ color: "#226d35", fontWeight: 900, marginBottom: 0 }}>Detected location: {postcodeInfo.label}</p> : null}
+            <p style={{ color: "#666", lineHeight: 1.5, marginBottom: 0 }}>Your postcode will be used to rank nearby jobs and providers that service your area.</p>
           </section>
           <section style={{ border: "1px solid #ddd", padding: 18, marginTop: 18 }}>
             <h3 style={{ marginTop: 0 }}>Included with this template</h3>
@@ -164,13 +204,13 @@ export default function WorkspacePanelsLive(props: Props) {
             </div>
           </section>
           <div className="template-review-checkout">
-            <div><span>Campaign template</span><strong>{selected.campaignName || selected.title}</strong><small>Login and template browsing are free.</small></div>
+            <div><span>Campaign template</span><strong>{selected.campaignName || selected.title}</strong><small>{postcodeInfo.valid ? postcodeInfo.label : "Enter postcode to continue"}</small></div>
             <section aria-label="Template price" style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 12, marginLeft: "auto", whiteSpace: "nowrap" }}>
               {selected.compareAtPriceAmount ? <div style={{ color: "#ff3f4f", fontSize: 24, fontWeight: 900, textDecoration: "line-through" }}>{formatMoney(selected.compareAtPriceAmount, selected.currency)}</div> : null}
               <div style={{ color: "#2f8f2f", fontSize: 30, fontWeight: 950 }}>{formatMoney(selected.priceAmount || 0, selected.currency)}</div>
               <div style={{ color: "#555", fontSize: 14, fontWeight: 700 }}>{selected.priceLabel}</div>
             </section>
-            <button className="workspace-primary" onClick={() => router.push(`/payment?template=${encodeURIComponent(selected.id)}`)}>{selected.paymentRequired === false ? "Use free template" : "Continue to checkout"}</button>
+            <button className="workspace-primary" onClick={continueToCheckout} disabled={!postcodeInfo.valid}>{selected.paymentRequired === false ? "Use free template" : "Continue to checkout"}</button>
           </div>
         </div>
       ) : (
@@ -184,8 +224,8 @@ export default function WorkspacePanelsLive(props: Props) {
               <article className="template-canva-card" key={item.id}>
                 <span className="template-category">{item.category}</span><h3>{item.title}</h3>
                 {item.imageUrl ? <img className="template-canva-image" src={item.imageUrl} alt={item.title} /> : <div className="template-canva-image template-canva-placeholder">Add a photo from Admin</div>}
-                <p>{item.description}</p><small>{item.role} · {item.location}</small>
-                <button type="button" onClick={() => setSelected(item)}>Review template →</button>
+                <p>{item.description}</p><small>{item.role} · Choose postcode</small>
+                <button type="button" onClick={() => openTemplate(item)}>Review template →</button>
               </article>
             ))}
           </div>
