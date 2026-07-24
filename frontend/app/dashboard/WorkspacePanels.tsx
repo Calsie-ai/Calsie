@@ -30,6 +30,7 @@ export default function WorkspacePanels({
   onUseTemplate,
   onResumeUpload,
   onConnectGmail,
+  onRevokeGmail,
   onToggleCampaign,
   onFindJobsNow,
 }: {
@@ -43,6 +44,7 @@ export default function WorkspacePanels({
   onUseTemplate: (template: CampaignTemplate) => void;
   onResumeUpload: (file: File) => void;
   onConnectGmail: () => void;
+  onRevokeGmail: () => void;
   onToggleCampaign: () => void;
   onFindJobsNow: () => void;
 }) {
@@ -204,10 +206,21 @@ export default function WorkspacePanels({
             <p className="workspace-gmail-policy-version">Privacy Policy version: {GMAIL_PRIVACY_POLICY_VERSION}</p>
           </div>
 
-          <button className="workspace-primary workspace-gmail-connect" onClick={onConnectGmail} disabled={busy || gmailReady || !gmailConsentComplete} aria-describedby="gmail-privacy-permission">
-            {gmailReady ? "Connected" : busy ? "Connecting..." : "Connect Google"}
-          </button>
-          {!gmailReady && !gmailConsentComplete && <small className="workspace-gmail-required">Select both consent checkboxes to enable Google connection.</small>}
+          {gmailReady ? (
+            <>
+              <button type="button" className="workspace-gmail-revoke" onClick={onRevokeGmail} disabled={busy}>
+                {busy ? "Revoking..." : "Revoke connection"}
+              </button>
+              <small className="workspace-gmail-revoke-note">This removes Calsie&apos;s saved Google tokens and prevents Gmail sending until you connect again.</small>
+            </>
+          ) : (
+            <>
+              <button type="button" className="workspace-primary workspace-gmail-connect" onClick={onConnectGmail} disabled={busy || !gmailConsentComplete} aria-describedby="gmail-privacy-permission">
+                {busy ? "Connecting..." : "Connect Google"}
+              </button>
+              {!gmailConsentComplete && <small className="workspace-gmail-required">Select both consent checkboxes to enable Google connection.</small>}
+            </>
+          )}
         </div>
       </section>
     );
