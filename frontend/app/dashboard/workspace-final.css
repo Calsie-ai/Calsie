@@ -66,3 +66,46 @@ html body main.applix-workspace .workspace-search::placeholder {
   -webkit-text-fill-color: #737373 !important;
   opacity: 1 !important;
 }
+
+html body main.applix-workspace #campaign-postcode {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+  caret-color: #111111 !important;
+  opacity: 1 !important;
+  color-scheme: light !important;
+  text-shadow: none !important;
+}
+
+html body main.applix-workspace #campaign-postcode::placeholder {
+  color: #737373 !important;
+  -webkit-text-fill-color: #737373 !important;
+  opacity: 1 !important;
+}
+
+html body main.applix-workspace #campaign-postcode:focus {
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+  outline: 3px solid rgba(255, 95, 120, 0.18) !important;
+  outline-offset: 2px !important;
+}
+
+html body main.applix-workspace #campaign-postcode:-webkit-autofill,
+html body main.applix-workspace #campaign-postcode:-webkit-autofill:hover,
+html body main.applix-workspace #campaign-postcode:-webkit-autofill:focus,
+html body main.applix-workspace #campaign-postcode:-webkit-autofill:active {
+  -webkit-text-fill-color: #111111 !important;
+  caret-color: #111111 !important;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  transition: background-color 9999s ease-out 0s !important;
+}
+
+html body main.applix-workspace #campaign-postcode::selection {
+  background: #ffd7de !important;
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+}
