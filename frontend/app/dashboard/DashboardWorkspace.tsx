@@ -115,6 +115,31 @@ export default function DashboardWorkspace() {
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not connect Gmail."); setBusy(false); }
   }
 
+  async function revokeGmail() {
+    const confirmed = window.confirm("Revoke the connected Gmail account? Calsie will no longer be able to send application emails until you connect again.");
+    if (!confirmed) return;
+    setBusy(true); setMessage("");
+    try {
+      const supabase = getSupabaseClient();
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Please sign in again.");
+      const response = await fetch("/api/applix/revoke-gmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_token: token }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) throw new Error(result.error || "Could not revoke Gmail connection.");
+      setGmailReady(false);
+      setMessage("Gmail connection revoked. Calsie can no longer send through this account.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not revoke Gmail connection.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function toggleCampaign() {
     if (!campaign) { setActive("templates"); return; }
     setBusy(true); setMessage("");
@@ -153,5 +178,5 @@ export default function DashboardWorkspace() {
 
   async function logout() { const supabase = getSupabaseClient(); await supabase.auth.signOut(); router.replace("/"); }
 
-  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} approvedCount={approvedCount} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanelsLive active={active} campaign={campaign} purchasedTemplate={purchasedTemplate} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} approvedCount={approvedCount} passedCount={passedCount} onOpenTracker={() => setActive("tracker")} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onToggleCampaign={() => void toggleCampaign()} onFindJobsNow={() => void findJobsNow()} /></div></main>;
+  return <main className="applix-workspace"><WorkspaceSidebar active={active} setActive={setActive} running={isCampaignRunning(campaign?.status)} approvedCount={approvedCount} onToggleCampaign={() => void toggleCampaign()} onLogout={() => void logout()} /><div className="workspace-main"><WorkspacePanelsLive active={active} campaign={campaign} purchasedTemplate={purchasedTemplate} resumeReady={resumeReady} resumeName={resumeName} gmailReady={gmailReady} busy={busy} message={message} approvedCount={approvedCount} passedCount={passedCount} onOpenTracker={() => setActive("tracker")} onUseTemplate={(item) => void useTemplate(item)} onResumeUpload={(file) => void uploadResume(file)} onConnectGmail={() => void connectGmail()} onRevokeGmail={() => void revokeGmail()} onToggleCampaign={() => void toggleCampaign()} onFindJobsNow={() => void findJobsNow()} /></div></main>;
 }
