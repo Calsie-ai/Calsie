@@ -16,27 +16,46 @@ type SubscriptionPayload = {
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   stripe_checkout_session_id?: string | null;
+  stripe_payment_intent_id?: string | null;
   status: string;
   plan_name: string;
   price_amount: number;
   currency: string;
   current_period_end?: string | null;
+  template_id?: string | null;
+  postcode?: string | null;
+  checkout_metadata?: Record<string, unknown>;
   updated_at: string;
 };
+
+function integerMetadata(value: string | undefined, fallback: number) {
+  const parsed = Number.parseInt(value || "", 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function cleanPostcode(value: string | undefined) {
+  const postcode = String(value || "").trim();
+  return /^\d{4}$/.test(postcode) ? postcode : null;
+}
 
 async function upsertSubscription(payload: SubscriptionPayload) {
   if (!payload.user_id || !SUPABASE_SERVICE_ROLE_KEY) return;
 
-  await fetch(`${SUPABASE_URL}/rest/v1/applix_subscriptions`, {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/applix_subscriptions?on_conflict=user_id`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       apikey: SUPABASE_SERVICE_ROLE_KEY,
       Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      Prefer: "resolution=merge-duplicates",
+      Prefer: "resolution=merge-duplicates,return=minimal",
     },
     body: JSON.stringify(payload),
   });
+
+  if (!response.ok) {
+    const details = await response.text().catch(() => "");
+    throw new Error(`Could not save Stripe payment status${details ? `: ${details.slice(0, 240)}` : "."}`);
+  }
 }
 
 function getPeriodEnd(subscription: Stripe.Subscription): string | null {
@@ -45,7 +64,6 @@ function getPeriodEnd(subscription: Stripe.Subscription): string | null {
     .filter((value): value is number => typeof value === "number");
 
   if (periodEnds.length === 0) return null;
-
   return new Date(Math.max(...periodEnds) * 1000).toISOString();
 }
 
@@ -54,9 +72,15 @@ function getStripeObjectId(value: string | { id?: string } | null) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const userId = session.metadata?.user_id || null;
+  const userId = session.metadata?.user_id || session.client_reference_id || null;
   const email = session.customer_details?.email || session.customer_email || session.metadata?.email || null;
-  const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id || null;
+  const subscriptionId = getStripeObjectId(session.subscription);
+  const paymentIntentId = getStripeObjectId(session.payment_intent);
+  const templateId = session.metadata?.template_id || null;
+  const postcode = cleanPostcode(session.metadata?.postcode);
+  const planName = session.metadata?.template_name || session.metadata?.plan_name || "Applix campaign";
+  const priceAmount = integerMetadata(session.metadata?.price_amount, Number(session.amount_total || 0));
+  const currency = (session.metadata?.currency || session.currency || "aud").toLowerCase();
 
   let subscription: Stripe.Subscription | null = null;
   if (stripe && subscriptionId) {
@@ -69,11 +93,20 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     stripe_customer_id: getStripeObjectId(session.customer),
     stripe_subscription_id: subscriptionId,
     stripe_checkout_session_id: session.id,
-    status: subscription?.status || "active",
-    plan_name: "Applix Pro",
-    price_amount: 2000,
-    currency: subscription?.currency || "aud",
+    stripe_payment_intent_id: paymentIntentId,
+    status: session.payment_status === "paid" ? "active" : session.payment_status || "checkout_completed",
+    plan_name: planName,
+    price_amount: priceAmount,
+    currency,
     current_period_end: subscription ? getPeriodEnd(subscription) : null,
+    template_id: templateId,
+    postcode,
+    checkout_metadata: {
+      checkout_mode: session.mode,
+      payment_status: session.payment_status,
+      template_slug: session.metadata?.template_slug || null,
+      price_label: session.metadata?.price_label || null,
+    },
     updated_at: new Date().toISOString(),
   });
 }
@@ -81,6 +114,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const userId = subscription.metadata?.user_id || null;
   const email = subscription.metadata?.email || null;
+  const templateId = subscription.metadata?.template_id || null;
+  const postcode = cleanPostcode(subscription.metadata?.postcode);
 
   await upsertSubscription({
     user_id: userId,
@@ -88,10 +123,16 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     stripe_customer_id: getStripeObjectId(subscription.customer),
     stripe_subscription_id: subscription.id,
     status: subscription.status,
-    plan_name: "Applix Pro",
-    price_amount: 2000,
-    currency: subscription.currency || "aud",
+    plan_name: subscription.metadata?.template_name || subscription.metadata?.plan_name || "Applix Pro",
+    price_amount: integerMetadata(subscription.metadata?.price_amount, 2000),
+    currency: (subscription.metadata?.currency || subscription.currency || "aud").toLowerCase(),
     current_period_end: getPeriodEnd(subscription),
+    template_id: templateId,
+    postcode,
+    checkout_metadata: {
+      checkout_mode: "subscription",
+      template_slug: subscription.metadata?.template_slug || null,
+    },
     updated_at: new Date().toISOString(),
   });
 }
@@ -101,18 +142,15 @@ export async function POST(req: Request) {
     if (!stripe || !STRIPE_SECRET_KEY) {
       return NextResponse.json({ ok: false, error: "Missing STRIPE_SECRET_KEY." }, { status: 500 });
     }
-
     if (!STRIPE_WEBHOOK_SECRET) {
       return NextResponse.json({ ok: false, error: "Missing STRIPE_WEBHOOK_SECRET." }, { status: 500 });
     }
-
     if (!SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json({ ok: false, error: "Missing SUPABASE_SERVICE_ROLE_KEY." }, { status: 500 });
     }
 
     const body = await req.text();
     const signature = req.headers.get("stripe-signature");
-
     if (!signature) {
       return NextResponse.json({ ok: false, error: "Missing Stripe signature." }, { status: 400 });
     }

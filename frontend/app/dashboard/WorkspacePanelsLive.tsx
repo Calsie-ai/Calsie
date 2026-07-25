@@ -70,6 +70,9 @@ export default function WorkspacePanelsLive(props: Props) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<CampaignTemplate | null>(null);
   const [postcode, setPostcode] = useState("");
+  const [postcodeTouched, setPostcodeTouched] = useState(false);
+  const [checkoutNavigating, setCheckoutNavigating] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -98,15 +101,30 @@ export default function WorkspacePanelsLive(props: Props) {
     return templates.filter((item) => !needle || `${item.title} ${item.campaignName} ${item.role} ${item.category} ${item.description}`.toLowerCase().includes(needle));
   }, [query, templates]);
 
-  const postcodeInfo = useMemo(() => inferAustralianPostcode(postcode), [postcode]);
+  const postcodeInfo = useMemo(() => inferAustralianPostcode(postcode.trim()), [postcode]);
 
   function openTemplate(item: CampaignTemplate) {
     setSelected(item);
     setPostcode("");
+    setPostcodeTouched(false);
+    setCheckoutNavigating(false);
+    setCheckoutError("");
   }
 
   function continueToCheckout() {
-    if (!selected || !postcodeInfo.valid) return;
+    setPostcodeTouched(true);
+    setCheckoutError("");
+    if (!selected) {
+      setCheckoutError("Choose a campaign template before checkout.");
+      return;
+    }
+    if (!postcodeInfo.valid) {
+      setCheckoutError("Enter a valid 4-digit Australian postcode.");
+      return;
+    }
+    if (checkoutNavigating) return;
+
+    setCheckoutNavigating(true);
     const params = new URLSearchParams({
       template: selected.id,
       postcode: postcodeInfo.postcode,
@@ -114,6 +132,14 @@ export default function WorkspacePanelsLive(props: Props) {
       region: postcodeInfo.region,
       location: postcodeInfo.label,
     });
+
+    try {
+      window.sessionStorage.setItem("applix_selected_template_id", selected.id);
+      window.sessionStorage.setItem("applix_campaign_postcode", postcodeInfo.postcode);
+    } catch {
+      // Checkout also receives both values in the URL, so storage failure is non-blocking.
+    }
+
     router.push(`/payment?${params.toString()}`);
   }
 
@@ -162,7 +188,7 @@ export default function WorkspacePanelsLive(props: Props) {
 
       {selected ? (
         <div className="template-review-canva">
-          <button className="template-review-back" onClick={() => setSelected(null)}>← Back to templates</button>
+          <button type="button" className="template-review-back" onClick={() => setSelected(null)}>← Back to templates</button>
           <div className="template-review-hero">
             <div className="template-review-copy">
               <p className="template-category">{selected.category}</p>
@@ -188,13 +214,21 @@ export default function WorkspacePanelsLive(props: Props) {
                 autoComplete="postal-code"
                 maxLength={4}
                 value={postcode}
-                onChange={(event) => setPostcode(normaliseAustralianPostcode(event.target.value))}
+                onBlur={() => setPostcodeTouched(true)}
+                onChange={(event) => {
+                  setPostcode(normaliseAustralianPostcode(event.target.value.trim()));
+                  setCheckoutError("");
+                }}
                 placeholder="Example: 2141"
+                aria-invalid={postcodeTouched && !postcodeInfo.valid}
+                aria-describedby="campaign-postcode-message"
                 style={{ minHeight: 48, border: "1px solid #bbb", padding: "0 14px", fontSize: 16, fontWeight: 800 }}
               />
             </label>
-            {postcode.length > 0 && !postcodeInfo.valid ? <p style={{ color: "#a12a38", fontWeight: 800, marginBottom: 0 }}>Enter a valid 4-digit Australian postcode.</p> : null}
-            {postcodeInfo.valid ? <p style={{ color: "#226d35", fontWeight: 900, marginBottom: 0 }}>Detected location: {postcodeInfo.label}</p> : null}
+            <div id="campaign-postcode-message" aria-live="polite">
+              {postcodeTouched && !postcodeInfo.valid ? <p style={{ color: "#a12a38", fontWeight: 800, marginBottom: 0 }}>Enter a valid 4-digit Australian postcode.</p> : null}
+              {postcodeInfo.valid ? <p style={{ color: "#226d35", fontWeight: 900, marginBottom: 0 }}>Detected location: {postcodeInfo.label}</p> : null}
+            </div>
             <p style={{ color: "#666", lineHeight: 1.5, marginBottom: 0 }}>Your postcode will be used to rank nearby jobs and providers that service your area.</p>
           </section>
           <section style={{ border: "1px solid #ddd", padding: 18, marginTop: 18 }}>
@@ -203,6 +237,7 @@ export default function WorkspacePanelsLive(props: Props) {
               {(selected.pricingFeatures || []).map((feature) => <div key={feature}>✓ {feature}</div>)}
             </div>
           </section>
+          {checkoutError ? <div className="workspace-message" role="alert" style={{ marginTop: 16 }}>{checkoutError}</div> : null}
           <div className="template-review-checkout">
             <div><span>Campaign template</span><strong>{selected.campaignName || selected.title}</strong><small>{postcodeInfo.valid ? postcodeInfo.label : "Enter postcode to continue"}</small></div>
             <section aria-label="Template price" style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 12, marginLeft: "auto", whiteSpace: "nowrap" }}>
@@ -210,7 +245,9 @@ export default function WorkspacePanelsLive(props: Props) {
               <div style={{ color: "#2f8f2f", fontSize: 30, fontWeight: 950 }}>{formatMoney(selected.priceAmount || 0, selected.currency)}</div>
               <div style={{ color: "#555", fontSize: 14, fontWeight: 700 }}>{selected.priceLabel}</div>
             </section>
-            <button className="workspace-primary" onClick={continueToCheckout} disabled={!postcodeInfo.valid}>{selected.paymentRequired === false ? "Use free template" : "Continue to checkout"}</button>
+            <button type="button" className="workspace-primary" onClick={continueToCheckout} disabled={!postcodeInfo.valid || checkoutNavigating} style={{ position: "relative", zIndex: 2, pointerEvents: checkoutNavigating ? "none" : "auto" }}>
+              {checkoutNavigating ? "Opening checkout…" : selected.paymentRequired === false ? "Use free template" : "Continue to checkout"}
+            </button>
           </div>
         </div>
       ) : (

@@ -20,6 +20,12 @@ type TemplateCheckout = {
   payment_required: boolean;
 };
 
+type CheckoutResult = {
+  ok?: boolean;
+  checkout_url?: string | null;
+  error?: string;
+};
+
 function money(amount: number, currency = "aud") {
   return new Intl.NumberFormat("en-AU", { style: "currency", currency: currency.toUpperCase(), maximumFractionDigits: amount % 100 === 0 ? 0 : 2 }).format(amount / 100);
 }
@@ -27,11 +33,12 @@ function money(amount: number, currency = "aud") {
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const templateId = searchParams.get("template") || "";
-  const postcode = searchParams.get("postcode") || "";
+  const templateId = searchParams.get("template")?.trim() || "";
+  const postcode = searchParams.get("postcode")?.trim() || "";
   const postcodeInfo = inferAustralianPostcode(postcode);
   const [template, setTemplate] = useState<TemplateCheckout | null>(null);
   const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => { void load(); }, [templateId, postcode]);
@@ -71,6 +78,47 @@ function CheckoutContent() {
     }
   }
 
+  async function openSecureCheckout() {
+    if (!template || checkoutLoading) return;
+    if (!postcodeInfo.valid) {
+      setMessage("Return to the template and enter a valid Australian postcode before checkout.");
+      return;
+    }
+
+    setCheckoutLoading(true);
+    setMessage("");
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const accessToken = data.session?.access_token;
+      if (!accessToken) {
+        const next = `/payment?template=${encodeURIComponent(template.id)}&postcode=${encodeURIComponent(postcodeInfo.postcode)}`;
+        router.replace(`/login?next=${encodeURIComponent(next)}`);
+        return;
+      }
+
+      const response = await fetch("/api/stripe/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          access_token: accessToken,
+          template_id: template.id,
+          postcode: postcodeInfo.postcode,
+        }),
+      });
+      const result = await response.json().catch(() => ({})) as CheckoutResult;
+      if (!response.ok || !result.ok || !result.checkout_url) {
+        throw new Error(result.error || "Could not create secure checkout.");
+      }
+
+      window.location.assign(result.checkout_url);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not create secure checkout.");
+      setCheckoutLoading(false);
+    }
+  }
+
   return (
     <main className="applix-landing" id="top">
       <header className="applix-header">
@@ -84,9 +132,9 @@ function CheckoutContent() {
       <section style={{ padding: "72px 20px 88px" }} aria-labelledby="payment-title">
         <div className="applix-container" style={{ maxWidth: 980 }}>
           {loading ? <p>Loading template checkout...</p> : null}
-          {message ? <div style={{ padding: 16, border: "1px solid #ff9ca5", background: "#fff0f2", fontWeight: 800 }}>{message}</div> : null}
+          {message ? <div role="alert" style={{ padding: 16, marginBottom: 18, border: "1px solid #ff9ca5", background: "#fff0f2", fontWeight: 800 }}>{message}</div> : null}
           {template ? (
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(300px,.8fr)", gap: 24, alignItems: "start" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 24, alignItems: "start" }}>
               <article style={{ border: "1px solid #ddd", background: "#fff", padding: 30 }}>
                 <p className="applix-eyebrow">Selected campaign template</p>
                 <h1 id="payment-title" style={{ margin: "8px 0 14px" }}>{template.campaign_name || template.title}</h1>
@@ -112,11 +160,16 @@ function CheckoutContent() {
                   <strong style={{ fontSize: 54 }}>{money(template.price_amount, template.currency)}</strong>
                 </div>
                 <p style={{ opacity: .75 }}>{template.price_label}</p>
-                <p style={{ lineHeight: 1.6 }}>Login and browsing were free. Payment is requested only for this selected campaign template.</p>
-                <button type="button" disabled style={{ width: "100%", minHeight: 52, marginTop: 18, background: "#fff", color: "#111", border: 0, fontWeight: 900, opacity: .7 }}>
-                  Secure payment coming next
+                <p style={{ lineHeight: 1.6 }}>Payment is requested only for this selected campaign template. Your campaign is created after Stripe confirms payment.</p>
+                <button
+                  type="button"
+                  onClick={() => void openSecureCheckout()}
+                  disabled={checkoutLoading || !postcodeInfo.valid}
+                  style={{ width: "100%", minHeight: 52, marginTop: 18, background: "#fff", color: "#111", border: 0, fontWeight: 900, cursor: checkoutLoading ? "wait" : "pointer", opacity: checkoutLoading ? .72 : 1 }}
+                >
+                  {checkoutLoading ? "Opening secure checkout…" : template.payment_required === false ? "Use free template" : "Continue to secure checkout"}
                 </button>
-                <small style={{ display: "block", marginTop: 12, opacity: .65 }}>No charge is taken yet. Stripe checkout is not connected in this branch.</small>
+                <small style={{ display: "block", marginTop: 12, opacity: .65 }}>You will be redirected to Stripe. No duplicate checkout request is created while this button is loading.</small>
               </aside>
             </div>
           ) : null}
