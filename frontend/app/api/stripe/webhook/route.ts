@@ -38,6 +38,10 @@ function cleanPostcode(value: string | undefined) {
   return /^\d{4}$/.test(postcode) ? postcode : null;
 }
 
+function checkoutIsFulfilled(session: Stripe.Checkout.Session) {
+  return session.payment_status === "paid" || session.payment_status === "no_payment_required";
+}
+
 async function upsertSubscription(payload: SubscriptionPayload) {
   if (!payload.user_id || !SUPABASE_SERVICE_ROLE_KEY) return;
 
@@ -71,7 +75,7 @@ function getStripeObjectId(value: string | { id?: string } | null) {
   return typeof value === "string" ? value : value?.id || null;
 }
 
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function saveCheckoutSession(session: Stripe.Checkout.Session, forcedStatus?: string) {
   const userId = session.metadata?.user_id || session.client_reference_id || null;
   const email = session.customer_details?.email || session.customer_email || session.metadata?.email || null;
   const subscriptionId = getStripeObjectId(session.subscription);
@@ -79,13 +83,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const templateId = session.metadata?.template_id || null;
   const postcode = cleanPostcode(session.metadata?.postcode);
   const planName = session.metadata?.template_name || session.metadata?.plan_name || "Applix campaign";
-  const priceAmount = integerMetadata(session.metadata?.price_amount, Number(session.amount_total || 0));
+  const listedPrice = integerMetadata(session.metadata?.price_amount, Number(session.amount_subtotal || session.amount_total || 0));
   const currency = (session.metadata?.currency || session.currency || "aud").toLowerCase();
 
   let subscription: Stripe.Subscription | null = null;
   if (stripe && subscriptionId) {
     subscription = await stripe.subscriptions.retrieve(subscriptionId);
   }
+
+  const status = forcedStatus || (checkoutIsFulfilled(session) ? "active" : session.payment_status || "checkout_completed");
 
   await upsertSubscription({
     user_id: userId,
@@ -94,18 +100,23 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     stripe_subscription_id: subscriptionId,
     stripe_checkout_session_id: session.id,
     stripe_payment_intent_id: paymentIntentId,
-    status: session.payment_status === "paid" ? "active" : session.payment_status || "checkout_completed",
+    status,
     plan_name: planName,
-    price_amount: priceAmount,
+    price_amount: listedPrice,
     currency,
     current_period_end: subscription ? getPeriodEnd(subscription) : null,
     template_id: templateId,
     postcode,
     checkout_metadata: {
       checkout_mode: session.mode,
+      checkout_status: session.status,
       payment_status: session.payment_status,
       template_slug: session.metadata?.template_slug || null,
       price_label: session.metadata?.price_label || null,
+      amount_subtotal: session.amount_subtotal,
+      amount_discount: session.total_details?.amount_discount ?? 0,
+      amount_total: session.amount_total,
+      no_payment_required: session.payment_status === "no_payment_required",
     },
     updated_at: new Date().toISOString(),
   });
@@ -157,8 +168,16 @@ export async function POST(req: Request) {
 
     const event = stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET);
 
-    if (event.type === "checkout.session.completed") {
-      await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+    if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+      await saveCheckoutSession(event.data.object as Stripe.Checkout.Session);
+    }
+
+    if (event.type === "checkout.session.async_payment_failed") {
+      await saveCheckoutSession(event.data.object as Stripe.Checkout.Session, "payment_failed");
+    }
+
+    if (event.type === "checkout.session.expired") {
+      await saveCheckoutSession(event.data.object as Stripe.Checkout.Session, "expired");
     }
 
     if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
