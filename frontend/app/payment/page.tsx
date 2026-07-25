@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import { inferAustralianPostcode } from "../../lib/australianPostcode";
+import styles from "./payment.module.css";
 
 type TemplateCheckout = {
   id: string;
@@ -27,7 +28,11 @@ type CheckoutResult = {
 };
 
 function money(amount: number, currency = "aud") {
-  return new Intl.NumberFormat("en-AU", { style: "currency", currency: currency.toUpperCase(), maximumFractionDigits: amount % 100 === 0 ? 0 : 2 }).format(amount / 100);
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+    maximumFractionDigits: amount % 100 === 0 ? 0 : 2,
+  }).format(amount / 100);
 }
 
 function CheckoutContent() {
@@ -41,7 +46,9 @@ function CheckoutContent() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  useEffect(() => { void load(); }, [templateId, postcode]);
+  useEffect(() => {
+    void load();
+  }, [templateId, postcode]);
 
   async function load() {
     setLoading(true);
@@ -107,7 +114,7 @@ function CheckoutContent() {
           postcode: postcodeInfo.postcode,
         }),
       });
-      const result = await response.json().catch(() => ({})) as CheckoutResult;
+      const result = (await response.json().catch(() => ({}))) as CheckoutResult;
       if (!response.ok || !result.ok || !result.checkout_url) {
         throw new Error(result.error || "Could not create secure checkout.");
       }
@@ -119,66 +126,121 @@ function CheckoutContent() {
     }
   }
 
+  const templateName = template?.campaign_name || template?.title || "Campaign checkout";
+
   return (
-    <main className="applix-landing" id="top">
+    <main className={`${styles.page} applix-landing`} id="top">
       <header className="applix-header">
         <div className="applix-container applix-header-inner">
-          <a className="applix-brand" href="/" aria-label="Calsie Jobs home"><img src="/applix-logo.svg" alt="" /><span>Calsie | Jobs</span></a>
-          <nav className="applix-nav" aria-label="Checkout navigation"><a href="/dashboard">Dashboard</a><a href="/support">Support</a></nav>
-          <div className="applix-actions"><a className="applix-button applix-button--subtle" href="/dashboard">Back to templates</a></div>
+          <a className="applix-brand" href="/" aria-label="Calsie Jobs home">
+            <img src="/applix-logo.svg" alt="" />
+            <span>Calsie | Jobs</span>
+          </a>
+          <nav className="applix-nav" aria-label="Checkout navigation">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/support">Support</a>
+          </nav>
+          <div className="applix-actions">
+            <a className="applix-button applix-button--subtle" href="/dashboard">Back to templates</a>
+          </div>
         </div>
       </header>
 
-      <section style={{ padding: "72px 20px 88px" }} aria-labelledby="payment-title">
-        <div className="applix-container" style={{ maxWidth: 980 }}>
-          {loading ? <p>Loading template checkout...</p> : null}
-          {message ? <div role="alert" style={{ padding: 16, marginBottom: 18, border: "1px solid #ff9ca5", background: "#fff0f2", fontWeight: 800 }}>{message}</div> : null}
-          {template ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 24, alignItems: "start" }}>
-              <article style={{ border: "1px solid #ddd", background: "#fff", padding: 30 }}>
-                <p className="applix-eyebrow">Selected campaign template</p>
-                <h1 id="payment-title" style={{ margin: "8px 0 14px" }}>{template.campaign_name || template.title}</h1>
-                <p style={{ color: "#555", lineHeight: 1.7 }}>{template.description}</p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12, margin: "24px 0" }}>
-                  <div><span style={{ color: "#777" }}>Target role</span><br /><strong>{template.role}</strong></div>
-                  <div><span style={{ color: "#777" }}>Campaign location</span><br /><strong>{postcodeInfo.label}</strong></div>
-                </div>
-                <div style={{ border: "1px solid #a8d8b4", background: "#f1fbf4", padding: 16, marginBottom: 24 }}>
-                  <strong>Smart local matching enabled</strong>
-                  <p style={{ margin: "7px 0 0", lineHeight: 1.6 }}>Calsie will use postcode {postcodeInfo.postcode} to rank nearby jobs and providers whose service-postcode coverage includes your area.</p>
-                </div>
-                <h2>Included features</h2>
-                <div style={{ display: "grid", gap: 12 }}>
-                  {(template.pricing_features || []).map((feature) => <div key={feature}>✓ {feature}</div>)}
-                </div>
-              </article>
+      <section className={styles.shell} aria-labelledby="payment-title">
+        <div className={styles.intro}>
+          <div>
+            <p className={styles.eyebrow}>Secure campaign checkout</p>
+            <h1 id="payment-title">Review your campaign before payment.</h1>
+          </div>
+          <p>Your template, location and campaign features are confirmed before Stripe opens.</p>
+        </div>
 
-              <aside style={{ border: "1px solid #111", background: "#111", color: "#fff", padding: 28, position: "sticky", top: 24 }}>
-                <p style={{ margin: 0, opacity: .7 }}>Template price</p>
-                <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: 10, margin: "16px 0" }}>
-                  {template.compare_at_price_amount ? <span style={{ textDecoration: "line-through", color: "#ff8b95", fontSize: 24 }}>{money(template.compare_at_price_amount, template.currency)}</span> : null}
-                  <strong style={{ fontSize: 54 }}>{money(template.price_amount, template.currency)}</strong>
+        {loading ? <div className={styles.loading}>Loading template checkout…</div> : null}
+        {message ? <div className={styles.alert} role="alert">{message}</div> : null}
+
+        {template ? (
+          <div className={styles.checkoutGrid}>
+            <article className={styles.summaryCard}>
+              <div className={styles.templateTag}>Selected campaign template</div>
+              <h2>{templateName}</h2>
+              <p className={styles.description}>{template.description}</p>
+
+              <div className={styles.metaGrid}>
+                <div className={styles.metaItem}>
+                  <span>Target role</span>
+                  <strong>{template.role}</strong>
                 </div>
-                <p style={{ opacity: .75 }}>{template.price_label}</p>
-                <p style={{ lineHeight: 1.6 }}>Payment is requested only for this selected campaign template. Your campaign is created after Stripe confirms payment.</p>
+                <div className={styles.metaItem}>
+                  <span>Campaign location</span>
+                  <strong>{postcodeInfo.label}</strong>
+                </div>
+              </div>
+
+              <div className={styles.matchingCard}>
+                <div className={styles.matchingIcon}>✓</div>
+                <div>
+                  <strong>Smart local matching enabled</strong>
+                  <p>Calsie will use postcode {postcodeInfo.postcode} to rank nearby jobs and providers whose service coverage includes your area.</p>
+                </div>
+              </div>
+
+              <div className={styles.featuresHeader}>
+                <h3>Included features</h3>
+                <span>{template.pricing_features?.length || 0} campaign benefits</span>
+              </div>
+              <div className={styles.featuresGrid}>
+                {(template.pricing_features || []).map((feature) => (
+                  <div className={styles.feature} key={feature}>
+                    <span className={styles.featureMark}>✓</span>
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <aside className={styles.priceCard} aria-label="Order summary">
+              <div className={styles.priceTop}>
+                <p className={styles.priceLabel}>Template price</p>
+                <div className={styles.priceRow}>
+                  {template.compare_at_price_amount ? (
+                    <span className={styles.comparePrice}>{money(template.compare_at_price_amount, template.currency)}</span>
+                  ) : null}
+                  <strong className={styles.currentPrice}>{money(template.price_amount, template.currency)}</strong>
+                </div>
+                <p className={styles.priceTerm}>{template.price_label}</p>
+              </div>
+
+              <div className={styles.priceBody}>
+                <div className={styles.orderLine}>
+                  <span>Campaign</span>
+                  <strong>{templateName}</strong>
+                </div>
+                <p className={styles.checkoutCopy}>Your campaign is created after Stripe confirms the payment or an approved promotion code.</p>
                 <button
                   type="button"
+                  className={styles.checkoutButton}
                   onClick={() => void openSecureCheckout()}
                   disabled={checkoutLoading || !postcodeInfo.valid}
-                  style={{ width: "100%", minHeight: 52, marginTop: 18, background: "#fff", color: "#111", border: 0, fontWeight: 900, cursor: checkoutLoading ? "wait" : "pointer", opacity: checkoutLoading ? .72 : 1 }}
                 >
                   {checkoutLoading ? "Opening secure checkout…" : template.payment_required === false ? "Use free template" : "Continue to secure checkout"}
                 </button>
-                <small style={{ display: "block", marginTop: 12, opacity: .65 }}>You will be redirected to Stripe. No duplicate checkout request is created while this button is loading.</small>
-              </aside>
-            </div>
-          ) : null}
-        </div>
+                <div className={styles.secureNote}>
+                  <b>↗</b>
+                  <span>You will be redirected to Stripe. Duplicate checkout requests are blocked while loading.</span>
+                </div>
+              </div>
+            </aside>
+          </div>
+        ) : null}
       </section>
     </main>
   );
 }
 
 export default function PaymentPage() {
-  return <Suspense fallback={<main style={{ padding: 40 }}>Loading checkout...</main>}><CheckoutContent /></Suspense>;
+  return (
+    <Suspense fallback={<main style={{ padding: 40 }}>Loading checkout…</main>}>
+      <CheckoutContent />
+    </Suspense>
+  );
 }
