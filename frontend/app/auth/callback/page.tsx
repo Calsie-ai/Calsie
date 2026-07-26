@@ -1,54 +1,53 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "../../providers/AuthProvider";
 import { getSupabaseClient } from "../../../lib/supabaseClient";
-
-function safeNextPath(value: string | null) {
-  if (!value) return "/dashboard";
-  if (!value.startsWith("/")) return "/dashboard";
-  if (value.startsWith("//")) return "/dashboard";
-  if (value.includes("http://") || value.includes("https://")) return "/dashboard";
-  return value;
-}
+import { loginPathFor, safeInternalPath } from "../../../lib/navigation";
 
 function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [message, setMessage] = useState("Finishing Google login...");
+  const { refresh } = useAuth();
+  const started = useRef(false);
+  const [message, setMessage] = useState("Finishing Google login…");
 
   useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    let redirectTimer: number | undefined;
+
     async function finishLogin() {
-      const supabase = getSupabaseClient();
-      const nextPath = safeNextPath(searchParams.get("next"));
+      const nextPath = safeInternalPath(searchParams.get("next"));
 
       try {
         const code = searchParams.get("code");
-
         if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          const { error } = await getSupabaseClient().auth.exchangeCodeForSession(code);
           if (error) throw error;
         }
 
-        const { data, error } = await supabase.auth.getSession();
-
-        if (error) throw error;
-
-        if (!data.session) {
-          setMessage("Login session was not created. Please try Google login again.");
-          window.setTimeout(() => router.replace("/"), 1500);
+        const session = await refresh();
+        if (!session) {
+          setMessage("Login session was not created. Returning you to login…");
+          redirectTimer = window.setTimeout(() => router.replace(loginPathFor(nextPath)), 1500);
           return;
         }
 
         router.replace(nextPath);
+        router.refresh();
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Google login failed.");
-        window.setTimeout(() => router.replace("/"), 2000);
+        redirectTimer = window.setTimeout(() => router.replace(loginPathFor(nextPath)), 2000);
       }
     }
 
-    finishLogin();
-  }, [router, searchParams]);
+    void finishLogin();
+    return () => {
+      if (redirectTimer) window.clearTimeout(redirectTimer);
+    };
+  }, [refresh, router, searchParams]);
 
   return <AuthCallbackShell message={message} />;
 }
@@ -68,6 +67,8 @@ function AuthCallbackShell({ message }: { message: string }) {
       }}
     >
       <section
+        aria-live="polite"
+        role="status"
         style={{
           width: "min(420px, 100%)",
           borderRadius: 28,
@@ -77,9 +78,7 @@ function AuthCallbackShell({ message }: { message: string }) {
         }}
       >
         <img src="/applix-logo.svg" alt="Applix logo" style={{ width: 90 }} />
-        <h1 style={{ color: "#ff5ca8", fontSize: 42, margin: "12px 0" }}>
-          APPLIX
-        </h1>
+        <h1 style={{ color: "#ff5ca8", fontSize: 42, margin: "12px 0" }}>APPLIX</h1>
         <p style={{ fontWeight: 900 }}>{message}</p>
       </section>
     </main>
@@ -88,8 +87,9 @@ function AuthCallbackShell({ message }: { message: string }) {
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense fallback={<AuthCallbackShell message="Finishing Google login..." />}>
+    <Suspense fallback={<AuthCallbackShell message="Finishing Google login…" />}>
       <AuthCallbackContent />
     </Suspense>
   );
 }
+

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { AuthProvider } from "./providers/AuthProvider";
 import "./globals.css";
 import "./resume-status-overrides.css";
 import "./campaign-actions-overrides.css";
@@ -26,7 +27,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><AuthProvider>{children}</AuthProvider></body>
     </html>
   );
 }
+
