@@ -11,14 +11,14 @@ const primary: Array<[WorkspaceTab, string, string]> = [
 
 export default function WorkspaceSidebar({
   active,
-  setActive,
+  onNavigate,
   running,
   approvedCount,
   onToggleCampaign,
   onLogout,
 }: {
   active: WorkspaceTab;
-  setActive: (tab: WorkspaceTab) => void;
+  onNavigate: (tab: WorkspaceTab) => void;
   running: boolean;
   approvedCount: number;
   onToggleCampaign: () => void;
@@ -31,7 +31,7 @@ export default function WorkspaceSidebar({
   ];
 
   const navButton = ([tab, label, icon]: [WorkspaceTab, string, string]) => (
-    <button key={tab} className={active === tab ? "is-active" : ""} onClick={() => setActive(tab)}>
+    <button key={tab} className={active === tab ? "is-active" : ""} onClick={() => onNavigate(tab)}>
       <span>{icon}</span>
       <b>
         {tab === "approve" ? (

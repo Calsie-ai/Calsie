@@ -40,7 +40,7 @@ export default function PricingSection() {
         </div>
 
         <div style={{ display: "flex", justifyContent: "center", marginTop: 42 }}>
-          <a className="applix-button applix-button--primary" href="/login?next=/dashboard" style={{ minHeight: 58, paddingInline: 34, textTransform: "uppercase" }}>
+          <a className="applix-button applix-button--primary" href="/login?next=%2Fdashboard%3Fpanel%3Dtemplates" style={{ minHeight: 58, paddingInline: 34, textTransform: "uppercase" }}>
             Login and browse free
           </a>
         </div>

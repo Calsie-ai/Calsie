@@ -236,7 +236,7 @@ export default function ResumeCanvasPage() {
       }
 
       setStatus("Resume saved. Returning to dashboard...");
-      router.replace("/dashboard");
+      router.replace("/dashboard?panel=resume");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Resume upload failed.");
     } finally {
@@ -262,7 +262,7 @@ export default function ResumeCanvasPage() {
           gap: "16px",
         }}
       >
-        <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", gap: "12px" }}>
+        <Link href="/dashboard?panel=resume" style={{ display: "inline-flex", alignItems: "center", gap: "12px" }}>
           <img src="/applix-logo.svg" alt="Applix logo" style={{ width: "54px", height: "54px", objectFit: "contain" }} />
           <div style={{ textAlign: "left" }}>
             <strong style={{ display: "block", color: "#ff7fa8", letterSpacing: ".18em", fontSize: "16px" }}>APPLIX</strong>
@@ -270,7 +270,7 @@ export default function ResumeCanvasPage() {
           </div>
         </Link>
 
-        <Link className="applix-setup-outline" href="/dashboard" style={{ width: "auto", minHeight: "48px", padding: "10px 18px", fontSize: "15px", borderWidth: "1px" }}>
+        <Link className="applix-setup-outline" href="/dashboard?panel=resume" style={{ width: "auto", minHeight: "48px", padding: "10px 18px", fontSize: "15px", borderWidth: "1px" }}>
           Home
         </Link>
       </header>

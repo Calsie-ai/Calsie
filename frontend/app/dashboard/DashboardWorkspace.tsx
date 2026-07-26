@@ -1,15 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers/AuthProvider";
 import { getSupabaseClient } from "../../lib/supabaseClient";
+import {
+  DASHBOARD_ONE_TIME_PARAMS,
+  canonicalDashboardPanelPath,
+  dashboardPanelPath,
+  dashboardPathAfterProcessing,
+  isDashboardPanel,
+  parseDashboardPanel,
+} from "../../lib/dashboardNavigation";
 import { loginPathFor, safeInternalPath } from "../../lib/navigation";
 import {
   claimPendingIntentForUser,
   consumePendingIntentAfterSuccess,
   discardPendingIntent,
-  isWorkspaceTab,
   pendingIntentMatchesWorkflow,
   readPendingIntent,
   type PendingIntentV1,
@@ -25,7 +32,7 @@ export default function DashboardWorkspace() {
   const { session, signOut, status, user } = useAuth();
   const query = searchParams.toString();
   const returnPath = safeInternalPath(`${pathname}${query ? `?${query}` : ""}`);
-  const [active, setActive] = useState<WorkspaceTab>("overview");
+  const active = parseDashboardPanel(searchParams.get("panel"));
   const [campaign, setCampaign] = useState<CampaignRecord | null>(null);
   const [purchasedTemplate, setPurchasedTemplate] = useState<CampaignTemplate | null>(null);
   const [approvedCount, setApprovedCount] = useState(0);
@@ -38,15 +45,15 @@ export default function DashboardWorkspace() {
   const [pendingIntent, setPendingIntent] = useState<PendingIntentV1 | null>(null);
   const [unclaimedIntent, setUnclaimedIntent] = useState<PendingIntentV1 | null>(null);
   const [restoredIntentId, setRestoredIntentId] = useState("");
+  const paymentCheckRef = useRef("");
+
+  const navigateToPanel = useCallback((panel: WorkspaceTab) => {
+    router.push(dashboardPanelPath(panel, new URLSearchParams(query)));
+  }, [query, router]);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace(loginPathFor(returnPath));
   }, [returnPath, router, status]);
-
-  useEffect(() => {
-    const requestedPanel = searchParams.get("panel");
-    if (isWorkspaceTab(requestedPanel)) setActive(requestedPanel);
-  }, [searchParams]);
 
   useEffect(() => {
     if (status !== "authenticated" || !user) return;
@@ -55,15 +62,40 @@ export default function DashboardWorkspace() {
 
   useEffect(() => {
     if (status !== "authenticated" || !user) return;
+    const currentParams = new URLSearchParams(query);
+    const requestedPanel = currentParams.get("panel");
     const intent = readPendingIntent();
-    if (!intent || !pendingIntentMatchesWorkflow(intent, pathname)) return;
-    if (intent.userHint && intent.userHint !== user.id) return;
+    const eligibleIntent = Boolean(
+      intent
+      && pendingIntentMatchesWorkflow(intent, pathname)
+      && (!intent.userHint || intent.userHint === user.id),
+    );
+    const shouldRestoreIntent = Boolean(
+      eligibleIntent
+      && intent
+      && (
+        currentParams.get("restoreIntent") === "1"
+        || currentParams.get("payment") === "success"
+        || requestedPanel === intent.panel
+      ),
+    );
+
+    if (shouldRestoreIntent && intent && requestedPanel !== intent.panel) {
+      router.replace(dashboardPanelPath(intent.panel, currentParams));
+      return;
+    }
+
+    const canonicalPath = canonicalDashboardPanelPath(currentParams);
+    if (canonicalPath) {
+      router.replace(canonicalPath);
+      return;
+    }
+
+    if (!shouldRestoreIntent || !intent || !isDashboardPanel(requestedPanel)) return;
 
     let activeEffect = true;
     const applyRestoration = () => {
       if (!activeEffect) return;
-      setActive(intent.panel);
-      setRestoredIntentId("");
       if (intent.userHint === user.id) {
         setPendingIntent(intent);
         setUnclaimedIntent(null);
@@ -74,10 +106,16 @@ export default function DashboardWorkspace() {
     };
 
     if (
-      searchParams.get("payment") === "success"
+      currentParams.get("payment") === "success"
       && intent.type === "purchase_template"
       && session?.access_token
     ) {
+      const paymentCheckKey = `${intent.id}:${currentParams.get("session_id") || "no-session"}`;
+      if (paymentCheckRef.current === paymentCheckKey) {
+        applyRestoration();
+        return;
+      }
+      paymentCheckRef.current = paymentCheckKey;
       void fetch("/api/stripe/payment-status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -93,6 +131,13 @@ export default function DashboardWorkspace() {
             setUnclaimedIntent(null);
             setRestoredIntentId("");
             setMessage("Payment confirmed. Your saved checkout draft was completed.");
+            const completedPath = dashboardPathAfterProcessing(
+              intent.panel,
+              currentParams,
+              true,
+              DASHBOARD_ONE_TIME_PARAMS,
+            );
+            if (completedPath) router.replace(completedPath);
             return;
           }
           applyRestoration();
@@ -107,7 +152,7 @@ export default function DashboardWorkspace() {
     return () => {
       activeEffect = false;
     };
-  }, [pathname, searchParams, session?.access_token, status, user?.id]);
+  }, [pathname, query, router, session?.access_token, status, user?.id]);
   useEffect(() => {
     const receiveTrackerCounts = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
@@ -185,7 +230,7 @@ export default function DashboardWorkspace() {
       setApprovedCount(0);
       setPassedCount(0);
       setMessage(`${template.title} campaign added.`);
-      setActive("overview");
+      navigateToPanel("overview");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not use template."); }
     finally { setBusy(false); }
   }
@@ -208,7 +253,8 @@ export default function DashboardWorkspace() {
     setBusy(true); setMessage("");
     try {
       const token = requireAccessToken();
-      const response = await fetch("/api/applix/connect-gmail", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_token: token, return_to: `${window.location.origin}${returnPath}` }) });
+      const gmailReturnPath = dashboardPanelPath("gmail", new URLSearchParams(query));
+      const response = await fetch("/api/applix/connect-gmail", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_token: token, return_to: `${window.location.origin}${gmailReturnPath}` }) });
       const result = await response.json(); if (!response.ok || !result.authorization_url) throw new Error(result.error || "Could not connect Gmail.");
       window.location.assign(result.authorization_url);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not connect Gmail."); setBusy(false); }
@@ -230,7 +276,7 @@ export default function DashboardWorkspace() {
   }
 
   async function toggleCampaign() {
-    if (!campaign) { setActive("templates"); return; }
+    if (!campaign) { navigateToPanel("templates"); return; }
     setBusy(true); setMessage("");
     try {
       const supabase = getSupabaseClient();
@@ -287,7 +333,7 @@ export default function DashboardWorkspace() {
     }
     setPendingIntent(claimed);
     setUnclaimedIntent(null);
-    setActive(claimed.panel);
+    navigateToPanel(claimed.panel);
   }
 
   function discardDraft(intent: PendingIntentV1) {
@@ -299,7 +345,27 @@ export default function DashboardWorkspace() {
     setUnclaimedIntent(null);
     setRestoredIntentId("");
     setMessage("Campaign draft discarded.");
+    const completedPath = dashboardPathAfterProcessing(
+      active,
+      new URLSearchParams(query),
+      true,
+      DASHBOARD_ONE_TIME_PARAMS,
+    );
+    if (completedPath) router.replace(completedPath);
   }
+
+  const handlePendingIntentRestored = useCallback((intentId: string) => {
+    setRestoredIntentId(intentId);
+    const currentParams = new URLSearchParams(query);
+    if (currentParams.get("restoreIntent") !== "1") return;
+    const completedPath = dashboardPathAfterProcessing(
+      parseDashboardPanel(currentParams.get("panel")),
+      currentParams,
+      true,
+      ["restoreIntent"],
+    );
+    if (completedPath) router.replace(completedPath);
+  }, [query, router]);
 
   if (status !== "authenticated" || !user) {
     return <main className="applix-workspace" aria-live="polite" aria-busy="true"><p role="status" style={{ margin: "auto" }}>Restoring your secure session…</p></main>;
@@ -309,7 +375,7 @@ export default function DashboardWorkspace() {
     <main className="applix-workspace">
       <WorkspaceSidebar
         active={active}
-        setActive={setActive}
+        onNavigate={navigateToPanel}
         running={isCampaignRunning(campaign?.status)}
         approvedCount={approvedCount}
         onToggleCampaign={() => void toggleCampaign()}
@@ -345,8 +411,8 @@ export default function DashboardWorkspace() {
           pendingIntent={pendingIntent}
           userHint={user.id}
           onPendingIntentChange={setPendingIntent}
-          onPendingIntentRestored={setRestoredIntentId}
-          onOpenTracker={() => setActive("tracker")}
+          onPendingIntentRestored={handlePendingIntentRestored}
+          onOpenTracker={() => navigateToPanel("tracker")}
           onUseTemplate={(item) => void useTemplate(item)}
           onResumeUpload={(file) => void uploadResume(file)}
           onConnectGmail={() => void connectGmail()}

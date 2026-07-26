@@ -6,7 +6,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test:pending-intent": "node --experimental-strip-types --test tests/pendingIntent.test.mts"
+    "test:pending-intent": "node --experimental-strip-types --test tests/pendingIntent.test.mts",
+    "test:dashboard-navigation": "node --experimental-strip-types --test tests/dashboardNavigation.test.mts"
   },
   "dependencies": {
     "@supabase/supabase-js": "latest",

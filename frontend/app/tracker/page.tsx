@@ -325,7 +325,7 @@ export default function TrackerPage() {
         {!embedded && (
           <header className={styles.header}>
             <div>
-              <Link href="/dashboard" className={styles.backLink}>← Back to dashboard</Link>
+              <Link href="/dashboard?panel=tracker" className={styles.backLink}>← Back to dashboard</Link>
               <p className={styles.eyebrow}>Calsie opportunities</p>
               <h1>{tab === "review" ? "Smash or Pass" : tab === "tracker" ? "Opportunity tracker" : "Application history"}</h1>
               <p className={styles.subtitle}>

@@ -1,5 +1,6 @@
 import type { WorkspaceTab } from "../app/dashboard/workspace-data";
 import { inferAustralianPostcode } from "./australianPostcode.ts";
+import { isDashboardPanel } from "./dashboardNavigation.ts";
 import { safeInternalPath } from "./navigation.ts";
 
 export const PENDING_INTENT_STORAGE_KEY = "applix.pendingIntent.v1";
@@ -20,16 +21,6 @@ const INTENT_TYPES = [
   "connect_gmail",
   "upload_resume",
 ] as const;
-
-const WORKSPACE_TABS: WorkspaceTab[] = [
-  "overview",
-  "templates",
-  "resume",
-  "gmail",
-  "campaign",
-  "approve",
-  "tracker",
-];
 
 export type PendingIntentType = (typeof INTENT_TYPES)[number];
 
@@ -147,10 +138,6 @@ function isAllowedType(value: unknown): value is PendingIntentType {
   return typeof value === "string" && (INTENT_TYPES as readonly string[]).includes(value);
 }
 
-export function isWorkspaceTab(value: unknown): value is WorkspaceTab {
-  return typeof value === "string" && WORKSPACE_TABS.includes(value as WorkspaceTab);
-}
-
 function hasExpectedWorkflow(intent: PendingIntentV1) {
   const parsed = new URL(intent.returnPath, "https://applix.invalid");
   if (intent.type === "create_campaign") {
@@ -183,7 +170,7 @@ export function validatePendingIntent(
   if (!isRecord(value)) return null;
   if (value.version !== 1) return null;
   if (typeof value.id !== "string" || !INTENT_ID_PATTERN.test(value.id)) return null;
-  if (!isAllowedType(value.type) || !isWorkspaceTab(value.panel)) return null;
+  if (!isAllowedType(value.type) || !isDashboardPanel(value.panel)) return null;
   if (!isSafeReturnPath(value.returnPath)) return null;
   if (!isValidIsoTimestamp(value.createdAt) || !isValidIsoTimestamp(value.expiresAt)) return null;
 

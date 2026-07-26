@@ -1,4 +1,4 @@
-export const DEFAULT_POST_AUTH_PATH = "/dashboard";
+export const DEFAULT_POST_AUTH_PATH = "/dashboard?panel=overview";
 
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 const ENCODED_PATH_SEPARATOR = /%(?:2f|5c)/i;

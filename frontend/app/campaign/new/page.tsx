@@ -322,7 +322,7 @@ export default function NewCampaignPage() {
       }
 
       if (savedIntent) consumePendingIntentAfterSuccess(savedIntent.id);
-      router.push("/dashboard");
+      router.push("/dashboard?panel=overview");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not create campaign.");
     } finally {
@@ -503,7 +503,7 @@ export default function NewCampaignPage() {
             {errorMessage && <p className="error-text">{errorMessage}</p>}
 
             <div className="form-actions" style={{ width: "100%" }}>
-              <Link className="ghost-link" href="/dashboard">Back</Link>
+              <Link className="ghost-link" href="/dashboard?panel=templates">Back</Link>
               <button className="primary-button" type="submit" disabled={loading}>{loading ? "Creating campaign..." : "Create Campaign"}</button>
             </div>
           </form>
