@@ -97,14 +97,14 @@ export default function ApplixSafeTracker({ campaignId }: Props) {
             <h2 className="text-3xl font-black">Applix Tracker Workbook</h2>
             <p className="mt-1 text-sm text-white/55">Excel-style tracker. Employer contact details are hidden from users.</p>
           </div>
-          <button onClick={load} className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold">Reload</button>
+          <button type="button" onClick={load} className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold">Reload</button>
         </div>
 
         <div className="mt-4 flex flex-col gap-3 md:flex-row">
           <input value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} placeholder="Search tracker" className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none" />
           <div className="flex flex-wrap gap-2">
             {statusTabs.map((item) => (
-              <button key={item} onClick={() => { setTab(item); setPage(0); }} className={`rounded-full px-3 py-2 text-xs font-bold uppercase ${tab === item ? "bg-pink-500" : "bg-white/10"}`}>{item}</button>
+              <button type="button" key={item} onClick={() => { setTab(item); setPage(0); }} className={`rounded-full px-3 py-2 text-xs font-bold uppercase ${tab === item ? "bg-pink-500" : "bg-white/10"}`}>{item}</button>
             ))}
           </div>
         </div>
@@ -112,9 +112,9 @@ export default function ApplixSafeTracker({ campaignId }: Props) {
         <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs text-white/60">
           <span>{filtered.length} records</span>
           <div className="flex items-center gap-2">
-            <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="rounded-full bg-white/10 px-3 py-1 disabled:opacity-30">Prev</button>
+            <button type="button" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="rounded-full bg-white/10 px-3 py-1 disabled:opacity-30">Prev</button>
             <span>Day {page + 1} / {pageCount}</span>
-            <button disabled={page + 1 >= pageCount} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} className="rounded-full bg-white/10 px-3 py-1 disabled:opacity-30">Next</button>
+            <button type="button" disabled={page + 1 >= pageCount} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} className="rounded-full bg-white/10 px-3 py-1 disabled:opacity-30">Next</button>
           </div>
         </div>
 
@@ -145,8 +145,8 @@ export default function ApplixSafeTracker({ campaignId }: Props) {
                     <td className="px-3 py-3"><span className="rounded-full bg-white/10 px-2 py-1">{clean(row.status, "new")}</span></td>
                     <td className="px-3 py-3">
                       <div className="flex gap-2">
-                        <button onClick={(e) => { e.stopPropagation(); decide(row, "approved"); }} className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Approve</button>
-                        <button onClick={(e) => { e.stopPropagation(); decide(row, "skipped"); }} className="rounded-full bg-rose-500/20 px-2 py-1 text-rose-200">Skip</button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); decide(row, "approved"); }} className="rounded-full bg-emerald-500/20 px-2 py-1 text-emerald-200">Approve</button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); decide(row, "skipped"); }} className="rounded-full bg-rose-500/20 px-2 py-1 text-rose-200">Skip</button>
                       </div>
                     </td>
                   </tr>

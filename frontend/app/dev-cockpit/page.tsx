@@ -120,7 +120,7 @@ function OverviewPanel() {
           <h2 style={{ margin: 0 }}>Overview</h2>
           <p style={{ margin: "6px 0 0", color: "#a7a7b7" }}>Live database counts from Supabase.</p>
         </div>
-        <button className="cockpit-button" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
+        <button type="button" className="cockpit-button" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
       </div>
       {error && <p className="cockpit-error">{error}</p>}
       <div className="cockpit-grid">
@@ -164,7 +164,7 @@ function DataPanel({ config }: { config: PanelConfig }) {
           <h2 style={{ margin: 0 }}>{config.title}</h2>
           <p style={{ margin: "6px 0 0", color: "#a7a7b7" }}>{config.description}</p>
         </div>
-        <button className="cockpit-button" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
+        <button type="button" className="cockpit-button" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
       </div>
       {error && <p className="cockpit-error">{error}</p>}
       <div className="cockpit-table-wrap">
@@ -186,7 +186,7 @@ function DataPanel({ config }: { config: PanelConfig }) {
                   <td key={column}>{column.includes("status") ? <Pill value={row[column]} /> : display(row[column])}</td>
                 ))}
                 <td>
-                  <button className="cockpit-small-button" onClick={() => setExpanded(expanded === row.id ? null : row.id)}>
+                  <button type="button" className="cockpit-small-button" onClick={() => setExpanded(expanded === row.id ? null : row.id)}>
                     {expanded === row.id ? "Hide" : "View"}
                   </button>
                   {expanded === row.id && <pre className="cockpit-raw">{JSON.stringify(row, null, 2)}</pre>}
@@ -276,9 +276,9 @@ export default function DevCockpitPage() {
       </header>
 
       <nav className="cockpit-tabs">
-        <button className={`cockpit-tab ${activeTab === "overview" ? "active" : ""}`} onClick={() => setActiveTab("overview")}>Overview</button>
+        <button type="button" className={`cockpit-tab ${activeTab === "overview" ? "active" : ""}`} onClick={() => setActiveTab("overview")}>Overview</button>
         {Object.entries(panels).map(([key, panel]) => (
-          <button key={key} className={`cockpit-tab ${activeTab === key ? "active" : ""}`} onClick={() => setActiveTab(key)}>{panel.title}</button>
+          <button type="button" key={key} className={`cockpit-tab ${activeTab === key ? "active" : ""}`} onClick={() => setActiveTab(key)}>{panel.title}</button>
         ))}
       </nav>
 

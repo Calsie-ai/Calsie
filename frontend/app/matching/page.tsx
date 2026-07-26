@@ -392,7 +392,7 @@ export default function MatchingPage() {
             <h1>{endReached ? "Applix is hunting jobs." : "No email-ready jobs loaded yet."}</h1>
             <p>{endReached ? "You have reached the end of the current saved jobs. Applix will keep hunting in the background and new jobs can appear after the next hourly update." : message || "Applix is preparing job data in the background."}</p>
             <p style={styles.helperText}>Come back in about 1 hour. The background job will refresh Supabase with new Adzuna + Render results.</p>
-            {!!jobs.length && <button onClick={previousJob} style={styles.secondaryButton}>Back to last job</button>}
+            {!!jobs.length && <button type="button" onClick={previousJob} style={styles.secondaryButton}>Back to last job</button>}
           </div>
         </section>
       </main>
@@ -438,7 +438,7 @@ export default function MatchingPage() {
           <section style={styles.sectionBox}>
             <h2>Job summary</h2>
             <p>{showFullDescription ? jobDescription : trimText(jobDescription, 460)}</p>
-            {isLongDescription && <button onClick={() => setShowFullDescription(!showFullDescription)} style={styles.readMoreButton}>{showFullDescription ? "Show less" : "Read more"}</button>}
+            {isLongDescription && <button type="button" onClick={() => setShowFullDescription(!showFullDescription)} style={styles.readMoreButton}>{showFullDescription ? "Show less" : "Read more"}</button>}
           </section>
 
           <section style={styles.sectionBoxLight}>
@@ -450,7 +450,7 @@ export default function MatchingPage() {
             <p style={styles.kitLabel}>Application kit</p>
             <h2>Create tailored resume</h2>
             <p>Applix uses your saved profile, this job ad, and OpenAI to create a targeted resume, cover note, and application steps.</p>
-            <button onClick={createResumeDraft} disabled={flowState === "generating"} style={styles.primaryButton}>{flowState === "generating" ? "Generating..." : "Create AI resume draft"}</button>
+            <button type="button" onClick={createResumeDraft} disabled={flowState === "generating"} style={styles.primaryButton}>{flowState === "generating" ? "Generating..." : "Create AI resume draft"}</button>
           </section>
 
           {aiMessage && <div style={styles.aiMessage}>{aiMessage}</div>}
@@ -504,9 +504,9 @@ export default function MatchingPage() {
               )}
 
               <div style={styles.resumeActions}>
-                <button onClick={() => setFlowState(isEditing ? "draft" : "editing")} style={styles.secondaryButton}>{isEditing ? "Save edits" : "Edit Resume"}</button>
-                <button onClick={() => window.print()} style={styles.secondaryButton}>Download PDF</button>
-                <button onClick={approveResumeAndPrepareApplication} disabled={preparingApplication} style={styles.approveButton}>{preparingApplication ? "Preparing application..." : "Approve Resume"}</button>
+                <button type="button" onClick={() => setFlowState(isEditing ? "draft" : "editing")} style={styles.secondaryButton}>{isEditing ? "Save edits" : "Edit Resume"}</button>
+                <button type="button" onClick={() => window.print()} style={styles.secondaryButton}>Download PDF</button>
+                <button type="button" onClick={approveResumeAndPrepareApplication} disabled={preparingApplication} style={styles.approveButton}>{preparingApplication ? "Preparing application..." : "Approve Resume"}</button>
               </div>
 
               {contactDiscovery && <div style={styles.approvedBox}><strong>{contactDiscovery.hiringEmail ? `Hiring email found: ${contactDiscovery.hiringEmail}` : "No hiring email found yet."}</strong><p>{contactDiscovery.notes?.join(" ")}</p>{contactDiscovery.sourceUrl && <a href={contactDiscovery.sourceUrl} target="_blank" rel="noreferrer" style={styles.jobsiteButton}>Open application gateway</a>}</div>}
@@ -530,10 +530,10 @@ export default function MatchingPage() {
           )}
 
           <div style={styles.actions}>
-            <button onClick={previousJob} style={styles.secondaryButton}>Previous</button>
-            <button onClick={skipCurrentJob} style={styles.secondaryButton}>Skip</button>
-            <button onClick={saveCurrentJob} style={isCurrentJobSaved ? styles.savedButton : styles.secondaryButton}>{isCurrentJobSaved ? "Saved" : "Save Job"}</button>
-            <button onClick={resumeDraft ? nextJob : createResumeDraft} style={styles.primaryButton}>{resumeDraft ? "Next job" : "Create resume"}</button>
+            <button type="button" onClick={previousJob} style={styles.secondaryButton}>Previous</button>
+            <button type="button" onClick={skipCurrentJob} style={styles.secondaryButton}>Skip</button>
+            <button type="button" onClick={saveCurrentJob} style={isCurrentJobSaved ? styles.savedButton : styles.secondaryButton}>{isCurrentJobSaved ? "Saved" : "Save Job"}</button>
+            <button type="button" onClick={resumeDraft ? nextJob : createResumeDraft} style={styles.primaryButton}>{resumeDraft ? "Next job" : "Create resume"}</button>
           </div>
         </article>
       </section>

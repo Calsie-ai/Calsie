@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseClient } from "../../lib/supabaseClient";
+import { normaliseAppError, type ActionState } from "../../lib/actionState";
 
 type Props = {
   resumeReady: boolean;
   resumeName: string;
-  busy: boolean;
-  onResumeUpload: (file: File) => void;
+  uploadState: ActionState;
+  onResumeUpload: (file: File) => Promise<void>;
 };
 
-export default function ResumePreviewPanel({ resumeReady, resumeName, busy, onResumeUpload }: Props) {
+export default function ResumePreviewPanel({ resumeReady, resumeName, uploadState, onResumeUpload }: Props) {
   const [previewUrl, setPreviewUrl] = useState("");
   const [fileType, setFileType] = useState("");
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -56,7 +57,7 @@ export default function ResumePreviewPanel({ resumeReady, resumeName, busy, onRe
       } catch (error) {
         if (!alive) return;
         setPreviewUrl("");
-        setPreviewError(error instanceof Error ? error.message : "Could not load the resume preview.");
+        setPreviewError(normaliseAppError(error, "Could not load the resume preview.") || "");
       } finally {
         if (alive) setLoadingPreview(false);
       }
@@ -67,6 +68,7 @@ export default function ResumePreviewPanel({ resumeReady, resumeName, busy, onRe
   }, [resumeReady, resumeName]);
 
   const isPdf = fileType.includes("pdf") || resumeName.toLowerCase().endsWith(".pdf");
+  const uploadLoading = uploadState.status === "loading";
 
   return (
     <section>
@@ -84,8 +86,23 @@ export default function ResumePreviewPanel({ resumeReady, resumeName, busy, onRe
             <p>{resumeReady ? resumeName || "Resume saved" : "Upload a PDF, DOC, or DOCX file."}</p>
           </div>
           <label className="workspace-primary">
-            {busy ? "Working..." : resumeReady ? "Upload or replace resume" : "Upload resume"}
-            <input hidden type="file" accept=".pdf,.doc,.docx" disabled={busy} onChange={(event) => event.target.files?.[0] && onResumeUpload(event.target.files[0])} />
+            {uploadLoading ? "Uploading resume…" : resumeReady ? "Upload or replace resume" : "Upload resume"}
+            <input
+              hidden
+              type="file"
+              accept=".pdf,.doc,.docx"
+              disabled={uploadLoading}
+              onChange={async (event) => {
+                const input = event.currentTarget;
+                const file = input.files?.[0];
+                if (!file) return;
+                try {
+                  await onResumeUpload(file);
+                } finally {
+                  input.value = "";
+                }
+              }}
+            />
           </label>
         </div>
 
@@ -96,8 +113,8 @@ export default function ResumePreviewPanel({ resumeReady, resumeName, busy, onRe
               {previewUrl && <a href={previewUrl} target="_blank" rel="noreferrer">Open in new tab</a>}
             </div>
 
-            {loadingPreview && <div className="workspace-resume-preview-state">Loading secure preview...</div>}
-            {previewError && <div className="workspace-resume-preview-state is-error">{previewError}</div>}
+            {loadingPreview && <div className="workspace-resume-preview-state" role="status" aria-live="polite">Loading secure preview…</div>}
+            {previewError && <div className="workspace-resume-preview-state is-error" role="alert">{previewError}</div>}
             {!loadingPreview && !previewError && previewUrl && isPdf && (
               <iframe src={previewUrl} title={`${resumeName || "Resume"} preview`} />
             )}

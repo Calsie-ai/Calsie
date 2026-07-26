@@ -6,12 +6,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers/AuthProvider";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import { safeInternalPath } from "../../lib/navigation";
+import { normaliseAppError, withActionTimeout } from "../../lib/actionState";
 
 function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { status, refresh } = useAuth();
   const exchangeStarted = useRef(false);
+  const submissionStarted = useRef(false);
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState("");
@@ -24,23 +26,27 @@ function ResetPasswordContent() {
     const code = searchParams.get("code");
     if (!code || exchangeStarted.current) return;
     exchangeStarted.current = true;
+    let active = true;
 
-    void getSupabaseClient().auth.exchangeCodeForSession(code)
-      .then(({ error }) => {
+    async function exchangeCode() {
+      try {
+        const { error } = await withActionTimeout(getSupabaseClient().auth.exchangeCodeForSession(code!));
         if (error) throw error;
-        return refresh();
-      })
-      .catch((error) => {
-        setRecoveryError(error instanceof Error ? error.message : "This password reset link is invalid or expired.");
-      })
-      .finally(() => {
-        setExchangePending(false);
-      });
+        await refresh();
+      } catch (error) {
+        if (active) setRecoveryError(normaliseAppError(error, "This password reset link is invalid or expired.") || "");
+      } finally {
+        if (active) setExchangePending(false);
+      }
+    }
+
+    void exchangeCode();
+    return () => { active = false; };
   }, [refresh, searchParams]);
 
   async function updatePassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving) return;
+    if (submissionStarted.current) return;
     if (password.length < 8) {
       setMessage("Use at least 8 characters for your new password.");
       return;
@@ -50,16 +56,19 @@ function ResetPasswordContent() {
       return;
     }
 
+    submissionStarted.current = true;
     setSaving(true);
     setMessage("");
     try {
-      const { error } = await getSupabaseClient().auth.updateUser({ password });
+      const { error } = await withActionTimeout(getSupabaseClient().auth.updateUser({ password }));
       if (error) throw error;
       setMessage("Password updated. Returning you to Applix…");
       router.replace(nextPath);
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not update your password.");
+      setMessage(normaliseAppError(error, "Could not update your password.") || "");
+    } finally {
+      submissionStarted.current = false;
       setSaving(false);
     }
   }
@@ -111,7 +120,7 @@ function ResetPasswordContent() {
             <button disabled={saving} style={saving ? styles.loadingButton : styles.primaryButton} type="submit">
               {saving ? "Updating password…" : "Update password"}
             </button>
-            {message ? <p aria-live="polite" role="status" style={styles.message}>{message}</p> : null}
+            {message ? <p aria-live={message.startsWith("Password updated") ? "polite" : "assertive"} role={message.startsWith("Password updated") ? "status" : "alert"} style={styles.message}>{message}</p> : null}
           </form>
         )}
       </section>

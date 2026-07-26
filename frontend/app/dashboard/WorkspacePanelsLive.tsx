@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
+import { normaliseAppError } from "../../lib/actionState";
 import { inferAustralianPostcode, normaliseAustralianPostcode } from "../../lib/australianPostcode";
 import { savePendingIntent, type PendingIntentV1 } from "../../lib/pendingIntent";
 import OverviewDashboard from "./OverviewDashboard";
@@ -92,22 +93,30 @@ export default function WorkspacePanelsLive(props: Props) {
 
   useEffect(() => {
     if (props.active !== "templates") return;
-    let alive = true;
+    const controller = new AbortController();
     setLoading(true);
     setError("");
-    const supabase = getSupabaseClient();
-    void supabase
-      .from("campaign_templates")
-      .select("id,slug,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required")
-      .eq("is_active", true)
-      .order("updated_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (!alive) return;
-        if (error) setError(error.message);
-        else setTemplates(((data || []) as Row[]).map(mapTemplate));
-        setLoading(false);
-      });
-    return () => { alive = false; };
+
+    async function loadTemplates() {
+      try {
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from("campaign_templates")
+          .select("id,slug,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required")
+          .eq("is_active", true)
+          .order("updated_at", { ascending: false })
+          .abortSignal(controller.signal);
+        if (error) throw error;
+        if (!controller.signal.aborted) setTemplates(((data || []) as Row[]).map(mapTemplate));
+      } catch (error) {
+        if (!controller.signal.aborted) setError(normaliseAppError(error, "Could not load templates.") || "");
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+
+    void loadTemplates();
+    return () => controller.abort();
   }, [props.active]);
 
   useEffect(() => {
@@ -208,7 +217,7 @@ export default function WorkspacePanelsLive(props: Props) {
   }
 
   if (props.active === "resume") {
-    return <ResumePreviewPanel resumeReady={props.resumeReady} resumeName={props.resumeName} busy={props.busy} onResumeUpload={props.onResumeUpload} />;
+    return <ResumePreviewPanel resumeReady={props.resumeReady} resumeName={props.resumeName} uploadState={props.actionStates.uploadResume} onResumeUpload={props.onResumeUpload} />;
   }
 
   if (props.active === "approve" || props.active === "tracker") {
@@ -316,8 +325,8 @@ export default function WorkspacePanelsLive(props: Props) {
         <>
           <label className="template-search-label" htmlFor="template-search">Search templates or job roles</label>
           <input id="template-search" className="workspace-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search templates or job roles" />
-          {loading && <div className="workspace-message">Loading templates...</div>}
-          {error && <div className="workspace-message">Could not load templates: {error}</div>}
+          {loading && <div className="workspace-message" role="status" aria-live="polite">Loading templates…</div>}
+          {error && <div className="workspace-message" role="alert">{error}</div>}
           <div className="template-canva-grid">
             {visible.map((item) => (
               <article className="template-canva-card" key={item.id}>
