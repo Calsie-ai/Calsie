@@ -150,7 +150,7 @@ begin
     'paid',
     'none',
     0,
-    30,
+    30::smallint,
     now(),
     '{"test_fixture":"paid_a"}'::jsonb
   );

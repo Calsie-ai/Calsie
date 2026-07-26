@@ -10,6 +10,7 @@
     "test:dashboard-navigation": "node --experimental-strip-types --test tests/dashboardNavigation.test.mts",
     "test:action-state": "node --experimental-strip-types --test tests/actionState.test.mts",
     "test:external-return": "node --experimental-strip-types --test tests/externalReturn.test.mts",
+    "test:payment-status-refund": "node --experimental-strip-types --test tests/paymentStatusRefund.test.mts",
     "test:stripe-webhook": "node --experimental-strip-types --test tests/stripeWebhookHardening.test.mts"
   },
   "dependencies": {

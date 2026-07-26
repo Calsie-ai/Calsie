@@ -5,6 +5,7 @@ import {
   type PaymentVerificationResponse,
   type PaymentVerificationStatus,
 } from "../../../../lib/externalReturn";
+import { verificationStatusForPurchase } from "../../../../lib/paymentVerification";
 
 export const runtime = "nodejs";
 
@@ -36,14 +37,6 @@ type PurchaseRow = {
 
 const INTENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,191}$/;
 const TEMPLATE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
-const TERMINAL_FAILURE_STATUSES = new Set([
-  "cancelled",
-  "expired",
-  "partially_refunded",
-  "payment_failed",
-  "fully_refunded",
-]);
-
 function getStripe() {
   return STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 }
@@ -113,10 +106,7 @@ async function paymentIntentIsValid(
     return false;
   }
 
-  const chargeId = objectId(paymentIntent.latest_charge);
-  if (!chargeId) return true;
-  const charge = await stripe.charges.retrieve(chargeId);
-  return !charge.refunded && charge.amount_refunded === 0;
+  return true;
 }
 
 export async function POST(req: Request) {
@@ -186,13 +176,6 @@ export async function POST(req: Request) {
     if (!purchase) {
       return response("pending", { checkoutSessionId });
     }
-    if (purchase.purchase_status && TERMINAL_FAILURE_STATUSES.has(purchase.purchase_status)) {
-      const terminalStatus = purchase.purchase_status === "expired"
-        ? "expired"
-        : "failed";
-      return response(terminalStatus, { checkoutSessionId });
-    }
-
     const persistedIntentId = String(purchase.pending_intent_id || "");
     const persistedExpectedAmount = Number(purchase.expected_amount);
     const persistedActualAmount = Number(purchase.actual_amount);
@@ -216,14 +199,13 @@ export async function POST(req: Request) {
         checkoutSessionId,
       });
     }
-    if (
-      purchase.purchase_status !== "paid"
-      || (
-        purchase.payment_status !== "paid"
-        && purchase.payment_status !== "no_payment_required"
-      )
-    ) {
-      return response("pending", { checkoutSessionId });
+
+    const purchaseVerificationStatus = verificationStatusForPurchase(
+      purchase.purchase_status,
+      purchase.payment_status,
+    );
+    if (purchaseVerificationStatus !== "confirmed") {
+      return response(purchaseVerificationStatus, { checkoutSessionId });
     }
 
     if (!(await paymentIntentIsValid(stripe, session))) {

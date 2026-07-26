@@ -211,31 +211,43 @@ export async function POST(req: Request) {
     if (!session.url) {
       throw new Error("Stripe did not return a checkout URL.");
     }
+    if (session.status !== "open") {
+      throw new Error("Stripe Checkout Session is not open.");
+    }
 
-    await registerCheckoutPurchase({
-      userId: currentUser.id,
-      email: currentUser.email || null,
-      customerId: typeof session.customer === "string" ? session.customer : session.customer?.id || null,
-      checkoutSessionId: session.id,
-      checkoutCreatedAt: new Date(session.created * 1000).toISOString(),
-      templateId: template.id,
-      planName: templateName,
-      expectedAmount: template.price_amount,
-      currency,
-      livemode: session.livemode,
-      postcode,
-      pendingIntentId: intentId,
-      safeMetadata: {
-        pending_intent_id: intentId,
-        template_slug: template.slug,
-        price_label: template.price_label || "one-time",
-        expected_price_amount: template.price_amount,
-        return_panel: "templates",
-        return_path: returnPath,
-        originating_path: originatingPath,
-        intended_action: "continue_to_checkout",
-      },
-    });
+    try {
+      await registerCheckoutPurchase({
+        userId: currentUser.id,
+        email: currentUser.email || null,
+        customerId: typeof session.customer === "string" ? session.customer : session.customer?.id || null,
+        checkoutSessionId: session.id,
+        checkoutCreatedAt: new Date(session.created * 1000).toISOString(),
+        templateId: template.id,
+        planName: templateName,
+        expectedAmount: template.price_amount,
+        currency,
+        livemode: session.livemode,
+        postcode,
+        pendingIntentId: intentId,
+        safeMetadata: {
+          pending_intent_id: intentId,
+          template_slug: template.slug,
+          price_label: template.price_label || "one-time",
+          expected_price_amount: template.price_amount,
+          return_panel: "templates",
+          return_path: returnPath,
+          originating_path: originatingPath,
+          intended_action: "continue_to_checkout",
+        },
+      });
+    } catch {
+      try {
+        await stripe.checkout.sessions.expire(session.id);
+      } catch {
+        // The checkout URL is never returned when persistence fails.
+      }
+      throw new Error("Could not persist Checkout Session.");
+    }
 
     return NextResponse.json({
       ok: true,
