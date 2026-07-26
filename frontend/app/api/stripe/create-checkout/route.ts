@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { createHash } from "node:crypto";
 import { STRIPE_CANCEL_PATH, STRIPE_SUCCESS_PATH } from "../../../../lib/externalReturn";
 import { safeInternalPath } from "../../../../lib/navigation";
+import { registerCheckoutPurchase } from "../../../../lib/server/stripeWebhookStore";
 import { resolveAppOrigin } from "../../../../lib/serverOrigin";
 
 export const runtime = "nodejs";
@@ -96,59 +97,6 @@ async function getTemplate(templateId: string) {
   const rows = await response.json().catch(() => []);
   if (!response.ok) throw new Error("Could not load the selected template.");
   return (Array.isArray(rows) ? rows[0] : null) as TemplateRow | null;
-}
-
-async function upsertPendingCheckout(params: {
-  userId: string;
-  email: string | null;
-  customerId: string | null;
-  sessionId: string;
-  template: TemplateRow;
-  postcode: string;
-  intentId: string;
-  originatingPath: string;
-  returnPath: string;
-}) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/applix_subscriptions?on_conflict=user_id`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      Prefer: "resolution=merge-duplicates,return=minimal",
-    },
-    body: JSON.stringify({
-      user_id: params.userId,
-      email: params.email,
-      stripe_customer_id: params.customerId,
-      stripe_subscription_id: null,
-      stripe_checkout_session_id: params.sessionId,
-      stripe_payment_intent_id: null,
-      status: "checkout_started",
-      plan_name: params.template.campaign_name || params.template.title,
-      price_amount: params.template.price_amount,
-      currency: params.template.currency.toLowerCase(),
-      current_period_end: null,
-      template_id: params.template.id,
-      postcode: params.postcode,
-      checkout_metadata: {
-        pending_intent_id: params.intentId,
-        template_slug: params.template.slug,
-        price_label: params.template.price_label || "one-time",
-        expected_price_amount: params.template.price_amount,
-        return_panel: "templates",
-        return_path: params.returnPath,
-        originating_path: params.originatingPath,
-        intended_action: "continue_to_checkout",
-      },
-      updated_at: new Date().toISOString(),
-    }),
-  });
-
-  if (!response.ok) {
-    const details = await response.text().catch(() => "");
-    throw new Error(`Could not save checkout status${details ? `: ${details.slice(0, 240)}` : "."}`);
-  }
 }
 
 export async function POST(req: Request) {
@@ -264,16 +212,29 @@ export async function POST(req: Request) {
       throw new Error("Stripe did not return a checkout URL.");
     }
 
-    await upsertPendingCheckout({
+    await registerCheckoutPurchase({
       userId: currentUser.id,
       email: currentUser.email || null,
       customerId: typeof session.customer === "string" ? session.customer : session.customer?.id || null,
-      sessionId: session.id,
-      template,
+      checkoutSessionId: session.id,
+      checkoutCreatedAt: new Date(session.created * 1000).toISOString(),
+      templateId: template.id,
+      planName: templateName,
+      expectedAmount: template.price_amount,
+      currency,
+      livemode: session.livemode,
       postcode,
-      intentId,
-      originatingPath,
-      returnPath,
+      pendingIntentId: intentId,
+      safeMetadata: {
+        pending_intent_id: intentId,
+        template_slug: template.slug,
+        price_label: template.price_label || "one-time",
+        expected_price_amount: template.price_amount,
+        return_panel: "templates",
+        return_path: returnPath,
+        originating_path: originatingPath,
+        intended_action: "continue_to_checkout",
+      },
     });
 
     return NextResponse.json({

@@ -22,11 +22,13 @@ type StatusBody = {
 };
 
 type PurchaseRow = {
-  checkout_metadata?: Record<string, unknown> | null;
+  actual_amount?: number | null;
   currency?: string | null;
+  expected_amount?: number | null;
+  payment_status?: string | null;
+  pending_intent_id?: string | null;
   postcode?: string | null;
-  price_amount?: number | null;
-  status?: string | null;
+  purchase_status?: string | null;
   stripe_checkout_session_id?: string | null;
   template_id?: string | null;
   user_id?: string | null;
@@ -37,9 +39,9 @@ const TEMPLATE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const TERMINAL_FAILURE_STATUSES = new Set([
   "cancelled",
   "expired",
-  "failed",
+  "partially_refunded",
   "payment_failed",
-  "refunded",
+  "fully_refunded",
 ]);
 
 function getStripe() {
@@ -75,10 +77,10 @@ async function getPurchase(userId: string, checkoutSessionId: string) {
   const query = new URLSearchParams({
     user_id: `eq.${userId}`,
     stripe_checkout_session_id: `eq.${checkoutSessionId}`,
-    select: "user_id,stripe_checkout_session_id,status,template_id,postcode,price_amount,currency,checkout_metadata",
+    select: "user_id,stripe_checkout_session_id,purchase_status,payment_status,pending_intent_id,template_id,postcode,expected_amount,actual_amount,currency",
     limit: "1",
   });
-  const result = await fetch(`${SUPABASE_URL}/rest/v1/applix_subscriptions?${query.toString()}`, {
+  const result = await fetch(`${SUPABASE_URL}/rest/v1/applix_purchases?${query.toString()}`, {
     headers: {
       apikey: SUPABASE_SERVICE_ROLE_KEY,
       Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
@@ -184,18 +186,18 @@ export async function POST(req: Request) {
     if (!purchase) {
       return response("pending", { checkoutSessionId });
     }
-    if (purchase.status && TERMINAL_FAILURE_STATUSES.has(purchase.status)) {
-      const terminalStatus = purchase.status === "expired"
+    if (purchase.purchase_status && TERMINAL_FAILURE_STATUSES.has(purchase.purchase_status)) {
+      const terminalStatus = purchase.purchase_status === "expired"
         ? "expired"
-        : purchase.status === "cancelled"
-          ? "cancelled"
-          : "failed";
+        : "failed";
       return response(terminalStatus, { checkoutSessionId });
     }
 
-    const persistedIntentId = String(purchase.checkout_metadata?.pending_intent_id || "");
-    const persistedAmount = Number(purchase.price_amount);
+    const persistedIntentId = String(purchase.pending_intent_id || "");
+    const persistedExpectedAmount = Number(purchase.expected_amount);
+    const persistedActualAmount = Number(purchase.actual_amount);
     const persistedCurrency = String(purchase.currency || "").toLowerCase();
+    const stripeExpectedAmount = Number(session.amount_subtotal ?? 0);
     const stripeAmount = Number(session.amount_total ?? 0);
     const stripeCurrency = String(session.currency || "").toLowerCase();
     const rowMatches = (
@@ -204,16 +206,23 @@ export async function POST(req: Request) {
       && purchase.template_id === templateId
       && (!postcode || purchase.postcode === postcode)
       && persistedIntentId === intentId
-      && persistedAmount === stripeAmount
+      && persistedExpectedAmount === stripeExpectedAmount
+      && persistedActualAmount === stripeAmount
       && persistedCurrency === stripeCurrency
     );
 
     if (!rowMatches) {
-      return response(purchase.status === "checkout_started" ? "pending" : "mismatch", {
+      return response(purchase.purchase_status === "checkout_started" ? "pending" : "mismatch", {
         checkoutSessionId,
       });
     }
-    if (purchase.status !== "active") {
+    if (
+      purchase.purchase_status !== "paid"
+      || (
+        purchase.payment_status !== "paid"
+        && purchase.payment_status !== "no_payment_required"
+      )
+    ) {
       return response("pending", { checkoutSessionId });
     }
 
