@@ -9,7 +9,8 @@
     "test:pending-intent": "node --experimental-strip-types --test tests/pendingIntent.test.mts",
     "test:dashboard-navigation": "node --experimental-strip-types --test tests/dashboardNavigation.test.mts",
     "test:action-state": "node --experimental-strip-types --test tests/actionState.test.mts",
-    "test:external-return": "node --experimental-strip-types --test tests/externalReturn.test.mts"
+    "test:external-return": "node --experimental-strip-types --test tests/externalReturn.test.mts",
+    "test:stripe-webhook": "node --experimental-strip-types --test tests/stripeWebhookHardening.test.mts"
   },
   "dependencies": {
     "@supabase/supabase-js": "latest",

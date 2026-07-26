@@ -243,8 +243,8 @@ test("no-payment-required verification skips PaymentIntent retrieval", () => {
 });
 
 test("webhook persists Stripe actual total rather than the catalogue price", () => {
-  assert.match(webhookSource, /paidAmount = Number\(session\.amount_total \?\? listedPrice\)/);
-  assert.match(webhookSource, /price_amount: paidAmount/);
+  assert.match(webhookSource, /receiveStripeEvent/);
+  assert.match(paymentStatusSource, /persistedActualAmount === stripeAmount/);
 });
 
 test("dashboard consumes pending intent only inside confirmed payment handling", () => {
