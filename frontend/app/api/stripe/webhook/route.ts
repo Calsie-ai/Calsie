@@ -8,7 +8,9 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 
-const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
+function getStripe() {
+  return STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
+}
 
 type SubscriptionPayload = {
   user_id: string | null;
@@ -84,9 +86,11 @@ async function saveCheckoutSession(session: Stripe.Checkout.Session, forcedStatu
   const postcode = cleanPostcode(session.metadata?.postcode);
   const planName = session.metadata?.template_name || session.metadata?.plan_name || "Applix campaign";
   const listedPrice = integerMetadata(session.metadata?.price_amount, Number(session.amount_subtotal || session.amount_total || 0));
+  const paidAmount = Number(session.amount_total ?? listedPrice);
   const currency = (session.metadata?.currency || session.currency || "aud").toLowerCase();
 
   let subscription: Stripe.Subscription | null = null;
+  const stripe = getStripe();
   if (stripe && subscriptionId) {
     subscription = await stripe.subscriptions.retrieve(subscriptionId);
   }
@@ -102,7 +106,7 @@ async function saveCheckoutSession(session: Stripe.Checkout.Session, forcedStatu
     stripe_payment_intent_id: paymentIntentId,
     status,
     plan_name: planName,
-    price_amount: listedPrice,
+    price_amount: paidAmount,
     currency,
     current_period_end: subscription ? getPeriodEnd(subscription) : null,
     template_id: templateId,
@@ -113,6 +117,12 @@ async function saveCheckoutSession(session: Stripe.Checkout.Session, forcedStatu
       payment_status: session.payment_status,
       template_slug: session.metadata?.template_slug || null,
       price_label: session.metadata?.price_label || null,
+      pending_intent_id: session.metadata?.pending_intent_id || null,
+      return_panel: session.metadata?.return_panel || null,
+      return_path: session.metadata?.return_path || null,
+      originating_path: session.metadata?.originating_path || null,
+      intended_action: session.metadata?.intended_action || null,
+      expected_price_amount: listedPrice,
       amount_subtotal: session.amount_subtotal,
       amount_discount: session.total_details?.amount_discount ?? 0,
       amount_total: session.amount_total,
@@ -150,6 +160,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
 export async function POST(req: Request) {
   try {
+    const stripe = getStripe();
     if (!stripe || !STRIPE_SECRET_KEY) {
       return NextResponse.json({ ok: false, error: "Missing STRIPE_SECRET_KEY." }, { status: 500 });
     }

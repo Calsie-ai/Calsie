@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { createHash } from "node:crypto";
+import { STRIPE_CANCEL_PATH, STRIPE_SUCCESS_PATH } from "../../../../lib/externalReturn";
+import { safeInternalPath } from "../../../../lib/navigation";
+import { resolveAppOrigin } from "../../../../lib/serverOrigin";
 
 export const runtime = "nodejs";
 
@@ -7,12 +11,18 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bnshgtrqbf
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://calsie.com.au");
 
-const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
+function getStripe() {
+  return STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
+}
 
 type CheckoutBody = {
   access_token?: string;
+  intent_id?: string;
+  intended_action?: string;
+  originating_path?: string;
+  return_path?: string;
+  return_panel?: string;
   template_id?: string;
   postcode?: string;
 };
@@ -95,6 +105,9 @@ async function upsertPendingCheckout(params: {
   sessionId: string;
   template: TemplateRow;
   postcode: string;
+  intentId: string;
+  originatingPath: string;
+  returnPath: string;
 }) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/applix_subscriptions?on_conflict=user_id`, {
     method: "POST",
@@ -119,8 +132,14 @@ async function upsertPendingCheckout(params: {
       template_id: params.template.id,
       postcode: params.postcode,
       checkout_metadata: {
+        pending_intent_id: params.intentId,
         template_slug: params.template.slug,
         price_label: params.template.price_label || "one-time",
+        expected_price_amount: params.template.price_amount,
+        return_panel: "templates",
+        return_path: params.returnPath,
+        originating_path: params.originatingPath,
+        intended_action: "continue_to_checkout",
       },
       updated_at: new Date().toISOString(),
     }),
@@ -138,6 +157,9 @@ export async function POST(req: Request) {
     const accessToken = body.access_token?.trim();
     const templateId = body.template_id?.trim();
     const postcode = cleanPostcode(body.postcode);
+    const intentId = body.intent_id?.trim() || "";
+    const returnPath = safeInternalPath(body.return_path, "/dashboard?panel=templates");
+    const originatingPath = safeInternalPath(body.originating_path, "/payment?restoreIntent=1");
 
     if (!accessToken) {
       return NextResponse.json({ ok: false, error: "Missing access token." }, { status: 401 });
@@ -148,6 +170,19 @@ export async function POST(req: Request) {
     if (!validAustralianPostcode(postcode)) {
       return NextResponse.json({ ok: false, error: "Enter a valid 4-digit Australian postcode." }, { status: 400 });
     }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{7,191}$/.test(intentId)) {
+      return NextResponse.json({ ok: false, error: "The saved checkout draft is invalid. Return to templates and try again." }, { status: 400 });
+    }
+    if (body.return_panel !== "templates" || body.intended_action !== "continue_to_checkout") {
+      return NextResponse.json({ ok: false, error: "The checkout return state is invalid." }, { status: 400 });
+    }
+    if (returnPath !== body.return_path || !returnPath.startsWith("/dashboard?")) {
+      return NextResponse.json({ ok: false, error: "The checkout return path is invalid." }, { status: 400 });
+    }
+    if (originatingPath !== body.originating_path || !originatingPath.startsWith("/payment")) {
+      return NextResponse.json({ ok: false, error: "The checkout origin path is invalid." }, { status: 400 });
+    }
+    const stripe = getStripe();
     if (!stripe || !STRIPE_SECRET_KEY) {
       return NextResponse.json({ ok: false, error: "Missing STRIPE_SECRET_KEY in Vercel." }, { status: 500 });
     }
@@ -186,20 +221,19 @@ export async function POST(req: Request) {
       price_amount: String(template.price_amount),
       currency,
       price_label: template.price_label || "one-time",
+      pending_intent_id: intentId,
+      return_panel: "templates",
+      return_path: returnPath,
+      originating_path: originatingPath,
+      intended_action: "continue_to_checkout",
     };
 
-    const successParams = new URLSearchParams({
-      payment: "success",
-      template: template.id,
-      postcode,
-    });
-    const cancelParams = new URLSearchParams({
-      template: template.id,
-      postcode,
-      payment: "cancelled",
-    });
-    const successUrl = `${APP_URL}/dashboard?${successParams.toString()}&session_id={CHECKOUT_SESSION_ID}`;
+    const appOrigin = resolveAppOrigin();
 
+    const idempotencyKey = `applix-checkout-${createHash("sha256")
+      .update(`${currentUser.id}:${intentId}:${template.id}:${postcode}`)
+      .digest("hex")
+      .slice(0, 40)}`;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer_email: currentUser.email || undefined,
@@ -219,12 +253,12 @@ export async function POST(req: Request) {
         },
         quantity: 1,
       }],
-      success_url: successUrl,
-      cancel_url: `${APP_URL}/payment?${cancelParams.toString()}`,
+      success_url: `${appOrigin}${STRIPE_SUCCESS_PATH}`,
+      cancel_url: `${appOrigin}${STRIPE_CANCEL_PATH}`,
       metadata,
       payment_intent_data: { metadata },
       allow_promotion_codes: true,
-    });
+    }, { idempotencyKey });
 
     if (!session.url) {
       throw new Error("Stripe did not return a checkout URL.");
@@ -237,6 +271,9 @@ export async function POST(req: Request) {
       sessionId: session.id,
       template,
       postcode,
+      intentId,
+      originatingPath,
+      returnPath,
     });
 
     return NextResponse.json({
@@ -249,6 +286,6 @@ export async function POST(req: Request) {
       mode: "payment",
     });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Could not create checkout." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Could not create secure checkout. Your campaign details were kept." }, { status: 500 });
   }
 }
