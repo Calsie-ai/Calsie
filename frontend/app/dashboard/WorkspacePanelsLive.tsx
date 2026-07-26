@@ -1,19 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ComponentProps } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import { inferAustralianPostcode, normaliseAustralianPostcode } from "../../lib/australianPostcode";
+import { savePendingIntent, type PendingIntentV1 } from "../../lib/pendingIntent";
 import OverviewDashboard from "./OverviewDashboard";
 import ResumePreviewPanel from "./ResumePreviewPanel";
 import WorkspacePanels from "./WorkspacePanels";
 import { isCampaignRunning, type CampaignTemplate } from "./workspace-data";
 
 type BaseProps = ComponentProps<typeof WorkspacePanels>;
-type Props = BaseProps & { approvedCount: number; passedCount: number; purchasedTemplate?: CampaignTemplate | null; onOpenTracker: () => void };
+type Props = BaseProps & {
+  approvedCount: number;
+  passedCount: number;
+  purchasedTemplate?: CampaignTemplate | null;
+  pendingIntent: PendingIntentV1 | null;
+  userHint: string;
+  onPendingIntentChange: (intent: PendingIntentV1 | null) => void;
+  onPendingIntentRestored: (intentId: string) => void;
+  onOpenTracker: () => void;
+};
 
 type Row = {
   id: string;
+  slug: string;
   title: string;
   campaign_name: string;
   image_url: string | null;
@@ -38,6 +49,7 @@ type Row = {
 export function mapTemplate(row: Row): CampaignTemplate {
   return {
     id: row.id,
+    slug: row.slug || undefined,
     title: row.title,
     campaignName: row.campaign_name || `${row.title} Campaign`,
     imageUrl: row.image_url,
@@ -75,6 +87,8 @@ export default function WorkspacePanelsLive(props: Props) {
   const [checkoutError, setCheckoutError] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const intentIdRef = useRef("");
+  const restoredIntentIdRef = useRef("");
 
   useEffect(() => {
     if (props.active !== "templates") return;
@@ -84,7 +98,7 @@ export default function WorkspacePanelsLive(props: Props) {
     const supabase = getSupabaseClient();
     void supabase
       .from("campaign_templates")
-      .select("id,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required")
+      .select("id,slug,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required")
       .eq("is_active", true)
       .order("updated_at", { ascending: false })
       .then(({ data, error }) => {
@@ -96,6 +110,42 @@ export default function WorkspacePanelsLive(props: Props) {
     return () => { alive = false; };
   }, [props.active]);
 
+  useEffect(() => {
+    intentIdRef.current = props.pendingIntent?.type === "purchase_template"
+      ? props.pendingIntent.id
+      : "";
+    if (props.pendingIntent || !restoredIntentIdRef.current) return;
+    restoredIntentIdRef.current = "";
+    setSelected(null);
+    setPostcode("");
+    setPostcodeTouched(false);
+    setCheckoutError("");
+  }, [props.pendingIntent]);
+
+  useEffect(() => {
+    const intent = props.pendingIntent;
+    if (
+      props.active !== "templates"
+      || intent?.type !== "purchase_template"
+      || restoredIntentIdRef.current === intent.id
+      || templates.length === 0
+    ) return;
+
+    const template = templates.find((item) => item.id === intent.templateId);
+    if (!template) {
+      setCheckoutError("The saved campaign template is no longer available. Your draft was kept so you can discard it or try again later.");
+      return;
+    }
+
+    setSelected(template);
+    setPostcode(intent.postcode || "");
+    setPostcodeTouched(Boolean(intent.postcode));
+    setCheckoutNavigating(false);
+    setCheckoutError("");
+    restoredIntentIdRef.current = intent.id;
+    props.onPendingIntentRestored(intent.id);
+  }, [props.active, props.onPendingIntentRestored, props.pendingIntent, templates]);
+
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return templates.filter((item) => !needle || `${item.title} ${item.campaignName} ${item.role} ${item.category} ${item.description}`.toLowerCase().includes(needle));
@@ -103,12 +153,32 @@ export default function WorkspacePanelsLive(props: Props) {
 
   const postcodeInfo = useMemo(() => inferAustralianPostcode(postcode.trim()), [postcode]);
 
+  function persistTemplateIntent(item: CampaignTemplate, nextPostcode: string) {
+    const saved = savePendingIntent({
+      id: intentIdRef.current || undefined,
+      type: "purchase_template",
+      returnPath: "/dashboard?panel=templates&restoreIntent=1",
+      panel: "templates",
+      templateId: item.id,
+      templateSlug: item.slug,
+      postcode: nextPostcode || undefined,
+      currentStep: "review",
+      intendedAction: "continue_to_checkout",
+      userHint: props.userHint,
+    });
+    if (!saved) return null;
+    intentIdRef.current = saved.id;
+    props.onPendingIntentChange(saved);
+    return saved;
+  }
+
   function openTemplate(item: CampaignTemplate) {
     setSelected(item);
     setPostcode("");
     setPostcodeTouched(false);
     setCheckoutNavigating(false);
     setCheckoutError("");
+    persistTemplateIntent(item, "");
   }
 
   function continueToCheckout() {
@@ -124,23 +194,13 @@ export default function WorkspacePanelsLive(props: Props) {
     }
     if (checkoutNavigating) return;
 
-    setCheckoutNavigating(true);
-    const params = new URLSearchParams({
-      template: selected.id,
-      postcode: postcodeInfo.postcode,
-      state: postcodeInfo.state,
-      region: postcodeInfo.region,
-      location: postcodeInfo.label,
-    });
-
-    try {
-      window.sessionStorage.setItem("applix_selected_template_id", selected.id);
-      window.sessionStorage.setItem("applix_campaign_postcode", postcodeInfo.postcode);
-    } catch {
-      // Checkout also receives both values in the URL, so storage failure is non-blocking.
+    if (!persistTemplateIntent(selected, postcodeInfo.postcode)) {
+      setCheckoutError("Could not safely save this campaign draft. Check browser storage permissions and try again.");
+      return;
     }
 
-    router.push(`/payment?${params.toString()}`);
+    setCheckoutNavigating(true);
+    router.push("/payment?restoreIntent=1");
   }
 
   if (props.active === "overview") {
@@ -216,8 +276,10 @@ export default function WorkspacePanelsLive(props: Props) {
                 value={postcode}
                 onBlur={() => setPostcodeTouched(true)}
                 onChange={(event) => {
-                  setPostcode(normaliseAustralianPostcode(event.target.value.trim()));
+                  const nextPostcode = normaliseAustralianPostcode(event.target.value.trim());
+                  setPostcode(nextPostcode);
                   setCheckoutError("");
+                  persistTemplateIntent(selected, nextPostcode);
                 }}
                 placeholder="Example: 2141"
                 aria-invalid={postcodeTouched && !postcodeInfo.valid}
