@@ -2,8 +2,11 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "../providers/AuthProvider";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import { inferAustralianPostcode } from "../../lib/australianPostcode";
+import { loginPathFor } from "../../lib/navigation";
+import { readPendingIntent, savePendingIntent, type PendingIntentV1 } from "../../lib/pendingIntent";
 import styles from "./payment.module.css";
 
 type TemplateCheckout = {
@@ -38,8 +41,13 @@ function money(amount: number, currency = "aud") {
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const templateId = searchParams.get("template")?.trim() || "";
-  const postcode = searchParams.get("postcode")?.trim() || "";
+  const { session, status, user } = useAuth();
+  const legacyTemplateId = searchParams.get("template")?.trim() || "";
+  const legacyPostcode = searchParams.get("postcode")?.trim() || "";
+  const [purchaseIntent, setPurchaseIntent] = useState<PendingIntentV1 | null>(null);
+  const [intentLoaded, setIntentLoaded] = useState(false);
+  const templateId = purchaseIntent?.templateId || legacyTemplateId;
+  const postcode = purchaseIntent?.postcode || legacyPostcode;
   const postcodeInfo = inferAustralianPostcode(postcode);
   const [template, setTemplate] = useState<TemplateCheckout | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,18 +55,50 @@ function CheckoutContent() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    const storedIntent = readPendingIntent();
+    setPurchaseIntent(storedIntent?.type === "purchase_template" ? storedIntent : null);
+    setIntentLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!intentLoaded || status === "loading") return;
     void load();
-  }, [templateId, postcode]);
+  }, [intentLoaded, postcode, purchaseIntent?.id, status, templateId, user?.id]);
 
   async function load() {
     setLoading(true);
     setMessage("");
     try {
-      const supabase = getSupabaseClient();
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) {
-        const next = `/payment?template=${encodeURIComponent(templateId)}&postcode=${encodeURIComponent(postcode)}`;
-        router.replace(`/login?next=${encodeURIComponent(next)}`);
+      if (status !== "authenticated" || !user) {
+        if (purchaseIntent) {
+          savePendingIntent({
+            id: purchaseIntent.id,
+            type: purchaseIntent.type,
+            returnPath: purchaseIntent.returnPath,
+            panel: purchaseIntent.panel,
+            templateId: purchaseIntent.templateId,
+            templateSlug: purchaseIntent.templateSlug,
+            postcode: purchaseIntent.postcode,
+            currentStep: purchaseIntent.currentStep,
+            intendedAction: purchaseIntent.intendedAction,
+            userHint: purchaseIntent.userHint,
+          });
+        } else if (templateId && postcodeInfo.valid) {
+          savePendingIntent({
+            type: "purchase_template",
+            returnPath: "/dashboard?panel=templates&restoreIntent=1",
+            panel: "templates",
+            templateId,
+            postcode: postcodeInfo.postcode,
+            currentStep: "review",
+            intendedAction: "continue_to_checkout",
+          });
+        }
+        router.replace(loginPathFor("/dashboard?panel=templates&restoreIntent=1"));
+        return;
+      }
+      if (purchaseIntent?.userHint && purchaseIntent.userHint !== user.id) {
+        setMessage("This saved campaign belongs to a different account. Return to templates to review or discard it.");
         return;
       }
       if (!templateId) {
@@ -69,7 +109,7 @@ function CheckoutContent() {
         setMessage("Return to the template and enter a valid Australian postcode before checkout.");
         return;
       }
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseClient()
         .from("campaign_templates")
         .select("id,title,campaign_name,role,location,description,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required")
         .eq("id", templateId)
@@ -96,12 +136,20 @@ function CheckoutContent() {
     setMessage("");
     try {
       const supabase = getSupabaseClient();
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      const accessToken = data.session?.access_token;
+      const accessToken = session?.access_token;
       if (!accessToken) {
-        const next = `/payment?template=${encodeURIComponent(template.id)}&postcode=${encodeURIComponent(postcodeInfo.postcode)}`;
-        router.replace(`/login?next=${encodeURIComponent(next)}`);
+        savePendingIntent({
+          id: purchaseIntent?.id,
+          type: "purchase_template",
+          returnPath: "/dashboard?panel=templates&restoreIntent=1",
+          panel: "templates",
+          templateId: template.id,
+          postcode: postcodeInfo.postcode,
+          currentStep: "review",
+          intendedAction: "continue_to_checkout",
+          userHint: purchaseIntent?.userHint,
+        });
+        router.replace(loginPathFor("/dashboard?panel=templates&restoreIntent=1"));
         return;
       }
 
