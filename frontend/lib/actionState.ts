@@ -4,6 +4,7 @@ export const DASHBOARD_ACTION_KEYS = [
   "useTemplate",
   "uploadResume",
   "connectGmail",
+  "verifyGmail",
   "revokeGmail",
   "startCampaign",
   "pauseCampaign",

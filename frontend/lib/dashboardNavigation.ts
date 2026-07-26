@@ -18,6 +18,8 @@ export const DASHBOARD_ONE_TIME_PARAMS = [
   "session_id",
   "template",
   "postcode",
+  "gmail",
+  "reason",
 ] as const;
 
 type DashboardOneTimeParam = (typeof DASHBOARD_ONE_TIME_PARAMS)[number];
@@ -28,6 +30,7 @@ type SearchParamsReader = {
 
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const CHECKOUT_SESSION_PATTERN = /^[A-Za-z0-9_]{8,200}$/;
+const GMAIL_REASON_PATTERN = /^[a-z_]{3,40}$/;
 
 const RETAINED_QUERY_PARAMS: ReadonlyArray<{
   name: DashboardOneTimeParam;
@@ -38,6 +41,8 @@ const RETAINED_QUERY_PARAMS: ReadonlyArray<{
   { name: "session_id", isValid: (value) => CHECKOUT_SESSION_PATTERN.test(value) },
   { name: "template", isValid: (value) => IDENTIFIER_PATTERN.test(value) },
   { name: "postcode", isValid: (value) => /^\d{4}$/.test(value) },
+  { name: "gmail", isValid: (value) => value === "connected" || value === "error" },
+  { name: "reason", isValid: (value) => GMAIL_REASON_PATTERN.test(value) },
 ];
 
 export function isDashboardPanel(value: unknown): value is WorkspaceTab {

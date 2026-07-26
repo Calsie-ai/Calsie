@@ -32,6 +32,18 @@ import {
   readPendingIntent,
   type PendingIntentV1,
 } from "../../lib/pendingIntent";
+import {
+  GMAIL_RETURN_PARAMS,
+  IDLE_EXTERNAL_RETURN,
+  PAYMENT_RETURN_PARAMS,
+  gmailReturnMessage,
+  isConfirmedPaymentStatus,
+  parseExternalReturn,
+  paymentVerificationKey,
+  transitionExternalReturn,
+  type ExternalReturnState,
+  type PaymentVerificationResponse,
+} from "../../lib/externalReturn";
 import WorkspaceSidebar from "./WorkspaceSidebar";
 import WorkspacePanelsLive, { mapTemplate } from "./WorkspacePanelsLive";
 import { CAMPAIGN_PLAN, isCampaignRunning, type CampaignRecord, type CampaignTemplate, type WorkspaceTab } from "./workspace-data";
@@ -57,7 +69,10 @@ export default function DashboardWorkspace() {
   const [unclaimedIntent, setUnclaimedIntent] = useState<PendingIntentV1 | null>(null);
   const [restoredIntentId, setRestoredIntentId] = useState("");
   const [paymentRetryNonce, setPaymentRetryNonce] = useState(0);
+  const [gmailRetryNonce, setGmailRetryNonce] = useState(0);
+  const [externalReturnState, setExternalReturnState] = useState<ExternalReturnState>(IDLE_EXTERNAL_RETURN);
   const paymentCheckRef = useRef("");
+  const gmailCheckRef = useRef("");
   const { abortAction, runAction, states: actionStates } = useActionStates(DASHBOARD_ACTION_KEYS);
 
   const reportError = useCallback((actionKey: DashboardActionKey, error: unknown, fallback: string) => {
@@ -88,23 +103,28 @@ export default function DashboardWorkspace() {
     if (status !== "authenticated" || !user) return;
     const currentParams = new URLSearchParams(query);
     const requestedPanel = currentParams.get("panel");
+    const externalReturn = parseExternalReturn(currentParams);
     const intent = readPendingIntent();
     const eligibleIntent = Boolean(
       intent
       && pendingIntentMatchesWorkflow(intent, pathname)
       && (!intent.userHint || intent.userHint === user.id),
     );
-    const shouldRestoreIntent = Boolean(
-      eligibleIntent
-      && intent
-      && (
-        currentParams.get("restoreIntent") === "1"
-        || currentParams.get("payment") === "success"
-        || requestedPanel === intent.panel
-      ),
-    );
+    const paymentReturn = externalReturn?.kind === "stripe_success" || externalReturn?.kind === "stripe_cancelled";
+    const gmailReturn = externalReturn?.kind === "gmail_connected" || externalReturn?.kind === "gmail_error";
+    const expectedPanel = paymentReturn ? "templates" : gmailReturn ? "gmail" : null;
+    const shouldRestoreIntent = Boolean(eligibleIntent && intent && (
+      currentParams.get("restoreIntent") === "1"
+      || paymentReturn
+      || requestedPanel === intent.panel
+    ));
 
-    if (shouldRestoreIntent && intent && requestedPanel !== intent.panel) {
+    if (expectedPanel && requestedPanel !== expectedPanel) {
+      router.replace(dashboardPanelPath(expectedPanel, currentParams));
+      return;
+    }
+
+    if (!expectedPanel && shouldRestoreIntent && intent && requestedPanel !== intent.panel) {
       router.replace(dashboardPanelPath(intent.panel, currentParams));
       return;
     }
@@ -115,11 +135,9 @@ export default function DashboardWorkspace() {
       return;
     }
 
-    if (!shouldRestoreIntent || !intent || !isDashboardPanel(requestedPanel)) return;
-
     let activeEffect = true;
     const applyRestoration = () => {
-      if (!activeEffect) return;
+      if (!activeEffect || !intent || !eligibleIntent) return;
       if (intent.userHint === user.id) {
         setPendingIntent(intent);
         setUnclaimedIntent(null);
@@ -129,17 +147,69 @@ export default function DashboardWorkspace() {
       }
     };
 
-    if (
-      currentParams.get("payment") === "success"
-      && intent.type === "purchase_template"
-      && session?.access_token
-    ) {
-      const paymentCheckKey = `${intent.id}:${currentParams.get("session_id") || "no-session"}`;
+    if (externalReturn?.kind === "stripe_cancelled") {
+      applyRestoration();
+      setExternalReturnState((state) => transitionExternalReturn(
+        transitionExternalReturn(state, { type: "return", kind: "stripe_cancelled" }),
+        { type: "cancel" },
+      ));
+      setNotice({
+        type: "warning",
+        message: "Checkout was cancelled. Your campaign details were kept.",
+        actionKey: "verifyPayment",
+      });
+      const completedPath = dashboardPathAfterProcessing(
+        "templates",
+        currentParams,
+        true,
+        PAYMENT_RETURN_PARAMS,
+      );
+      if (completedPath) router.replace(completedPath);
+      return () => {
+        activeEffect = false;
+      };
+    }
+
+    if (externalReturn?.kind === "stripe_success") {
+      applyRestoration();
+      const validPurchaseIntent = Boolean(
+        intent
+        && eligibleIntent
+        && intent.type === "purchase_template"
+        && intent.templateId
+        && intent.postcode,
+      );
+      if (externalReturn.invalidSession || !externalReturn.sessionId || !validPurchaseIntent || !intent || !session?.access_token) {
+        setExternalReturnState((state) => transitionExternalReturn(
+          transitionExternalReturn(state, { type: "return", kind: "stripe_success" }),
+          { type: "fail" },
+        ));
+        setNotice({
+          type: "error",
+          message: "This payment return could not be verified. Your checkout draft is safe.",
+          actionKey: "verifyPayment",
+        });
+        const completedPath = dashboardPathAfterProcessing(
+          "templates",
+          currentParams,
+          true,
+          PAYMENT_RETURN_PARAMS,
+        );
+        if (completedPath) router.replace(completedPath);
+        return () => {
+          activeEffect = false;
+        };
+      }
+
+      const paymentCheckKey = paymentVerificationKey(externalReturn.sessionId, intent.id);
       if (paymentCheckRef.current === paymentCheckKey) {
-        applyRestoration();
         return;
       }
       paymentCheckRef.current = paymentCheckKey;
+      setExternalReturnState((state) => transitionExternalReturn(
+        transitionExternalReturn(state, { type: "return", kind: "stripe_success", key: paymentCheckKey }),
+        { type: "verify" },
+      ));
       setNotice({ type: "info", message: "Verifying your payment…", actionKey: "verifyPayment" });
       void runAction(
         "verifyPayment",
@@ -147,10 +217,16 @@ export default function DashboardWorkspace() {
           const response = await fetch("/api/stripe/payment-status", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ access_token: session.access_token }),
+            body: JSON.stringify({
+              access_token: session.access_token,
+              checkout_session_id: externalReturn.sessionId,
+              intent_id: intent.id,
+              template_id: intent.templateId,
+              postcode: intent.postcode,
+            }),
             signal,
           });
-          return readJsonResponse<{ ok?: boolean; paid?: boolean; subscription?: { template_id?: string } }>(
+          return readJsonResponse<PaymentVerificationResponse>(
             response,
             "Could not verify payment.",
           );
@@ -160,29 +236,42 @@ export default function DashboardWorkspace() {
         if (!activeEffect) return;
         if (outcome.outcome === "success") {
           const result = outcome.value;
-          const paidTemplateId = result.subscription?.template_id;
-          if (result.ok && result.paid && paidTemplateId === intent.templateId) {
+          if (
+            isConfirmedPaymentStatus(result)
+            && result.checkoutSessionId === externalReturn.sessionId
+            && result.templateId === intent.templateId
+            && result.postcode === intent.postcode
+          ) {
             consumePendingIntentAfterSuccess(intent.id);
-            setPendingIntent(null);
+            setPendingIntent(intent);
             setUnclaimedIntent(null);
             setRestoredIntentId("");
+            setExternalReturnState((state) => transitionExternalReturn(
+              transitionExternalReturn(state, { type: "confirm" }),
+              { type: "process" },
+            ));
             reportSuccess("verifyPayment", "Payment confirmed. Your saved checkout draft was completed.");
             const completedPath = dashboardPathAfterProcessing(
               intent.panel,
               currentParams,
               true,
-              DASHBOARD_ONE_TIME_PARAMS,
+              PAYMENT_RETURN_PARAMS,
             );
             if (completedPath) router.replace(completedPath);
             return;
           }
-          applyRestoration();
-          setNotice({ type: "warning", message: "Payment is not confirmed yet. Your campaign draft has been kept.", actionKey: "verifyPayment" });
+          if (result.status === "pending") {
+            setExternalReturnState((state) => transitionExternalReturn(state, { type: "pending" }));
+            setNotice({ type: "warning", message: "Payment is still processing. Your checkout draft is safe; retry verification shortly.", actionKey: "verifyPayment" });
+            return;
+          }
+          setExternalReturnState((state) => transitionExternalReturn(state, { type: "fail" }));
+          setNotice({ type: "error", message: "Payment could not be confirmed. Your checkout draft is safe.", actionKey: "verifyPayment" });
           return;
         }
         if (outcome.outcome === "error") {
           paymentCheckRef.current = "";
-          applyRestoration();
+          setExternalReturnState((state) => transitionExternalReturn(state, { type: "fail" }));
           reportError("verifyPayment", outcome.error, "Could not verify payment. Your draft is safe; retry when ready.");
         }
       });
@@ -192,11 +281,93 @@ export default function DashboardWorkspace() {
       };
     }
 
-    applyRestoration();
+    if (gmailReturn && externalReturn) {
+      const gmailCheckKey = `${externalReturn.kind}:${externalReturn.kind === "gmail_error" ? externalReturn.reason : "connected"}`;
+      if (gmailCheckRef.current === gmailCheckKey) return;
+      gmailCheckRef.current = gmailCheckKey;
+      setExternalReturnState((state) => transitionExternalReturn(
+        transitionExternalReturn(state, { type: "return", kind: externalReturn.kind, key: gmailCheckKey }),
+        { type: "verify" },
+      ));
+      setNotice({ type: "info", message: "Checking your Gmail connection…", actionKey: "verifyGmail" });
+      void runAction(
+        "verifyGmail",
+        async ({ signal }) => {
+          const supabase = getSupabaseClient();
+          const result = await supabase
+            .from("user_email_authorizations")
+            .select("status,provider_email,connected_at")
+            .eq("user_identifier", user.email || user.id)
+            .eq("provider", "google")
+            .abortSignal(signal)
+            .maybeSingle();
+          if (result.error) throw result.error;
+          return { connected: result.data?.status === "connected" };
+        },
+        { timeoutMs: ACTION_TIMEOUTS.gmail, errorMessage: "Could not check Gmail status." },
+      ).then((outcome) => {
+        if (!activeEffect) return;
+        if (outcome.outcome === "success") {
+          const connected = outcome.value.connected;
+          setGmailReady(connected);
+          if (externalReturn.kind === "gmail_connected" && connected) {
+            setExternalReturnState((state) => transitionExternalReturn(
+              transitionExternalReturn(state, { type: "confirm" }),
+              { type: "process" },
+            ));
+            reportSuccess("verifyGmail", "Gmail connected.");
+          } else {
+            setExternalReturnState((state) => transitionExternalReturn(
+              transitionExternalReturn(state, { type: "fail" }),
+              { type: "process" },
+            ));
+            setNotice({
+              type: connected ? "warning" : "error",
+              message: externalReturn.kind === "gmail_error"
+                ? gmailReturnMessage(externalReturn.reason)
+                : "Gmail authorization returned, but no active connection was confirmed. Try connecting again.",
+              actionKey: "verifyGmail",
+            });
+          }
+          const completedPath = dashboardPathAfterProcessing(
+            "gmail",
+            currentParams,
+            true,
+            GMAIL_RETURN_PARAMS,
+          );
+          if (completedPath) router.replace(completedPath);
+          return;
+        }
+        if (outcome.outcome === "error") {
+          gmailCheckRef.current = "";
+          setExternalReturnState((state) => transitionExternalReturn(state, { type: "fail" }));
+          reportError("verifyGmail", outcome.error, "Could not check Gmail status. Your existing connection was left unchanged.");
+        }
+      });
+      return () => {
+        activeEffect = false;
+        abortAction("verifyGmail");
+      };
+    }
+
+    if (shouldRestoreIntent && intent && isDashboardPanel(requestedPanel)) applyRestoration();
     return () => {
       activeEffect = false;
     };
-  }, [pathname, paymentRetryNonce, query, router, session?.access_token, status, user?.id]);
+  }, [
+    abortAction,
+    gmailRetryNonce,
+    pathname,
+    paymentRetryNonce,
+    query,
+    reportError,
+    reportSuccess,
+    router,
+    runAction,
+    session?.access_token,
+    status,
+    user,
+  ]);
   useEffect(() => {
     const receiveTrackerCounts = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
@@ -361,11 +532,21 @@ export default function DashboardWorkspace() {
     setNotice(null);
     const outcome = await runAction("connectGmail", async ({ signal }) => {
       const token = requireAccessToken();
-      const gmailReturnPath = dashboardPanelPath("gmail", new URLSearchParams(query));
+      const savedIntent = readPendingIntent();
+      setExternalReturnState((state) => transitionExternalReturn(state, {
+        type: "depart",
+        kind: "gmail_connected",
+        key: savedIntent?.id || "",
+      }));
       const response = await fetch("/api/applix/connect-gmail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: token, return_to: `${window.location.origin}${gmailReturnPath}` }),
+        body: JSON.stringify({
+          access_token: token,
+          provider: "google",
+          return_path: "/dashboard?panel=gmail",
+          pending_intent_id: savedIntent?.id || null,
+        }),
         signal,
       });
       const result = await readJsonResponse<{ ok?: boolean; authorization_url?: string }>(response, "Could not connect Gmail.");
@@ -578,7 +759,8 @@ export default function DashboardWorkspace() {
             aria-live={notice.type === "error" ? "assertive" : "polite"}
           >
             {notice.message}
-            {notice.actionKey === "verifyPayment" && notice.type === "error" ? (
+            {notice.actionKey === "verifyPayment"
+              && (externalReturnState.phase === "pending" || (externalReturnState.phase === "failed" && searchParams.get("payment") === "success")) ? (
               <button
                 type="button"
                 className="workspace-secondary"
@@ -589,6 +771,32 @@ export default function DashboardWorkspace() {
                 }}
               >
                 Retry verification
+              </button>
+            ) : null}
+            {notice.actionKey === "verifyPayment"
+              && pendingIntent?.type === "purchase_template"
+              && (externalReturnState.phase === "cancelled" || externalReturnState.phase === "failed") ? (
+              <button
+                type="button"
+                className="workspace-secondary"
+                onClick={() => router.push("/payment?restoreIntent=1")}
+              >
+                Continue to checkout
+              </button>
+            ) : null}
+            {notice.actionKey === "verifyGmail"
+              && notice.type === "error"
+              && searchParams.has("gmail") ? (
+              <button
+                type="button"
+                className="workspace-secondary"
+                disabled={isActionLoading(actionStates, "verifyGmail")}
+                onClick={() => {
+                  gmailCheckRef.current = "";
+                  setGmailRetryNonce((value) => value + 1);
+                }}
+              >
+                Check Gmail status
               </button>
             ) : null}
           </div>

@@ -13,6 +13,7 @@ import styles from "./payment.module.css";
 
 type TemplateCheckout = {
   id: string;
+  slug: string;
   title: string;
   campaign_name: string;
   role: string;
@@ -119,7 +120,7 @@ function CheckoutContent() {
       }
       const { data, error } = await getSupabaseClient()
         .from("campaign_templates")
-        .select("id,title,campaign_name,role,location,description,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required")
+        .select("id,slug,title,campaign_name,role,location,description,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required")
         .eq("id", templateId)
         .eq("is_active", true)
         .abortSignal(signal)
@@ -147,20 +148,25 @@ function CheckoutContent() {
     setCheckoutLoading(true);
     setMessage("");
     try {
-      const supabase = getSupabaseClient();
       const accessToken = session?.access_token;
+      const savedIntent = savePendingIntent({
+        id: purchaseIntent?.id,
+        type: "purchase_template",
+        returnPath: "/dashboard?panel=templates&restoreIntent=1",
+        panel: "templates",
+        templateId: template.id,
+        templateSlug: template.slug,
+        postcode: postcodeInfo.postcode,
+        currentStep: "checkout_departure",
+        intendedAction: "continue_to_checkout",
+        userHint: user?.id || purchaseIntent?.userHint,
+      });
+      if (!savedIntent) {
+        throw new Error("Could not safely save this campaign draft. Check browser storage permissions and try again.");
+      }
+      setPurchaseIntent(savedIntent);
+
       if (!accessToken) {
-        savePendingIntent({
-          id: purchaseIntent?.id,
-          type: "purchase_template",
-          returnPath: "/dashboard?panel=templates&restoreIntent=1",
-          panel: "templates",
-          templateId: template.id,
-          postcode: postcodeInfo.postcode,
-          currentStep: "review",
-          intendedAction: "continue_to_checkout",
-          userHint: purchaseIntent?.userHint,
-        });
         router.replace(loginPathFor("/dashboard?panel=templates&restoreIntent=1"));
         return;
       }
@@ -170,6 +176,11 @@ function CheckoutContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           access_token: accessToken,
+          intent_id: savedIntent.id,
+          intended_action: savedIntent.intendedAction,
+          originating_path: `${window.location.pathname}${window.location.search}`,
+          return_panel: savedIntent.panel,
+          return_path: savedIntent.returnPath,
           template_id: template.id,
           postcode: postcodeInfo.postcode,
         }),
