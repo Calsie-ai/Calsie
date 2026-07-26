@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../../lib/supabaseClient";
+import { ACTION_TIMEOUTS, normaliseAppError, withActionTimeout } from "../../../lib/actionState";
 
 type TemplateForm = {
   campaignName: string;
@@ -214,6 +215,9 @@ export default function CampaignTemplatesPage() {
   const [created, setCreated] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const submissionRef = useRef(false);
+  const submissionAbortRef = useRef<AbortController | null>(null);
+  const navigationTimerRef = useRef<number | null>(null);
 
   const selectedTemplate = useMemo(() => templates.find((template) => template.id === selectedTemplateId) || null, [selectedTemplateId]);
 
@@ -228,7 +232,7 @@ export default function CampaignTemplatesPage() {
         }
         setUserId(data.user.id);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Could not check login.");
+        setErrorMessage(normaliseAppError(error, "Could not check login.") || "");
       } finally {
         setCheckingUser(false);
       }
@@ -236,6 +240,11 @@ export default function CampaignTemplatesPage() {
 
     checkUser();
   }, [router]);
+
+  useEffect(() => () => {
+    submissionAbortRef.current?.abort();
+    if (navigationTimerRef.current) window.clearTimeout(navigationTimerRef.current);
+  }, []);
 
   function selectTemplate(template: CampaignTemplate) {
     setSelectedTemplateId(template.id);
@@ -251,6 +260,10 @@ export default function CampaignTemplatesPage() {
 
   async function saveTemplate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submissionRef.current) return;
+    submissionRef.current = true;
+    const controller = new AbortController();
+    submissionAbortRef.current = controller;
     setErrorMessage("");
     setMessage("");
     setCreated(false);
@@ -317,7 +330,7 @@ export default function CampaignTemplatesPage() {
       };
 
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from("campaigns").insert({
+      const request = supabase.from("campaigns").insert({
         user_id: userId,
         name: campaignName,
         location,
@@ -326,16 +339,19 @@ export default function CampaignTemplatesPage() {
         filters: { ...search, require_email: requireEmail, require_user_approval: requireApproval },
         outreach,
         status: "draft",
-      });
+      }).abortSignal(controller.signal);
+      const { error } = await withActionTimeout(Promise.resolve(request), ACTION_TIMEOUTS.ordinary, () => controller.abort());
 
       if (error) throw error;
 
       setCreated(true);
       setMessage("Template saved. Campaign created.");
-      window.setTimeout(() => router.push("/dashboard?panel=overview"), 1200);
+      navigationTimerRef.current = window.setTimeout(() => router.push("/dashboard?panel=overview"), 1200);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not save template.");
+      setErrorMessage(normaliseAppError(error, "Could not save template.") || "");
     } finally {
+      submissionAbortRef.current = null;
+      submissionRef.current = false;
       setSaving(false);
     }
   }
@@ -357,8 +373,8 @@ export default function CampaignTemplatesPage() {
 
       <section className="templates-stack">
         {checkingUser && <p className="templates-status success">Checking your Applix workspace...</p>}
-        {message && <p className="templates-status success">{message}</p>}
-        {errorMessage && <p className="templates-status error">{errorMessage}</p>}
+        {message && <p className="templates-status success" role="status" aria-live="polite">{message}</p>}
+        {errorMessage && <p className="templates-status error" role="alert">{errorMessage}</p>}
 
         <div className="templates-carousel-wrap">
           <p className="templates-carousel-hint">Swipe template</p>

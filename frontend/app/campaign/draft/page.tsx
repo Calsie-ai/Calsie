@@ -141,7 +141,7 @@ export default function CampaignDraftPage() {
 
         <section style={styles.actionsCard}>
           <p style={styles.status}>{status}</p>
-          <button style={styles.primaryButton} onClick={launchCampaign} disabled={launching}>{launching ? "Launching..." : "Launch campaign"}</button>
+          <button type="button" style={styles.primaryButton} onClick={launchCampaign} disabled={launching}>{launching ? "Launching..." : "Launch campaign"}</button>
           <Link href="/" style={styles.secondaryButton}>Edit setup</Link>
         </section>
       </section>

@@ -270,7 +270,7 @@ export default function ProfilePage() {
       <section style={styles.card}>
         <div style={styles.topBar}>
           <Link href="/" style={styles.backLink}>← Home</Link>
-          <button onClick={handleLogout} style={styles.logoutButton}>Logout</button>
+          <button type="button" onClick={handleLogout} style={styles.logoutButton}>Logout</button>
         </div>
 
         <p style={styles.badge}>Base Resume Profile</p>
@@ -320,7 +320,7 @@ export default function ProfilePage() {
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
             <h2 style={styles.sectionTitle}>Work experience</h2>
-            <button onClick={() => setWorkExperience([...workExperience, { ...emptyWorkExperience }])} style={styles.smallButton}>Add job</button>
+            <button type="button" onClick={() => setWorkExperience([...workExperience, { ...emptyWorkExperience }])} style={styles.smallButton}>Add job</button>
           </div>
 
           {workExperience.map((item, index) => (
@@ -345,7 +345,7 @@ export default function ProfilePage() {
 
           <div style={styles.sectionHeader}>
             <h3 style={styles.subTitle}>Education</h3>
-            <button onClick={() => setEducation([...education, { ...emptyEducation }])} style={styles.smallButton}>Add education</button>
+            <button type="button" onClick={() => setEducation([...education, { ...emptyEducation }])} style={styles.smallButton}>Add education</button>
           </div>
           {education.map((item, index) => (
             <div key={index} style={styles.formGrid}>
@@ -357,7 +357,7 @@ export default function ProfilePage() {
 
           <div style={styles.sectionHeader}>
             <h3 style={styles.subTitle}>Certifications and licences</h3>
-            <button onClick={() => setCertifications([...certifications, { ...emptyCertification }])} style={styles.smallButton}>Add certificate</button>
+            <button type="button" onClick={() => setCertifications([...certifications, { ...emptyCertification }])} style={styles.smallButton}>Add certificate</button>
           </div>
           {certifications.map((item, index) => (
             <div key={index} style={styles.formGrid}>
@@ -374,7 +374,7 @@ export default function ProfilePage() {
 
           <div style={styles.sectionHeader}>
             <h3 style={styles.subTitle}>References</h3>
-            <button onClick={() => setReferences([...references, { ...emptyReference }])} style={styles.smallButton}>Add reference</button>
+            <button type="button" onClick={() => setReferences([...references, { ...emptyReference }])} style={styles.smallButton}>Add reference</button>
           </div>
           {references.map((item, index) => (
             <div key={index} style={styles.formGrid}>
@@ -388,7 +388,7 @@ export default function ProfilePage() {
         </section>
 
         <div style={styles.actions}>
-          <button onClick={saveResumeProfile} disabled={saving} style={styles.primaryButton}>{saving ? "Saving..." : "Save resume profile"}</button>
+          <button type="button" onClick={saveResumeProfile} disabled={saving} style={styles.primaryButton}>{saving ? "Saving..." : "Save resume profile"}</button>
           <Link href="/matching" style={styles.secondaryButton}>Go to job matches</Link>
         </div>
 

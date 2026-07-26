@@ -137,7 +137,7 @@ export default function AdminPricingPage() {
           <h2>Templates</h2>
           <div style={styles.templateList}>
             {templates.map((item) => (
-              <button key={item.id} onClick={() => setSelectedId(item.id)} style={item.id === selectedId ? styles.activeTemplate : styles.templateButton}>
+              <button type="button" key={item.id} onClick={() => setSelectedId(item.id)} style={item.id === selectedId ? styles.activeTemplate : styles.templateButton}>
                 <strong>{item.title}</strong>
                 <span>{item.is_active ? "Active" : "Paused"}</span>
               </button>
@@ -158,7 +158,7 @@ export default function AdminPricingPage() {
               </div>
               <label style={styles.field}>Included features, one per line<textarea rows={10} value={features} onChange={(event) => setFeatures(event.target.value)} /></label>
               <label style={styles.checkbox}><input type="checkbox" checked={paymentRequired} onChange={(event) => setPaymentRequired(event.target.checked)} /> Require payment before campaign creation</label>
-              <button style={styles.primary} disabled={saving} onClick={() => void save()}>{saving ? "Saving..." : "Save pricing"}</button>
+              <button type="button" style={styles.primary} disabled={saving} onClick={() => void save()}>{saving ? "Saving..." : "Save pricing"}</button>
             </>
           ) : <p>No templates available.</p>}
         </section>

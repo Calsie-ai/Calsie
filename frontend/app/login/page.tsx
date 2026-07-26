@@ -1,24 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers/AuthProvider";
 import { safeInternalPath } from "../../lib/navigation";
 import { supabase } from "../../lib/supabaseClient";
-
-function withTimeout<T>(promise: Promise<T>, milliseconds = 12000): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => {
-      reject(new Error("Login is taking too long. Check your internet connection and Supabase settings, then try again."));
-    }, milliseconds);
-
-    promise
-      .then((value) => resolve(value))
-      .catch((error) => reject(error))
-      .finally(() => window.clearTimeout(timer));
-  });
-}
+import { normaliseAppError, withActionTimeout } from "../../lib/actionState";
 
 function cleanEmail(value: string) {
   return value.trim().toLowerCase();
@@ -30,7 +18,7 @@ function friendlyAuthError(error: unknown) {
   if (raw.includes("email not confirmed") || raw.includes("confirm")) return "Your email is not confirmed yet. Check your inbox for the confirmation email before logging in.";
   if (raw.includes("invalid path specified")) return "The login redirect path was invalid. Refresh this page and try again.";
   if (raw.includes("fetch") || raw.includes("network") || raw.includes("timeout")) return "Applix could not reach the login server. Check internet connection or Supabase environment settings.";
-  return error instanceof Error ? error.message : "Login failed. Please check your details and try again.";
+  return normaliseAppError(error, "Login failed. Please check your details and try again.");
 }
 
 function LoginContent() {
@@ -43,8 +31,10 @@ function LoginContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error" | "info">("info");
   const [loading, setLoading] = useState(false);
   const [redirectWhenAuthenticated, setRedirectWhenAuthenticated] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (status !== "authenticated" || (!redirectWhenAuthenticated && mode !== "login")) return;
@@ -53,30 +43,35 @@ function LoginContent() {
   }, [mode, nextPath, redirectWhenAuthenticated, router, status]);
 
   async function handlePasswordReset() {
-    if (loading) return;
+    if (submittingRef.current) return;
     const authEmail = cleanEmail(email);
     if (!authEmail || !authEmail.includes("@")) {
+      setMessageType("error");
       setMessage("Enter your full email address first, then Applix can send a reset link.");
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     setMessage("");
     try {
       const redirectTo = `${window.location.origin}/reset-password?next=${encodeURIComponent(nextPath)}`;
-      const { error } = await withTimeout(supabase.auth.resetPasswordForEmail(authEmail, { redirectTo }));
+      const { error } = await withActionTimeout(supabase.auth.resetPasswordForEmail(authEmail, { redirectTo }));
       if (error) throw error;
+      setMessageType("success");
       setMessage("Password reset link sent. Check your email, then open the link to choose a new password.");
     } catch (error) {
+      setMessageType("error");
       setMessage(friendlyAuthError(error));
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }
 
   async function handleAuth(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (loading) return;
+    if (submittingRef.current) return;
     if (mode === "reset") {
       await handlePasswordReset();
       return;
@@ -85,48 +80,56 @@ function LoginContent() {
     const authEmail = cleanEmail(email);
     const authPassword = password.trim();
     if (!authEmail || !authEmail.includes("@")) {
+      setMessageType("error");
       setMessage("Enter your full email address, for example name@gmail.com.");
       return;
     }
     if (authPassword.length < 6) {
+      setMessageType("error");
       setMessage("Password must be at least 6 characters. If you forgot it, press Reset password.");
       return;
     }
     if (mode === "signup" && !fullName.trim()) {
+      setMessageType("error");
       setMessage("Enter your full name before creating an account.");
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     setMessage("");
     try {
       if (mode === "signup") {
         const redirectTo = `${window.location.origin}/login?next=${encodeURIComponent(nextPath)}`;
-        const { data, error } = await withTimeout(supabase.auth.signUp({
+        const { data, error } = await withActionTimeout(supabase.auth.signUp({
           email: authEmail,
           password: authPassword,
           options: { emailRedirectTo: redirectTo, data: { full_name: fullName.trim() } },
         }));
         if (error) throw error;
         if (!data.session) {
+          setMessageType("success");
           setMessage("Account created. Please check your email to confirm your account, then log in.");
           setMode("login");
           return;
         }
         setMessage("Account ready. Opening Applix…");
       } else {
-        const { error } = await withTimeout(supabase.auth.signInWithPassword({ email: authEmail, password: authPassword }));
+        const { error } = await withActionTimeout(supabase.auth.signInWithPassword({ email: authEmail, password: authPassword }));
         if (error) throw error;
         setMessage("Login successful. Opening Applix…");
       }
 
+      setMessageType("success");
       setRedirectWhenAuthenticated(true);
       const session = await refresh();
       if (!session) throw new Error("Login succeeded but the session could not be restored. Please try again.");
     } catch (error) {
       setRedirectWhenAuthenticated(false);
+      setMessageType("error");
       setMessage(friendlyAuthError(error));
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }
@@ -177,7 +180,7 @@ function LoginContent() {
 
           {loading ? <p aria-live="polite" role="status" style={styles.helpText}>This should only take a few seconds.</p> : null}
           {message ? (
-            <p aria-live="polite" role="status" style={message.includes("created") || message.includes("successful") || message.includes("Opening") || message.includes("ready") || message.includes("reset link sent") ? styles.successMessage : styles.message}>{message}</p>
+            <p aria-live={messageType === "error" ? "assertive" : "polite"} role={messageType === "error" ? "alert" : "status"} style={messageType === "success" ? styles.successMessage : styles.message}>{message}</p>
           ) : null}
         </form>
       </section>
@@ -213,4 +216,3 @@ const styles = {
   message: { color: "#dc2626", lineHeight: 1.5, margin: 0, fontWeight: 800 },
   successMessage: { color: "#166534", background: "#dcfce7", padding: 12, borderRadius: 14, lineHeight: 1.5, fontWeight: 800 },
 };
-

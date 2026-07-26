@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
+import { ACTION_TIMEOUTS, normaliseAppError, readJsonResponse, withActionTimeout } from "../../lib/actionState";
 
 type ParsedData = {
   fullName: string;
@@ -70,6 +71,10 @@ export default function ResumeCanvasPage() {
   const [loading, setLoading] = useState(true);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const uploadRef = useRef(false);
+  const uploadAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => uploadAbortRef.current?.abort(), []);
 
   useEffect(() => {
     async function load() {
@@ -91,7 +96,7 @@ export default function ResumeCanvasPage() {
           .maybeSingle();
 
         if (error) {
-          setStatus(error.message);
+          setStatus(normaliseAppError(error, "Could not load your resume.") || "");
           return;
         }
 
@@ -118,7 +123,7 @@ export default function ResumeCanvasPage() {
           setStatus("No resume connected yet. Upload your DOC or DOCX resume to activate Applix.");
         }
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Could not load resume.");
+        setStatus(normaliseAppError(error, "Could not load resume.") || "");
       } finally {
         setLoading(false);
       }
@@ -128,18 +133,29 @@ export default function ResumeCanvasPage() {
   }, [router]);
 
   async function uploadResume(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
+    if (uploadRef.current) {
+      input.value = "";
+      return;
+    }
 
     if (!isDocResume(file)) {
       setStatus("Only DOC or DOCX resume files are accepted.");
-      event.target.value = "";
+      input.value = "";
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      setStatus("The resume must be 6 MB or smaller.");
+      input.value = "";
       return;
     }
 
     const detectedFileType = file.type || file.name.split(".").pop() || "";
-    setFileName(file.name);
-    setFileType(detectedFileType);
+    uploadRef.current = true;
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
     setStatus("");
     setParsing(true);
 
@@ -157,27 +173,27 @@ export default function ResumeCanvasPage() {
 
       if (!userId) setUserId(activeUserId);
 
-      const path = `${activeUserId}/master-source.${safeExt(file)}`;
-      const { error: storageError } = await supabase.storage
+      const path = `${activeUserId}/master-source-${Date.now().toString(36)}.${safeExt(file)}`;
+      const uploadRequest = supabase.storage
         .from("resumes")
         .upload(path, file, {
-          upsert: true,
+          upsert: false,
           contentType: file.type || "application/octet-stream",
         });
+      const { error: storageError } = await withActionTimeout(Promise.resolve(uploadRequest), ACTION_TIMEOUTS.upload, () => controller.abort());
 
       if (storageError) throw storageError;
 
-      setFilePath(path);
-
       const formData = new FormData();
       formData.append("resume", file);
-      const response = await fetch("/api/applix/parse-resume", {
+      const response = await withActionTimeout(fetch("/api/applix/parse-resume", {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
         body: formData,
-      });
-      const data = await response.json();
-      if (!response.ok || !data?.ok) throw new Error(data?.error || "Could not parse resume.");
+        signal: controller.signal,
+      }), ACTION_TIMEOUTS.upload, () => controller.abort());
+      const data = await readJsonResponse<{ ok?: boolean; parsed?: Record<string, string> }>(response, "Could not parse resume.");
+      if (!data.ok) throw new Error("Resume parsing failed");
 
       const p = data.parsed || {};
       const nextParsed: ParsedData = {
@@ -194,7 +210,6 @@ export default function ResumeCanvasPage() {
         certifications: p.certificates || parsed.certifications,
       };
 
-      setParsed(nextParsed);
       setParsing(false);
       setSaving(true);
 
@@ -235,19 +250,26 @@ export default function ResumeCanvasPage() {
         setResumeId(resumeProfile.id);
       }
 
+      setFileName(file.name);
+      setFileType(detectedFileType);
+      setFilePath(path);
+      setParsed(nextParsed);
       setStatus("Resume saved. Returning to dashboard...");
       router.replace("/dashboard?panel=resume");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Resume upload failed.");
+      setStatus(normaliseAppError(error, "Resume upload failed. Your previous resume was kept.") || "");
     } finally {
+      uploadAbortRef.current = null;
+      uploadRef.current = false;
       setParsing(false);
       setSaving(false);
-      event.target.value = "";
+      input.value = "";
     }
   }
 
   const resumeReady = Boolean(fileName || filePath);
   const uploadLabel = saving ? "Saving..." : parsing ? "Uploading..." : resumeReady ? "Upload / Change Resume" : "Upload Resume";
+  const statusIsError = /could not|failed|only|missing|must be|sign in again/i.test(status);
 
   return (
     <main className="applix-home-shell" style={{ gridTemplateRows: "auto 1fr", overflow: "auto", paddingTop: "24px" }}>
@@ -318,7 +340,7 @@ export default function ResumeCanvasPage() {
           Your Resume Will Be Attached to the Mail. Please use the current and best resume.<br />Only DOC or DOCX files are accepted.
         </div>
 
-        <p className="applix-home-copy" style={{ marginTop: "16px" }}>{loading ? "Checking resume..." : status}</p>
+        <p className="applix-home-copy" role={statusIsError ? "alert" : "status"} aria-live={statusIsError ? "assertive" : "polite"} style={{ marginTop: "16px" }}>{loading ? "Checking resume..." : status}</p>
 
         <div style={{ width: "min(680px, 100%)", display: "grid", gap: "14px", marginTop: "32px" }}>
           <label

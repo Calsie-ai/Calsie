@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../providers/AuthProvider";
@@ -8,6 +8,7 @@ import { getSupabaseClient } from "../../lib/supabaseClient";
 import { inferAustralianPostcode } from "../../lib/australianPostcode";
 import { loginPathFor } from "../../lib/navigation";
 import { readPendingIntent, savePendingIntent, type PendingIntentV1 } from "../../lib/pendingIntent";
+import { ACTION_TIMEOUTS, isAbortError, normaliseAppError, readJsonResponse, withActionTimeout } from "../../lib/actionState";
 import styles from "./payment.module.css";
 
 type TemplateCheckout = {
@@ -54,6 +55,8 @@ function CheckoutContent() {
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const checkoutRequestRef = useRef(false);
+  const checkoutAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const storedIntent = readPendingIntent();
@@ -63,10 +66,14 @@ function CheckoutContent() {
 
   useEffect(() => {
     if (!intentLoaded || status === "loading") return;
-    void load();
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
   }, [intentLoaded, postcode, purchaseIntent?.id, status, templateId, user?.id]);
 
-  async function load() {
+  useEffect(() => () => checkoutAbortRef.current?.abort(), []);
+
+  async function load(signal: AbortSignal) {
     setLoading(true);
     setMessage("");
     try {
@@ -115,24 +122,28 @@ function CheckoutContent() {
         .select("id,title,campaign_name,role,location,description,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required")
         .eq("id", templateId)
         .eq("is_active", true)
+        .abortSignal(signal)
         .maybeSingle();
       if (error) throw error;
       if (!data) throw new Error("This template is unavailable.");
-      setTemplate(data as TemplateCheckout);
+      if (!signal.aborted) setTemplate(data as TemplateCheckout);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not load checkout.");
+      if (!isAbortError(error)) setMessage(normaliseAppError(error, "Could not load checkout.") || "");
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }
 
   async function openSecureCheckout() {
-    if (!template || checkoutLoading) return;
+    if (!template || checkoutRequestRef.current) return;
     if (!postcodeInfo.valid) {
       setMessage("Return to the template and enter a valid Australian postcode before checkout.");
       return;
     }
 
+    checkoutRequestRef.current = true;
+    const controller = new AbortController();
+    checkoutAbortRef.current = controller;
     setCheckoutLoading(true);
     setMessage("");
     try {
@@ -154,7 +165,7 @@ function CheckoutContent() {
         return;
       }
 
-      const response = await fetch("/api/stripe/create-checkout", {
+      const response = await withActionTimeout(fetch("/api/stripe/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -162,15 +173,17 @@ function CheckoutContent() {
           template_id: template.id,
           postcode: postcodeInfo.postcode,
         }),
-      });
-      const result = (await response.json().catch(() => ({}))) as CheckoutResult;
-      if (!response.ok || !result.ok || !result.checkout_url) {
-        throw new Error(result.error || "Could not create secure checkout.");
-      }
+        signal: controller.signal,
+      }), ACTION_TIMEOUTS.ordinary, () => controller.abort());
+      const result = await readJsonResponse<CheckoutResult>(response, "Could not create secure checkout.");
+      if (!result.ok || !result.checkout_url) throw new Error("Checkout URL missing");
 
       window.location.assign(result.checkout_url);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not create secure checkout.");
+      if (!isAbortError(error)) setMessage(normaliseAppError(error, "Could not create secure checkout.") || "");
+    } finally {
+      checkoutAbortRef.current = null;
+      checkoutRequestRef.current = false;
       setCheckoutLoading(false);
     }
   }
@@ -204,7 +217,7 @@ function CheckoutContent() {
           <p>Your template, location and campaign features are confirmed before Stripe opens.</p>
         </div>
 
-        {loading ? <div className={styles.loading}>Loading template checkout…</div> : null}
+        {loading ? <div className={styles.loading} role="status" aria-live="polite">Loading template checkout…</div> : null}
         {message ? <div className={styles.alert} role="alert">{message}</div> : null}
 
         {template ? (

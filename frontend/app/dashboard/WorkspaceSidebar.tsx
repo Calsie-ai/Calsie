@@ -9,21 +9,29 @@ const primary: Array<[WorkspaceTab, string, string]> = [
   ["gmail", "Gmail Connection", "✉"],
 ];
 
+type Props = {
+  active: WorkspaceTab;
+  onNavigate: (tab: WorkspaceTab) => void;
+  running: boolean;
+  approvedCount: number;
+  actionLoading: boolean;
+  actionDisabled: boolean;
+  onToggleCampaign: () => void;
+  logoutLoading: boolean;
+  onLogout: () => void;
+};
+
 export default function WorkspaceSidebar({
   active,
   onNavigate,
   running,
   approvedCount,
+  actionLoading,
+  actionDisabled,
   onToggleCampaign,
+  logoutLoading,
   onLogout,
-}: {
-  active: WorkspaceTab;
-  onNavigate: (tab: WorkspaceTab) => void;
-  running: boolean;
-  approvedCount: number;
-  onToggleCampaign: () => void;
-  onLogout: () => void;
-}) {
+}: Props) {
   const campaign: Array<[WorkspaceTab, string, string]> = [
     ["campaign", "Set Up Campaign", "+"],
     ["approve", "SMASH OR PASS", "✓"],
@@ -31,7 +39,7 @@ export default function WorkspaceSidebar({
   ];
 
   const navButton = ([tab, label, icon]: [WorkspaceTab, string, string]) => (
-    <button key={tab} className={active === tab ? "is-active" : ""} onClick={() => onNavigate(tab)}>
+    <button type="button" key={tab} className={active === tab ? "is-active" : ""} onClick={() => onNavigate(tab)}>
       <span>{icon}</span>
       <b>
         {tab === "approve" ? (
@@ -54,10 +62,12 @@ export default function WorkspaceSidebar({
       <nav>{primary.map(navButton)}</nav>
       <p className="workspace-label">Campaign</p>
       <nav>{campaign.map(navButton)}</nav>
-      <button className="workspace-campaign-toggle" onClick={onToggleCampaign}>{running ? "Pause Campaign" : "Start Campaign"}</button>
+      <button type="button" className="workspace-campaign-toggle" disabled={actionDisabled} onClick={onToggleCampaign}>
+        {actionLoading ? (running ? "Pausing campaign…" : "Starting campaign…") : running ? "Pause Campaign" : "Start Campaign"}
+      </button>
       <div className="workspace-sidebar-bottom">
-        <button onClick={() => window.location.assign("/support")}><span>?</span><b>Help</b></button>
-        <button onClick={onLogout}><span>↪</span><b>Log out</b></button>
+        <button type="button" onClick={() => window.location.assign("/support")}><span>?</span><b>Help</b></button>
+        <button type="button" disabled={logoutLoading} onClick={onLogout}><span>↪</span><b>{logoutLoading ? "Logging out…" : "Log out"}</b></button>
       </div>
     </aside>
   );

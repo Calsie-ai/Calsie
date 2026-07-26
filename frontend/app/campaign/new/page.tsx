@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "../../providers/AuthProvider";
 import { getSupabaseClient } from "../../../lib/supabaseClient";
 import { loginPathFor } from "../../../lib/navigation";
+import { ACTION_TIMEOUTS, normaliseAppError, withActionTimeout } from "../../../lib/actionState";
 import {
   claimPendingIntentForUser,
   consumePendingIntentAfterSuccess,
@@ -122,6 +123,10 @@ export default function NewCampaignPage() {
   const intentIdRef = useRef("");
   const dirtyRef = useRef(false);
   const restorationAttemptedRef = useRef(false);
+  const submissionRef = useRef(false);
+  const submissionAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => submissionAbortRef.current?.abort(), []);
 
   const campaignSummary = useMemo(() => {
     const role = targetRole.trim() || "your selected role";
@@ -256,6 +261,10 @@ export default function NewCampaignPage() {
 
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submissionRef.current) return;
+    submissionRef.current = true;
+    const controller = new AbortController();
+    submissionAbortRef.current = controller;
     setErrorMessage("");
     setLoading(true);
 
@@ -271,7 +280,7 @@ export default function NewCampaignPage() {
       }
 
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from("campaigns").insert({
+      const request = supabase.from("campaigns").insert({
         user_id: user.id,
         name: name.trim(),
         location: targetLocation.trim() || null,
@@ -314,18 +323,18 @@ export default function NewCampaignPage() {
           notes: notes.trim() || null,
         },
         status: "draft",
-      });
+      }).abortSignal(controller.signal);
+      const { error } = await withActionTimeout(Promise.resolve(request), ACTION_TIMEOUTS.ordinary, () => controller.abort());
 
-      if (error) {
-        setErrorMessage(error.message);
-        return;
-      }
+      if (error) throw error;
 
       if (savedIntent) consumePendingIntentAfterSuccess(savedIntent.id);
       router.push("/dashboard?panel=overview");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not create campaign.");
+      setErrorMessage(normaliseAppError(error, "Could not create campaign. Your draft was kept.") || "");
     } finally {
+      submissionAbortRef.current = null;
+      submissionRef.current = false;
       setLoading(false);
     }
   }
@@ -500,7 +509,7 @@ export default function NewCampaignPage() {
               <p>{campaignSummary}</p>
             </div>
 
-            {errorMessage && <p className="error-text">{errorMessage}</p>}
+            {errorMessage && <p className="error-text" role="alert">{errorMessage}</p>}
 
             <div className="form-actions" style={{ width: "100%" }}>
               <Link className="ghost-link" href="/dashboard?panel=templates">Back</Link>

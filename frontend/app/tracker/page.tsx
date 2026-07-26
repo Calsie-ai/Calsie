@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
+import { ACTION_TIMEOUTS, isAbortError, normaliseAppError, readJsonResponse, withActionTimeout } from "../../lib/actionState";
 import styles from "./tracker.module.css";
 
 type Campaign = {
@@ -52,11 +53,7 @@ const MAX_SHEET_ZOOM = 130;
 const SHEET_ZOOM_STEP = 10;
 
 function messageFrom(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object" && "message" in error) {
-    return String((error as { message?: unknown }).message || fallback);
-  }
-  return fallback;
+  return normaliseAppError(error, fallback) || fallback;
 }
 
 function formatDate(value: string | null) {
@@ -101,6 +98,9 @@ export default function TrackerPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [sheetZoom, setSheetZoom] = useState(100);
+  const decisionGuardsRef = useRef(new Set<string>());
+  const bulkGuardRef = useRef(false);
+  const loadAbortRef = useRef<AbortController | null>(null);
 
   const pendingOpportunities = useMemo(
     () => opportunities.filter((item) => item.status !== "approved"),
@@ -124,6 +124,9 @@ export default function TrackerPage() {
   }
 
   async function load(options: { quiet?: boolean } = {}) {
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
     if (!options.quiet) setLoading(true);
     setError("");
     try {
@@ -140,6 +143,7 @@ export default function TrackerPage() {
         .eq("user_id", auth.data.user.id)
         .order("created_at", { ascending: false })
         .limit(1)
+        .abortSignal(controller.signal)
         .maybeSingle();
       if (campaignResult.error) throw campaignResult.error;
 
@@ -151,7 +155,7 @@ export default function TrackerPage() {
         const reviewResult = await supabase.rpc("get_review_opportunities", {
           p_campaign_id: latestCampaign.id,
           p_limit: 100,
-        });
+        }).abortSignal(controller.signal);
         if (reviewResult.error) throw reviewResult.error;
         loadedOpportunities = (reviewResult.data || []) as ReviewOpportunity[];
       }
@@ -164,26 +168,34 @@ export default function TrackerPage() {
           .select("id,title,company,location,status,apply_url,created_at")
           .eq("user_id", auth.data.user.id)
           .order("created_at", { ascending: false })
-          .limit(500);
+          .limit(500)
+          .abortSignal(controller.signal);
         if (legacyResult.error) throw legacyResult.error;
         setLegacyJobs((legacyResult.data || []) as LegacyJob[]);
       }
       setSelectedIds((current) => current.filter((key) => loadedOpportunities.some((item) => opportunityKey(item) === key)));
     } catch (loadError) {
+      if (isAbortError(loadError)) return;
       setError(messageFrom(loadError, "Could not load the review queue."));
       if (!options.quiet) {
         setOpportunities([]);
         setLegacyJobs([]);
       }
     } finally {
-      if (!options.quiet) setLoading(false);
+      if (loadAbortRef.current === controller) {
+        loadAbortRef.current = null;
+        if (!options.quiet) setLoading(false);
+      }
     }
   }
 
   useEffect(() => {
     void load();
     const timer = window.setInterval(() => void load({ quiet: true }), 8000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      loadAbortRef.current?.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
@@ -192,7 +204,8 @@ export default function TrackerPage() {
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !anonKey) throw new Error("Missing Supabase environment variables.");
 
-    const response = await fetch(`${supabaseUrl}/functions/v1/prepare-approved-applications`, {
+    const controller = new AbortController();
+    const response = await withActionTimeout(fetch(`${supabaseUrl}/functions/v1/prepare-approved-applications`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -200,11 +213,10 @@ export default function TrackerPage() {
         authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ campaign_id: campaignId, limit: 25 }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload?.ok === false) {
-      throw new Error(payload?.error || "Application preparation failed.");
-    }
+      signal: controller.signal,
+    }), ACTION_TIMEOUTS.ordinary, () => controller.abort());
+    const payload = await readJsonResponse<{ ok?: boolean }>(response, "Application preparation failed.");
+    if (payload.ok === false) throw new Error("Application preparation failed");
     return payload;
   }
 
@@ -232,7 +244,8 @@ export default function TrackerPage() {
 
   async function decide(opportunity: ReviewOpportunity, decision: Decision) {
     const key = opportunityKey(opportunity);
-    if (busyId || bulkBusy || opportunity.status === "approved") return;
+    if (decisionGuardsRef.current.has(key) || bulkGuardRef.current || opportunity.status === "approved") return;
+    decisionGuardsRef.current.add(key);
     setBusyId(key);
     setMessage("");
     setError("");
@@ -264,13 +277,15 @@ export default function TrackerPage() {
       setError(messageFrom(decisionError, "Could not save the decision."));
       await load();
     } finally {
+      decisionGuardsRef.current.delete(key);
       setBusyId(null);
     }
   }
 
   async function decideSelected(decision: Decision) {
     const items = pendingOpportunities.filter((item) => selectedIds.includes(opportunityKey(item)));
-    if (!items.length || bulkBusy || busyId) return;
+    if (!items.length || bulkGuardRef.current || decisionGuardsRef.current.size > 0) return;
+    bulkGuardRef.current = true;
     setBulkBusy(true);
     setMessage("");
     setError("");
@@ -300,6 +315,7 @@ export default function TrackerPage() {
       setError(messageFrom(bulkError, "Could not complete the bulk decision."));
       await load();
     } finally {
+      bulkGuardRef.current = false;
       setBulkBusy(false);
     }
   }
@@ -332,7 +348,7 @@ export default function TrackerPage() {
                 {campaign ? `${campaign.name || campaign.target_business_type || "Campaign"} · ${campaign.location || "Location not set"}` : "No campaign selected"}
               </p>
             </div>
-            <button onClick={() => void load()} disabled={loading} className={styles.reload}>
+              <button type="button" onClick={() => void load()} disabled={loading} className={styles.reload}>
               {loading ? "Loading..." : "Reload"}
             </button>
           </header>
@@ -346,9 +362,9 @@ export default function TrackerPage() {
 
         <div className={styles.trackerNav}>
           <div className={styles.tabs}>
-            <button onClick={() => setTab("review")} className={`${styles.tab} ${tab === "review" ? styles.activeTab : ""}`}>Smash or Pass</button>
-            <button onClick={() => setTab("tracker")} className={`${styles.tab} ${tab === "tracker" ? styles.activeTab : ""}`}>Tracker</button>
-            <button onClick={() => setTab("history")} className={`${styles.tab} ${tab === "history" ? styles.activeTab : ""}`}>Application History</button>
+            <button type="button" onClick={() => setTab("review")} className={`${styles.tab} ${tab === "review" ? styles.activeTab : ""}`}>Smash or Pass</button>
+            <button type="button" onClick={() => setTab("tracker")} className={`${styles.tab} ${tab === "tracker" ? styles.activeTab : ""}`}>Tracker</button>
+            <button type="button" onClick={() => setTab("history")} className={`${styles.tab} ${tab === "history" ? styles.activeTab : ""}`}>Application History</button>
           </div>
           <div className={styles.zoomControls} aria-label="Tracker sheet zoom controls">
             <button type="button" onClick={() => zoomSheet("out")} disabled={sheetZoom <= MIN_SHEET_ZOOM} aria-label="Zoom tracker sheet out">−</button>
@@ -357,16 +373,16 @@ export default function TrackerPage() {
           </div>
         </div>
 
-        {message && <p className={styles.notice}>{message}</p>}
-        {error && <p className={styles.error}>{error}</p>}
+        {message && <p className={styles.notice} role="status" aria-live="polite">{message}</p>}
+        {error && <p className={styles.error} role="alert">{error}</p>}
 
         {tab === "review" && (
           <section>
             <div className={styles.toolbar}>
               <span className={styles.toolbarLabel}>{pendingOpportunities.length} awaiting approval · {selectedIds.length} selected</span>
               <div className={styles.toolbarRight}>
-                <button className={styles.skipSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("skipped")}>Pass selected</button>
-                <button className={styles.approveSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("approved")}>{bulkBusy ? "Working..." : "Smash selected"}</button>
+                    <button type="button" className={styles.skipSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("skipped")}>Pass selected</button>
+                    <button type="button" className={styles.approveSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("approved")}>{bulkBusy ? "Working..." : "Smash selected"}</button>
               </div>
             </div>
 
@@ -409,8 +425,8 @@ export default function TrackerPage() {
                             </td>
                             <td>
                               <div className={styles.actions}>
-                                <button className={styles.skip} disabled={busyId === key || bulkBusy} onClick={() => void decide(item, "skipped")}>Pass</button>
-                                <button className={styles.approve} disabled={busyId === key || bulkBusy} onClick={() => void decide(item, "approved")}>{busyId === key ? "..." : "Smash"}</button>
+                                <button type="button" className={styles.skip} disabled={busyId === key || bulkBusy} onClick={() => void decide(item, "skipped")}>Pass</button>
+                                <button type="button" className={styles.approve} disabled={busyId === key || bulkBusy} onClick={() => void decide(item, "approved")}>{busyId === key ? "..." : "Smash"}</button>
                               </div>
                             </td>
                           </tr>

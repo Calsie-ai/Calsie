@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { isActionLoading, type ActionStateMap, type DashboardActionKey } from "../../lib/actionState";
 import {
   CAMPAIGN_PLAN,
   CAMPAIGN_TEMPLATES,
@@ -25,8 +26,8 @@ export default function WorkspacePanels({
   resumeReady,
   resumeName,
   gmailReady,
-  busy,
-  message,
+  actionStates,
+  selectedTemplateActionId,
   onUseTemplate,
   onResumeUpload,
   onConnectGmail,
@@ -39,10 +40,10 @@ export default function WorkspacePanels({
   resumeReady: boolean;
   resumeName: string;
   gmailReady: boolean;
-  busy: boolean;
-  message: string;
+  actionStates: ActionStateMap<DashboardActionKey>;
+  selectedTemplateActionId: string;
   onUseTemplate: (template: CampaignTemplate) => void;
-  onResumeUpload: (file: File) => void;
+  onResumeUpload: (file: File) => Promise<void>;
   onConnectGmail: () => void;
   onRevokeGmail: () => void;
   onToggleCampaign: () => void;
@@ -91,6 +92,14 @@ export default function WorkspacePanels({
   const statusClass = running ? "is-running" : paused ? "is-paused" : "is-idle";
   const statusText = running ? "Campaign running" : paused ? "Paused" : status;
   const gmailConsentComplete = privacyAccepted && dedicatedEmailConfirmed;
+  const templateLoading = isActionLoading(actionStates, "useTemplate");
+  const resumeLoading = isActionLoading(actionStates, "uploadResume");
+  const connectLoading = isActionLoading(actionStates, "connectGmail");
+  const revokeLoading = isActionLoading(actionStates, "revokeGmail");
+  const startLoading = isActionLoading(actionStates, "startCampaign");
+  const pauseLoading = isActionLoading(actionStates, "pauseCampaign");
+  const campaignActionLoading = startLoading || pauseLoading;
+  const findJobsLoading = isActionLoading(actionStates, "findJobs");
 
   if (active === "templates") {
     return (
@@ -122,7 +131,9 @@ export default function WorkspacePanels({
             </div>
             <div className="workspace-actions">
               <button type="button" className="workspace-secondary" onClick={() => setSelectedTemplate(null)}>Cancel</button>
-              <button type="button" className="workspace-primary" onClick={confirmTemplate} disabled={busy || !reviewTitle.trim() || !reviewRole.trim()}>{busy ? "Adding template..." : "Confirm and add campaign"}</button>
+              <button type="button" className="workspace-primary" onClick={confirmTemplate} disabled={templateLoading || !reviewTitle.trim() || !reviewRole.trim()}>
+                {templateLoading && selectedTemplateActionId === selectedTemplate.id ? "Adding template…" : "Confirm and add campaign"}
+              </button>
             </div>
           </div>
         ) : (
@@ -132,7 +143,7 @@ export default function WorkspacePanels({
               <article className="workspace-template-custom">
                 <small>Custom campaign</small><h3>Build your own campaign</h3><p>Choose the role, location, job type, requirements, and campaign settings yourself.</p><span className="workspace-template-usage">1,200 times used</span><Link className="workspace-template-link" href="/campaign/new">Create custom</Link>
               </article>
-              {templates.map((item) => <article key={item.id}><small>{item.category}</small><h3>{item.title}</h3><p>{item.description}</p><button type="button" onClick={() => openTemplateReview(item)} disabled={busy}>Review template</button></article>)}
+              {templates.map((item) => <article key={item.id}><small>{item.category}</small><h3>{item.title}</h3><p>{item.description}</p><button type="button" onClick={() => openTemplateReview(item)}>Review template</button></article>)}
             </div>
             {query.trim() && templates.length === 0 && <div className="workspace-message">No ready-made templates match that search. Use the custom campaign card above.</div>}
           </>
@@ -148,7 +159,25 @@ export default function WorkspacePanels({
         <div className="workspace-card">
           <h3>{resumeReady ? "Resume ready" : "Resume required"}</h3>
           <p>{resumeReady ? resumeName || "Resume saved" : "Upload a PDF, DOC, or DOCX file."}</p>
-          <label className="workspace-primary">{busy ? "Working..." : "Upload or replace resume"}<input hidden type="file" accept=".pdf,.doc,.docx" onChange={(event) => event.target.files?.[0] && onResumeUpload(event.target.files[0])} /></label>
+          <label className="workspace-primary">
+            {resumeLoading ? "Uploading resume…" : "Upload or replace resume"}
+            <input
+              hidden
+              type="file"
+              accept=".pdf,.doc,.docx"
+              disabled={resumeLoading}
+              onChange={async (event) => {
+                const input = event.currentTarget;
+                const file = input.files?.[0];
+                if (!file) return;
+                try {
+                  await onResumeUpload(file);
+                } finally {
+                  input.value = "";
+                }
+              }}
+            />
+          </label>
           <Link href="/resume-canvas">Open resume editor</Link>
         </div>
       </section>
@@ -194,12 +223,12 @@ export default function WorkspacePanels({
             </div>
 
             <label className={`workspace-gmail-consent${gmailReady ? " is-disabled" : ""}`}>
-              <input type="checkbox" checked={privacyAccepted || gmailReady} disabled={gmailReady || busy} onChange={(event) => setPrivacyAccepted(event.target.checked)} />
+              <input type="checkbox" checked={privacyAccepted || gmailReady} disabled={gmailReady || connectLoading} onChange={(event) => setPrivacyAccepted(event.target.checked)} />
               <span><strong>{GMAIL_CONNECTION_CONSENT_TEXT}</strong></span>
             </label>
 
             <label className={`workspace-gmail-consent${gmailReady ? " is-disabled" : ""}`}>
-              <input type="checkbox" checked={dedicatedEmailConfirmed || gmailReady} disabled={gmailReady || busy} onChange={(event) => setDedicatedEmailConfirmed(event.target.checked)} />
+              <input type="checkbox" checked={dedicatedEmailConfirmed || gmailReady} disabled={gmailReady || connectLoading} onChange={(event) => setDedicatedEmailConfirmed(event.target.checked)} />
               <span><strong>{GMAIL_DEDICATED_EMAIL_CONFIRMATION_TEXT}</strong></span>
             </label>
 
@@ -208,15 +237,15 @@ export default function WorkspacePanels({
 
           {gmailReady ? (
             <>
-              <button type="button" className="workspace-gmail-revoke" onClick={onRevokeGmail} disabled={busy}>
-                {busy ? "Revoking..." : "Revoke connection"}
+              <button type="button" className="workspace-gmail-revoke" onClick={onRevokeGmail} disabled={revokeLoading}>
+                {revokeLoading ? "Revoking…" : "Revoke connection"}
               </button>
               <small className="workspace-gmail-revoke-note">This removes Calsie&apos;s saved Google tokens and prevents Gmail sending until you connect again.</small>
             </>
           ) : (
             <>
-              <button type="button" className="workspace-primary workspace-gmail-connect" onClick={onConnectGmail} disabled={busy || !gmailConsentComplete} aria-describedby="gmail-privacy-permission">
-                {busy ? "Connecting..." : "Connect Google"}
+              <button type="button" className="workspace-primary workspace-gmail-connect" onClick={onConnectGmail} disabled={connectLoading || !gmailConsentComplete} aria-describedby="gmail-privacy-permission">
+                {connectLoading ? "Connecting…" : "Connect Google"}
               </button>
               {!gmailConsentComplete && <small className="workspace-gmail-required">Select both consent checkboxes to enable Google connection.</small>}
             </>
@@ -235,11 +264,12 @@ export default function WorkspacePanels({
           <h3>{campaign?.name || "No campaign selected"}</h3>
           <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Choose and review a campaign from Browse Templates first."}</p>
           <div className="workspace-actions">
-            {running && <button className="workspace-secondary" onClick={onFindJobsNow} disabled={busy || !campaign}>{busy ? "Finding jobs..." : "Find New Jobs Now"}</button>}
-            <button className="workspace-primary" onClick={onToggleCampaign} disabled={busy || !campaign}>{running ? "Pause Campaign" : paused ? "Resume Campaign" : "Start Campaign"}</button>
+            {running && <button type="button" className="workspace-secondary" onClick={onFindJobsNow} disabled={findJobsLoading || !campaign}>{findJobsLoading ? "Finding jobs…" : "Find New Jobs Now"}</button>}
+            <button type="button" className="workspace-primary" onClick={onToggleCampaign} disabled={campaignActionLoading || !campaign || (!running && (!resumeReady || !gmailReady))}>
+              {pauseLoading ? "Pausing campaign…" : startLoading ? "Starting campaign…" : running ? "Pause Campaign" : paused ? "Resume Campaign" : "Start Campaign"}
+            </button>
           </div>
         </div>
-        {message && <div className="workspace-message">{message}</div>}
       </section>
     );
   }
@@ -256,14 +286,15 @@ export default function WorkspacePanels({
   return (
     <section>
       <header><p>Workspace</p><h1>Welcome back</h1><span>Your Applix control centre.</span></header>
-      {message && <div className="workspace-message">{message}</div>}
       <div className="workspace-plan"><div><b>{resumeReady ? "Ready" : "Missing"}</b><span>resume</span></div><div><b>{gmailReady ? "Connected" : "Disconnected"}</b><span>Gmail</span></div><div><b>{status}</b><span>campaign</span></div><div><b>{CAMPAIGN_PLAN.hourly_email_limit}/hour</b><span>send limit</span></div></div>
       <div className="workspace-card">
         <h3>{campaign?.name || "Set up your first campaign"}</h3>
         <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Browse templates, upload your resume, connect Gmail, and start."}</p>
         <div className="workspace-actions">
-          {running && <button className="workspace-secondary" onClick={onFindJobsNow} disabled={busy || !campaign}>{busy ? "Finding jobs..." : "Find New Jobs Now"}</button>}
-          <button className="workspace-primary" onClick={onToggleCampaign} disabled={busy || !campaign}>{running ? "Pause Campaign" : paused ? "Resume Campaign" : "Start Campaign"}</button>
+          {running && <button type="button" className="workspace-secondary" onClick={onFindJobsNow} disabled={findJobsLoading || !campaign}>{findJobsLoading ? "Finding jobs…" : "Find New Jobs Now"}</button>}
+          <button type="button" className="workspace-primary" onClick={onToggleCampaign} disabled={campaignActionLoading || !campaign || (!running && (!resumeReady || !gmailReady))}>
+            {pauseLoading ? "Pausing campaign…" : startLoading ? "Starting campaign…" : running ? "Pause Campaign" : paused ? "Resume Campaign" : "Start Campaign"}
+          </button>
         </div>
       </div>
     </section>

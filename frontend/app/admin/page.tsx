@@ -224,7 +224,7 @@ export default function AdminPage() {
 
     <section className={styles.layout}>
       <div className={styles.panel}>
-        <div className={styles.panelHead}><div><p className={styles.eyebrow}>{editingId ? "Editing" : "New template"}</p><h2>{editingId ? form.title : "Create template"}</h2></div>{editingId && <button className={styles.secondary} onClick={resetForm}>Cancel edit</button>}</div>
+        <div className={styles.panelHead}><div><p className={styles.eyebrow}>{editingId ? "Editing" : "New template"}</p><h2>{editingId ? form.title : "Create template"}</h2></div>{editingId && <button type="button" className={styles.secondary} onClick={resetForm}>Cancel edit</button>}</div>
         <div className={styles.grid}>
           <Field label="Template title" value={form.title} onChange={(value) => setForm({ ...form, title: value, slug: form.slug || slugify(value), campaign_name: form.campaign_name || `${value} Campaign` })} />
           <Field label="Campaign name" value={form.campaign_name} onChange={(value) => setForm({ ...form, campaign_name: value })} />
@@ -237,7 +237,7 @@ export default function AdminPage() {
 
         <div className={styles.mediaRow}>
           <div className={styles.preview}>{imageFile ? <img src={URL.createObjectURL(imageFile)} alt="New template preview" /> : form.image_url ? <img src={form.image_url} alt="Template preview" /> : "Template photo preview"}</div>
-          <div className={styles.uploadBox}><strong>Template photo</strong><span>JPG, PNG, or WebP · maximum 5 MB</span><label className={styles.uploadButton}>Choose photo<input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] || null)} /></label>{(form.image_url || imageFile) && <button className={styles.secondary} onClick={() => { setImageFile(null); setForm({ ...form, image_url: null, image_path: null }); }}>Remove photo</button>}</div>
+          <div className={styles.uploadBox}><strong>Template photo</strong><span>JPG, PNG, or WebP · maximum 5 MB</span><label className={styles.uploadButton}>Choose photo<input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setImageFile(event.target.files?.[0] || null)} /></label>{(form.image_url || imageFile) && <button type="button" className={styles.secondary} onClick={() => { setImageFile(null); setForm({ ...form, image_url: null, image_path: null }); }}>Remove photo</button>}</div>
         </div>
 
         <details className={styles.details}><summary>Advanced search and campaign settings</summary>
@@ -259,19 +259,19 @@ export default function AdminPage() {
         </details>
 
         <label className={styles.checkbox}><input type="checkbox" checked={form.is_active} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} />Active and visible to users</label>
-        <div className={styles.actions}><button className={styles.primary} disabled={saving} onClick={() => void saveTemplate()}>{saving ? "Saving..." : editingId ? "Save changes" : "Create template"}</button><button className={styles.secondary} onClick={resetForm}>Clear form</button></div>
+        <div className={styles.actions}><button type="button" className={styles.primary} disabled={saving} onClick={() => void saveTemplate()}>{saving ? "Saving..." : editingId ? "Save changes" : "Create template"}</button><button type="button" className={styles.secondary} onClick={resetForm}>Clear form</button></div>
       </div>
 
       <aside className={styles.panel}>
         <div className={styles.panelHead}><div><p className={styles.eyebrow}>Library</p><h2>{templates.length} templates</h2></div></div>
-        <div className={styles.exportRow}><button className={styles.secondary} onClick={() => downloadJson("calsie-campaign-templates.json", templates)}>Download all JSON</button></div>
+        <div className={styles.exportRow}><button type="button" className={styles.secondary} onClick={() => downloadJson("calsie-campaign-templates.json", templates)}>Download all JSON</button></div>
         <input className={styles.search} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search templates" />
         <div className={styles.list}>{filtered.map((item) => <article className={styles.card} key={item.id}>
           <div className={styles.cardTop}><div><span className={styles.category}>{item.category}</span><h3>{item.title}</h3></div><span className={styles.badge}>{item.is_active ? "Active" : "Paused"}</span></div>
           {item.image_url && <img className={styles.thumb} src={item.image_url} alt="" />}
           <p className={styles.meta}><b>{item.campaign_name || item.title}</b><br />{item.role} · {item.location}</p>
           <p className={styles.meta}>{item.description}</p>
-          <div className={styles.cardActions}><button className={styles.secondary} onClick={() => editTemplate(item)}>Edit</button><button className={styles.secondary} onClick={() => void toggleTemplate(item)}>{item.is_active ? "Pause" : "Activate"}</button><button className={styles.secondary} onClick={() => downloadJson(`${item.slug}.json`, item)}>Download</button><button className={styles.danger} onClick={() => void deleteTemplate(item)}>Delete</button></div>
+          <div className={styles.cardActions}><button type="button" className={styles.secondary} onClick={() => editTemplate(item)}>Edit</button><button type="button" className={styles.secondary} onClick={() => void toggleTemplate(item)}>{item.is_active ? "Pause" : "Activate"}</button><button type="button" className={styles.secondary} onClick={() => downloadJson(`${item.slug}.json`, item)}>Download</button><button type="button" className={styles.danger} onClick={() => void deleteTemplate(item)}>Delete</button></div>
         </article>)}{filtered.length === 0 && <p>No templates match your search.</p>}</div>
       </aside>
     </section>

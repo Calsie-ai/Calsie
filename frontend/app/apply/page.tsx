@@ -30,7 +30,7 @@ export default function ApplyPage() {
 
         <div style={styles.actions}>
           <Link href="/matching" style={styles.secondaryButton}>Back to matches</Link>
-          <button style={styles.primaryButton}>Generate kit soon</button>
+          <button type="button" style={styles.primaryButton}>Generate kit soon</button>
         </div>
       </section>
     </main>
