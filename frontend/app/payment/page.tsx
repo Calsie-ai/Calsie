@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "../providers/AuthProvider";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import { inferAustralianPostcode } from "../../lib/australianPostcode";
@@ -185,11 +186,11 @@ function CheckoutContent() {
             <span>Calsie | Jobs</span>
           </a>
           <nav className="applix-nav" aria-label="Checkout navigation">
-            <a href="/dashboard">Dashboard</a>
+            <Link href="/dashboard?panel=overview">Dashboard</Link>
             <a href="/support">Support</a>
           </nav>
           <div className="applix-actions">
-            <a className="applix-button applix-button--subtle" href="/dashboard">Back to templates</a>
+            <Link className="applix-button applix-button--subtle" href="/dashboard?panel=templates">Back to templates</Link>
           </div>
         </div>
       </header>

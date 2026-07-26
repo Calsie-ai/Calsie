@@ -332,7 +332,7 @@ export default function CampaignTemplatesPage() {
 
       setCreated(true);
       setMessage("Template saved. Campaign created.");
-      window.setTimeout(() => router.push("/dashboard"), 1200);
+      window.setTimeout(() => router.push("/dashboard?panel=overview"), 1200);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not save template.");
     } finally {
@@ -344,7 +344,7 @@ export default function CampaignTemplatesPage() {
     <main className="templates-shell">
       <nav className="templates-nav" aria-label="Template navigation">
         <button className="templates-round" type="button" onClick={() => router.back()}>Back</button>
-        <Link className="templates-dashboard-link" href="/dashboard">Dashboard</Link>
+        <Link className="templates-dashboard-link" href="/dashboard?panel=templates">Dashboard</Link>
       </nav>
 
       <section className="templates-hero">
@@ -422,7 +422,7 @@ export default function CampaignTemplatesPage() {
             </fieldset>
 
             <div className="template-form-actions">
-              <Link className="template-secondary" href="/dashboard">Back to dashboard</Link>
+              <Link className="template-secondary" href="/dashboard?panel=templates">Back to dashboard</Link>
               <button className="template-primary" type="submit" disabled={checkingUser || saving || created}>{saving ? "Saving..." : created ? "Campaign created" : "Save Template / Create Campaign"}</button>
             </div>
           </form>

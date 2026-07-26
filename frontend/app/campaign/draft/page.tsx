@@ -72,7 +72,7 @@ export default function CampaignDraftPage() {
 
       sessionStorage.setItem("applixLastCampaignId", data.campaign.id);
       setStatus("Campaign launched. Python scraper queue is ready.");
-      router.push(`/dashboard?campaign=${data.campaign.id}`);
+      router.push("/dashboard?panel=campaign");
     } catch (error: any) {
       setStatus(error?.message || "Campaign launch failed.");
     } finally {
