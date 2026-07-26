@@ -15,6 +15,18 @@ const migrationSource = readFileSync(
   new URL("../../supabase/migrations/20260726173707_stripe_webhook_hardening.sql", import.meta.url),
   "utf8",
 );
+const preflightMigrationSource = readFileSync(
+  new URL("../../supabase/migrations/20260726173706_stage6_backfill_preflight.sql", import.meta.url),
+  "utf8",
+);
+const readinessMigrationSource = readFileSync(
+  new URL("../../supabase/migrations/20260726190000_stage6_deployment_readiness.sql", import.meta.url),
+  "utf8",
+);
+const integrationTestSource = readFileSync(
+  new URL("../../supabase/tests/stripe_webhook_hardening.sql", import.meta.url),
+  "utf8",
+);
 const webhookSource = readFileSync(
   new URL("../app/api/stripe/webhook/route.ts", import.meta.url),
   "utf8",
@@ -377,14 +389,55 @@ test("49. checkout identity is persisted before returning its URL", () => {
   assert.match(createCheckoutSource, /checkoutSessionId: session\.id/);
 });
 
-test("50. payment verification reads the immutable Session row", () => {
+test("50. failed purchase registration expires the unpaid Checkout Session", () => {
+  const registration = createCheckoutSource.indexOf("await registerCheckoutPurchase({");
+  const expiration = createCheckoutSource.indexOf("await stripe.checkout.sessions.expire(session.id)");
+  const checkoutUrl = createCheckoutSource.indexOf("checkout_url: session.url");
+  assert.ok(registration < expiration);
+  assert.ok(expiration < checkoutUrl);
+  assert.match(createCheckoutSource, /if \(session\.status !== "open"\)/);
+});
+
+test("51. payment verification reads the immutable Session row", () => {
   assert.match(paymentStatusSource, /rest\/v1\/applix_purchases/);
   assert.match(paymentStatusSource, /stripe_checkout_session_id: `eq\.\$\{checkoutSessionId\}`/);
   assert.match(paymentStatusSource, /persistedExpectedAmount === stripeExpectedAmount/);
   assert.match(paymentStatusSource, /persistedActualAmount === stripeAmount/);
 });
 
-test("51. projection statuses remain compatible with existing campaign gates", () => {
+test("52. projection statuses remain compatible with existing campaign gates", () => {
   assert.equal(projectionStatusForPurchase("paid"), "active");
   assert.equal(projectionStatusForPurchase("fully_refunded"), "refunded");
+});
+
+test("53. incompatible legacy rows are made ineligible before Stage 6", () => {
+  assert.match(preflightMigrationSource, /20260726173706|Stage 6/i);
+  assert.match(preflightMigrationSource, /invalid_checkout_session_id/);
+  assert.match(preflightMigrationSource, /invalid_currency/);
+  assert.match(preflightMigrationSource, /invalid_amount/);
+  assert.match(preflightMigrationSource, /checkout_metadata - 'pending_intent_id'/);
+});
+
+test("54. ambiguous legacy identities are skipped rather than mis-projected", () => {
+  assert.match(preflightMigrationSource, /duplicate_checkout_session_id/);
+  assert.match(preflightMigrationSource, /duplicate_payment_intent_id/);
+  assert.match(preflightMigrationSource, /having count\(\*\) > 1/g);
+  assert.match(preflightMigrationSource, /stage6_backfill_skip_reason/);
+});
+
+test("55. discounted and zero-cost legacy expected amounts are repaired safely", () => {
+  assert.match(readinessMigrationSource, /expected_price_amount/);
+  assert.match(readinessMigrationSource, />= coalesce\(purchases\.actual_amount, 0\)/);
+  assert.match(readinessMigrationSource, /expected_amount_backfilled_from_checkout_metadata/);
+});
+
+test("56. integration SQL calls the exact smallint RPC signature", () => {
+  assert.match(integrationTestSource, /30::smallint/);
+});
+
+test("57. reconciliation does not require its secret while disabled", () => {
+  assert.ok(
+    reconcileSource.indexOf("if (!RECONCILIATION_ENABLED)")
+      < reconcileSource.indexOf("if (!authorized(req))"),
+  );
 });
