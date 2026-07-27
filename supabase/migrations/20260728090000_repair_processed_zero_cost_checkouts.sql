@@ -66,6 +66,7 @@ with eligible as (
     latest_event_precedence = 30,
     latest_stripe_event_id = eligible.stripe_event_id,
     latest_stripe_event_created_at = eligible.stripe_created_at,
+    terminal_state_at = coalesce(p.terminal_state_at, eligible.stripe_created_at, now()),
     safe_metadata = p.safe_metadata || jsonb_build_object(
       'zero_cost_paid_repair', true,
       'zero_cost_paid_repair_migration', '20260728090000'
@@ -80,7 +81,6 @@ with eligible as (
 update public.applix_subscriptions s
 set
   status = 'active',
-  payment_status = p.payment_status,
   price_amount = 0,
   current_purchase_id = p.id,
   current_purchase_sequence = p.purchase_sequence,
