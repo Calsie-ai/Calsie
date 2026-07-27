@@ -40,11 +40,32 @@
   white-space: nowrap;
 }
 
+/* Keep the desktop navigation fixed in view while the workspace content scrolls. */
+@media (min-width: 851px) {
+  .applix-workspace .workspace-sidebar {
+    position: sticky !important;
+    top: 0 !important;
+    align-self: start !important;
+    height: 100vh !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    background: #111111 !important;
+  }
+}
+
 @media (max-width: 850px) {
   .workspace-brand img {
     width: 52px !important;
     height: 52px !important;
     margin: -8px;
+  }
+
+  .applix-workspace .workspace-sidebar {
+    position: static !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
 }
 
