@@ -11,7 +11,8 @@
     "test:action-state": "node --experimental-strip-types --test tests/actionState.test.mts",
     "test:external-return": "node --experimental-strip-types --test tests/externalReturn.test.mts",
     "test:payment-status-refund": "node --experimental-strip-types --test tests/paymentStatusRefund.test.mts",
-    "test:stripe-webhook": "node --experimental-strip-types --test tests/stripeWebhookHardening.test.mts"
+    "test:stripe-webhook": "node --experimental-strip-types --test tests/stripeWebhookHardening.test.mts",
+    "test:zero-cost-checkout": "node --experimental-strip-types --test tests/zeroCostCheckoutActivation.test.mts"
   },
   "dependencies": {
     "@supabase/supabase-js": "latest",

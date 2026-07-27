@@ -93,15 +93,22 @@ async function paymentIntentIsValid(
   stripe: Stripe,
   session: Stripe.Checkout.Session,
 ) {
-  if (session.payment_status === "no_payment_required") return true;
-
   const paymentIntentId = objectId(session.payment_intent);
-  if (!paymentIntentId) return false;
+  const amountTotal = Number(session.amount_total ?? 0);
+  const zeroCostCompleted = (
+    session.status === "complete"
+    && amountTotal === 0
+    && !paymentIntentId
+    && (session.payment_status === "paid" || session.payment_status === "no_payment_required")
+  );
+  if (zeroCostCompleted) return true;
+
+  if (!paymentIntentId || amountTotal <= 0) return false;
   const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
   if (
     paymentIntent.status !== "succeeded"
     || paymentIntent.currency.toLowerCase() !== String(session.currency || "").toLowerCase()
-    || paymentIntent.amount_received !== Number(session.amount_total ?? 0)
+    || paymentIntent.amount_received !== amountTotal
   ) {
     return false;
   }
