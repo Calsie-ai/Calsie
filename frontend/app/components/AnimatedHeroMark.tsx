@@ -30,9 +30,10 @@ export default function AnimatedHeroMark() {
       style={{
         position: "relative",
         display: "block",
-        width: "min(760px, 100%)",
+        width: "100%",
+        maxWidth: "560px",
         aspectRatio: "16 / 5",
-        margin: "0 auto 22px",
+        margin: "0 0 20px",
         padding: 0,
         overflow: "hidden",
         border: 0,
@@ -51,17 +52,13 @@ export default function AnimatedHeroMark() {
             aria-hidden={!isActive}
             style={{
               position: "absolute",
-              left: "50%",
-              top: "50%",
-              width: "365%",
-              height: "365%",
-              maxWidth: "none",
+              inset: 0,
+              width: "100%",
+              height: "100%",
               objectFit: "contain",
-              objectPosition: "center",
+              objectPosition: "left center",
               opacity: isActive ? 1 : 0,
-              transform: isActive
-                ? "translate(-50%, -50%) scale(1)"
-                : "translate(-47%, -50%) scale(.98)",
+              transform: isActive ? "translateX(0)" : "translateX(18px)",
               transition: "opacity 500ms ease, transform 500ms ease",
               pointerEvents: "none",
             }}
