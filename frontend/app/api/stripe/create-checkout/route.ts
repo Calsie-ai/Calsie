@@ -45,6 +45,13 @@ type TemplateRow = {
   payment_required: boolean;
 };
 
+type ExistingPurchase = {
+  id: string;
+  purchase_status: string;
+  stripe_checkout_session_id: string;
+  template_id: string;
+};
+
 function cleanPostcode(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -97,6 +104,27 @@ async function getTemplate(templateId: string) {
   const rows = await response.json().catch(() => []);
   if (!response.ok) throw new Error("Could not load the selected template.");
   return (Array.isArray(rows) ? rows[0] : null) as TemplateRow | null;
+}
+
+async function getExistingPurchase(userId: string, templateId: string) {
+  const query = new URLSearchParams({
+    user_id: `eq.${userId}`,
+    template_id: `eq.${templateId}`,
+    purchase_status: "in.(paid,partially_refunded)",
+    select: "id,purchase_status,stripe_checkout_session_id,template_id",
+    order: "purchase_sequence.desc",
+    limit: "1",
+  });
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/applix_purchases?${query.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+    },
+    cache: "no-store",
+  });
+  const rows = await response.json().catch(() => []);
+  if (!response.ok) throw new Error("Could not check existing purchases.");
+  return (Array.isArray(rows) ? rows[0] : null) as ExistingPurchase | null;
 }
 
 export async function POST(req: Request) {
@@ -155,6 +183,18 @@ export async function POST(req: Request) {
     }
     if (!Number.isInteger(template.price_amount) || template.price_amount <= 0) {
       return NextResponse.json({ ok: false, error: "The selected template has invalid pricing." }, { status: 409 });
+    }
+
+    const existingPurchase = await getExistingPurchase(currentUser.id, template.id);
+    if (existingPurchase) {
+      return NextResponse.json({
+        ok: false,
+        status: "already_purchased",
+        template_id: template.id,
+        purchase_id: existingPurchase.id,
+        checkout_session_id: existingPurchase.stripe_checkout_session_id,
+        campaign_id: null,
+      }, { status: 409 });
     }
 
     const templateName = template.campaign_name || template.title;
@@ -258,7 +298,7 @@ export async function POST(req: Request) {
       currency,
       mode: "payment",
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ ok: false, error: "Could not create secure checkout. Your campaign details were kept." }, { status: 500 });
   }
 }
