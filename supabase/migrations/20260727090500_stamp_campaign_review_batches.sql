@@ -16,7 +16,7 @@ begin
   end if;
 
   -- Batch identity is immutable after first assignment.
-  if old.batch_date is not null and old.campaign_day is not null then
+  if tg_op = 'UPDATE' and old.batch_date is not null and old.campaign_day is not null then
     new.batch_date := old.batch_date;
     new.campaign_day := old.campaign_day;
     return new;
