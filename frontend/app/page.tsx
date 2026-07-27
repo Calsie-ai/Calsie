@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { getSupabaseClient } from "../lib/supabaseClient";
+import AnimatedHeroMark from "./components/AnimatedHeroMark";
 import AppFooter from "./components/AppFooter";
 import PricingSection from "./components/PricingSection";
 
@@ -117,6 +118,7 @@ export default function HomePage() {
       <section className="applix-hero" aria-labelledby="hero-title">
         <div className="applix-container applix-hero-grid">
           <div>
+            <AnimatedHeroMark />
             <p className="applix-eyebrow">AI Job Application Assistant</p>
             <h1 id="hero-title">Apply to jobs faster with AI that works with you</h1>
             <p className="applix-hero-copy"><strong>The best opportunities start with being seen.</strong><br />Because the right resume means nothing if the right person never sees it.</p>
