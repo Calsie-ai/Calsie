@@ -143,15 +143,20 @@ export function transitionForStripeSnapshot(
     };
   }
 
-  if (
-    snapshot.paymentStatus === "no_payment_required"
-    && !snapshot.hasPaymentIntent
+  const zeroCostCompleted = (
+    snapshot.checkoutStatus === "complete"
     && snapshot.actualAmount === 0
-    && snapshot.checkoutStatus === "complete"
-  ) {
+    && !snapshot.hasPaymentIntent
+    && (snapshot.paymentStatus === "paid" || snapshot.paymentStatus === "no_payment_required")
+    && (
+      snapshot.eventType === "checkout.session.completed"
+      || snapshot.eventType === "checkout.session.async_payment_succeeded"
+    )
+  );
+  if (zeroCostCompleted) {
     return {
       amountRefunded: 0,
-      paymentStatus: "no_payment_required",
+      paymentStatus: snapshot.paymentStatus as "paid" | "no_payment_required",
       precedence: 30,
       purchaseStatus: "paid",
       refundStatus: "none",
