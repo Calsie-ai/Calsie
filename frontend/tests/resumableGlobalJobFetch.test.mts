@@ -20,7 +20,7 @@ test("persists the provider request ID before returning", () => {
 
 test("polls the Outscraper request-results endpoint", () => {
   assert.match(source, /OUTSCRAPER_REQUESTS_URL/);
-  assert.match(source, /requests\/{requestId}/i);
+  assert.match(source, /encodeURIComponent\(requestId\)/);
   assert.match(source, /action: "provider_pending"/);
   assert.match(source, /providerStatus === "success"/);
 });
