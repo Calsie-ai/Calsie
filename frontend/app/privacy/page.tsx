@@ -1,6 +1,5 @@
 import Link from "next/link";
-
-const SUPPORT_EMAIL = "hostsajan@gmail.com";
+import { CALSIE_CONTACT_EMAIL } from "../../lib/contact";
 
 const shellStyle = {
   minHeight: "100vh",
@@ -42,11 +41,11 @@ export default function PrivacyPage() {
 
         <p style={textStyle}>Calsie uses trusted service providers to help protect user accounts and information. Google provides secure account connection and authorisation, while Supabase provides protected sign-in, database and file-storage services. Calsie also uses secure hosting systems to operate the website. Personal information is only shared with service providers when necessary to operate, maintain and protect the service, and it is not shared with advertisers, data brokers or information resellers.</p>
 
-        <p style={textStyle}>Users may connect a separate Google account created specifically for job applications to keep employment activity separate from personal emails, although this is optional. A user may disconnect their Google account at any time through their Google Account settings and may request access, correction or deletion of their Calsie information by contacting <a href={`mailto:${SUPPORT_EMAIL}`} style={linkStyle}>{SUPPORT_EMAIL}</a>.</p>
+        <p style={textStyle}>Users may connect a separate Google account created specifically for job applications to keep employment activity separate from personal emails, although this is optional. A user may disconnect their Google account at any time through their Google Account settings and may request access, correction or deletion of their Calsie information by contacting <a href={`mailto:${CALSIE_CONTACT_EMAIL}`} style={linkStyle}>{CALSIE_CONTACT_EMAIL}</a>.</p>
 
         <p style={textStyle}>Calsie handles information received from Google in accordance with Google&apos;s user-data and privacy requirements.</p>
 
-        <p style={{ fontSize: "14px", lineHeight: 1.6 }}>Last updated: 12 July 2026.</p>
+        <p style={{ fontSize: "14px", lineHeight: 1.6 }}>Last updated: 30 July 2026.</p>
       </section>
     </main>
   );

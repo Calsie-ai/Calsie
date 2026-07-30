@@ -1,4 +1,6 @@
-export const GMAIL_PRIVACY_POLICY_VERSION = "2026-07-12";
+import { CALSIE_CONTACT_EMAIL } from "../../lib/contact";
+
+export const GMAIL_PRIVACY_POLICY_VERSION = "2026-07-30";
 
 export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 
@@ -22,9 +24,9 @@ export const GMAIL_PRIVACY_SUMMARY = [
   [
     "A separate or dedicated Google account created specifically for job applications is required before connecting Google to a Calsie campaign.",
     "This keeps employment activity separate from personal emails and sensitive records.",
-    "A user may disconnect the Google account at any time through Google Account settings and may request access, correction or deletion of Calsie information by contacting hostsajan@gmail.com.",
+    `A user may disconnect the Google account at any time through Google Account settings and may request access, correction or deletion of Calsie information by contacting ${CALSIE_CONTACT_EMAIL}.`,
   ].join(" "),
-  "Calsie handles information received from Google in accordance with Google's user-data and privacy requirements. Last updated: 12 July 2026.",
+  "Calsie handles information received from Google in accordance with Google's user-data and privacy requirements. Last updated: 30 July 2026.",
 ] as const;
 
 export const GMAIL_CONNECTION_CONSENT_TEXT =

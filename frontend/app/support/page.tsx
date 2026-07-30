@@ -1,6 +1,5 @@
 import Link from "next/link";
-
-const SUPPORT_EMAIL = "hostsajan@gmail.com";
+import { CALSIE_CONTACT_EMAIL } from "../../lib/contact";
 
 const shellStyle = {
   minHeight: "100vh",
@@ -28,19 +27,19 @@ export default function SupportPage() {
   return (
     <main style={shellStyle}>
       <section style={contentStyle}>
-        <Link href="/" style={linkStyle}>Back to Applix</Link>
+        <Link href="/" style={linkStyle}>Back to Calsie</Link>
         <div>
           <p style={{ margin: "0 0 10px", color: "#FE818D", fontWeight: 900, letterSpacing: ".12em", textTransform: "uppercase" }}>Support</p>
           <h1 style={{ margin: 0, fontSize: "clamp(38px, 8vw, 72px)", lineHeight: 1 }}>Support</h1>
         </div>
         <p style={{ fontSize: "18px", lineHeight: 1.7 }}>
-          If Applix is not behaving as expected, check that you are signed in, your resume is uploaded, your connector is active, and your campaign is configured before restarting the workflow.
+          If Calsie is not behaving as expected, check that you are signed in, your resume is uploaded, your connector is active, and your campaign is configured before restarting the workflow.
         </p>
         <p style={{ fontSize: "18px", lineHeight: 1.7 }}>
-          For help with billing, access, Gmail connection, tracker approvals, resume parsing, privacy, or account deletion, contact Applix support at:
+          For help with billing, access, Gmail connection, tracker approvals, resume parsing, privacy, or account deletion, contact Calsie support at:
         </p>
-        <a href={`mailto:${SUPPORT_EMAIL}`} style={{ ...linkStyle, fontSize: "22px" }}>{SUPPORT_EMAIL}</a>
-        <Link href="/contact" style={{ ...linkStyle, fontSize: "18px" }}>Contact Applix</Link>
+        <a href={`mailto:${CALSIE_CONTACT_EMAIL}`} style={{ ...linkStyle, fontSize: "22px" }}>{CALSIE_CONTACT_EMAIL}</a>
+        <Link href="/contact" style={{ ...linkStyle, fontSize: "18px" }}>Contact Calsie</Link>
       </section>
     </main>
   );
