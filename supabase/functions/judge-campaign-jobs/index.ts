@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
     if (!campaignResult.data) return reply({ ok: false, error: "Campaign not found" }, 404);
     const campaign = campaignResult.data as Row;
 
-    const matchQuery = supabase.from("campaign_job_matches").select("*,jobs!inner(id,title,company,location,job_type,description,posted_at,source,apply_url)").eq("campaign_id", campaignId);
+    const matchQuery = supabase.from("campaign_job_matches").select("*,template_job_catalogue!inner(id,title,company,location,job_type,description,posted_at,source,apply_url)").eq("campaign_id", campaignId);
     const matchResult = requestedIds.length
       ? await matchQuery.in("job_id", requestedIds).limit(limit)
       : await matchQuery.eq("filter_status", "eligible").order("match_score", { ascending: false }).limit(limit);
@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
     const results: Row[] = [];
 
     for (const match of matchResult.data || []) {
-      const job = match.jobs as Row;
+      const job = match.template_job_catalogue as Row;
 
       // Never re-judge or reset a row that has entered campaign history.
       if (match.selected_for_campaign === true || match.user_decision === "approved" || match.user_decision === "skipped") {
