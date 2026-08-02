@@ -66,6 +66,49 @@ ChatGPT does not approve based only on Codex's written summary. The actual diff 
 11. Do not hide failing checks, unresolved errors, or unverified assumptions.
 12. Do not mix multiple unrelated features in one pull request.
 
+## IMPORTANT: Status-driven, traceable workflow architecture
+
+This is a mandatory development standard for every new asynchronous, scheduled,
+multi-step, integration, queue, Cron, and background-processing workflow.
+Build each workflow so that failures can be located and understood step by step.
+
+### Required design rules
+
+- Keep separate status fields for each major component. Do not use one overloaded
+  status field for an entire workflow.
+- Maintain an append-only event log for every meaningful state transition.
+- Store stable machine-readable error codes alongside human-readable messages.
+- Record timestamps for creation, scheduling, claiming, processing, deferral,
+  retry, completion, cancellation, failure, timeout, and recovery.
+- Carry linked trace IDs through every stage, including applicable identifiers
+  such as `email_id`, `schedule_id`, `scheduler_run_id`, `dispatcher_run_id`,
+  `attempt_id`, `gmail_connection_id`, and external provider IDs.
+- Preserve schedule and attempt history. Never overwrite the old record when an
+  item is deferred, retried, or rescheduled; create a new linked record.
+- Record success only after the external provider confirms success.
+- Protect claims, reservations, and state transitions against duplicate
+  execution and race conditions using atomic database operations or locks.
+- Distinguish retryable errors, permanent errors, and unknown external outcomes.
+- Add stuck-record detection and recovery for items left in `claimed`,
+  `processing`, or equivalent states beyond an expected timeout.
+- Make every transition explicit and validate that the previous status permits
+  the requested next status.
+
+### Required debugging model
+
+- **Current status:** where the process is now.
+- **Event log:** exactly how the process reached that state.
+- **Error code:** why it stopped, deferred, retried, or failed.
+- **Trace IDs:** which records, runs, attempts, and provider operations belong
+  to the same workflow.
+
+### Completion requirement
+
+Before declaring a workflow complete, verify that an internal operator can trace
+one item from creation through scheduling, Cron dispatch, claiming, provider
+calls, retries, recovery, and final outcome without relying only on temporary
+function logs.
+
 ## Required verification
 After every code change, run the checks that exist in the repository, including where available:
 - type checking
