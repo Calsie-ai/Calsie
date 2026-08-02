@@ -60,7 +60,9 @@ function agedCareServiceScore(categories: unknown) {
 }
 
 function selectedJob(row: Row) {
-  const job = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs;
+  const job = Array.isArray(row.template_job_catalogue)
+    ? row.template_job_catalogue[0]
+    : row.template_job_catalogue;
   return {
     review_id: row.id,
     opportunity_type: "live_job",
@@ -176,7 +178,7 @@ Deno.serve(async (req: Request) => {
     const dayStart = `${runDate}T00:00:00.000Z`;
     const dayEnd = new Date(new Date(dayStart).getTime() + 86400000).toISOString();
     const now = new Date().toISOString();
-    const jobFields = "id,job_id,match_score,ai_role_relevance_score,ai_confidence,ai_reason,selected_at,filter_status,selected_for_campaign,jobs!inner(title,company,location)";
+    const jobFields = "id,job_id,match_score,ai_role_relevance_score,ai_confidence,ai_reason,selected_at,filter_status,selected_for_campaign,template_job_catalogue!inner(title,company,location)";
 
     const [selectedJobsResult, selectedCompaniesResult] = await Promise.all([
       supabase

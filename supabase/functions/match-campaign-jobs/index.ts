@@ -140,11 +140,32 @@ Deno.serve(async (req) => {
     const cutoff = new Date(Date.now() - ageDays * 86400000).toISOString();
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
+    const campaignResult = await supabase
+      .from("campaigns")
+      .select("template_id")
+      .eq("id", campaignId)
+      .maybeSingle();
+    if (campaignResult.error) return reply({ ok: false, error: campaignResult.error.message }, 500);
+    if (!campaignResult.data?.template_id) {
+      return reply({ ok: false, error: "Campaign is not linked to a template job pool" }, 409);
+    }
+
+    const poolResult = await supabase
+      .from("template_job_pool_links")
+      .select("pool_key")
+      .eq("template_id", campaignResult.data.template_id)
+      .maybeSingle();
+    if (poolResult.error) return reply({ ok: false, error: poolResult.error.message }, 500);
+    const poolKey = text(poolResult.data?.pool_key);
+    if (!poolKey) {
+      return reply({ ok: false, error: "No job catalogue is mapped to this campaign template" }, 409);
+    }
+
     let query = supabase
-      .from("jobs")
+      .from("template_job_catalogue")
       .select("id,title,company,location,description,job_type,posted_at,fetched_at,created_at,expires_at,catalogue_status,source,apply_url")
-      .is("user_id", null)
-      .is("campaign_id", null)
+      .eq("pool_key", poolKey)
+      .eq("is_active", true)
       .not("catalogue_status", "in", "(expired,closed,invalid)");
 
     if (requestedIds.length) query = query.in("id", requestedIds);
@@ -190,6 +211,7 @@ Deno.serve(async (req) => {
       const payload: Row = {
         campaign_id: campaignId,
         job_id: job.id,
+        job_pool: poolKey,
         orchestrator_run_id: runId,
         ...result,
         selected_for_campaign: Boolean(current?.selected_for_campaign),
@@ -214,6 +236,7 @@ Deno.serve(async (req) => {
       ok: true,
       function: "match-campaign-jobs",
       version: "bulk_match_v2",
+      job_pool: poolKey,
       campaign_id: campaignId,
       orchestrator_run_id: runId,
       requested_job_count: requestedIds.length,

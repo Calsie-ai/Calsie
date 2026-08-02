@@ -174,7 +174,7 @@ async function updateJobsWithPoolContact(supabase: ReturnType<typeof createClien
   if (!jobIds.length) return 0;
 
   const { error } = await supabase
-    .from("jobs")
+    .from("template_job_catalogue")
     .update({
       extracted_email: email,
       company_website_url: poolRow.company_website_url || null,
@@ -336,7 +336,7 @@ serve(async (req) => {
 
     const matchesResult = await supabase
       .from("campaign_job_matches")
-      .select("campaign_id,user_decision,reviewed_at,jobs!inner(*)")
+      .select("campaign_id,user_decision,reviewed_at,template_job_catalogue!inner(*)")
       .eq("campaign_id", campaignId)
       .eq("selected_for_campaign", true)
       .eq("ai_status", "completed")
@@ -352,9 +352,9 @@ serve(async (req) => {
 
     const approvedJobs = (matchesResult.data || [])
       .map((row: Row) => {
-        const joinedJob = Array.isArray(row.jobs)
-          ? row.jobs[0]
-          : row.jobs;
+        const joinedJob = Array.isArray(row.template_job_catalogue)
+          ? row.template_job_catalogue[0]
+          : row.template_job_catalogue;
 
         if (!joinedJob) return null;
 

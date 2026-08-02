@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
       let matchQuery = supabase
         .from("campaign_job_matches")
         .select(
-          "campaign_id,user_decision,reviewed_at,jobs!inner(id,email_contact_id,extracted_email,company,title,apply_method,email_extraction_status)"
+          "campaign_id,user_decision,reviewed_at,template_job_catalogue!inner(id,email_contact_id,extracted_email,company,title,apply_method,email_extraction_status)"
         )
         .eq("campaign_id", campaignId)
         .eq("selected_for_campaign", true)
@@ -182,9 +182,9 @@ Deno.serve(async (req) => {
 
       candidates = (matches || [])
         .map((row: Row) => {
-          const joinedJob = Array.isArray(row.jobs)
-            ? row.jobs[0]
-            : row.jobs;
+          const joinedJob = Array.isArray(row.template_job_catalogue)
+            ? row.template_job_catalogue[0]
+            : row.template_job_catalogue;
 
           if (!joinedJob) return null;
 
@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
         .slice(0, jobId ? 1 : limit) as Row[];
     } else {
       let query = supabase
-        .from("jobs")
+        .from("template_job_catalogue")
         .select("id,campaign_id,email_contact_id,extracted_email,company,title,user_id,apply_method,email_extraction_status,status,user_decision")
         .not("extracted_email", "is", null)
         .eq("apply_method", "email")
