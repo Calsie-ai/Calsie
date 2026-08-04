@@ -14,7 +14,7 @@ const navLinks = [
 ];
 
 const stats = [
-  { value: "2 min", label: "setup" },
+  { value: "2 min", label: "setup time" },
   { value: "24/day", label: "approved applications" },
   { value: "1/hour", label: "controlled sending" },
   { value: "720", label: "maximum over 30 days" },
@@ -100,17 +100,28 @@ export default function HomePage() {
       <header className="applix-header">
         <div className="applix-container applix-header-inner">
           <a className="applix-brand" href="#top" aria-label="Calsie Jobs home">
-            <img src="/applix-logo.svg" alt="" />
+            <img src="/applix-logo.svg" alt="Calsie Jobs Logo" />
             <span>Calsie | Jobs</span>
           </a>
           <nav className="applix-nav" aria-label="Primary navigation">
-            {navLinks.map((link) => <a key={link.href} href={link.href}>{link.label}</a>)}
+            {navLinks.map((link) => (
+              <a key={link.href} href={link.href}>
+                {link.label}
+              </a>
+            ))}
           </nav>
           <div className="applix-actions">
-            <button type="button" className="applix-button applix-button--subtle" onClick={loginWithGoogle} disabled={loading}>
+            <button
+              type="button"
+              className="applix-button applix-button--subtle"
+              onClick={loginWithGoogle}
+              disabled={loading}
+            >
               {loading ? "Opening" : "Log in"}
             </button>
-            <a className="applix-button applix-button--primary" href="#start-check">Get Started</a>
+            <a className="applix-button applix-button--primary" href="#start-check">
+              Get Started
+            </a>
           </div>
         </div>
       </header>
@@ -118,60 +129,109 @@ export default function HomePage() {
       <section className="applix-hero" aria-labelledby="hero-title">
         <div className="applix-container applix-hero-grid">
           <div>
-            <AnimatedHeroMark />
-            <p className="applix-eyebrow">AI Job Application Assistant</p>
-            <h1 id="hero-title">Apply to jobs faster with AI that works with you</h1>
-            <p className="applix-hero-copy"><strong>The best opportunities start with being seen.</strong><br />Because the right resume means nothing if the right person never sees it.</p>
-            <div className="applix-hero-actions">
-              <a className="applix-button applix-button--primary" href="#start-check">Get Started</a>
-              <a className="applix-button" href="#how-it-works">See how it works</a>
+            <div className="hero-badge">
+              <span className="hero-badge-dot" />
+              <span>Automating Australian Job Applications</span>
             </div>
-            <p className="applix-supporting-line">Up to 720 approved applications over a 30-day campaign.</p>
-            {status ? <p className="applix-status" role="alert">{status}</p> : null}
+            
+            <h1 id="hero-title">
+              Land your New Job in Australia <span className="highlight">automatically</span>.
+            </h1>
+            
+            <p className="applix-hero-copy">
+              Calsie Jobs automates the entire Australian job hunt—finding openings, tailoring your resume, and drafting personalized applications—while you retain full control and final approval.
+            </p>
+            
+            <div className="applix-hero-actions">
+              <a className="applix-button applix-button--primary" href="#start-check">
+                Start Free Campaign
+              </a>
+              <a className="applix-button" href="#how-it-works">
+                See How It Works
+              </a>
+            </div>
+            
+            <p className="applix-supporting-line">
+              No credit card required. Control campaign limits up to 24 applications per day.
+            </p>
+            
+            {status ? (
+              <p className="applix-status" role="alert">
+                {status}
+              </p>
+            ) : null}
           </div>
 
           <div className="applix-tracker-preview" aria-label="Example Calsie Jobs application tracker">
+            <div className="tracker-browser-bar">
+              <span className="browser-dot" />
+              <span className="browser-dot" />
+              <span className="browser-dot" />
+            </div>
+            
             <div className="applix-tracker-head">
               <div>
-                <span className="applix-tracker-kicker">AI mission control</span>
-                <h2>Application tracker</h2>
+                <span className="applix-tracker-kicker">AUTOMATION SYSTEM</span>
+                <h2>Live Campaign Tracking</h2>
               </div>
-              <span className="applix-tracker-live"><i /> Active campaign</span>
+              <span className="applix-tracker-live">
+                <i /> Active Run
+              </span>
             </div>
 
             <div className="applix-tracker-campaign">
-              <strong>Support Worker / Community Services Campaign</strong>
-              <span>Sydney NSW · Full-time and part-time roles</span>
+              <strong>Support Worker / Disability Services Campaign</strong>
+              <span>Sydney, Melbourne, Brisbane · Full-Time</span>
             </div>
 
             <div className="applix-tracker-stats">
               {trackerStats.map(([label, value]) => (
-                <div key={label}><span>{label}</span><strong>{value}</strong></div>
+                <div key={label}>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                </div>
               ))}
             </div>
 
             <div className="applix-tracker-toolbar">
-              <div><span className="is-active">All</span><span>Day 1</span></div>
-              <p>Example campaign activity</p>
+              <div>
+                <span className="is-active">All Active</span>
+                <span>Day 1</span>
+              </div>
+              <p>Demo Activity</p>
             </div>
 
             <div className="applix-tracker-table" role="table" aria-label="Example tracked jobs">
               <div className="applix-tracker-row applix-tracker-row--head" role="row">
-                <span>Company</span><span>Opportunity</span><span>Status</span><span>Review</span>
+                <span>Company</span>
+                <span>Role / Location</span>
+                <span>Status</span>
+                <span>Action</span>
               </div>
               {trackerRows.map(([company, role, rowStatus, action]) => (
                 <div className="applix-tracker-row" role="row" key={`${company}-${role}`}>
-                  <span><strong>{company}</strong><small>Sydney, NSW</small></span>
+                  <span>
+                    <strong>{company}</strong>
+                    <small>NSW, VIC, QLD</small>
+                  </span>
                   <span>{role}</span>
-                  <span><b className={`tracker-status tracker-status--${rowStatus.toLowerCase()}`}>{rowStatus}</b></span>
-                  <span><button type="button" tabIndex={-1}>{action}</button></span>
+                  <span>
+                    <b className={`tracker-status tracker-status--${rowStatus.toLowerCase()}`}>
+                      {rowStatus}
+                    </b>
+                  </span>
+                  <span>
+                    <button type="button" tabIndex={-1}>
+                      {action}
+                    </button>
+                  </span>
                 </div>
               ))}
             </div>
 
             <div className="applix-tracker-foot">
               <span>Showing 5 of 120 opportunities</span>
-              <strong>Search → Tailor → Approve → Send</strong>
+              <strong>Scan → Match → Edit → Send</strong>
             </div>
           </div>
         </div>
@@ -179,19 +239,30 @@ export default function HomePage() {
 
       <section className="applix-stats" aria-label="Calsie Jobs highlights">
         <div className="applix-container applix-stats-grid">
-          {stats.map((stat) => <div className="applix-stat" key={stat.label}><strong>{stat.value}</strong><span>{stat.label}</span></div>)}
+          {stats.map((stat) => (
+            <div className="applix-stat" key={stat.label}>
+              <strong>{stat.value}</strong>
+              <span>{stat.label}</span>
+            </div>
+          ))}
         </div>
       </section>
 
       <section className="applix-section" id="about" aria-labelledby="trust-title">
         <div className="applix-container">
           <div className="applix-section-header centered">
-            <p className="applix-eyebrow">Built for modern job seekers</p>
-            <h2 id="trust-title">Less repetition. More deliberate applications.</h2>
-            <p>Calsie Jobs is designed to reduce repetitive job application work while keeping every send under your control.</p>
+            <span className="applix-eyebrow">Minimal Outreach Overhead</span>
+            <h2 id="trust-title">Deliberate application prep. No manual forms.</h2>
+            <p>
+              Calsie Jobs takes the repetitive work out of job hunts. We target vacancies, generate specific drafts, and handle sending without sacrificing control.
+            </p>
           </div>
           <div className="applix-trust-grid" aria-label="Calsie Jobs trust signals">
-            {trustLabels.map((label) => <div className="applix-trust-item" key={label}>{label}</div>)}
+            {trustLabels.map((label) => (
+              <div className="applix-trust-item" key={label}>
+                {label}
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -199,14 +270,18 @@ export default function HomePage() {
       <section className="applix-section" id="features" aria-labelledby="features-title">
         <div className="applix-container">
           <div className="applix-section-header">
-            <p className="applix-eyebrow">Features</p>
-            <h2 id="features-title">Everything you need to move from search to send.</h2>
-            <p>A controlled workflow for finding roles, tailoring materials, reviewing drafts, and tracking every application.</p>
+            <span className="applix-eyebrow">Platform Features</span>
+            <h2 id="features-title">Automate your application workflow completely.</h2>
+            <p>
+              Every tool required to move from searching directories to signing contracts in Australia.
+            </p>
           </div>
           <div className="applix-card-grid">
             {features.map(([title, body], index) => (
               <article className="applix-feature-card" key={title}>
-                <span className="applix-feature-number">0{index + 1}</span><h3>{title}</h3><p>{body}</p>
+                <span className="applix-feature-number">0{index + 1}</span>
+                <h3>{title}</h3>
+                <p>{body}</p>
               </article>
             ))}
           </div>
@@ -215,10 +290,20 @@ export default function HomePage() {
 
       <section className="applix-section applix-how" id="how-it-works" aria-labelledby="steps-title">
         <div className="applix-container">
-          <div className="applix-section-header centered applix-how-header"><h2 id="steps-title">How Calsie Jobs works</h2><p>Prepare up to 24 applications a day while keeping approval in your hands.</p></div>
+          <div className="applix-section-header centered applix-how-header">
+            <span className="applix-eyebrow">Three Step Setup</span>
+            <h2 id="steps-title">How Calsie Jobs works</h2>
+            <p>
+              Our process handles finding vacancies and drafting proposals while you make final sending decisions.
+            </p>
+          </div>
           <div className="applix-step-track">
             {steps.map(([title, body], index) => (
-              <article className="applix-step-card" key={title}><span className="applix-step-number">{index + 1}</span><h3>{title}</h3><p>{body}</p></article>
+              <article className="applix-step-card" key={title}>
+                <span className="applix-step-number">{index + 1}</span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
             ))}
           </div>
         </div>
@@ -226,8 +311,21 @@ export default function HomePage() {
 
       <section className="applix-philosophy" aria-labelledby="why-title">
         <div className="applix-container applix-philosophy-panel">
-          <div><p className="applix-eyebrow">Why Calsie Jobs</p><h2 id="why-title">Fast applications, without losing control.</h2><p>Calsie Jobs is built for people who want AI speed with a clear daily cap, an hourly sending limit, and approval before every application moves forward.</p></div>
-          <div className="applix-philosophy-note"><strong>AI should accelerate the workflow, not take away your judgment.</strong><span>Approve applications in advance, pause at any time, and send no more than one approved application per hour.</span></div>
+          <div>
+            <span className="applix-eyebrow" style={{ color: "var(--cl-red)" }}>
+              Campaign Control
+            </span>
+            <h2 id="why-title">Controlled sending pace keeps your inbox healthy.</h2>
+            <p>
+              Automation shouldn't look like spam. Calsie Jobs schedules approved mailings to distribute applications naturally throughout working hours.
+            </p>
+          </div>
+          <div className="applix-philosophy-note">
+            <strong>Intelligent Speed Limits</strong>
+            <span>
+              Send limit is capped at 1 application per hour to maintain account safety. Pause, resume, or edit campaigns at any time.
+            </span>
+          </div>
         </div>
       </section>
 
@@ -236,25 +334,68 @@ export default function HomePage() {
       <section className="applix-final-cta" aria-labelledby="cta-title">
         <div className="applix-container applix-final-grid" id="start-check">
           <div className="applix-final-copy">
-            <p className="applix-eyebrow">Start with control</p>
-            <h2 id="cta-title">Start a 30-day Calsie Jobs campaign</h2>
-            <p>Prepare up to 24 applications per day, approve the ones you want, and send no more than one approved application per hour—up to 720 applications over 30 days.</p>
-            <div className="applix-final-actions"><a className="applix-button applix-button--light" href="#start-check">Get Started</a><a className="applix-button" href="#features">Learn More</a></div>
+            <span className="applix-eyebrow">Launch Settings</span>
+            <h2 id="cta-title">Ready to automate your Australian job search?</h2>
+            <p>
+              Configure Calsie Jobs, connect your profile instructions, and approve up to 24 applications per day.
+            </p>
+            <div className="applix-final-actions">
+              <a className="applix-button applix-button--primary" href="#start-check">
+                Get Started
+              </a>
+              <a className="applix-button" href="#features">
+                Explore Features
+              </a>
+            </div>
           </div>
 
           <div className="applix-start-card" aria-live="polite">
             <div className="applix-start-card-top">
-              <span>{carouselComplete ? "Ready to continue" : `${carouselIndex + 1}/${onboardingSlides.length}`}</span>
+              <span>
+                {carouselComplete ? "Ready to continue" : `${carouselIndex + 1}/${onboardingSlides.length}`}
+              </span>
               <div className="applix-progress" aria-hidden="true">
-                {onboardingSlides.map((slide, index) => <span key={slide[0]} className={index <= carouselIndex || carouselComplete ? "is-active" : undefined} />)}
+                {onboardingSlides.map((slide, index) => (
+                  <span
+                    key={slide[0]}
+                    className={index <= carouselIndex || carouselComplete ? "is-active" : undefined}
+                  />
+                ))}
               </div>
             </div>
             {!carouselComplete ? (
-              <><h3>{activeSlide[0]}</h3><p>{activeSlide[1]}</p><button type="button" className="applix-button applix-button--primary" onClick={confirmSlide}>{carouselIndex === onboardingSlides.length - 1 ? "Complete start check" : "Yes, I understood"}</button></>
+              <>
+                <h3>{activeSlide[0]}</h3>
+                <p>{activeSlide[1]}</p>
+                <button
+                  type="button"
+                  className="applix-button applix-button--primary"
+                  onClick={confirmSlide}
+                >
+                  {carouselIndex === onboardingSlides.length - 1 ? "Complete setup check" : "Next"}
+                </button>
+              </>
             ) : (
-              <><h3>Start check complete</h3><p>Continue with Google to open Calsie Jobs and create your controlled 30-day campaign.</p><button type="button" className="applix-button applix-button--primary" onClick={loginWithGoogle} disabled={loading}>{loading ? "Opening" : "Sign in / Sign up"}</button></>
+              <>
+                <h3>Setup Checklist Complete</h3>
+                <p>
+                  Connect your Google Account to authorize Calsie Jobs to drafts emails for matches.
+                </p>
+                <button
+                  type="button"
+                  className="applix-button applix-button--primary"
+                  onClick={loginWithGoogle}
+                  disabled={loading}
+                >
+                  {loading ? "Opening" : "Register / Sign In"}
+                </button>
+              </>
             )}
-            {status ? <p className="applix-status" role="alert">{status}</p> : null}
+            {status ? (
+              <p className="applix-status" role="alert">
+                {status}
+              </p>
+            ) : null}
           </div>
         </div>
       </section>
