@@ -128,12 +128,12 @@ export default function GmailPanel({ gmailReady, actionStates, onConnectGmail, o
 
             <label className={`ws-gmail-consent${gmailReady ? " is-disabled" : ""}`}>
               <input type="checkbox" checked={privacyAccepted || gmailReady} disabled={gmailReady || connectLoading} onChange={(event) => setPrivacyAccepted(event.target.checked)} />
-              <span><strong>{GMAIL_CONNECTION_CONSENT_TEXT}</strong></span>
+              <span>{GMAIL_CONNECTION_CONSENT_TEXT}</span>
             </label>
 
             <label className={`ws-gmail-consent${gmailReady ? " is-disabled" : ""}`}>
               <input type="checkbox" checked={dedicatedEmailConfirmed || gmailReady} disabled={gmailReady || connectLoading} onChange={(event) => setDedicatedEmailConfirmed(event.target.checked)} />
-              <span><strong>{GMAIL_DEDICATED_EMAIL_CONFIRMATION_TEXT}</strong></span>
+              <span>{GMAIL_DEDICATED_EMAIL_CONFIRMATION_TEXT}</span>
             </label>
           </div>
 

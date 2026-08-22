@@ -8,8 +8,6 @@ import "../dashboard/workspace.css";
 import "../dashboard/workspace-contrast.css";
 import "../dashboard/workspace-tracker.css";
 import "../dashboard/workspace-final.css";
-import "../dashboard/gmail-consent.css";
-import "../dashboard/resume-preview.css";
 import "../dashboard/workspace-macos-theme.css";
 
 export default function DashboardDesignLayout({ children }: { children: ReactNode }) {

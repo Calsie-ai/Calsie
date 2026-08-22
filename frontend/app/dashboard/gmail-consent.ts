@@ -30,7 +30,7 @@ export const GMAIL_PRIVACY_SUMMARY = [
 ] as const;
 
 export const GMAIL_CONNECTION_CONSENT_TEXT =
-  "I have read and agree to the Calsie Privacy Policy. I authorise Calsie to connect to my Google account and send job-application emails only after I have reviewed and approved them.";
+  "I agree to the Calsie Privacy Policy and authorise Calsie to connect my Google account, sending job-application emails only after I approve them.";
 
 export const GMAIL_DEDICATED_EMAIL_CONFIRMATION_TEXT =
   "I confirm I have created a separate or dedicated email account for my Calsie campaign.";
