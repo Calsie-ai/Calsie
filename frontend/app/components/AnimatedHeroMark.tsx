@@ -31,13 +31,14 @@ export default function AnimatedHeroMark() {
         position: "relative",
         display: "block",
         width: "100%",
-        maxWidth: "560px",
-        aspectRatio: "16 / 5",
-        margin: "0 0 20px",
+        maxWidth: "400px",
+        height: "80px",
+        margin: "0 auto",
         padding: 0,
         overflow: "hidden",
-        border: 0,
-        background: "transparent",
+        border: "1.5px solid #e4e4e7",
+        borderRadius: "4px",
+        background: "#f8f9fa",
         cursor: "pointer",
       }}
     >
@@ -52,14 +53,14 @@ export default function AnimatedHeroMark() {
             aria-hidden={!isActive}
             style={{
               position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
+              top: "50%",
+              left: "50%",
+              transform: isActive ? "translate(-50%, -50%) scale(1)" : "translate(-50%, -50%) scale(0.95)",
+              width: "auto",
+              height: "40px",
               objectFit: "contain",
-              objectPosition: "left center",
               opacity: isActive ? 1 : 0,
-              transform: isActive ? "translateX(0)" : "translateX(18px)",
-              transition: "opacity 500ms ease, transform 500ms ease",
+              transition: "opacity 300ms ease, transform 300ms ease",
               pointerEvents: "none",
             }}
           />

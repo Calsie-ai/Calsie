@@ -2,23 +2,18 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ArrowRight, Search, Wand2 } from "lucide-react";
 import { isActionLoading, type ActionStateMap, type DashboardActionKey } from "../../lib/actionState";
 import {
   CAMPAIGN_PLAN,
   CAMPAIGN_TEMPLATES,
   campaignLocation,
   campaignRole,
+  templateCategoryIcon,
   type CampaignRecord,
   type CampaignTemplate,
   type WorkspaceTab,
 } from "./workspace-data";
-import {
-  GMAIL_CONNECTION_CONSENT_TEXT,
-  GMAIL_DEDICATED_EMAIL_CONFIRMATION_TEXT,
-  GMAIL_PRIVACY_POLICY_VERSION,
-  GMAIL_PRIVACY_SUMMARY,
-  GMAIL_SEND_SCOPE,
-} from "./gmail-consent";
 
 export default function WorkspacePanels({
   active,
@@ -55,8 +50,6 @@ export default function WorkspacePanels({
   const [reviewRole, setReviewRole] = useState("");
   const [reviewLocation, setReviewLocation] = useState("");
   const [reviewDescription, setReviewDescription] = useState("");
-  const [privacyAccepted, setPrivacyAccepted] = useState(false);
-  const [dedicatedEmailConfirmed, setDedicatedEmailConfirmed] = useState(false);
 
   const templates = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -91,11 +84,8 @@ export default function WorkspacePanels({
   const paused = status === "paused";
   const statusClass = running ? "is-running" : paused ? "is-paused" : "is-idle";
   const statusText = running ? "Campaign running" : paused ? "Paused" : status;
-  const gmailConsentComplete = privacyAccepted && dedicatedEmailConfirmed;
   const templateLoading = isActionLoading(actionStates, "useTemplate");
   const resumeLoading = isActionLoading(actionStates, "uploadResume");
-  const connectLoading = isActionLoading(actionStates, "connectGmail");
-  const revokeLoading = isActionLoading(actionStates, "revokeGmail");
   const startLoading = isActionLoading(actionStates, "startCampaign");
   const pauseLoading = isActionLoading(actionStates, "pauseCampaign");
   const campaignActionLoading = startLoading || pauseLoading;
@@ -103,52 +93,78 @@ export default function WorkspacePanels({
 
   if (active === "templates") {
     return (
-      <section>
-        <header>
-          <p>Templates</p>
-          <h1>Browse templates</h1>
-          <span>Choose a custom campaign or review a ready-made template before creating it.</span>
+      <div className="ws-panel">
+        <header className="ws-panel-head">
+          <p className="ws-panel-eyebrow">Templates</p>
+          <h1 className="ws-panel-title">Browse templates</h1>
+          <p className="ws-panel-sub">Choose a custom campaign or start from a ready-made template.</p>
         </header>
 
         {selectedTemplate ? (
-          <div className="workspace-template-review">
-            <div className="workspace-template-review-heading">
+          <div className="ws-review-card">
+            <div className="ws-review-head">
               <div>
-                <small>{selectedTemplate.category}</small>
+                <span className="ws-template-tag">{selectedTemplate.category}</span>
                 <h2>Review template</h2>
                 <p>Change any detail before adding this campaign to your workspace.</p>
               </div>
-              <button type="button" className="workspace-secondary" onClick={() => setSelectedTemplate(null)}>Back to templates</button>
+              <button type="button" className="ws-btn-outline" onClick={() => setSelectedTemplate(null)}>Back to templates</button>
             </div>
-            <div className="workspace-template-review-grid">
-              <label>Campaign name<input value={reviewTitle} onChange={(event) => setReviewTitle(event.target.value)} /></label>
-              <label>Target role<input value={reviewRole} onChange={(event) => setReviewRole(event.target.value)} /></label>
-              <label>Target location<input value={reviewLocation} onChange={(event) => setReviewLocation(event.target.value)} /></label>
-              <label className="workspace-template-review-wide">Template details<textarea rows={4} value={reviewDescription} onChange={(event) => setReviewDescription(event.target.value)} /></label>
+            <div className="ws-review-grid">
+              <label className="ws-field">Campaign name<input value={reviewTitle} onChange={(event) => setReviewTitle(event.target.value)} /></label>
+              <label className="ws-field">Target role<input value={reviewRole} onChange={(event) => setReviewRole(event.target.value)} /></label>
+              <label className="ws-field">Target location<input value={reviewLocation} onChange={(event) => setReviewLocation(event.target.value)} /></label>
+              <label className="ws-field ws-field-wide">Template details<textarea rows={4} value={reviewDescription} onChange={(event) => setReviewDescription(event.target.value)} /></label>
             </div>
-            <div className="workspace-template-review-summary">
-              <strong>Campaign plan</strong><span>24 jobs per day</span><span>1 approved email per hour</span><span>30 days · up to 720 applications</span><span>Approval required before sending</span>
+            <div className="ws-review-summary">
+              <div><span>Jobs per day</span><strong>24</strong></div>
+              <div><span>Emails per hour</span><strong>1 approved</strong></div>
+              <div><span>Duration</span><strong>30 days · up to 720</strong></div>
+              <div><span>Approval</span><strong>Required before sending</strong></div>
             </div>
-            <div className="workspace-actions">
-              <button type="button" className="workspace-secondary" onClick={() => setSelectedTemplate(null)}>Cancel</button>
-              <button type="button" className="workspace-primary" onClick={confirmTemplate} disabled={templateLoading || !reviewTitle.trim() || !reviewRole.trim()}>
+            <div className="ws-review-actions">
+              <button type="button" className="ws-btn-outline" onClick={() => setSelectedTemplate(null)}>Cancel</button>
+              <button type="button" className="ws-btn-primary" onClick={confirmTemplate} disabled={templateLoading || !reviewTitle.trim() || !reviewRole.trim()}>
                 {templateLoading && selectedTemplateActionId === selectedTemplate.id ? "Adding template…" : "Confirm and add campaign"}
               </button>
             </div>
           </div>
         ) : (
           <>
-            <input className="workspace-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search templates or job roles" />
-            <div className="workspace-template-grid">
-              <article className="workspace-template-custom">
-                <small>Custom campaign</small><h3>Build your own campaign</h3><p>Choose the role, location, job type, requirements, and campaign settings yourself.</p><span className="workspace-template-usage">1,200 times used</span><Link className="workspace-template-link" href="/campaign/new">Create custom</Link>
-              </article>
-              {templates.map((item) => <article key={item.id}><small>{item.category}</small><h3>{item.title}</h3><p>{item.description}</p><button type="button" onClick={() => openTemplateReview(item)}>Review template</button></article>)}
+            <div className="ws-template-search">
+              <Search size={18} strokeWidth={1.8} />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search templates or job roles" />
             </div>
-            {query.trim() && templates.length === 0 && <div className="workspace-message">No ready-made templates match that search. Use the custom campaign card above.</div>}
+            <div className="ws-template-grid">
+              <article className="ws-template-card ws-template-card-custom">
+                <div className="ws-template-icon"><Wand2 size={20} strokeWidth={1.8} /></div>
+                <span className="ws-template-tag">Custom campaign</span>
+                <h3>Build your own campaign</h3>
+                <p>Choose the role, location, job type, requirements, and campaign settings yourself.</p>
+                <div className="ws-template-foot">
+                  <span className="ws-template-usage">1,200 times used</span>
+                  <Link className="ws-template-btn" href="/campaign/new">Create custom<ArrowRight size={14} strokeWidth={2.4} /></Link>
+                </div>
+              </article>
+              {templates.map((item) => {
+                const Icon = templateCategoryIcon(item.category);
+                return (
+                  <article key={item.id} className="ws-template-card">
+                    <div className="ws-template-icon"><Icon size={20} strokeWidth={1.8} /></div>
+                    <span className="ws-template-tag">{item.category}</span>
+                    <h3>{item.title}</h3>
+                    <p>{item.description}</p>
+                    <div className="ws-template-foot">
+                      <button type="button" className="ws-template-btn" onClick={() => openTemplateReview(item)}>Review template<ArrowRight size={14} strokeWidth={2.4} /></button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            {query.trim() && templates.length === 0 && <div className="ws-panel-message">No ready-made templates match that search. Use the custom campaign card above.</div>}
           </>
         )}
-      </section>
+      </div>
     );
   }
 
@@ -179,77 +195,6 @@ export default function WorkspacePanels({
             />
           </label>
           <Link href="/resume-canvas">Open resume editor</Link>
-        </div>
-      </section>
-    );
-  }
-
-  if (active === "gmail") {
-    return (
-      <section>
-        <header>
-          <p>Connection</p>
-          <h1>Gmail connection</h1>
-          <span>Read the Calsie Privacy Policy and complete both consent confirmations before connecting Google.</span>
-        </header>
-        <div className="workspace-card workspace-gmail-card">
-          <div className="workspace-gmail-status">
-            <div>
-              <small>Connection status</small>
-              <h3>{gmailReady ? "Gmail connected" : "Gmail disconnected"}</h3>
-              <p>{gmailReady ? "Calsie can prepare approved sends through your connected account." : "Google cannot be connected until both confirmations below are selected."}</p>
-            </div>
-            <span className={gmailReady ? "is-connected" : "is-disconnected"}>{gmailReady ? "Connected" : "Not connected"}</span>
-          </div>
-
-          <div className="workspace-gmail-disclosure" id="gmail-privacy-permission">
-            <div className="workspace-gmail-disclosure-heading">
-              <div><small>Privacy Policy</small><h3>How Calsie handles your information</h3></div>
-              <Link href="/privacy" target="_blank" rel="noreferrer">Open full Privacy Policy</Link>
-            </div>
-
-            <div className="workspace-gmail-policy-copy">
-              {GMAIL_PRIVACY_SUMMARY.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-            </div>
-
-            <div className="workspace-gmail-recommendation">
-              <strong>Google permission requested</strong>
-              <span><code>{GMAIL_SEND_SCOPE}</code> — used only to send job-application emails after user review and approval.</span>
-            </div>
-
-            <div className="workspace-gmail-consent-heading">
-              <strong>Consent</strong>
-              <small>Both confirmations are required to enable Google connection.</small>
-            </div>
-
-            <label className={`workspace-gmail-consent${gmailReady ? " is-disabled" : ""}`}>
-              <input type="checkbox" checked={privacyAccepted || gmailReady} disabled={gmailReady || connectLoading} onChange={(event) => setPrivacyAccepted(event.target.checked)} />
-              <span><strong>{GMAIL_CONNECTION_CONSENT_TEXT}</strong></span>
-            </label>
-
-            <label className={`workspace-gmail-consent${gmailReady ? " is-disabled" : ""}`}>
-              <input type="checkbox" checked={dedicatedEmailConfirmed || gmailReady} disabled={gmailReady || connectLoading} onChange={(event) => setDedicatedEmailConfirmed(event.target.checked)} />
-              <span><strong>{GMAIL_DEDICATED_EMAIL_CONFIRMATION_TEXT}</strong></span>
-            </label>
-
-            <p className="workspace-gmail-policy-version">Privacy Policy version: {GMAIL_PRIVACY_POLICY_VERSION}</p>
-          </div>
-
-          {gmailReady ? (
-            <>
-              <button type="button" className="workspace-gmail-revoke" onClick={onRevokeGmail} disabled={revokeLoading}>
-                {revokeLoading ? "Revoking…" : "Revoke connection"}
-              </button>
-              <small className="workspace-gmail-revoke-note">This removes Calsie&apos;s saved Google tokens and prevents Gmail sending until you connect again.</small>
-            </>
-          ) : (
-            <>
-              <button type="button" className="workspace-primary workspace-gmail-connect" onClick={onConnectGmail} disabled={connectLoading || !gmailConsentComplete} aria-describedby="gmail-privacy-permission">
-                {connectLoading ? "Connecting…" : "Connect Google"}
-              </button>
-              {!gmailConsentComplete && <small className="workspace-gmail-required">Select both consent checkboxes to enable Google connection.</small>}
-            </>
-          )}
         </div>
       </section>
     );

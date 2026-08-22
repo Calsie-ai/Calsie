@@ -16,8 +16,10 @@
     "test:resumable-job-fetch": "node --experimental-strip-types --test tests/resumableGlobalJobFetch.test.mts"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.6.1",
     "@supabase/supabase-js": "latest",
     "googleapis": "^144.0.0",
+    "lucide-react": "^1.31.0",
     "mammoth": "latest",
     "next": "latest",
     "pdf-parse": "latest",

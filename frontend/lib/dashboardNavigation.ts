@@ -6,6 +6,7 @@ export const DASHBOARD_PANELS = [
   "overview",
   "templates",
   "resume",
+  "buildResume",
   "gmail",
   "campaign",
   "approve",

@@ -1,46 +1,97 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import LegalShell, { LegalSection, CheckStep, type TocEntry } from "../components/LegalShell";
 import { CALSIE_CONTACT_EMAIL } from "../../lib/contact";
 
-const shellStyle = {
-  minHeight: "100vh",
-  background: "#ffffff",
-  color: "#000000",
-  fontFamily: "Arial, Helvetica, sans-serif",
-  padding: "48px 20px",
-} as const;
+export const metadata: Metadata = {
+  title: "Support",
+  description:
+    "Get help with Calsie Jobs — troubleshooting steps for campaigns, Gmail connection, resume parsing and billing, plus how to reach the support team.",
+  alternates: { canonical: "/support" },
+};
 
-const contentStyle = {
-  maxWidth: "780px",
-  margin: "0 auto",
-  display: "grid",
-  gap: "22px",
-} as const;
+const TOC: TocEntry[] = [
+  { id: "checks", label: "1. Try these first" },
+  { id: "topics", label: "2. What we help with" },
+  { id: "contact", label: "3. Contact support" },
+];
 
-const linkStyle = {
-  color: "#000000",
-  fontWeight: 800,
-  textDecorationColor: "#FE818D",
-  textDecorationThickness: "2px",
-} as const;
+const TOPICS = [
+  "Billing and payments",
+  "Account access",
+  "Gmail connection",
+  "Tracker approvals",
+  "Resume parsing",
+  "Privacy questions",
+  "Account deletion",
+  "Campaign settings",
+];
 
 export default function SupportPage() {
   return (
-    <main style={shellStyle}>
-      <section style={contentStyle}>
-        <Link href="/" style={linkStyle}>Back to Calsie</Link>
-        <div>
-          <p style={{ margin: "0 0 10px", color: "#FE818D", fontWeight: 900, letterSpacing: ".12em", textTransform: "uppercase" }}>Support</p>
-          <h1 style={{ margin: 0, fontSize: "clamp(38px, 8vw, 72px)", lineHeight: 1 }}>Support</h1>
+    <LegalShell
+      eyebrow="Help · Support"
+      title="Support"
+      lede="Most issues clear up with a quick check of your setup. If they don't, we're one email away."
+      updated="30 July 2026"
+      active="support"
+      toc={TOC}
+    >
+      <LegalSection id="checks" n={1} title="Try these first">
+        <p>
+          If Calsie is not behaving as expected, work through these four checks before restarting the workflow — they
+          resolve the majority of reports.
+        </p>
+        <ol className="csl-steps">
+          <CheckStep n={1} title="You are signed in">
+            Open the <Link href="/dashboard">dashboard</Link> and confirm your session is still active. Sessions can
+            expire after a long break.
+          </CheckStep>
+          <CheckStep n={2} title="Your resume is uploaded">
+            Calsie needs a base resume to tailor applications from. Check it has parsed correctly and the details look
+            right.
+          </CheckStep>
+          <CheckStep n={3} title="Your connector is active">
+            Confirm your Gmail connection is still authorised. Revoking access in your Google Account settings will
+            pause sending.
+          </CheckStep>
+          <CheckStep n={4} title="Your campaign is configured">
+            Check the role, location and hours are set. A campaign with no matching criteria will not queue
+            applications.
+          </CheckStep>
+        </ol>
+      </LegalSection>
+
+      <LegalSection id="topics" n={2} title="What we can help with">
+        <p>Email the support team about any of the following and we&apos;ll take a look at your account:</p>
+        <div className="csl-topics">
+          {TOPICS.map((topic) => (
+            <span className="csl-topic" key={topic}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 12.5 9 17.5 20 6" />
+              </svg>
+              {topic}
+            </span>
+          ))}
         </div>
-        <p style={{ fontSize: "18px", lineHeight: 1.7 }}>
-          If Calsie is not behaving as expected, check that you are signed in, your resume is uploaded, your connector is active, and your campaign is configured before restarting the workflow.
-        </p>
-        <p style={{ fontSize: "18px", lineHeight: 1.7 }}>
-          For help with billing, access, Gmail connection, tracker approvals, resume parsing, privacy, or account deletion, contact Calsie support at:
-        </p>
-        <a href={`mailto:${CALSIE_CONTACT_EMAIL}`} style={{ ...linkStyle, fontSize: "22px" }}>{CALSIE_CONTACT_EMAIL}</a>
-        <Link href="/contact" style={{ ...linkStyle, fontSize: "18px" }}>Contact Calsie</Link>
-      </section>
-    </main>
+      </LegalSection>
+
+      <LegalSection id="contact" n={3} title="Contact support">
+        <div className="csl-contact">
+          <p className="csl-contact-label">Email Calsie support</p>
+          <a className="csl-mailto" href={`mailto:${CALSIE_CONTACT_EMAIL}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="1.5" />
+              <path d="M3.5 6 12 13 20.5 6" />
+            </svg>
+            {CALSIE_CONTACT_EMAIL}
+          </a>
+          <p className="csl-contact-alt">
+            Prefer a form? Use the <Link href="/contact">contact page</Link> instead. Include your account email and
+            what you expected to happen — it gets you a faster answer.
+          </p>
+        </div>
+      </LegalSection>
+    </LegalShell>
   );
 }

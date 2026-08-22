@@ -1,0 +1,62 @@
+/* ============================================================
+   Calsie Jobs — Auth callback (Google OAuth + signup confirmation)
+   Mirrors the login page's design system. Scoped to .cac-shell so
+   nothing leaks into other routes.
+   ============================================================ */
+
+html:has(.cac-shell), body:has(.cac-shell){
+  background:#FBFBFA;
+  color:#1D1D1F;
+  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Inter, sans-serif;
+}
+
+.cac-shell{
+  --cac-ink:#1D1D1F;
+  --cac-ink-soft:#6E6E73;
+  --cac-bg:#FBFBFA;
+  --cac-border:#E5E5E0;
+  --cac-orange:#EF5A24;
+  --cac-orange-deep:#C2440F;
+  --cac-orange-tint:#FCE7DC;
+  --cac-sf:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Inter, sans-serif;
+
+  min-height:100vh;
+  min-height:100svh;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  background:var(--cac-bg);
+  font-family:var(--cac-sf);
+}
+
+.cac-card{
+  width:min(360px, 100%);
+  text-align:center;
+  padding:clamp(32px,5vw,44px) clamp(26px,4vw,36px);
+  background:rgba(255,255,255,.78);
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border:1px solid rgba(29,29,31,.07);
+  border-radius:26px;
+  box-shadow:0 30px 70px rgba(29,29,31,.12);
+}
+
+.cac-brand{display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:17px; color:var(--cac-ink); letter-spacing:-0.01em;}
+.cac-brand img{width:32px; height:32px; object-fit:contain;}
+.cac-brand .badge{
+  font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:10px; color:var(--cac-orange-deep);
+  background:var(--cac-orange-tint); padding:2.5px 7px; border-radius:5px; letter-spacing:.06em; text-transform:uppercase;
+}
+
+.cac-spinner{
+  display:block;
+  width:26px; height:26px; margin:26px auto 18px;
+  border:2.5px solid rgba(239,90,36,.18); border-top-color:var(--cac-orange);
+  border-radius:50%;
+  animation:cac-spin .8s linear infinite;
+}
+@keyframes cac-spin{to{transform:rotate(360deg);}}
+@media (prefers-reduced-motion:reduce){.cac-spinner{animation:none;}}
+
+.cac-message{font-size:14.5px; color:var(--cac-ink-soft); line-height:1.55;}
+.cac-message.is-error{margin-top:24px; color:var(--cac-orange-deep);}

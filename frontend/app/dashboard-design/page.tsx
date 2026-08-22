@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import OverviewDashboard from "../dashboard/OverviewDashboard";
 import WorkspaceSidebar from "../dashboard/WorkspaceSidebar";
+import WorkspaceTopbar from "../dashboard/WorkspaceTopbar";
 import WorkspacePanels from "../dashboard/WorkspacePanels";
 import type { CampaignRecord, CampaignTemplate, WorkspaceTab } from "../dashboard/workspace-data";
 import { createActionStateMap, DASHBOARD_ACTION_KEYS } from "../../lib/actionState";
@@ -41,6 +42,7 @@ function DesignTracker() {
 
 export default function DashboardDesignPage() {
   const [active, setPreviewPanel] = useState<WorkspaceTab>("overview");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [campaign, setCampaign] = useState<CampaignRecord>(MOCK_CAMPAIGN);
   const [message, setMessage] = useState("Design mode: no production actions will run.");
   const approvedCount = 127;
@@ -48,10 +50,10 @@ export default function DashboardDesignPage() {
   const actionStates = MOCK_ACTION_STATES;
 
   const panel = useMemo(() => {
-    if (active === "overview") return <OverviewDashboard campaign={campaign} resumeReady resumeName="User Resume Name Here" gmailReady approvedCount={approvedCount} passedCount={passedCount} onOpenTracker={() => setPreviewPanel("tracker")} />;
+    if (active === "overview") return <OverviewDashboard campaign={campaign} resumeReady resumeName="User Resume Name Here" gmailReady approvedCount={approvedCount} passedCount={passedCount} greetingName="Sanjaya" onOpenTracker={() => setPreviewPanel("tracker")} onBrowseTemplates={() => setPreviewPanel("templates")} onUpdateResume={() => setPreviewPanel("resume")} onConnectGmail={() => setPreviewPanel("gmail")} onSetUpCampaign={() => setPreviewPanel("campaign")} />;
     if (active === "tracker") return <DesignTracker />;
     return <WorkspacePanels active={active} campaign={campaign} resumeReady resumeName="Sajan-Giri-Resume.pdf" gmailReady actionStates={actionStates} selectedTemplateActionId="" onUseTemplate={(template: CampaignTemplate) => { setCampaign({ ...MOCK_CAMPAIGN, name: `${template.title} Campaign`, location: template.location, target_business_type: template.role }); setMessage("Mock campaign updated for design preview."); setPreviewPanel("campaign"); }} onResumeUpload={async () => { setMessage("Mock resume upload clicked."); }} onConnectGmail={() => setMessage("Mock Gmail connection clicked.")} onRevokeGmail={() => setMessage("Mock Gmail connection revoked.")} onToggleCampaign={() => setCampaign((current) => ({ ...current, status: current.status === "active" ? "paused" : "active" }))} onFindJobsNow={() => setMessage("Mock job search completed.")} />;
   }, [active, campaign, message]);
 
-  return <main className="applix-workspace"><WorkspaceSidebar active={active} onNavigate={setPreviewPanel} running={campaign.status === "active"} approvedCount={approvedCount} actionLoading={false} actionDisabled={false} onToggleCampaign={() => setCampaign((current) => ({ ...current, status: current.status === "active" ? "paused" : "active" }))} logoutLoading={false} onLogout={() => setMessage("Mock logout clicked.")} /><div className="workspace-main">{panel}</div></main>;
+  return <main className={`applix-workspace${sidebarCollapsed ? " is-sidebar-collapsed" : ""}`}><WorkspaceSidebar active={active} onNavigate={setPreviewPanel} running={campaign.status === "active"} approvedCount={approvedCount} actionLoading={false} actionDisabled={false} onToggleCampaign={() => setCampaign((current) => ({ ...current, status: current.status === "active" ? "paused" : "active" }))} logoutLoading={false} onLogout={() => setMessage("Mock logout clicked.")} displayName="Sanjaya Rajbhandari" email="design-preview@calsie.jobs" initial="S" collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((value) => !value)} /><div className="workspace-main"><WorkspaceTopbar displayName="Sanjaya Rajbhandari" initial="S" />{panel}</div></main>;
 }

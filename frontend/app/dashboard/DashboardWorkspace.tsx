@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ArrowRight, CloudUpload, Recycle, X } from "lucide-react";
 import { useAuth } from "../providers/AuthProvider";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import {
@@ -44,9 +45,34 @@ import {
   type ExternalReturnState,
   type PaymentVerificationResponse,
 } from "../../lib/externalReturn";
+import { HelpCircle } from "lucide-react";
 import WorkspaceSidebar from "./WorkspaceSidebar";
+import WorkspaceTopbar from "./WorkspaceTopbar";
 import WorkspacePanelsLive, { mapTemplate } from "./WorkspacePanelsLive";
 import { CAMPAIGN_PLAN, isCampaignRunning, type CampaignRecord, type CampaignTemplate, type WorkspaceTab } from "./workspace-data";
+
+type AuthUserLike = { email?: string | null; user_metadata?: Record<string, unknown> | null } | null;
+
+function metaStringField(user: AuthUserLike, keys: string[]) {
+  const meta = user?.user_metadata;
+  if (!meta) return null;
+  for (const key of keys) {
+    const value = meta[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function fullNameFor(user: AuthUserLike) {
+  return metaStringField(user, ["full_name", "name"]) || user?.email || "Account";
+}
+
+function greetingNameFor(user: AuthUserLike) {
+  const source = metaStringField(user, ["full_name", "name"]) || (user?.email ? user.email.split("@")[0] : "");
+  const firstToken = source.split(/[\s._-]+/)[0] || "";
+  if (!firstToken) return "there";
+  return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
+}
 
 export default function DashboardWorkspace() {
   const router = useRouter();
@@ -71,6 +97,7 @@ export default function DashboardWorkspace() {
   const [paymentRetryNonce, setPaymentRetryNonce] = useState(0);
   const [gmailRetryNonce, setGmailRetryNonce] = useState(0);
   const [externalReturnState, setExternalReturnState] = useState<ExternalReturnState>(IDLE_EXTERNAL_RETURN);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const paymentCheckRef = useRef("");
   const gmailCheckRef = useRef("");
   const { abortAction, runAction, states: actionStates } = useActionStates(DASHBOARD_ACTION_KEYS);
@@ -714,6 +741,16 @@ export default function DashboardWorkspace() {
     if (completedPath) router.replace(completedPath);
   }
 
+  // The "draft restored" notice is purely informational — the draft is
+  // already applied by the time it shows — so it behaves like a toast:
+  // it clears itself after a few seconds, and can be dismissed sooner.
+  // Dismissing only hides the message; the restored draft itself stays.
+  useEffect(() => {
+    if (!restoredIntentId) return;
+    const timer = window.setTimeout(() => setRestoredIntentId(""), 4500);
+    return () => window.clearTimeout(timer);
+  }, [restoredIntentId]);
+
   const handlePendingIntentRestored = useCallback((intentId: string) => {
     setRestoredIntentId(intentId);
     const currentParams = new URLSearchParams(query);
@@ -737,89 +774,119 @@ export default function DashboardWorkspace() {
     isActionLoading(actionStates, "startCampaign")
     || isActionLoading(actionStates, "pauseCampaign")
   );
+  const fullName = fullNameFor(user);
+  const greetingName = greetingNameFor(user);
+  const initial = (fullName.trim().charAt(0) || "?").toUpperCase();
+  const campaignPrerequisitesMissing = Boolean(campaign) && !isCampaignRunning(campaign?.status) && (!resumeReady || !gmailReady);
+  const campaignActionDisabled = !campaign || campaignActionBlocked || campaignPrerequisitesMissing;
+  // A disabled control that never says why is a dead end — name the one
+  // thing still standing in the way.
+  const campaignDisabledReason = !campaign
+    ? "Choose a campaign template to get started"
+    : campaignPrerequisitesMissing
+      ? (!resumeReady ? "Upload your resume first" : "Connect Gmail first")
+      : "";
 
   return (
-    <main className="applix-workspace">
+    <main className={`applix-workspace${sidebarOpen ? "" : " is-sidebar-collapsed"}`}>
       <WorkspaceSidebar
         active={active}
         onNavigate={navigateToPanel}
         running={isCampaignRunning(campaign?.status)}
         approvedCount={approvedCount}
         actionLoading={campaignActionLoading}
-        actionDisabled={!campaign || campaignActionBlocked || (!isCampaignRunning(campaign.status) && (!resumeReady || !gmailReady))}
+        actionDisabled={campaignActionDisabled}
+        disabledReason={campaignDisabledReason}
         onToggleCampaign={() => void toggleCampaign()}
         logoutLoading={isActionLoading(actionStates, "logout")}
         onLogout={() => void logout()}
+        displayName={fullName}
+        email={user.email ?? ""}
+        initial={initial}
+        collapsed={!sidebarOpen}
+        onToggleCollapsed={() => setSidebarOpen((value) => !value)}
       />
-      <div className="workspace-main">
+      <div className={`workspace-main${active === "templates" ? " is-templates" : ""}`}>
+        <div className="ws-topbar-zone">
+          <WorkspaceTopbar displayName={fullName} initial={initial} hideSearch={active === "templates"} />
+          {unclaimedIntent ? (
+            <div className="ws-notice ws-notice-draft" role="status" aria-live="polite">
+              <span className="ws-notice-icon"><CloudUpload size={18} strokeWidth={2} /></span>
+              <p className="ws-notice-text">A campaign draft is ready. Restore it to this account?</p>
+              <span className="ws-notice-actions">
+                <button type="button" className="ws-btn-primary" disabled={isActionLoading(actionStates, "restoreIntent")} onClick={() => void restoreUnclaimedDraft()}>
+                  {isActionLoading(actionStates, "restoreIntent") ? "Restoring…" : "Restore draft"}
+                </button>
+                <button type="button" className="ws-notice-link" disabled={isActionLoading(actionStates, "discardIntent")} onClick={() => void discardDraft(unclaimedIntent)}>
+                  {isActionLoading(actionStates, "discardIntent") ? "Discarding…" : "Discard draft"}<ArrowRight size={13} strokeWidth={2.4} />
+                </button>
+              </span>
+            </div>
+          ) : null}
+          {pendingIntent && restoredIntentId === pendingIntent.id ? (
+            <div className="ws-notice ws-notice-draft" role="status" aria-live="polite">
+              <span className="ws-notice-icon"><Recycle size={18} strokeWidth={2} /></span>
+              <p className="ws-notice-text">Your campaign draft has been restored.</p>
+              <span className="ws-notice-actions">
+                <button type="button" className="ws-notice-link" disabled={isActionLoading(actionStates, "discardIntent")} onClick={() => void discardDraft(pendingIntent)}>
+                  {isActionLoading(actionStates, "discardIntent") ? "Discarding…" : "Discard draft"}<ArrowRight size={13} strokeWidth={2.4} />
+                </button>
+              </span>
+              <button type="button" className="ws-notice-close" aria-label="Dismiss this message" onClick={() => setRestoredIntentId("")}>
+                <X size={15} strokeWidth={2.4} />
+              </button>
+            </div>
+          ) : null}
+        </div>
         {notice ? (
           <div
-            className="workspace-message"
+            className={`ws-notice${notice.type === "error" ? " ws-notice-error" : notice.type === "success" ? " ws-notice-success" : " ws-notice-warning"}`}
             role={notice.type === "error" ? "alert" : "status"}
             aria-live={notice.type === "error" ? "assertive" : "polite"}
           >
-            {notice.message}
-            {notice.actionKey === "verifyPayment"
-              && (externalReturnState.phase === "pending" || (externalReturnState.phase === "failed" && searchParams.get("payment") === "success")) ? (
-              <button
-                type="button"
-                className="workspace-secondary"
-                disabled={isActionLoading(actionStates, "verifyPayment")}
-                onClick={() => {
-                  paymentCheckRef.current = "";
-                  setPaymentRetryNonce((value) => value + 1);
-                }}
-              >
-                Retry verification
-              </button>
-            ) : null}
-            {notice.actionKey === "verifyPayment"
-              && pendingIntent?.type === "purchase_template"
-              && (externalReturnState.phase === "cancelled" || externalReturnState.phase === "failed") ? (
-              <button
-                type="button"
-                className="workspace-secondary"
-                onClick={() => router.push("/payment?restoreIntent=1")}
-              >
-                Continue to checkout
-              </button>
-            ) : null}
-            {notice.actionKey === "verifyGmail"
-              && notice.type === "error"
-              && searchParams.has("gmail") ? (
-              <button
-                type="button"
-                className="workspace-secondary"
-                disabled={isActionLoading(actionStates, "verifyGmail")}
-                onClick={() => {
-                  gmailCheckRef.current = "";
-                  setGmailRetryNonce((value) => value + 1);
-                }}
-              >
-                Check Gmail status
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-        {unclaimedIntent ? (
-          <div className="workspace-message" role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <span>A campaign draft is ready. Restore it to this account?</span>
-            <span style={{ display: "flex", gap: 8 }}>
-              <button type="button" className="workspace-primary" disabled={isActionLoading(actionStates, "restoreIntent")} onClick={() => void restoreUnclaimedDraft()}>
-                {isActionLoading(actionStates, "restoreIntent") ? "Restoring…" : "Restore draft"}
-              </button>
-              <button type="button" className="workspace-secondary" disabled={isActionLoading(actionStates, "discardIntent")} onClick={() => void discardDraft(unclaimedIntent)}>
-                {isActionLoading(actionStates, "discardIntent") ? "Discarding…" : "Discard draft"}
-              </button>
+            <span>{notice.message}</span>
+            <span className="ws-notice-actions">
+              {notice.actionKey === "verifyPayment"
+                && (externalReturnState.phase === "pending" || (externalReturnState.phase === "failed" && searchParams.get("payment") === "success")) ? (
+                <button
+                  type="button"
+                  className="ws-btn-outline"
+                  disabled={isActionLoading(actionStates, "verifyPayment")}
+                  onClick={() => {
+                    paymentCheckRef.current = "";
+                    setPaymentRetryNonce((value) => value + 1);
+                  }}
+                >
+                  Retry verification
+                </button>
+              ) : null}
+              {notice.actionKey === "verifyPayment"
+                && pendingIntent?.type === "purchase_template"
+                && (externalReturnState.phase === "cancelled" || externalReturnState.phase === "failed") ? (
+                <button
+                  type="button"
+                  className="ws-btn-outline"
+                  onClick={() => router.push("/payment?restoreIntent=1")}
+                >
+                  Continue to checkout
+                </button>
+              ) : null}
+              {notice.actionKey === "verifyGmail"
+                && notice.type === "error"
+                && searchParams.has("gmail") ? (
+                <button
+                  type="button"
+                  className="ws-btn-outline"
+                  disabled={isActionLoading(actionStates, "verifyGmail")}
+                  onClick={() => {
+                    gmailCheckRef.current = "";
+                    setGmailRetryNonce((value) => value + 1);
+                  }}
+                >
+                  Check Gmail status
+                </button>
+              ) : null}
             </span>
-          </div>
-        ) : null}
-        {pendingIntent && restoredIntentId === pendingIntent.id ? (
-          <div className="workspace-message" role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <span>Your campaign draft has been restored.</span>
-            <button type="button" className="workspace-secondary" disabled={isActionLoading(actionStates, "discardIntent")} onClick={() => void discardDraft(pendingIntent)}>
-              {isActionLoading(actionStates, "discardIntent") ? "Discarding…" : "Discard draft"}
-            </button>
           </div>
         ) : null}
         <WorkspacePanelsLive
@@ -835,9 +902,14 @@ export default function DashboardWorkspace() {
           passedCount={passedCount}
           pendingIntent={pendingIntent}
           userHint={user.id}
+          greetingName={greetingName}
           onPendingIntentChange={setPendingIntent}
           onPendingIntentRestored={handlePendingIntentRestored}
           onOpenTracker={() => navigateToPanel("tracker")}
+          onBrowseTemplates={() => navigateToPanel("templates")}
+          onOpenResumePanel={() => navigateToPanel("resume")}
+          onOpenGmailPanel={() => navigateToPanel("gmail")}
+          onOpenCampaignPanel={() => navigateToPanel("campaign")}
           onUseTemplate={(item) => void useTemplate(item)}
           onResumeUpload={uploadResume}
           onConnectGmail={() => void connectGmail()}
@@ -846,6 +918,15 @@ export default function DashboardWorkspace() {
           onFindJobsNow={() => void findJobsNow()}
         />
       </div>
+      <button
+        type="button"
+        className="ws-fab"
+        aria-label="Help"
+        title="Help"
+        onClick={() => router.push("/support")}
+      >
+        <HelpCircle size={26} strokeWidth={2.1} />
+      </button>
     </main>
   );
 }

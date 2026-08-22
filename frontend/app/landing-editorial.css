@@ -1,10 +1,24 @@
+/* ============================================================
+   CALSIE JOBS — FULL LANDING PAGE DESIGN SYSTEM
+   Premium · Flat · High-Contrast · Swiss-Inspired
+   NO GRADIENTS · NO GLOW · NO BLUR SHADOWS
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap');
+
+/* ─── Reset & Root ───────────────────────────────────────── */
 html:has(.applix-landing) {
   scroll-behavior: smooth;
 }
 
 body:has(.applix-landing) {
-  background: #FFFFFF !important;
-  color: #000000 !important;
+  background: #ffffff;
+  color: #0a0a0a;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body:has(.applix-landing)::before,
@@ -13,872 +27,793 @@ body:has(.applix-landing)::after {
   display: none !important;
 }
 
+/* ─── Design Tokens ──────────────────────────────────────── */
 .applix-landing {
-  --applix-accent: #FE818D;
-  --applix-black: #000000;
-  --applix-white: #FFFFFF;
-  --applix-tint: #FFF7F8;
-  --applix-border: #EAEAEA;
-  --applix-muted: #5C5C5C;
+  /* Core Palette */
+  --ink:         #0a0a0a;
+  --ink-2:       #18181b;
+  --muted:       #71717a;
+  --subtle:      #a1a1aa;
+  --border:      #e4e4e7;
+  --border-md:   #d4d4d8;
+  --surface:     #f9fafb;
+  --surface-2:   #f4f4f5;
+  --white:       #ffffff;
+
+  --accent:      #ff4f4f;
+  --accent-dk:   #dc2626;
+  --accent-lt:   #fff1f1;
+
+  /* Backward compat */
+  --cl-red:         var(--accent);
+  --cl-red-dark:    var(--accent-dk);
+  --cl-red-light:   var(--accent-lt);
+  --cl-ink:         var(--ink);
+  --cl-muted:       var(--muted);
+  --cl-subtle:      var(--subtle);
+  --cl-border:      var(--border);
+  --cl-border-dark: var(--ink);
+  --cl-surface:     var(--surface);
+  --cl-surface-hover: var(--surface-2);
+  --cl-white:       var(--white);
+  --font-sans:      'Inter', -apple-system, system-ui, sans-serif;
 
   min-height: 100vh;
   overflow-x: hidden;
-  background: var(--applix-white) !important;
-  color: var(--applix-black) !important;
-  font-family: Arial, Helvetica, sans-serif;
-  letter-spacing: 0 !important;
-  isolation: auto !important;
-}
-
-.applix-landing::before,
-.applix-landing::after {
-  content: none !important;
-  display: none !important;
+  background: var(--white);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
 }
 
 .applix-landing *,
 .applix-landing *::before,
 .applix-landing *::after {
   box-sizing: border-box;
-  letter-spacing: 0 !important;
   text-shadow: none !important;
 }
 
-.applix-landing h1,
-.applix-landing h2,
-.applix-landing h3,
-.applix-landing h4,
-.applix-landing p,
-.applix-landing span,
-.applix-landing strong,
-.applix-landing a,
-.applix-landing button,
-.applix-landing small,
-.applix-landing label {
-  color: inherit !important;
-}
-
+/* ─── Container ──────────────────────────────────────────── */
 .applix-container {
-  width: min(1120px, calc(100% - 40px));
+  width: min(1200px, calc(100% - 48px));
   margin: 0 auto;
 }
 
+/* ─── Typography Helpers ─────────────────────────────────── */
+.applix-landing h1,
+.applix-landing h2,
+.applix-landing h3,
+.applix-landing h4 {
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  color: var(--ink);
+  letter-spacing: -0.03em;
+}
+
+.applix-landing p {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.applix-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+/* ─── Header / Nav ───────────────────────────────────────── */
 .applix-header {
   position: sticky;
   top: 0;
-  z-index: 20;
-  border-bottom: 1px solid var(--applix-border);
-  background: rgba(255, 255, 255, .94) !important;
-  backdrop-filter: blur(16px);
+  z-index: 100;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
 }
 
 .applix-header-inner {
-  min-height: 72px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  min-height: 68px;
+  display: flex;
   align-items: center;
-  gap: 28px;
+  justify-content: space-between;
+  gap: 24px;
 }
 
 .applix-brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  color: var(--applix-black) !important;
-  font-size: 18px;
-  font-weight: 850;
   text-decoration: none;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
 }
 
 .applix-brand img {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   object-fit: contain;
 }
 
 .applix-nav {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: clamp(18px, 3vw, 34px);
+  gap: 32px;
 }
 
-.applix-nav a,
-.applix-footer a {
-  color: var(--applix-muted) !important;
-  font-size: 14px;
-  font-weight: 700;
+.applix-nav a {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--muted);
   text-decoration: none;
-  transition: color .18s ease;
+  transition: color 0.12s;
+  letter-spacing: 0;
 }
 
-.applix-nav a:hover,
-.applix-footer a:hover {
-  color: var(--applix-accent) !important;
+.applix-nav a:hover {
+  color: var(--ink);
 }
 
 .applix-actions {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
+/* ─── Buttons ────────────────────────────────────────────── */
 .applix-button {
-  min-height: 42px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border-radius: 6px;
+  gap: 6px;
+  height: 40px;
   padding: 0 18px;
-  border: 1px solid var(--applix-border);
-  background: var(--applix-white) !important;
-  color: var(--applix-black) !important;
-  font-size: 14px;
-  font-weight: 850;
-  line-height: 1;
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-md);
+  background: var(--white);
+  color: var(--ink);
   text-decoration: none;
-  box-shadow: none !important;
-  transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  box-shadow: none;
+  white-space: nowrap;
 }
 
 .applix-button:hover {
-  transform: translateY(-1px);
-  border-color: var(--applix-black);
-}
-
-.applix-button:focus-visible,
-.applix-nav a:focus-visible,
-.applix-footer a:focus-visible {
-  outline: 3px solid rgba(254, 129, 141, .36);
-  outline-offset: 4px;
+  background: var(--surface);
+  border-color: var(--border-md);
 }
 
 .applix-button--primary {
-  border-color: var(--applix-accent);
-  background: var(--applix-accent) !important;
-  color: var(--applix-black) !important;
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+  height: 44px;
+  padding: 0 22px;
+  font-size: 14px;
 }
 
-.applix-button--dark {
-  border-color: var(--applix-black);
-  background: var(--applix-black) !important;
-  color: var(--applix-white) !important;
-}
-
-.applix-button--light {
-  border-color: var(--applix-white);
-  background: var(--applix-white) !important;
-  color: var(--applix-black) !important;
+.applix-button--primary:hover {
+  background: var(--accent-dk) !important;
+  border-color: var(--accent-dk) !important;
 }
 
 .applix-button--subtle {
+  border-color: transparent !important;
   background: transparent !important;
 }
 
-.applix-button:disabled {
-  opacity: .62;
-  transform: none;
+.applix-button--subtle:hover {
+  background: var(--surface) !important;
+  border-color: transparent !important;
 }
 
+.applix-button--dark {
+  background: var(--ink) !important;
+  border-color: var(--ink) !important;
+  color: #fff !important;
+}
+
+.applix-button--dark:hover {
+  background: var(--ink-2) !important;
+}
+
+.applix-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ─── Hero Section ───────────────────────────────────────── */
 .applix-hero {
-  padding: clamp(70px, 10vw, 128px) 0 clamp(64px, 8vw, 104px);
+  padding: 96px 0 80px;
+  background: var(--white) url('/hero-bg.png') no-repeat right center;
+  background-size: 52% auto;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
 }
 
 .applix-hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(320px, .82fr);
-  gap: clamp(44px, 7vw, 82px);
+  grid-template-columns: 1fr 1fr;
+  gap: 56px;
   align-items: center;
 }
 
-.applix-eyebrow {
-  margin: 0 0 16px;
-  color: var(--applix-accent) !important;
+/* Hero left col */
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px 5px 8px;
+  border: 1.5px solid var(--border-md);
+  border-radius: 99px;
+  margin-bottom: 28px;
+  background: var(--white);
+}
+
+.hero-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: block;
+  flex-shrink: 0;
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.hero-badge span:last-child {
   font-size: 12px;
-  font-weight: 900;
-  line-height: 1.2;
-  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.01em;
 }
 
 .applix-hero h1 {
-  max-width: 790px;
-  margin: 0;
-  color: var(--applix-black) !important;
-  font-size: clamp(48px, 7.9vw, 94px);
-  line-height: .95;
+  font-size: clamp(40px, 4.8vw, 68px);
   font-weight: 900;
+  line-height: 1.03;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  margin-bottom: 24px;
+}
+
+.applix-hero h1 .highlight {
+  color: var(--accent);
 }
 
 .applix-hero-copy {
-  max-width: 660px;
-  margin: 28px 0 0;
-  color: var(--applix-muted) !important;
-  font-size: clamp(17px, 2vw, 21px);
-  line-height: 1.55;
+  font-size: 17px;
+  line-height: 1.68;
+  color: var(--muted);
+  max-width: 520px;
+  margin-bottom: 36px;
 }
 
 .applix-hero-actions {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
-  margin-top: 34px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
 }
 
 .applix-supporting-line {
-  margin: 18px 0 0;
-  color: var(--applix-muted) !important;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 12.5px;
+  color: var(--subtle);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.applix-supporting-line::before {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 1px;
+  background: var(--border-md);
+  flex-shrink: 0;
 }
 
 .applix-status {
-  margin: 16px 0 0;
-  color: var(--applix-black) !important;
-  font-size: 14px;
-  line-height: 1.5;
-  border-left: 3px solid var(--applix-accent);
-  padding-left: 12px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--accent-lt);
+  border-left: 3px solid var(--accent);
+  font-size: 13.5px;
+  color: var(--accent-dk);
+  border-radius: 0 4px 4px 0;
 }
 
-.applix-product-panel {
-  border: 1px solid var(--applix-border);
-  border-radius: 8px;
-  background: var(--applix-white) !important;
-  padding: 18px;
-}
-
-.applix-panel-topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 14px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--applix-border);
-}
-
-.applix-panel-title {
-  display: grid;
-  gap: 2px;
-}
-
-.applix-panel-title strong {
-  color: var(--applix-black) !important;
-  font-size: 14px;
-}
-
-.applix-panel-title span,
-.applix-panel-pill,
-.applix-row-meta,
-.applix-mini-label {
-  color: var(--applix-muted) !important;
-  font-size: 12px;
-  line-height: 1.3;
-}
-
-.applix-panel-pill {
-  border: 1px solid rgba(254, 129, 141, .34);
-  border-radius: 6px;
-  background: var(--applix-tint) !important;
-  color: var(--applix-black) !important;
-  padding: 8px 10px;
-  font-weight: 850;
-}
-
-.applix-match-list,
-.applix-workflow-list {
-  display: grid;
-  gap: 10px;
-}
-
-.applix-match-list {
-  padding: 18px 0;
-}
-
-.applix-match-row {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid var(--applix-border);
-  border-radius: 8px;
-  padding: 12px;
-  background: var(--applix-white) !important;
-}
-
-.applix-match-score {
-  width: 46px;
-  height: 46px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--applix-accent) !important;
-  color: var(--applix-black) !important;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.applix-row-copy strong {
-  display: block;
-  color: var(--applix-black) !important;
-  font-size: 14px;
-}
-
-.applix-row-copy span {
-  color: var(--applix-muted) !important;
-  font-size: 12px;
-}
-
-.applix-row-status {
-  color: var(--applix-black) !important;
-  font-size: 12px;
-  font-weight: 850;
-}
-
-.applix-workflow-list {
-  border-top: 1px solid var(--applix-border);
-  padding-top: 16px;
-}
-
-.applix-workflow-item {
-  display: grid;
-  grid-template-columns: 28px 1fr;
-  gap: 10px;
-  align-items: start;
-}
-
-.applix-workflow-item span:first-child {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border-radius: 6px;
-  border: 1px solid var(--applix-border);
-  color: var(--applix-black) !important;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.applix-workflow-item strong {
-  display: block;
-  color: var(--applix-black) !important;
-  font-size: 14px;
-}
-
-.applix-workflow-item small {
-  color: var(--applix-muted) !important;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
+/* ─── Stats Bar ──────────────────────────────────────────── */
 .applix-stats {
-  background: var(--applix-black) !important;
-  color: var(--applix-white) !important;
+  background: var(--ink);
+  color: #fff;
 }
 
 .applix-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  border-left: 1px solid rgba(255, 255, 255, .18);
-  border-right: 1px solid rgba(255, 255, 255, .18);
+  grid-template-columns: repeat(4, 1fr);
 }
 
 .applix-stat {
-  min-height: 132px;
-  display: grid;
-  align-content: center;
-  gap: 8px;
-  padding: 26px 22px;
-  border-left: 1px solid rgba(255, 255, 255, .18);
+  padding: 36px 32px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.applix-stat:first-child {
-  border-left: 0;
+.applix-stat:last-child {
+  border-right: none;
 }
 
 .applix-stat strong {
-  color: var(--applix-white) !important;
-  font-size: clamp(24px, 3vw, 34px);
+  font-size: 38px;
+  font-weight: 800;
   line-height: 1;
+  letter-spacing: -0.04em;
+  color: #fff;
 }
 
 .applix-stat span {
-  color: rgba(255, 255, 255, .74) !important;
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.45);
 }
 
+/* ─── Section Base ───────────────────────────────────────── */
 .applix-section {
-  padding: clamp(72px, 10vw, 126px) 0;
-  border-bottom: 1px solid var(--applix-border);
+  padding: 96px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--white);
 }
 
 .applix-section-header {
-  max-width: 760px;
-  margin-bottom: clamp(32px, 5vw, 56px);
+  margin-bottom: 60px;
 }
 
 .applix-section-header.centered {
+  text-align: center;
+  max-width: 640px;
   margin-left: auto;
   margin-right: auto;
-  text-align: center;
 }
 
-.applix-section h2,
-.applix-philosophy h2,
-.applix-final-copy h2 {
-  margin: 0;
-  color: var(--applix-black) !important;
-  font-size: clamp(36px, 5vw, 64px);
-  line-height: 1;
-  font-weight: 900;
+.applix-section-header h2 {
+  font-size: clamp(28px, 3vw, 40px);
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  margin-bottom: 14px;
 }
 
-.applix-section-header p,
-.applix-philosophy p,
-.applix-final-copy p {
-  margin: 20px 0 0;
-  color: var(--applix-muted) !important;
-  font-size: clamp(16px, 1.8vw, 19px);
+.applix-section-header p {
+  font-size: 16px;
+  color: var(--muted);
   line-height: 1.65;
 }
 
+/* ─── Trust Grid ─────────────────────────────────────────── */
 .applix-trust-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border: 1px solid var(--applix-border);
+  grid-template-columns: repeat(4, 1fr);
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .applix-trust-item {
-  min-height: 92px;
-  display: grid;
-  place-items: center;
-  padding: 18px;
-  border-left: 1px solid var(--applix-border);
-  background: var(--applix-white) !important;
-  color: var(--applix-black) !important;
-  font-size: 14px;
-  font-weight: 850;
+  padding: 20px 24px;
   text-align: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  border-right: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.applix-trust-item:first-child {
-  border-left: 0;
+.applix-trust-item:last-child {
+  border-right: none;
 }
 
+/* ─── Feature Cards ──────────────────────────────────────── */
 .applix-card-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.applix-feature-card,
-.applix-start-card {
-  border: 1px solid var(--applix-border);
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5px;
+  border: 1.5px solid var(--border);
   border-radius: 8px;
-  background: var(--applix-white) !important;
+  overflow: hidden;
+  background: var(--border);
 }
 
 .applix-feature-card {
-  min-height: 214px;
-  padding: 24px;
-  display: grid;
-  align-content: start;
-  gap: 18px;
-  transition: border-color .18s ease, transform .18s ease;
+  padding: 36px 32px;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: background 0.15s;
+  border: none;
+  border-radius: 0;
+  cursor: default;
 }
 
 .applix-feature-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--applix-accent);
+  background: var(--surface);
+}
+
+.applix-feature-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--accent-lt);
+  border: 1.5px solid rgba(255,79,79,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
 }
 
 .applix-feature-number {
-  color: var(--applix-accent) !important;
-  font-size: 13px;
-  font-weight: 900;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent);
 }
 
 .applix-feature-card h3 {
-  margin: 0;
-  color: var(--applix-black) !important;
-  font-size: 21px;
-  line-height: 1.2;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
 }
 
 .applix-feature-card p {
-  margin: 0;
-  color: var(--applix-muted) !important;
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.65;
 }
 
-.applix-how-header {
-  max-width: 620px;
-  margin-bottom: clamp(38px, 6vw, 66px);
-}
-
-.applix-how-header h2 {
-  font-size: clamp(32px, 4vw, 44px);
-  line-height: 1.12;
-  font-weight: 500;
-}
-
-.applix-how-header p {
-  margin-top: 10px;
-  font-size: 12px;
-  line-height: 1.45;
+/* ─── How It Works ───────────────────────────────────────── */
+.applix-how {
+  background: var(--surface) !important;
 }
 
 .applix-step-track {
-  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(34px, 7vw, 92px);
-  align-items: start;
-}
-
-.applix-step-track::before {
-  content: "";
-  position: absolute;
-  top: 20px;
-  left: calc(16.666% + 21px);
-  right: calc(16.666% + 21px);
-  height: 1px;
-  background: rgba(0, 0, 0, .34);
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
 }
 
 .applix-step-card {
-  position: relative;
-  z-index: 1;
-  min-height: auto;
-  display: grid;
-  justify-items: center;
-  align-content: start;
-  gap: 10px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent !important;
-  text-align: center;
+  padding: 36px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: border-color 0.15s;
+}
+
+.applix-step-card:hover {
+  border-color: var(--border-md);
 }
 
 .applix-step-number {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 10px;
-  border: 1px solid rgba(0, 0, 0, .58);
-  background: var(--applix-white) !important;
-  color: var(--applix-black) !important;
-  font-size: 13px;
-  font-weight: 500;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .applix-step-card h3 {
-  margin: 0;
-  color: var(--applix-black) !important;
-  font-size: 14px;
-  line-height: 1.2;
-  font-weight: 850;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
 }
 
 .applix-step-card p {
-  max-width: 260px;
-  margin: 0 auto;
-  color: var(--applix-muted) !important;
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.65;
 }
 
+/* ─── Philosophy (Dark Band) ─────────────────────────────── */
 .applix-philosophy {
-  padding: clamp(72px, 10vw, 126px) 0;
-  background: var(--applix-tint) !important;
-  border-bottom: 1px solid var(--applix-border);
+  padding: 96px 0;
+  background: var(--ink);
+  color: #fff;
 }
 
 .applix-philosophy-panel {
   display: grid;
-  grid-template-columns: minmax(0, .95fr) minmax(280px, .62fr);
-  gap: clamp(30px, 6vw, 80px);
-  align-items: end;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+
+.applix-philosophy h2 {
+  font-size: clamp(26px, 2.8vw, 38px);
+  font-weight: 850;
+  color: #fff;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 16px;
+}
+
+.applix-philosophy p {
+  font-size: 16px;
+  color: rgba(255,255,255,0.6);
+  line-height: 1.65;
 }
 
 .applix-philosophy-note {
-  border-left: 4px solid var(--applix-accent);
-  padding-left: 24px;
+  padding: 36px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .applix-philosophy-note strong {
-  display: block;
-  color: var(--applix-black) !important;
-  font-size: clamp(22px, 3vw, 34px);
-  line-height: 1.12;
+  font-size: 19px;
+  font-weight: 750;
+  color: #fff;
+  letter-spacing: -0.025em;
 }
 
 .applix-philosophy-note span {
-  display: block;
-  margin-top: 12px;
-  color: var(--applix-muted) !important;
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 14px;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.65;
 }
 
+/* ─── Final CTA ──────────────────────────────────────────── */
 .applix-final-cta {
-  padding: clamp(70px, 9vw, 118px) 0;
-  background: var(--applix-black) !important;
-  color: var(--applix-white) !important;
+  padding: 96px 0;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
 }
 
 .applix-final-grid {
   display: grid;
-  grid-template-columns: minmax(0, .9fr) minmax(320px, .72fr);
-  gap: clamp(34px, 7vw, 84px);
-  align-items: center;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: start;
 }
 
-.applix-final-copy h2,
-.applix-final-copy p,
-.applix-final-copy .applix-eyebrow {
-  color: var(--applix-white) !important;
+.applix-final-copy h2 {
+  font-size: clamp(26px, 2.8vw, 38px);
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 16px;
 }
 
 .applix-final-copy p {
-  color: rgba(255, 255, 255, .72) !important;
+  font-size: 16px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin-bottom: 32px;
 }
 
 .applix-final-actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 12px;
-  margin-top: 30px;
+  flex-wrap: wrap;
 }
 
+/* ─── Onboarding / Start Card ────────────────────────────── */
 .applix-start-card {
-  padding: 24px;
-  color: var(--applix-black) !important;
+  padding: 40px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .applix-start-card-top {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 22px;
+  align-items: center;
 }
 
 .applix-start-card-top span {
-  color: var(--applix-muted) !important;
-  font-size: 13px;
-  font-weight: 850;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--subtle);
+  letter-spacing: 0.04em;
 }
 
 .applix-progress {
-  display: inline-flex;
-  gap: 5px;
+  display: flex;
+  gap: 4px;
 }
 
 .applix-progress span {
-  width: 22px;
-  height: 5px;
-  border-radius: 4px;
-  background: var(--applix-border) !important;
+  width: 20px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  transition: background 0.2s;
 }
 
 .applix-progress span.is-active {
-  background: var(--applix-accent) !important;
+  background: var(--accent);
 }
 
 .applix-start-card h3 {
-  margin: 0;
-  color: var(--applix-black) !important;
-  font-size: clamp(24px, 3vw, 34px);
-  line-height: 1.1;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
 }
 
 .applix-start-card p {
-  margin: 14px 0 0;
-  color: var(--applix-muted) !important;
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.65;
 }
 
 .applix-start-card .applix-button {
   width: 100%;
-  margin-top: 22px;
+  height: 46px;
+  font-size: 14px;
 }
 
+/* ─── Footer ─────────────────────────────────────────────── */
 .applix-footer {
-  padding: 34px 0;
-  border-top: 1px solid var(--applix-border);
-  background: var(--applix-white) !important;
+  padding: 72px 0 48px;
+  background: var(--white);
+  border-top: 1px solid var(--border);
 }
 
 .applix-footer-inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 28px;
-}
-
-.applix-footer-brand {
-  display: grid;
-  gap: 8px;
-}
-
-.applix-footer-brand strong {
-  color: var(--applix-black) !important;
-  font-size: 18px;
-}
-
-.applix-footer-brand p {
-  margin: 0;
-  color: var(--applix-muted) !important;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.applix-footer-links {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 18px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 32px;
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .applix-hero {
+    background-size: 46% auto;
+  }
 }
 
 @media (max-width: 960px) {
-  .applix-header-inner {
-    grid-template-columns: 1fr auto;
+  .applix-hero {
+    background-position: right bottom;
+    background-size: 60% auto;
+    padding: 72px 0 64px;
+  }
+
+  .applix-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+
+  .applix-hero-copy {
+    max-width: 100%;
+  }
+
+  .applix-philosophy-panel,
+  .applix-final-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
   }
 
   .applix-nav {
     display: none;
   }
 
-  .applix-hero-grid,
-  .applix-final-grid,
-  .applix-philosophy-panel {
-    grid-template-columns: 1fr;
-  }
-
   .applix-stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .applix-card-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .applix-trust-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, 1fr);
   }
 
-  .applix-trust-item:nth-child(odd) {
-    border-left: 0;
+  .applix-trust-item:nth-child(2) {
+    border-right: none;
   }
 
-  .applix-trust-item:nth-child(n + 3) {
-    border-top: 1px solid var(--applix-border);
+  .applix-trust-item:nth-child(1),
+  .applix-trust-item:nth-child(2) {
+    border-bottom: 1.5px solid var(--border);
   }
-}
 
-@media (max-width: 760px) {
+  .applix-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .applix-step-track {
-    max-width: 420px;
     grid-template-columns: 1fr;
-    gap: 32px;
-    margin: 0 auto;
-  }
-
-  .applix-step-track::before {
-    display: none;
-  }
-
-  .applix-step-card p {
-    max-width: 320px;
   }
 }
 
 @media (max-width: 640px) {
-  .applix-container {
-    width: min(100% - 28px, 1120px);
-  }
-
-  .applix-header-inner {
-    min-height: auto;
-    padding: 12px 0;
-    gap: 12px;
-  }
-
-  .applix-actions {
-    gap: 8px;
-  }
-
-  .applix-actions .applix-button {
-    min-height: 38px;
-    padding: 0 12px;
-    font-size: 13px;
-  }
-
   .applix-hero {
-    padding-top: 54px;
+    background-image: none;
   }
 
   .applix-hero h1 {
-    font-size: clamp(42px, 14vw, 62px);
+    font-size: 36px;
   }
 
-  .applix-product-panel,
-  .applix-start-card {
-    padding: 16px;
+  .applix-stat {
+    padding: 28px 20px;
   }
 
-  .applix-match-row {
-    grid-template-columns: auto 1fr;
+  .applix-stat strong {
+    font-size: 30px;
   }
 
-  .applix-row-status {
-    grid-column: 2;
+  .applix-section-header h2 {
+    font-size: 26px;
   }
 
-  .applix-stats-grid,
-  .applix-card-grid,
-  .applix-trust-grid,
-  .applix-footer-inner {
+  .applix-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .applix-stat {
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .applix-card-grid {
     grid-template-columns: 1fr;
   }
 
-  .applix-stat,
-  .applix-trust-item,
-  .applix-trust-item:nth-child(odd) {
-    border-left: 0;
+  .applix-trust-grid {
+    grid-template-columns: 1fr;
   }
 
-  .applix-stat:not(:first-child),
-  .applix-trust-item:not(:first-child) {
-    border-top: 1px solid var(--applix-border);
+  .applix-trust-item {
+    border-right: none;
+    border-bottom: 1.5px solid var(--border);
   }
 
-  .applix-footer-links {
-    justify-content: flex-start;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html:has(.applix-landing) {
-    scroll-behavior: auto;
+  .applix-trust-item:last-child {
+    border-bottom: none;
   }
 
-  .applix-button,
-  .applix-feature-card {
-    transition: none;
-  }
-
-  .applix-button:hover,
-  .applix-feature-card:hover {
-    transform: none;
+  .applix-footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
   }
 }

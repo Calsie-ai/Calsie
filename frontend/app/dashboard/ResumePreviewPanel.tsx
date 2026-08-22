@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CheckCircle2, FileText, UploadCloud } from "lucide-react";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import { normaliseAppError, type ActionState } from "../../lib/actionState";
 
@@ -71,21 +72,26 @@ export default function ResumePreviewPanel({ resumeReady, resumeName, uploadStat
   const uploadLoading = uploadState.status === "loading";
 
   return (
-    <section>
-      <header>
-        <p>Resume</p>
-        <h1>Update resume</h1>
-        <span>Keep the current resume Calsie attaches to approved applications.</span>
+    <div className="ws-panel">
+      <header className="ws-panel-head">
+        <p className="ws-panel-eyebrow ws-panel-eyebrow-icon"><FileText size={13} strokeWidth={2.4} /> Resume</p>
+        <h1 className="ws-panel-title">Update resume</h1>
+        <p className="ws-panel-sub">Keep the current resume Calsie attaches to approved applications.</p>
       </header>
 
-      <div className="workspace-card workspace-resume-card">
-        <div className="workspace-resume-heading">
-          <div>
-            <small>Current resume</small>
-            <h3>{resumeReady ? "Your resume is ready" : "Resume required"}</h3>
-            <p>{resumeReady ? resumeName || "Resume saved" : "Upload a PDF, DOC, or DOCX file."}</p>
+      <div className="ws-resume-card">
+        <div className="ws-resume-heading">
+          <div className="ws-resume-heading-copy">
+            <span className={`ws-resume-status-icon${resumeReady ? " is-ready" : ""}`}>
+              {resumeReady ? <CheckCircle2 size={18} strokeWidth={2.2} /> : <UploadCloud size={18} strokeWidth={2.2} />}
+            </span>
+            <div>
+              <small>Current resume</small>
+              <h3>{resumeReady ? "Your resume is ready" : "Resume required"}</h3>
+              <p>{resumeReady ? resumeName || "Resume saved" : "Upload a PDF, DOC, or DOCX file."}</p>
+            </div>
           </div>
-          <label className="workspace-primary">
+          <label className="ws-btn-primary ws-resume-upload-btn">
             {uploadLoading ? "Uploading resume…" : resumeReady ? "Upload or replace resume" : "Upload resume"}
             <input
               hidden
@@ -107,27 +113,27 @@ export default function ResumePreviewPanel({ resumeReady, resumeName, uploadStat
         </div>
 
         {resumeReady && (
-          <div className="workspace-resume-preview">
-            <div className="workspace-resume-preview-bar">
+          <div className="ws-resume-preview">
+            <div className="ws-resume-preview-bar">
               <strong>Resume preview</strong>
               {previewUrl && <a href={previewUrl} target="_blank" rel="noreferrer">Open in new tab</a>}
             </div>
 
-            {loadingPreview && <div className="workspace-resume-preview-state" role="status" aria-live="polite">Loading secure preview…</div>}
-            {previewError && <div className="workspace-resume-preview-state is-error" role="alert">{previewError}</div>}
+            {loadingPreview && <div className="ws-resume-preview-state" role="status" aria-live="polite">Loading secure preview…</div>}
+            {previewError && <div className="ws-resume-preview-state is-error" role="alert">{previewError}</div>}
             {!loadingPreview && !previewError && previewUrl && isPdf && (
               <iframe src={previewUrl} title={`${resumeName || "Resume"} preview`} />
             )}
             {!loadingPreview && !previewError && previewUrl && !isPdf && (
-              <div className="workspace-resume-preview-state">
+              <div className="ws-resume-preview-state">
                 <strong>Preview is available in a new tab.</strong>
                 <span>Word documents are opened securely instead of embedded in the dashboard.</span>
-                <a className="workspace-secondary" href={previewUrl} target="_blank" rel="noreferrer">Open resume</a>
+                <a className="ws-btn-outline" href={previewUrl} target="_blank" rel="noreferrer">Open resume</a>
               </div>
             )}
           </div>
         )}
       </div>
-    </section>
+    </div>
   );
 }

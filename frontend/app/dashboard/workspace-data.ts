@@ -1,7 +1,18 @@
+import {
+  Briefcase,
+  Cpu,
+  GraduationCap,
+  HeartPulse,
+  Headset,
+  Layers,
+  type LucideIcon,
+} from "lucide-react";
+
 export type WorkspaceTab =
   | "overview"
   | "templates"
   | "resume"
+  | "buildResume"
   | "gmail"
   | "campaign"
   | "approve"
@@ -85,4 +96,26 @@ export function campaignRole(campaign?: CampaignRecord | null) {
 
 export function campaignLocation(campaign?: CampaignRecord | null) {
   return campaign?.search?.target_location || campaign?.location || "Location not set";
+}
+
+export function templateCategoryIcon(category: string): LucideIcon {
+  const key = category.toLowerCase();
+  if (key.includes("health") || key.includes("ndis") || key.includes("aged") || key.includes("care") || key.includes("social")) return HeartPulse;
+  if (key.includes("tech")) return Cpu;
+  if (key.includes("customer")) return Headset;
+  if (key.includes("business") || key.includes("account") || key.includes("finance")) return Briefcase;
+  if (key.includes("child") || key.includes("education")) return GraduationCap;
+  return Layers;
+}
+
+// A subtle per-category tint for the small category label on template
+// cards — purely a visual grouping cue, category names/logic are unchanged.
+export function templateCategoryAccent(category: string): string {
+  const key = category.toLowerCase();
+  if (key.includes("health") || key.includes("ndis") || key.includes("aged") || key.includes("care") || key.includes("social")) return "ws-tag-teal";
+  if (key.includes("tech")) return "ws-tag-blue";
+  if (key.includes("customer")) return "ws-tag-pink";
+  if (key.includes("business") || key.includes("account") || key.includes("finance")) return "ws-tag-violet";
+  if (key.includes("child") || key.includes("education")) return "ws-tag-amber";
+  return "ws-tag-neutral";
 }

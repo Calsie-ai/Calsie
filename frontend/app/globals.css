@@ -1,3 +1,87 @@
+/* Self-hosted San Francisco (SF Pro Display), from public/font/. Several
+   theme files (login, legal, callback, landing-macos) already name "SF
+   Pro Display" in their font stacks, expecting the -apple-system keyword
+   to resolve it on Apple devices — on Windows/Linux/Android that keyword
+   doesn't apply and the literal name had nothing to bind to, so it fell
+   straight through to Helvetica Neue/Inter. Declaring the family here,
+   once, loaded on every page via the root layout, is what makes that
+   existing "SF Pro Display" reference actually resolve everywhere.
+   Only 3 upright cuts and 6 italic cuts exist in the supplied set (no
+   upright Light/SemiBold/Heavy/Black) — weights without an upright match
+   (200/300/600/800/900) fall back to the nearest upright cut the CSS font
+   matching algorithm finds (400/500/700), not to italic glyphs. */
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYREGULAR.OTF") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYMEDIUM.OTF") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYBOLD.OTF") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYTHINITALIC.OTF") format("opentype");
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYULTRALIGHTITALIC.OTF") format("opentype");
+  font-weight: 200;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYLIGHTITALIC.OTF") format("opentype");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYSEMIBOLDITALIC.OTF") format("opentype");
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYHEAVYITALIC.OTF") format("opentype");
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYBLACKITALIC.OTF") format("opentype");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -6,7 +90,7 @@ html, body {
   min-height: 100%;
   background: #070711;
   color: #ffffff;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;
 }
 
 a { color: inherit; text-decoration: none; }
