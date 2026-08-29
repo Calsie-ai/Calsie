@@ -1,0 +1,274 @@
+body:has(.agent-log-shell) {
+  background: #fff7fb !important;
+}
+
+.agent-log-shell {
+  min-height: 100vh !important;
+  padding: clamp(14px, 3vw, 26px) clamp(14px, 4vw, 32px) 54px !important;
+  color: #16131a !important;
+  background-color: #fff7fb !important;
+  background-image:
+    linear-gradient(rgba(255, 70, 190, .18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 70, 190, .18) 1px, transparent 1px) !important;
+  background-size: 28px 28px !important;
+  overflow-x: hidden !important;
+}
+
+.agent-log-shell::before {
+  content: '' !important;
+  position: fixed !important;
+  inset: -12% -35% -20% !important;
+  background-image:
+    linear-gradient(rgba(20, 16, 22, .26) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20, 16, 22, .26) 1px, transparent 1px) !important;
+  background-size: 28px 28px !important;
+  transform: perspective(760px) rotateX(22deg) scale(1.08) !important;
+  transform-origin: top center !important;
+  opacity: .22 !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%) !important;
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.88) 16%, rgba(0,0,0,.88) 84%, transparent 100%) !important;
+}
+
+.agent-log-shell::after {
+  content: '' !important;
+  position: fixed !important;
+  inset: 0 !important;
+  background: radial-gradient(circle at 50% 18%, rgba(255,255,255,.94), rgba(255,255,255,.7) 34%, transparent 68%) !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+.agent-log-shell > * {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.agent-log-header,
+.agent-log-hero,
+.agent-log-card,
+.agent-summary-grid,
+.agent-action-row,
+.agent-message,
+.agent-error {
+  width: min(100%, 620px) !important;
+  max-width: 620px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.agent-log-header {
+  margin-bottom: clamp(18px, 4vw, 30px) !important;
+}
+
+.agent-log-brand {
+  color: #16131a !important;
+  text-decoration: none !important;
+}
+
+.agent-log-brand img {
+  width: clamp(56px, 16vw, 92px) !important;
+  height: auto !important;
+  filter: drop-shadow(0 12px 20px rgba(255, 87, 87, .18)) !important;
+}
+
+.agent-log-brand strong {
+  color: #ff5757 !important;
+}
+
+.agent-log-brand span,
+.agent-home-link {
+  color: #16131a !important;
+}
+
+.agent-home-link {
+  background: rgba(255,255,255,.68) !important;
+  border: 1px solid rgba(22,19,26,.16) !important;
+  box-shadow: 0 10px 26px rgba(0,0,0,.08) !important;
+}
+
+.agent-log-hero {
+  text-align: center !important;
+  margin-bottom: 22px !important;
+}
+
+.agent-kicker {
+  color: #ff5757 !important;
+  letter-spacing: .16em !important;
+}
+
+.agent-log-hero h1 {
+  color: #16131a !important;
+  font-size: clamp(38px, 10vw, 72px) !important;
+  line-height: .95 !important;
+  letter-spacing: -.04em !important;
+}
+
+.agent-log-hero p,
+.campaign-overview p,
+.table-title-row span,
+.day-line-header > span,
+.editable-sheet-table td,
+.editable-sheet-table td span,
+.muted-cell,
+.day-dot-row small,
+.day-dot-row em {
+  color: rgba(22,19,26,.74) !important;
+}
+
+.agent-log-card,
+.summary-card {
+  background: rgba(255,255,255,.58) !important;
+  border: 1px solid rgba(22,19,26,.12) !important;
+  box-shadow: 0 12px 28px rgba(0,0,0,.08) !important;
+  backdrop-filter: blur(12px) !important;
+  color: #16131a !important;
+}
+
+.campaign-overview,
+.agent-day-timeline,
+.table-card,
+.empty-agent-card {
+  border-radius: 28px !important;
+}
+
+.campaign-overview h2,
+.day-line-header h2,
+.table-title-row h2,
+.empty-agent-card h2,
+.editable-sheet-table td strong,
+.day-dot-row strong,
+.summary-card strong {
+  color: #16131a !important;
+}
+
+.active-pill {
+  background: rgba(255, 92, 168, .12) !important;
+  border: 1px solid rgba(255, 92, 168, .28) !important;
+  color: #ff5757 !important;
+}
+
+.agent-summary-grid {
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 10px !important;
+}
+
+.summary-card {
+  padding: 16px 10px !important;
+  border-radius: 22px !important;
+}
+
+.summary-card span {
+  color: rgba(22,19,26,.64) !important;
+}
+
+.agent-day-timeline {
+  margin-bottom: 18px !important;
+}
+
+.day-dot-row::before {
+  background: linear-gradient(90deg, rgba(255,87,87,0), rgba(255,87,87,.55), rgba(255,87,87,0)) !important;
+}
+
+.day-dot-row button {
+  color: #16131a !important;
+}
+
+.day-dot {
+  border-color: rgba(22,19,26,.22) !important;
+  background: rgba(255,255,255,.78) !important;
+  box-shadow: 0 0 0 5px rgba(255,87,87,.05) !important;
+}
+
+.day-dot-row button.active .day-dot {
+  border-color: rgba(255,87,87,.96) !important;
+  box-shadow: 0 0 0 5px rgba(255,87,87,.12), 0 0 22px rgba(255,87,87,.22) !important;
+}
+
+.agent-action-row a,
+.agent-action-row button,
+.sheet-pagination button,
+.agent-home-link {
+  color: #16131a !important;
+  background: rgba(255,255,255,.62) !important;
+  border: 1px solid rgba(22,19,26,.18) !important;
+  box-shadow: 0 10px 24px rgba(0,0,0,.07) !important;
+}
+
+.agent-action-row a:nth-child(2),
+.agent-action-row a:nth-child(3) {
+  background: rgba(255, 92, 168, .1) !important;
+  border-color: rgba(255, 92, 168, .24) !important;
+}
+
+.agent-message {
+  color: #065f46 !important;
+}
+
+.agent-error {
+  color: #991b1b !important;
+}
+
+.agent-table-wrap {
+  border-color: rgba(22,19,26,.12) !important;
+  background: rgba(255,255,255,.54) !important;
+}
+
+.editable-sheet-table th {
+  background: rgba(255,247,251,.96) !important;
+  color: rgba(22,19,26,.66) !important;
+}
+
+.editable-sheet-table th,
+.editable-sheet-table td {
+  border-bottom: 1px solid rgba(22,19,26,.08) !important;
+}
+
+.editable-sheet-table tbody tr:hover {
+  background: rgba(255,92,168,.06) !important;
+}
+
+.editable-sheet-table a {
+  color: #ff5757 !important;
+  font-weight: 950 !important;
+}
+
+.status-select {
+  background: rgba(255,255,255,.86) !important;
+  color: #16131a !important;
+  border-color: rgba(22,19,26,.18) !important;
+}
+
+.approve-button {
+  background: rgba(16,185,129,.12) !important;
+  color: #065f46 !important;
+  border-color: rgba(16,185,129,.24) !important;
+}
+
+.decline-button {
+  background: rgba(254,226,226,.78) !important;
+  color: #991b1b !important;
+  border-color: rgba(248,113,113,.38) !important;
+}
+
+.sheet-pagination {
+  color: rgba(22,19,26,.72) !important;
+}
+
+@media (max-width: 760px) {
+  .agent-summary-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .agent-log-shell {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+
+  .agent-log-hero h1 {
+    font-size: clamp(38px, 11vw, 58px) !important;
+  }
+}

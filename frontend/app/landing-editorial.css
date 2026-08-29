@@ -1,0 +1,819 @@
+/* ============================================================
+   CALSIE JOBS — FULL LANDING PAGE DESIGN SYSTEM
+   Premium · Flat · High-Contrast · Swiss-Inspired
+   NO GRADIENTS · NO GLOW · NO BLUR SHADOWS
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap');
+
+/* ─── Reset & Root ───────────────────────────────────────── */
+html:has(.applix-landing) {
+  scroll-behavior: smooth;
+}
+
+body:has(.applix-landing) {
+  background: #ffffff;
+  color: #0a0a0a;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body:has(.applix-landing)::before,
+body:has(.applix-landing)::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* ─── Design Tokens ──────────────────────────────────────── */
+.applix-landing {
+  /* Core Palette */
+  --ink:         #0a0a0a;
+  --ink-2:       #18181b;
+  --muted:       #71717a;
+  --subtle:      #a1a1aa;
+  --border:      #e4e4e7;
+  --border-md:   #d4d4d8;
+  --surface:     #f9fafb;
+  --surface-2:   #f4f4f5;
+  --white:       #ffffff;
+
+  --accent:      #ff4f4f;
+  --accent-dk:   #dc2626;
+  --accent-lt:   #fff1f1;
+
+  /* Backward compat */
+  --cl-red:         var(--accent);
+  --cl-red-dark:    var(--accent-dk);
+  --cl-red-light:   var(--accent-lt);
+  --cl-ink:         var(--ink);
+  --cl-muted:       var(--muted);
+  --cl-subtle:      var(--subtle);
+  --cl-border:      var(--border);
+  --cl-border-dark: var(--ink);
+  --cl-surface:     var(--surface);
+  --cl-surface-hover: var(--surface-2);
+  --cl-white:       var(--white);
+  --font-sans:      'Inter', -apple-system, system-ui, sans-serif;
+
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: var(--white);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+}
+
+.applix-landing *,
+.applix-landing *::before,
+.applix-landing *::after {
+  box-sizing: border-box;
+  text-shadow: none !important;
+}
+
+/* ─── Container ──────────────────────────────────────────── */
+.applix-container {
+  width: min(1200px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+/* ─── Typography Helpers ─────────────────────────────────── */
+.applix-landing h1,
+.applix-landing h2,
+.applix-landing h3,
+.applix-landing h4 {
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  color: var(--ink);
+  letter-spacing: -0.03em;
+}
+
+.applix-landing p {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.applix-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+/* ─── Header / Nav ───────────────────────────────────────── */
+.applix-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+.applix-header-inner {
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.applix-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.applix-brand img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.applix-nav {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.applix-nav a {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.12s;
+  letter-spacing: 0;
+}
+
+.applix-nav a:hover {
+  color: var(--ink);
+}
+
+.applix-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── Buttons ────────────────────────────────────────────── */
+.applix-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 18px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-md);
+  background: var(--white);
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.applix-button:hover {
+  background: var(--surface);
+  border-color: var(--border-md);
+}
+
+.applix-button--primary {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+  height: 44px;
+  padding: 0 22px;
+  font-size: 14px;
+}
+
+.applix-button--primary:hover {
+  background: var(--accent-dk) !important;
+  border-color: var(--accent-dk) !important;
+}
+
+.applix-button--subtle {
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+.applix-button--subtle:hover {
+  background: var(--surface) !important;
+  border-color: transparent !important;
+}
+
+.applix-button--dark {
+  background: var(--ink) !important;
+  border-color: var(--ink) !important;
+  color: #fff !important;
+}
+
+.applix-button--dark:hover {
+  background: var(--ink-2) !important;
+}
+
+.applix-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ─── Hero Section ───────────────────────────────────────── */
+.applix-hero {
+  padding: 96px 0 80px;
+  background: var(--white) url('/hero-bg.png') no-repeat right center;
+  background-size: 52% auto;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.applix-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 56px;
+  align-items: center;
+}
+
+/* Hero left col */
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px 5px 8px;
+  border: 1.5px solid var(--border-md);
+  border-radius: 99px;
+  margin-bottom: 28px;
+  background: var(--white);
+}
+
+.hero-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: block;
+  flex-shrink: 0;
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.hero-badge span:last-child {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+
+.applix-hero h1 {
+  font-size: clamp(40px, 4.8vw, 68px);
+  font-weight: 900;
+  line-height: 1.03;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  margin-bottom: 24px;
+}
+
+.applix-hero h1 .highlight {
+  color: var(--accent);
+}
+
+.applix-hero-copy {
+  font-size: 17px;
+  line-height: 1.68;
+  color: var(--muted);
+  max-width: 520px;
+  margin-bottom: 36px;
+}
+
+.applix-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.applix-supporting-line {
+  font-size: 12.5px;
+  color: var(--subtle);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.applix-supporting-line::before {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 1px;
+  background: var(--border-md);
+  flex-shrink: 0;
+}
+
+.applix-status {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--accent-lt);
+  border-left: 3px solid var(--accent);
+  font-size: 13.5px;
+  color: var(--accent-dk);
+  border-radius: 0 4px 4px 0;
+}
+
+/* ─── Stats Bar ──────────────────────────────────────────── */
+.applix-stats {
+  background: var(--ink);
+  color: #fff;
+}
+
+.applix-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.applix-stat {
+  padding: 36px 32px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.applix-stat:last-child {
+  border-right: none;
+}
+
+.applix-stat strong {
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #fff;
+}
+
+.applix-stat span {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.45);
+}
+
+/* ─── Section Base ───────────────────────────────────────── */
+.applix-section {
+  padding: 96px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--white);
+}
+
+.applix-section-header {
+  margin-bottom: 60px;
+}
+
+.applix-section-header.centered {
+  text-align: center;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.applix-section-header h2 {
+  font-size: clamp(28px, 3vw, 40px);
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  margin-bottom: 14px;
+}
+
+.applix-section-header p {
+  font-size: 16px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+/* ─── Trust Grid ─────────────────────────────────────────── */
+.applix-trust-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.applix-trust-item {
+  padding: 20px 24px;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  border-right: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.applix-trust-item:last-child {
+  border-right: none;
+}
+
+/* ─── Feature Cards ──────────────────────────────────────── */
+.applix-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.applix-feature-card {
+  padding: 36px 32px;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: background 0.15s;
+  border: none;
+  border-radius: 0;
+  cursor: default;
+}
+
+.applix-feature-card:hover {
+  background: var(--surface);
+}
+
+.applix-feature-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--accent-lt);
+  border: 1.5px solid rgba(255,79,79,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.applix-feature-number {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.applix-feature-card h3 {
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+}
+
+.applix-feature-card p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+/* ─── How It Works ───────────────────────────────────────── */
+.applix-how {
+  background: var(--surface) !important;
+}
+
+.applix-step-track {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.applix-step-card {
+  padding: 36px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: border-color 0.15s;
+}
+
+.applix-step-card:hover {
+  border-color: var(--border-md);
+}
+
+.applix-step-number {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.applix-step-card h3 {
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+}
+
+.applix-step-card p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+/* ─── Philosophy (Dark Band) ─────────────────────────────── */
+.applix-philosophy {
+  padding: 96px 0;
+  background: var(--ink);
+  color: #fff;
+}
+
+.applix-philosophy-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+
+.applix-philosophy h2 {
+  font-size: clamp(26px, 2.8vw, 38px);
+  font-weight: 850;
+  color: #fff;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 16px;
+}
+
+.applix-philosophy p {
+  font-size: 16px;
+  color: rgba(255,255,255,0.6);
+  line-height: 1.65;
+}
+
+.applix-philosophy-note {
+  padding: 36px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.applix-philosophy-note strong {
+  font-size: 19px;
+  font-weight: 750;
+  color: #fff;
+  letter-spacing: -0.025em;
+}
+
+.applix-philosophy-note span {
+  font-size: 14px;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.65;
+}
+
+/* ─── Final CTA ──────────────────────────────────────────── */
+.applix-final-cta {
+  padding: 96px 0;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+}
+
+.applix-final-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: start;
+}
+
+.applix-final-copy h2 {
+  font-size: clamp(26px, 2.8vw, 38px);
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 16px;
+}
+
+.applix-final-copy p {
+  font-size: 16px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin-bottom: 32px;
+}
+
+.applix-final-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ─── Onboarding / Start Card ────────────────────────────── */
+.applix-start-card {
+  padding: 40px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.applix-start-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.applix-start-card-top span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--subtle);
+  letter-spacing: 0.04em;
+}
+
+.applix-progress {
+  display: flex;
+  gap: 4px;
+}
+
+.applix-progress span {
+  width: 20px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  transition: background 0.2s;
+}
+
+.applix-progress span.is-active {
+  background: var(--accent);
+}
+
+.applix-start-card h3 {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.applix-start-card p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.applix-start-card .applix-button {
+  width: 100%;
+  height: 46px;
+  font-size: 14px;
+}
+
+/* ─── Footer ─────────────────────────────────────────────── */
+.applix-footer {
+  padding: 72px 0 48px;
+  background: var(--white);
+  border-top: 1px solid var(--border);
+}
+
+.applix-footer-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 32px;
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .applix-hero {
+    background-size: 46% auto;
+  }
+}
+
+@media (max-width: 960px) {
+  .applix-hero {
+    background-position: right bottom;
+    background-size: 60% auto;
+    padding: 72px 0 64px;
+  }
+
+  .applix-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+
+  .applix-hero-copy {
+    max-width: 100%;
+  }
+
+  .applix-philosophy-panel,
+  .applix-final-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .applix-nav {
+    display: none;
+  }
+
+  .applix-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .applix-trust-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .applix-trust-item:nth-child(2) {
+    border-right: none;
+  }
+
+  .applix-trust-item:nth-child(1),
+  .applix-trust-item:nth-child(2) {
+    border-bottom: 1.5px solid var(--border);
+  }
+
+  .applix-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .applix-step-track {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .applix-hero {
+    background-image: none;
+  }
+
+  .applix-hero h1 {
+    font-size: 36px;
+  }
+
+  .applix-stat {
+    padding: 28px 20px;
+  }
+
+  .applix-stat strong {
+    font-size: 30px;
+  }
+
+  .applix-section-header h2 {
+    font-size: 26px;
+  }
+
+  .applix-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .applix-stat {
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .applix-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .applix-trust-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .applix-trust-item {
+    border-right: none;
+    border-bottom: 1.5px solid var(--border);
+  }
+
+  .applix-trust-item:last-child {
+    border-bottom: none;
+  }
+
+  .applix-footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+}

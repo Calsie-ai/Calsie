@@ -1,0 +1,8 @@
+Deploy trigger for Vercel.
+
+Purpose: force Vercel to pick up the latest tracker change that loads saved Supabase jobs without calling OutScraper.
+
+Latest tracker behavior:
+- Reload saved jobs from Supabase
+- Do not call /api/applix/fetch-jobs from tracker
+- Do not require OUTSCRAPER_JOBS_URL for viewing saved jobs

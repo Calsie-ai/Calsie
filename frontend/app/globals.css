@@ -1,0 +1,669 @@
+/* Self-hosted San Francisco (SF Pro Display), from public/font/. Several
+   theme files (login, legal, callback, landing-macos) already name "SF
+   Pro Display" in their font stacks, expecting the -apple-system keyword
+   to resolve it on Apple devices — on Windows/Linux/Android that keyword
+   doesn't apply and the literal name had nothing to bind to, so it fell
+   straight through to Helvetica Neue/Inter. Declaring the family here,
+   once, loaded on every page via the root layout, is what makes that
+   existing "SF Pro Display" reference actually resolve everywhere.
+   Only 3 upright cuts and 6 italic cuts exist in the supplied set (no
+   upright Light/SemiBold/Heavy/Black) — weights without an upright match
+   (200/300/600/800/900) fall back to the nearest upright cut the CSS font
+   matching algorithm finds (400/500/700), not to italic glyphs. */
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYREGULAR.OTF") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYMEDIUM.OTF") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYBOLD.OTF") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYTHINITALIC.OTF") format("opentype");
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYULTRALIGHTITALIC.OTF") format("opentype");
+  font-weight: 200;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYLIGHTITALIC.OTF") format("opentype");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYSEMIBOLDITALIC.OTF") format("opentype");
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYHEAVYITALIC.OTF") format("opentype");
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/font/SFPRODISPLAYBLACKITALIC.OTF") format("opentype");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: #070711;
+  color: #ffffff;
+  font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;
+}
+
+a { color: inherit; text-decoration: none; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .7; }
+
+.applix-setup-shell,
+.applix-home-shell {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  overflow: hidden;
+  padding: clamp(28px, 5vw, 58px) 18px 42px;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255,255,255,.16), transparent 17%),
+    radial-gradient(circle at 28% 18%, rgba(240, 142, 255, .32), transparent 20%),
+    radial-gradient(circle at 82% 18%, rgba(112, 86, 255, .42), transparent 22%),
+    linear-gradient(180deg, #a47bff 0%, #6a30d1 22%, #151124 52%, #030309 78%, #010103 100%);
+}
+
+.applix-setup-shell::before,
+.applix-home-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(122deg, transparent 0 70%, rgba(0, 245, 255, .86) 70.2%, transparent 71.1%),
+    linear-gradient(130deg, transparent 0 74%, rgba(146, 49, 255, .68) 74.2%, transparent 75.1%),
+    linear-gradient(180deg, rgba(255,255,255,.08), transparent 42%);
+  opacity: .75;
+  pointer-events: none;
+}
+
+.applix-setup-back,
+.applix-setup-info,
+.home-signout {
+  position: absolute;
+  z-index: 2;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(190, 225, 255, .64);
+  border: 1px solid rgba(255,255,255,.4);
+  color: rgba(0,0,0,.78);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 20px 50px rgba(0,0,0,.18);
+  backdrop-filter: blur(18px);
+}
+
+.applix-setup-back {
+  top: clamp(30px, 7vw, 62px);
+  left: clamp(28px, 7vw, 70px);
+  width: 70px;
+  height: 70px;
+  border: 0;
+  font-size: 42px;
+  line-height: 1;
+}
+
+.applix-setup-info {
+  top: clamp(30px, 7vw, 62px);
+  right: clamp(28px, 7vw, 70px);
+  width: 54px;
+  height: 54px;
+  font-family: Georgia, serif;
+  font-size: 35px;
+  font-style: italic;
+  color: rgba(255,255,255,.9);
+  background: rgba(64, 180, 255, .22);
+  border-color: rgba(114, 229, 255, .85);
+}
+
+.home-signout {
+  top: clamp(34px, 7vw, 66px);
+  right: clamp(24px, 6vw, 54px);
+  padding: 13px 18px;
+  font-size: 14px;
+  font-weight: 900;
+  border: 1px solid rgba(255,255,255,.28);
+  color: rgba(255,255,255,.92);
+  background: rgba(255,255,255,.1);
+}
+
+.applix-setup-center,
+.applix-home-center {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: min(860px, 100%);
+  text-align: center;
+  padding-top: clamp(74px, 8vh, 120px);
+}
+
+.applix-setup-orb {
+  position: relative;
+  width: clamp(138px, 18vw, 210px);
+  height: clamp(138px, 18vw, 210px);
+  margin-bottom: 34px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 35% 25%, rgba(255,255,255,.9), transparent 13%),
+    radial-gradient(circle at 72% 74%, rgba(0,255,231,.32), transparent 28%),
+    radial-gradient(circle at 28% 74%, rgba(255,116,238,.42), transparent 30%),
+    linear-gradient(135deg, rgba(248, 206, 255, .76), rgba(32, 18, 75, .32) 48%, rgba(0, 255, 230, .18));
+  border: 2px solid rgba(255, 222, 163, .8);
+  box-shadow:
+    inset 0 0 30px rgba(255,255,255,.35),
+    0 0 42px rgba(238, 126, 255, .5),
+    0 28px 70px rgba(0,0,0,.34);
+  backdrop-filter: blur(8px);
+}
+
+.applix-setup-orb::before {
+  content: "";
+  position: absolute;
+  inset: 12px 22px auto 26px;
+  height: 32px;
+  border-radius: 50%;
+  border-top: 3px solid rgba(255,255,255,.62);
+  transform: rotate(-10deg);
+}
+
+.applix-setup-orb span {
+  color: #f5a0ff;
+  font-size: clamp(28px, 4vw, 46px);
+  font-weight: 950;
+  letter-spacing: 2px;
+  text-shadow: 0 4px 0 rgba(70, 22, 92, .24), 0 0 22px rgba(255, 153, 243, .72);
+}
+
+.small-home-orb {
+  width: clamp(110px, 14vw, 165px);
+  height: clamp(110px, 14vw, 165px);
+  margin-bottom: 24px;
+}
+
+.small-home-orb span { font-size: clamp(22px, 3.4vw, 36px); }
+
+.applix-setup-kicker {
+  margin: 0 0 18px;
+  color: rgba(255,255,255,.72);
+  font-size: 13px;
+  font-weight: 950;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+}
+
+.applix-setup-center h1,
+.applix-home-center h1 {
+  margin: 0;
+  color: rgba(255,255,255,.97);
+  font-size: clamp(56px, 10vw, 104px);
+  line-height: .94;
+  letter-spacing: -4px;
+  text-shadow: 0 18px 55px rgba(0,0,0,.24);
+}
+
+.applix-setup-copy,
+.applix-home-copy {
+  max-width: 660px;
+  margin: 26px auto 0;
+  color: rgba(255,255,255,.74);
+  font-size: clamp(16px, 2vw, 20px);
+  line-height: 1.5;
+}
+
+.applix-setup-bottom,
+.applix-home-bottom {
+  position: relative;
+  z-index: 1;
+  width: min(720px, 100%);
+  display: grid;
+  gap: 18px;
+  padding-bottom: 4px;
+}
+
+.applix-setup-actions,
+.applix-setup-form,
+.applix-home-actions {
+  display: grid;
+  gap: 18px;
+}
+
+.applix-setup-form input {
+  width: 100%;
+  min-height: 68px;
+  border: 1px solid rgba(255,255,255,.36);
+  border-radius: 999px;
+  padding: 18px 26px;
+  background: rgba(255,255,255,.14);
+  color: white;
+  outline: none;
+  text-align: center;
+  font-weight: 850;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 24px 70px rgba(0,0,0,.18);
+  backdrop-filter: blur(20px);
+}
+
+.applix-setup-form input::placeholder { color: rgba(255,255,255,.72); }
+
+.applix-setup-form input:focus {
+  border-color: rgba(255,255,255,.9);
+  box-shadow: 0 0 0 5px rgba(255,255,255,.16), 0 24px 70px rgba(0,0,0,.18);
+}
+
+.applix-setup-primary,
+.applix-setup-outline {
+  min-height: 82px;
+  width: 100%;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 30px;
+  font-size: clamp(20px, 3.6vw, 34px);
+  font-weight: 950;
+  letter-spacing: -.8px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 24px 70px rgba(0,0,0,.2);
+  backdrop-filter: blur(22px);
+}
+
+.applix-setup-primary {
+  border: 0;
+  background: rgba(255,255,255,.54);
+  color: rgba(12, 12, 18, .94);
+}
+
+.applix-setup-outline {
+  border: 4px solid rgba(255,255,255,.88);
+  background: rgba(255,255,255,.05);
+  color: white;
+}
+
+.home-action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.home-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.home-check,
+.home-campaign-card,
+.home-dev-details {
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 26px;
+  background: rgba(255,255,255,.1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 18px 45px rgba(0,0,0,.16);
+  backdrop-filter: blur(18px);
+}
+
+.home-check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  padding: 16px;
+}
+
+.home-check span {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.18);
+  color: white;
+  font-weight: 950;
+}
+
+.home-check.ready span {
+  background: rgba(167, 243, 208, .22);
+  color: #d6fff1;
+}
+
+.home-check strong {
+  display: block;
+  margin-bottom: 4px;
+  color: white;
+  font-size: 15px;
+}
+
+.home-check p,
+.home-campaign-card p {
+  margin: 0;
+  color: rgba(255,255,255,.7);
+  line-height: 1.35;
+  font-size: 13px;
+}
+
+.home-campaign-card {
+  padding: 18px;
+  text-align: center;
+}
+
+.home-campaign-card strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.home-dev-details {
+  padding: 16px;
+}
+
+.home-dev-details summary {
+  cursor: pointer;
+  font-weight: 900;
+  color: rgba(255,255,255,.86);
+}
+
+.home-dev-details pre {
+  white-space: pre-wrap;
+  overflow-x: auto;
+  margin-bottom: 0;
+  color: #d9fff6;
+}
+
+.applix-setup-status {
+  margin: 0;
+  color: rgba(255,255,255,.9);
+  text-align: center;
+  line-height: 1.45;
+  font-weight: 850;
+  text-shadow: 0 14px 35px rgba(0,0,0,.2);
+}
+
+.applix-setup-status.success {
+  padding: 15px 18px;
+  border: 1px solid rgba(255,255,255,.26);
+  border-radius: 22px;
+  background: rgba(255,255,255,.12);
+  backdrop-filter: blur(16px);
+}
+
+.landing-shell,
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 18px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(168, 85, 247, .35), transparent 28%),
+    radial-gradient(circle at 85% 20%, rgba(34, 211, 238, .18), transparent 24%),
+    linear-gradient(180deg, #120b2d 0%, #070711 56%, #030306 100%);
+}
+
+.landing-card,
+.dashboard-card {
+  width: min(720px, 100%);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 32px;
+  padding: clamp(24px, 5vw, 48px);
+  background: rgba(10, 12, 22, .82);
+  box-shadow: 0 28px 90px rgba(0,0,0,.45);
+  backdrop-filter: blur(18px);
+}
+
+.narrow-card { width: min(620px, 100%); }
+
+.brand-mark {
+  width: 92px;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f0abfc, #8b5cf6 52%, #22d3ee);
+  color: white;
+  font-weight: 950;
+  letter-spacing: -1px;
+  box-shadow: 0 0 40px rgba(168, 85, 247, .55);
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: #a7f3d0;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+h1, h2, h3, p { margin-top: 0; }
+
+h1 {
+  margin-bottom: 16px;
+  font-size: clamp(36px, 7vw, 64px);
+  line-height: .95;
+  letter-spacing: -3px;
+}
+
+h2 { font-size: clamp(26px, 5vw, 38px); letter-spacing: -1.5px; }
+h3 { margin-bottom: 6px; font-size: 19px; }
+
+.landing-copy,
+.muted,
+.empty-state p,
+.campaign-row p {
+  color: rgba(255,255,255,.68);
+  line-height: 1.5;
+}
+
+.auth-form,
+.campaign-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.auth-form label,
+.campaign-form label {
+  display: grid;
+  gap: 8px;
+  color: rgba(255,255,255,.86);
+  font-weight: 800;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 16px;
+  padding: 15px 16px;
+  background: rgba(255,255,255,.07);
+  color: #ffffff;
+  outline: none;
+}
+
+textarea { resize: vertical; }
+
+input:focus,
+textarea:focus {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 4px rgba(167, 139, 250, .16);
+}
+
+input:disabled,
+textarea:disabled,
+.auth-form-sent input {
+  background: rgba(148, 163, 184, .16);
+  border-color: rgba(148, 163, 184, .28);
+  color: rgba(255,255,255,.55);
+}
+
+.auth-form button,
+.primary-button,
+.primary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 15px 20px;
+  background: linear-gradient(135deg, #f472b6, #8b5cf6 55%, #22d3ee);
+  color: white;
+  font-weight: 950;
+  box-shadow: 0 16px 44px rgba(139, 92, 246, .32);
+}
+
+.auth-form-sent button,
+.auth-form button:disabled {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  color: rgba(255,255,255,.8);
+  box-shadow: none;
+}
+
+.primary-link.small { padding: 11px 16px; font-size: 14px; }
+
+.ghost-button,
+.ghost-link {
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 999px;
+  padding: 12px 16px;
+  background: rgba(255,255,255,.06);
+  color: white;
+  font-weight: 850;
+}
+
+.form-status {
+  margin: 18px 0 0;
+  color: #a7f3d0;
+  line-height: 1.5;
+}
+
+.success-status {
+  padding: 14px 16px;
+  border: 1px solid rgba(167, 243, 208, .22);
+  border-radius: 16px;
+  background: rgba(16, 185, 129, .1);
+}
+
+.error-text {
+  margin: 12px 0 0;
+  color: #fca5a5;
+  line-height: 1.5;
+}
+
+.dashboard-header,
+.section-title-row,
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.empty-state {
+  margin-top: 28px;
+  padding: 28px;
+  border: 1px dashed rgba(255,255,255,.2);
+  border-radius: 24px;
+  background: rgba(255,255,255,.045);
+}
+
+.campaign-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.campaign-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 20px;
+  background: rgba(255,255,255,.055);
+}
+
+.campaign-meta {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  color: rgba(255,255,255,.75);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+  .applix-setup-shell,
+  .applix-home-shell { padding-bottom: 28px; }
+  .applix-setup-back { width: 58px; height: 58px; font-size: 34px; }
+  .applix-setup-info { width: 44px; height: 44px; font-size: 30px; }
+  .home-signout { top: 34px; right: 18px; }
+  .applix-setup-copy,
+  .applix-home-copy { display: none; }
+  .applix-setup-center h1,
+  .applix-home-center h1 { letter-spacing: -2.5px; }
+  .applix-setup-primary,
+  .applix-setup-outline { min-height: 70px; }
+  .home-check-grid,
+  .home-action-row { grid-template-columns: 1fr; }
+
+  .dashboard-header,
+  .section-title-row,
+  .form-actions,
+  .campaign-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .campaign-meta { justify-items: start; }
+}

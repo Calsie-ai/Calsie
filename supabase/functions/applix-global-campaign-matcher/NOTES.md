@@ -1,0 +1,1 @@
+Fresh matching jobs are selected first. Only the remaining daily quota is filled from verified unused contacts linked to the campaign template.

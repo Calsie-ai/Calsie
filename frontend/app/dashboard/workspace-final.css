@@ -1,0 +1,111 @@
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill,
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill span,
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill b {
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill.is-running {
+  border: 1px solid #fe818d !important;
+  background: #ffebed !important;
+  color: #111 !important;
+}
+
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill.is-running i {
+  background: #fe5f70 !important;
+}
+
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill.is-paused {
+  border: 1px solid #111 !important;
+  background: #111 !important;
+  color: #fff !important;
+}
+
+html body main.applix-workspace .workspace-tracker-heading .workspace-status-pill.is-idle {
+  border: 1px solid #999 !important;
+  background: #fff !important;
+  color: #333 !important;
+}
+
+html body main.applix-workspace .workspace-privacy-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 22px;
+}
+
+html body main.applix-workspace .workspace-privacy-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 9px 16px;
+  border: 1px solid #cfe8d2 !important;
+  border-radius: 999px;
+  background: #eef9ef !important;
+  color: #173a1d !important;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: none !important;
+}
+
+html body main.applix-workspace .workspace-privacy-pill:hover {
+  background: #e3f5e5 !important;
+  border-color: #b9dcbf !important;
+}
+
+html body main.applix-workspace .workspace-search {
+  background: #ffffff !important;
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+  caret-color: #fe5f70 !important;
+  opacity: 1 !important;
+}
+
+html body main.applix-workspace .workspace-search::placeholder {
+  color: #737373 !important;
+  -webkit-text-fill-color: #737373 !important;
+  opacity: 1 !important;
+}
+
+html body main.applix-workspace #campaign-postcode {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+  caret-color: #111111 !important;
+  opacity: 1 !important;
+  color-scheme: light !important;
+  text-shadow: none !important;
+}
+
+html body main.applix-workspace #campaign-postcode::placeholder {
+  color: #737373 !important;
+  -webkit-text-fill-color: #737373 !important;
+  opacity: 1 !important;
+}
+
+html body main.applix-workspace #campaign-postcode:focus {
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+  outline: 3px solid rgba(255, 95, 120, 0.18) !important;
+  outline-offset: 2px !important;
+}
+
+html body main.applix-workspace #campaign-postcode:-webkit-autofill,
+html body main.applix-workspace #campaign-postcode:-webkit-autofill:hover,
+html body main.applix-workspace #campaign-postcode:-webkit-autofill:focus,
+html body main.applix-workspace #campaign-postcode:-webkit-autofill:active {
+  -webkit-text-fill-color: #111111 !important;
+  caret-color: #111111 !important;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  transition: background-color 9999s ease-out 0s !important;
+}
+
+html body main.applix-workspace #campaign-postcode::selection {
+  background: #ffd7de !important;
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+}

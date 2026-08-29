@@ -1,0 +1,1 @@
+This function accepts only the configured service-role bearer token or cron secret. It performs no email or draft actions.

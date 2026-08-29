@@ -1,0 +1,284 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+/* ============================================================
+   Calsie Jobs — Login / Sign up
+   Mirrors the landing page design system. Scoped to .csa-auth so
+   nothing leaks into other routes.
+   ============================================================ */
+
+/* globals.css paints html/body dark for the app shell — override it for this
+   route so no dark edge shows through behind the light auth layout. */
+html:has(.csa-auth), body:has(.csa-auth), html:has(.csa-loading), body:has(.csa-loading){
+  background:#FBFBFA;
+  color:#1D1D1F;
+  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Inter, sans-serif;
+}
+
+.csa-auth{
+  --csa-ink:#1D1D1F;
+  --csa-ink-soft:#6E6E73;
+  --csa-muted:#98989D;
+  --csa-bg:#FBFBFA;
+  --csa-surface:#FFFFFF;
+  --csa-surface-alt:#F5F5F2;
+  --csa-border:#E5E5E0;
+  --csa-border-soft:#EEEEE9;
+  --csa-orange:#EF5A24;
+  --csa-orange-deep:#C2440F;
+  --csa-orange-tint:#FCE7DC;
+  --csa-orange-tint-soft:#FDF2EC;
+  --csa-green:#2F6B4A;
+  --csa-green-tint:#E4F0E8;
+
+  --csa-sf: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Inter, sans-serif;
+  --csa-display:var(--csa-sf);
+  --csa-body:var(--csa-sf);
+  --csa-mono:'IBM Plex Mono', monospace;
+
+  --csa-shadow-sm:0 1px 3px rgba(29,29,31,0.06);
+  --csa-shadow-md:0 10px 30px rgba(29,29,31,0.08);
+  --csa-shadow-lg:0 30px 70px rgba(29,29,31,0.12);
+  --csa-pill:980px;
+
+  --csa-shell-pad:clamp(14px,2.6vw,32px);
+
+  height:100vh;
+  height:100svh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:var(--csa-shell-pad);
+  background:var(--csa-bg);
+  color:var(--csa-ink);
+  font-family:var(--csa-body);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+.csa-panel{
+  width:100%;
+  max-width:1180px;
+  height:100%;
+  max-height:calc(100vh - 2 * var(--csa-shell-pad));
+  max-height:calc(100svh - 2 * var(--csa-shell-pad));
+  display:grid;
+  grid-template-columns:1.02fr 1fr;
+  background:var(--csa-surface);
+  border-radius:28px;
+  overflow:hidden;
+  box-shadow:0 30px 80px rgba(29,29,31,.16), 0 2px 8px rgba(29,29,31,.06);
+}
+.csa-auth *{box-sizing:border-box; margin:0; padding:0;}
+.csa-auth a{color:inherit; text-decoration:none;}
+.csa-auth button{font-family:inherit; cursor:pointer;}
+.csa-auth img{display:block; max-width:100%;}
+.csa-auth :focus-visible{outline:2px solid var(--csa-orange); outline-offset:3px; border-radius:6px;}
+.csa-auth h1,.csa-auth h2,.csa-auth h3{font-family:var(--csa-display); font-weight:600; letter-spacing:-0.02em;}
+
+/* ---------- Brand visual panel (right on desktop) ---------- */
+.csa-aside{
+  position:relative; isolation:isolate; overflow:hidden;
+  background:linear-gradient(150deg, #FF9D6E 0%, #F37341 45%, #E85A26 100%);
+  padding:clamp(22px,3vw,40px);
+  display:flex; flex-direction:column; justify-content:space-between; gap:18px;
+  order:2;
+}
+
+.csa-brand{display:inline-flex; align-items:center; gap:8px; font-family:var(--csa-display); font-weight:700; font-size:17px; transition:opacity .15s ease;}
+.csa-brand:hover{opacity:.72;}
+.csa-brand img{width:34px; height:34px; object-fit:contain;}
+.csa-brand .badge{font-family:var(--csa-mono); font-weight:600; font-size:10px; color:var(--csa-orange-deep); background:var(--csa-orange-tint); padding:2.5px 7px; border-radius:5px; letter-spacing:.06em; text-transform:uppercase;}
+
+.csa-aside-top{flex-shrink:0;}
+.csa-aside h2{font-size:clamp(24px,2.6vw,34px); line-height:1.14; margin:0; max-width:17ch; color:#fff;}
+
+.csa-aside-visual{position:relative; flex:1; min-height:0; max-width:480px; width:100%; margin:0 auto;}
+.csa-aside-visual img{width:100%; height:100%; object-fit:cover; display:block; border-radius:20px; box-shadow:0 24px 48px rgba(0,0,0,.22);}
+.csa-aside-chip{
+  position:absolute; left:16px; bottom:16px;
+  display:inline-flex; align-items:center; gap:7px;
+  background:var(--csa-surface); color:var(--csa-ink);
+  padding:9px 14px; border-radius:var(--csa-pill);
+  font-size:11.5px; font-weight:600; letter-spacing:.01em;
+  box-shadow:0 14px 30px rgba(0,0,0,.2);
+  white-space:nowrap;
+}
+.csa-aside-chip-dot{width:7px; height:7px; border-radius:50%; background:var(--csa-green); flex-shrink:0;}
+@media (max-width:1140px){.csa-aside-chip{font-size:10.5px; padding:8px 12px;}}
+
+.csa-aside-trust{flex-shrink:0; text-align:center;}
+.csa-aside-trust-label{display:block; font-family:var(--csa-mono); font-size:11px; letter-spacing:.06em; color:rgba(255,255,255,.65); margin-bottom:12px;}
+.csa-aside-logos{display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;}
+.csa-aside-logo{background:#fff; border-radius:9px; height:32px; padding:0 11px; display:flex; align-items:center; justify-content:center;}
+.csa-aside-logo img{max-height:16px; max-width:76px; object-fit:contain;}
+
+/* ---------- Right form panel ---------- */
+.csa-main{display:flex; align-items:center; justify-content:center; padding:clamp(16px,2.4vw,28px) clamp(20px,4vw,48px); overflow:hidden; order:1;}
+
+/* .csa-panel is already the floating card (rounded corners + shadow), so the
+   form sits directly on its white background — no nested card chrome. */
+.csa-card{
+  width:min(400px,100%);
+  padding:6px 0;
+  margin:auto 0;
+}
+.csa-card-top{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px;}
+.csa-card h1{font-size:clamp(24px,2.6vw,30px); line-height:1.12; margin:0 0 6px;}
+.csa-sub{color:var(--csa-ink-soft); font-size:13.5px; line-height:1.5;}
+
+/* ---------- Continue with Google ---------- */
+.csa-google{
+  width:100%; min-height:46px; margin-top:14px;
+  border:1px solid #D6D5D0; border-radius:var(--csa-pill);
+  background:rgba(255,255,255,.75); backdrop-filter:blur(14px) saturate(180%); -webkit-backdrop-filter:blur(14px) saturate(180%);
+  color:var(--csa-ink);
+  font-size:14.5px; font-weight:600; font-family:var(--csa-body);
+  display:inline-flex; align-items:center; justify-content:center; gap:10px;
+  transition:transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s ease, border-color .2s ease, background .2s ease;
+}
+.csa-google:hover:not(:disabled){border-color:#C6C5C0; background:rgba(255,255,255,.92); transform:translateY(-1px); box-shadow:var(--csa-shadow-sm);}
+.csa-google:disabled{opacity:.62; cursor:not-allowed; transform:none;}
+.csa-spinner.is-dark{border-color:rgba(29,29,31,.18); border-top-color:var(--csa-ink);}
+
+.csa-divider{display:flex; align-items:center; gap:12px; margin:14px 0 2px; font-family:var(--csa-mono); font-size:11.5px; color:var(--csa-ink-soft); letter-spacing:.02em;}
+.csa-divider::before, .csa-divider::after{content:''; flex:1; height:1px; background:#DEDDD8;}
+
+.csa-form{display:grid; gap:12px; margin-top:14px;}
+
+/* ---------- Animated field collapse ----------
+   grid-template-rows 0fr→1fr animates to auto height without JS measuring.
+   The negative margin cancels the form's own gap while collapsed, so a
+   hidden field contributes exactly zero space. */
+.csa-collapse{
+  display:grid; grid-template-rows:0fr; opacity:0; margin-bottom:-12px;
+  transition:grid-template-rows .42s cubic-bezier(.22,.68,.24,1),
+             opacity .26s ease,
+             margin-bottom .42s cubic-bezier(.22,.68,.24,1);
+}
+.csa-collapse.is-open{grid-template-rows:1fr; opacity:1; margin-bottom:0;}
+.csa-collapse > .csa-collapse-inner{overflow:hidden; min-height:0;}
+/* Nudge the contents in as the row opens — reads as arrival, not a pop. */
+.csa-collapse > .csa-collapse-inner > *{
+  transform:translateY(-6px);
+  transition:transform .42s cubic-bezier(.22,.68,.24,1);
+}
+.csa-collapse.is-open > .csa-collapse-inner > *{transform:translateY(0);}
+
+/* Heading + subtitle crossfade when the mode changes. */
+.csa-head{animation:csa-swap .36s cubic-bezier(.22,.68,.24,1);}
+@keyframes csa-swap{from{opacity:0; transform:translateY(-5px);} to{opacity:1; transform:none;}}
+
+/* Submit label swap without resizing the button. */
+.csa-submit span.csa-label-swap{animation:csa-swap .3s cubic-bezier(.22,.68,.24,1);}
+
+@media (prefers-reduced-motion:reduce){
+  .csa-collapse,
+  .csa-collapse > .csa-collapse-inner > *{transition:none;}
+  .csa-head, .csa-submit span.csa-label-swap{animation:none;}
+}
+.csa-field{display:grid; gap:6px;}
+/* Holds just the "Forgot password?" link where a label used to sit — collapses
+   to nothing when not rendered, since the fields no longer carry visible labels. */
+.csa-field-top{display:flex; justify-content:flex-end;}
+/* Live confirm-password feedback, so a mismatch is caught before submitting. */
+.csa-match{font-family:var(--csa-mono); font-size:10.5px; font-weight:500; letter-spacing:.03em; color:var(--csa-muted); transition:color .18s ease; justify-self:end;}
+.csa-match.is-ok{color:var(--csa-green);}
+.csa-input{
+  width:100%; min-height:44px;
+  border:1px solid #D6D5D0; border-radius:11px;
+  padding:0 14px; font-size:15px; font-family:var(--csa-body);
+  background:rgba(255,255,255,.7); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  color:var(--csa-ink);
+  outline:none; transition:border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.csa-input::placeholder{color:var(--csa-ink-soft);}
+.csa-input:hover:not(:disabled){border-color:#C6C5C0; background:rgba(255,255,255,.85);}
+/* Apple system-blue focus ring — thin border + soft translucent halo, the
+   standard iOS/macOS text-field focus treatment. Background stays glassy
+   (translucent + blurred) rather than flattening to solid white. */
+.csa-input:focus{
+  border-color:#0A84FF; box-shadow:0 0 0 3.5px rgba(10,132,255,.22);
+  background:rgba(255,255,255,.72);
+  backdrop-filter:blur(16px) saturate(180%); -webkit-backdrop-filter:blur(16px) saturate(180%);
+}
+.csa-input:focus-visible{outline:none;}
+.csa-input:disabled{background:var(--csa-surface-alt); color:var(--csa-muted); cursor:not-allowed;}
+
+/* Password field with reveal toggle */
+.csa-pw{position:relative;}
+.csa-pw .csa-input{padding-right:44px;}
+.csa-pw-toggle{
+  position:absolute; right:5px; top:50%; transform:translateY(-50%);
+  width:34px; height:34px;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:0; background:transparent; padding:0; border-radius:8px;
+  color:var(--csa-ink-soft); transition:color .15s ease, background .15s ease;
+}
+.csa-pw-toggle:hover:not(:disabled){color:var(--csa-orange-deep); background:var(--csa-orange-tint-soft);}
+.csa-pw-toggle:disabled{cursor:not-allowed; opacity:.5;}
+
+.csa-submit{
+  width:100%; min-height:46px; margin-top:4px;
+  border:1px solid transparent; border-radius:var(--csa-pill);
+  background:var(--csa-orange); color:#fff;
+  font-size:15px; font-weight:600; font-family:var(--csa-body);
+  display:inline-flex; align-items:center; justify-content:center; gap:9px;
+  transition:transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s ease, background .2s ease;
+}
+.csa-submit:hover:not(:disabled){background:var(--csa-orange-deep); transform:translateY(-1px); box-shadow:var(--csa-shadow-md);}
+.csa-submit:disabled{opacity:.62; cursor:not-allowed; transform:none;}
+.csa-spinner{width:15px; height:15px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:csa-spin .7s linear infinite;}
+@keyframes csa-spin{to{transform:rotate(360deg);}}
+@media (prefers-reduced-motion:reduce){.csa-spinner{animation:none;}}
+
+.csa-linkrow{display:flex; justify-content:center; margin-top:2px;}
+.csa-link{border:0; background:transparent; padding:6px 4px; font-family:var(--csa-body); font-size:13px; font-weight:500; color:var(--csa-orange-deep); transition:color .15s ease;}
+.csa-link:hover:not(:disabled){color:var(--csa-orange);}
+.csa-link:disabled{cursor:not-allowed; opacity:.55;}
+
+.csa-switch{text-align:center; font-size:13.5px; color:var(--csa-ink-soft); margin-top:2px;}
+.csa-switch-link{border:0; background:transparent; padding:0; font-family:var(--csa-body); font-size:13.5px; font-weight:600; color:var(--csa-orange-deep); transition:color .15s ease;}
+.csa-switch-link:hover:not(:disabled){color:var(--csa-orange);}
+.csa-switch-link:disabled{cursor:not-allowed; opacity:.55;}
+
+.csa-inline-link{border:0; background:transparent; padding:0; font-family:var(--csa-body); font-size:12px; font-weight:500; color:var(--csa-orange-deep); transition:color .15s ease;}
+.csa-inline-link:hover:not(:disabled){color:var(--csa-orange);}
+.csa-inline-link:disabled{cursor:not-allowed; opacity:.55;}
+
+.csa-checkbox{display:flex; align-items:flex-start; gap:9px; font-size:12.5px; color:var(--csa-ink-soft); line-height:1.5; cursor:pointer;}
+.csa-checkbox input{margin-top:2px; width:16px; height:16px; accent-color:var(--csa-orange); flex-shrink:0; cursor:pointer;}
+.csa-checkbox a{color:var(--csa-ink); text-decoration:underline; text-underline-offset:2px;}
+.csa-checkbox:has(input:disabled){cursor:not-allowed; opacity:.6;}
+
+.csa-msg{display:flex; align-items:flex-start; gap:9px; padding:12px 14px; border-radius:11px; font-size:13.5px; line-height:1.5; border:1px solid transparent;}
+.csa-msg-icon{flex-shrink:0; width:16px; height:16px; margin-top:2px;}
+.csa-msg-icon svg{width:16px; height:16px; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+.csa-msg.is-error{background:#FDF2F0; border-color:#F6D5CC; color:#A5330F;}
+.csa-msg.is-error svg{stroke:#C2440F;}
+.csa-msg.is-success{background:var(--csa-green-tint); border-color:#C9E2D3; color:#245239;}
+.csa-msg.is-success svg{stroke:var(--csa-green);}
+.csa-msg.is-info{background:var(--csa-surface-alt); border-color:var(--csa-border); color:var(--csa-ink-soft);}
+.csa-msg.is-info svg{stroke:var(--csa-ink-soft);}
+
+.csa-foot{margin-top:14px; padding-top:12px; border-top:1px solid var(--csa-border-soft); font-size:11.5px; color:var(--csa-muted); text-align:center; line-height:1.5;}
+.csa-foot a{color:var(--csa-ink-soft); text-decoration:underline; text-underline-offset:2px;}
+.csa-foot a:hover{color:var(--csa-ink);}
+
+/* Suspense fallback */
+.csa-loading{min-height:100vh; display:grid; place-items:center; background:var(--csa-bg); font-family:var(--csa-body); color:var(--csa-ink-soft); font-size:14px;}
+
+/* ---------- Responsive ---------- */
+@media (max-width:960px){
+  /* Mobile drops the aside and can genuinely run longer than one screen
+     (signup adds fields), so let the page scroll normally here instead of
+     the desktop's fit-to-viewport card. */
+  .csa-auth{height:auto; min-height:100vh; min-height:100svh; padding:0; align-items:flex-start; overflow:visible;}
+  .csa-panel{grid-template-columns:1fr; border-radius:0; box-shadow:none; height:auto; max-height:none; min-height:100vh; min-height:100svh;}
+  .csa-aside{display:none;}
+  .csa-main{padding:clamp(28px,7vw,44px) 20px 48px; overflow-y:visible; order:0;}
+  .csa-card{margin:0;}
+}
+@media (max-width:560px){
+  .csa-card h1{font-size:26px;}
+}

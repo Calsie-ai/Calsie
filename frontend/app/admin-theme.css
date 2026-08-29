@@ -1,0 +1,96 @@
+body:has(.applix-admin-scope) {
+  background: #ffebed !important;
+  color: #16131a !important;
+}
+
+body:has(.applix-admin-scope)::before,
+body:has(.applix-admin-scope)::after,
+.applix-admin-scope main::before,
+.applix-admin-scope main::after {
+  display: none !important;
+  content: none !important;
+}
+
+.applix-admin-scope,
+.applix-admin-scope main {
+  min-height: 100vh;
+  background: #ffebed !important;
+  background-image: none !important;
+  color: #16131a !important;
+}
+
+.applix-admin-scope main h1,
+.applix-admin-scope main h2,
+.applix-admin-scope main h3,
+.applix-admin-scope main strong {
+  color: #000000 !important;
+}
+
+.applix-admin-scope main p,
+.applix-admin-scope main span,
+.applix-admin-scope main label {
+  color: #16131a !important;
+}
+
+.applix-admin-scope main > header p:first-child,
+.applix-admin-scope main section p:first-child {
+  color: #ff5757 !important;
+}
+
+.applix-admin-scope main > section > div {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, .12) !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .08) !important;
+}
+
+.applix-admin-scope main > section > aside {
+  background: #000000 !important;
+  border: 1px solid #000000 !important;
+  color: #ffffff !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .14) !important;
+}
+
+.applix-admin-scope main > section > aside h2,
+.applix-admin-scope main > section > aside h3,
+.applix-admin-scope main > section > aside p,
+.applix-admin-scope main > section > aside span,
+.applix-admin-scope main > section > aside small {
+  color: #ffffff !important;
+}
+
+.applix-admin-scope input,
+.applix-admin-scope textarea,
+.applix-admin-scope select {
+  background: #ffffff !important;
+  color: #16131a !important;
+  -webkit-text-fill-color: #16131a !important;
+  border-color: rgba(0, 0, 0, .16) !important;
+}
+
+.applix-admin-scope main > section > aside input {
+  background: #16131a !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  border-color: rgba(255, 255, 255, .2) !important;
+}
+
+.applix-admin-scope button,
+.applix-admin-scope a {
+  border-color: #000000 !important;
+}
+
+.applix-admin-scope main > header a,
+.applix-admin-scope main > section > div > button:last-child {
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+.applix-admin-scope main > section > aside article {
+  background: #16131a !important;
+  border-color: rgba(255, 255, 255, .18) !important;
+}
+
+.applix-admin-scope main > section > aside article button {
+  background: #ffebed !important;
+  color: #000000 !important;
+}

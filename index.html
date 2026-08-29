@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>APPLIX</title>
+  <meta name="description" content="APPLIX magic-link access landing page." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page-shell">
+    <div class="top-glow" aria-hidden="true"></div>
+
+    <header class="access-bar" aria-label="APPLIX access controls">
+      <a class="brand" href="#top" aria-label="APPLIX home">APPLIX</a>
+      <div class="access-actions">
+        <a id="dashboardLink" class="btn btn-primary" href="#">Enter Dashboard</a>
+        <a class="btn btn-secondary" href="#request-access">Request Access</a>
+      </div>
+    </header>
+
+    <section id="top" class="landing-art" aria-label="APPLIX landing page artwork">
+      <img src="assets/Home.svg" alt="APPLIX landing page artwork" onerror="this.remove();document.querySelector('.fallback-art').hidden=false;" />
+      <div class="fallback-art" hidden>
+        <div class="orb"></div>
+        <p class="eyebrow">AI Powered Play</p>
+        <h1>APPLIX</h1>
+        <p>Magic-link access for your private APPLIX dashboard.</p>
+        <div class="cards">
+          <span>AI Resources</span>
+          <span>Gameplay Systems</span>
+          <span>Private Testing</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="request-access" class="invite-panel" aria-label="APPLIX invite access">
+      <div class="panel-copy">
+        <p class="eyebrow">Private minimal test</p>
+        <h2>Use APPLIX through magic-link access.</h2>
+        <p>Already have access? Enter the dashboard. New testers can request free minimal access with the invite code below.</p>
+        <div class="invite-code" aria-label="Invite code">
+          <span>Invite Code</span>
+          <strong>Applixvvip26</strong>
+        </div>
+      </div>
+
+      <form id="accessForm" class="access-form">
+        <label>Email address<input id="email" type="email" placeholder="you@example.com" autocomplete="email" required /></label>
+        <label>Invite code<input id="inviteCode" type="text" placeholder="Enter invite code" autocomplete="off" required /></label>
+        <button class="btn btn-primary form-btn" type="submit">Request Free Test Access</button>
+        <p id="formMessage" class="form-message" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

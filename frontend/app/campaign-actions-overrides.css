@@ -1,0 +1,177 @@
+.dashboard-cockpit-shell .dashboard-single-row::after {
+  display: none !important;
+  content: none !important;
+}
+
+.dashboard-cockpit-shell .dashboard-app-connect.ready {
+  pointer-events: none !important;
+  cursor: default !important;
+}
+
+.dashboard-cockpit-shell .campaign-summary-card {
+  padding-top: clamp(18px, 4vw, 30px) !important;
+}
+
+.dashboard-cockpit-shell .campaign-summary-card > p:not(.campaign-target) {
+  display: none !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons {
+  width: min(100%, 520px) !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: center !important;
+  justify-items: center !important;
+  gap: clamp(6px, 2.4vw, 18px) !important;
+  margin: 18px auto 0 !important;
+  padding: 10px 0 4px !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons::before {
+  content: '|| Pause' !important;
+  order: 2 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  min-height: 42px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #16131a !important;
+  font-size: clamp(12px, 2.6vw, 14px) !important;
+  line-height: 1.1 !important;
+  font-weight: 950 !important;
+  letter-spacing: .01em !important;
+  text-align: center !important;
+  cursor: default !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons .ghost-link,
+.dashboard-cockpit-shell .campaign-buttons .ghost-button {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 42px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #16131a !important;
+  font-size: 0 !important;
+  line-height: 1 !important;
+  font-weight: 950 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  appearance: none !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons .ghost-link {
+  order: 1 !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons .ghost-button {
+  order: 3 !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons .ghost-link::before,
+.dashboard-cockpit-shell .campaign-buttons .ghost-button::before {
+  display: inline-block !important;
+  min-width: 18px !important;
+  color: #ff5757 !important;
+  font-size: clamp(28px, 5.4vw, 38px) !important;
+  line-height: .8 !important;
+  font-weight: 500 !important;
+  text-align: center !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons .ghost-link::before {
+  content: '+' !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons .ghost-button::before {
+  content: '-' !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons .ghost-link::after,
+.dashboard-cockpit-shell .campaign-buttons .ghost-button::after {
+  display: inline-block !important;
+  color: #16131a !important;
+  font-size: clamp(12px, 2.6vw, 14px) !important;
+  line-height: 1.1 !important;
+  font-weight: 950 !important;
+  letter-spacing: .01em !important;
+  text-align: left !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons .ghost-link::after {
+  content: 'New campaign' !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons .ghost-button::after {
+  content: 'Delete' !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons .ghost-link:hover,
+.dashboard-cockpit-shell .campaign-buttons .ghost-button:hover {
+  color: #ff5757 !important;
+  background: transparent !important;
+}
+
+.dashboard-cockpit-shell .campaign-buttons .ghost-button:disabled {
+  opacity: .55 !important;
+  cursor: not-allowed !important;
+}
+
+.dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker'] {
+  width: min(100%, 520px) !important;
+  min-height: clamp(84px, 15vw, 118px) !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent url('/TrackApplix.svg') center / contain no-repeat !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker']::before,
+.dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker']::after {
+  display: none !important;
+  content: none !important;
+}
+
+.dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker']:hover {
+  transform: translateY(-1px) !important;
+  filter: drop-shadow(0 12px 20px rgba(255, 87, 87, .18)) !important;
+}
+
+@media (max-width: 520px) {
+  .dashboard-cockpit-shell .campaign-buttons {
+    gap: 4px !important;
+  }
+
+  .dashboard-cockpit-shell .campaign-buttons::before,
+  .dashboard-cockpit-shell .campaign-buttons .ghost-link::after,
+  .dashboard-cockpit-shell .campaign-buttons .ghost-button::after {
+    font-size: 11px !important;
+  }
+
+  .dashboard-cockpit-shell .campaign-buttons .ghost-link,
+  .dashboard-cockpit-shell .campaign-buttons .ghost-button,
+  .dashboard-cockpit-shell .campaign-buttons::before {
+    min-height: 38px !important;
+  }
+
+  .dashboard-cockpit-shell .dashboard-actions .applix-setup-primary[href='/tracker'] {
+    min-height: 84px !important;
+  }
+}

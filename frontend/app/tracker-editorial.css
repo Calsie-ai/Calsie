@@ -1,0 +1,128 @@
+html body main.agent-log-shell {
+  --tracker-accent: #FE818D;
+  --tracker-black: #000;
+  --tracker-white: #FFF;
+  --tracker-tint: #FFF7F8;
+  --tracker-border: #EAEAEA;
+  --tracker-muted: #5C5C5C;
+  min-height: 100vh !important;
+  padding: clamp(22px,4vw,44px) 20px 64px !important;
+  background: var(--tracker-white) !important;
+  color: var(--tracker-black) !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+html body main.agent-log-shell::before,
+html body main.agent-log-shell::after { content: none !important; display: none !important; }
+
+html body main.agent-log-shell .agent-log-header,
+html body main.agent-log-shell .agent-log-hero,
+html body main.agent-log-shell .agent-log-card,
+html body main.agent-log-shell .agent-summary-grid,
+html body main.agent-log-shell .agent-action-row,
+html body main.agent-log-shell .agent-message,
+html body main.agent-log-shell .agent-error {
+  width: min(1180px,100%) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+html body main.agent-log-shell .agent-log-header {
+  display:flex !important; align-items:center !important; justify-content:space-between !important;
+  gap:16px !important; margin-bottom:clamp(34px,6vw,64px) !important;
+  padding-bottom:18px !important; border-bottom:1px solid var(--tracker-border) !important;
+}
+
+html body main.agent-log-shell .agent-log-brand { display:inline-flex !important; align-items:center !important; gap:12px !important; color:var(--tracker-black) !important; }
+html body main.agent-log-shell .agent-log-brand img { width:48px !important; height:48px !important; object-fit:contain !important; }
+html body main.agent-log-shell .agent-log-brand strong { display:block !important; color:var(--tracker-accent) !important; letter-spacing:.14em !important; }
+html body main.agent-log-shell .agent-log-brand span { color:var(--tracker-muted) !important; }
+
+html body main.agent-log-shell .agent-home-link,
+html body main.agent-log-shell .agent-action-row a,
+html body main.agent-log-shell .agent-action-row button,
+html body main.agent-log-shell .sheet-pagination button {
+  min-height:46px !important; padding:0 18px !important;
+  border:1px solid var(--tracker-black) !important; border-radius:6px !important;
+  background:var(--tracker-white) !important; color:var(--tracker-black) !important;
+  box-shadow:none !important; backdrop-filter:none !important; font-weight:900 !important;
+}
+
+html body main.agent-log-shell .agent-log-hero { text-align:center !important; margin-bottom:28px !important; }
+html body main.agent-log-shell .agent-kicker { color:var(--tracker-accent) !important; }
+html body main.agent-log-shell .agent-log-hero h1 { max-width:900px !important; margin:0 auto !important; color:var(--tracker-black) !important; font-size:clamp(44px,7vw,78px) !important; line-height:.96 !important; }
+html body main.agent-log-shell .agent-log-hero p { max-width:700px !important; margin:18px auto 0 !important; color:var(--tracker-muted) !important; }
+
+html body main.agent-log-shell .agent-log-card,
+html body main.agent-log-shell .summary-card {
+  border:1px solid var(--tracker-border) !important; border-radius:8px !important;
+  background:var(--tracker-white) !important; color:var(--tracker-black) !important;
+  box-shadow:none !important; backdrop-filter:none !important;
+}
+
+html body main.agent-log-shell .campaign-overview { padding:26px !important; margin-bottom:18px !important; text-align:center !important; }
+html body main.agent-log-shell .campaign-overview h2,
+html body main.agent-log-shell .day-line-header h2,
+html body main.agent-log-shell .table-title-row h2,
+html body main.agent-log-shell .empty-agent-card h2 { color:var(--tracker-black) !important; }
+html body main.agent-log-shell .campaign-overview p,
+html body main.agent-log-shell .day-line-header>span,
+html body main.agent-log-shell .table-title-row>span,
+html body main.agent-log-shell .empty-agent-card p { color:var(--tracker-muted) !important; }
+html body main.agent-log-shell .active-pill { border:1px solid rgba(254,129,141,.45) !important; background:var(--tracker-tint) !important; color:var(--tracker-black) !important; }
+
+html body main.agent-log-shell .agent-summary-grid { display:grid !important; grid-template-columns:repeat(4,minmax(0,1fr)) !important; gap:14px !important; margin-bottom:18px !important; }
+html body main.agent-log-shell .summary-card { padding:22px !important; text-align:center !important; }
+html body main.agent-log-shell .summary-card span { color:var(--tracker-muted) !important; }
+html body main.agent-log-shell .summary-card strong { color:var(--tracker-black) !important; }
+html body main.agent-log-shell .summary-card.prepared,
+html body main.agent-log-shell .summary-card.applied { border-color:rgba(254,129,141,.55) !important; background:var(--tracker-tint) !important; }
+
+html body main.agent-log-shell .agent-day-timeline { padding:clamp(20px,3vw,30px) !important; margin-bottom:18px !important; }
+html body main.agent-log-shell .day-dot-row::before { background:var(--tracker-border) !important; }
+html body main.agent-log-shell .day-dot-row button { border:1px solid transparent !important; border-radius:8px !important; background:transparent !important; color:var(--tracker-black) !important; }
+html body main.agent-log-shell .day-dot-row button.active { border-color:var(--tracker-accent) !important; background:var(--tracker-tint) !important; }
+html body main.agent-log-shell .day-dot { border:2px solid var(--tracker-border) !important; background:var(--tracker-white) !important; box-shadow:none !important; }
+html body main.agent-log-shell .day-dot-row button.active .day-dot { border-color:var(--tracker-accent) !important; background:var(--tracker-accent) !important; }
+html body main.agent-log-shell .day-dot-row small,
+html body main.agent-log-shell .day-dot-row em { color:var(--tracker-muted) !important; }
+
+html body main.agent-log-shell .agent-action-row { display:flex !important; justify-content:center !important; gap:12px !important; flex-wrap:wrap !important; margin-bottom:18px !important; }
+html body main.agent-log-shell .agent-action-row a:nth-child(2),
+html body main.agent-log-shell .agent-action-row a:nth-child(3) { border-color:var(--tracker-accent) !important; background:var(--tracker-accent) !important; color:var(--tracker-black) !important; }
+
+html body main.agent-log-shell .agent-message,
+html body main.agent-log-shell .agent-error { padding:14px 18px !important; margin-bottom:18px !important; border:1px solid var(--tracker-border) !important; border-radius:6px !important; background:var(--tracker-tint) !important; color:var(--tracker-black) !important; text-align:center !important; }
+html body main.agent-log-shell .agent-error { border-color:#D14343 !important; background:#FFF1F1 !important; color:#8A1C1C !important; }
+
+html body main.agent-log-shell .table-card { padding:clamp(20px,3vw,32px) !important; }
+html body main.agent-log-shell .agent-table-wrap { overflow-x:auto !important; border:1px solid var(--tracker-border) !important; border-radius:8px !important; }
+html body main.agent-log-shell .editable-sheet-table { width:100% !important; min-width:1040px !important; border-collapse:collapse !important; background:var(--tracker-white) !important; }
+html body main.agent-log-shell .editable-sheet-table th,
+html body main.agent-log-shell .editable-sheet-table td { padding:14px 16px !important; border-bottom:1px solid var(--tracker-border) !important; color:var(--tracker-black) !important; }
+html body main.agent-log-shell .editable-sheet-table th { background:var(--tracker-tint) !important; color:var(--tracker-muted) !important; }
+html body main.agent-log-shell .editable-sheet-table tbody tr:hover { background:var(--tracker-tint) !important; }
+html body main.agent-log-shell .editable-sheet-table td strong { color:var(--tracker-black) !important; }
+html body main.agent-log-shell .editable-sheet-table td span,
+html body main.agent-log-shell .muted-cell { color:var(--tracker-muted) !important; }
+html body main.agent-log-shell .editable-sheet-table td a { color:var(--tracker-black) !important; text-decoration-color:var(--tracker-accent) !important; }
+
+html body main.agent-log-shell .status-select { border:1px solid var(--tracker-border) !important; border-radius:6px !important; background:var(--tracker-white) !important; color:var(--tracker-black) !important; }
+html body main.agent-log-shell .approve-button { border:1px solid var(--tracker-accent) !important; background:var(--tracker-accent) !important; color:var(--tracker-black) !important; }
+html body main.agent-log-shell .decline-button { border:1px solid var(--tracker-black) !important; background:var(--tracker-white) !important; color:var(--tracker-black) !important; }
+
+html body main.agent-log-shell a:focus-visible,
+html body main.agent-log-shell button:focus-visible,
+html body main.agent-log-shell select:focus-visible { outline:3px solid rgba(254,129,141,.42) !important; outline-offset:3px !important; }
+
+@media (max-width:820px) {
+  html body main.agent-log-shell .agent-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+  html body main.agent-log-shell .day-line-header,
+  html body main.agent-log-shell .table-title-row { flex-direction:column !important; align-items:flex-start !important; }
+}
+
+@media (max-width:640px) {
+  html body main.agent-log-shell { padding:18px 14px 48px !important; }
+  html body main.agent-log-shell .agent-summary-grid { grid-template-columns:1fr !important; }
+  html body main.agent-log-shell .sheet-pagination { flex-direction:column !important; }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "symbiote-applix",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test:pending-intent": "node --experimental-strip-types --test tests/pendingIntent.test.mts",
+    "test:dashboard-navigation": "node --experimental-strip-types --test tests/dashboardNavigation.test.mts",
+    "test:action-state": "node --experimental-strip-types --test tests/actionState.test.mts",
+    "test:external-return": "node --experimental-strip-types --test tests/externalReturn.test.mts",
+    "test:payment-status-refund": "node --experimental-strip-types --test tests/paymentStatusRefund.test.mts",
+    "test:stripe-webhook": "node --experimental-strip-types --test tests/stripeWebhookHardening.test.mts",
+    "test:zero-cost-checkout": "node --experimental-strip-types --test tests/zeroCostCheckoutActivation.test.mts",
+    "test:resumable-job-fetch": "node --experimental-strip-types --test tests/resumableGlobalJobFetch.test.mts"
+  },
+  "dependencies": {
+    "@react-pdf/renderer": "^4.6.1",
+    "@supabase/supabase-js": "latest",
+    "googleapis": "^144.0.0",
+    "lucide-react": "^1.31.0",
+    "mammoth": "latest",
+    "next": "latest",
+    "pdf-parse": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "stripe": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
+}

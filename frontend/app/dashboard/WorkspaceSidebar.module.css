@@ -1,0 +1,51 @@
+.approveJobs {
+  width: calc(100% - 20px);
+  min-height: 52px;
+  margin: 10px;
+  border: 1px solid rgba(255, 85, 117, .58);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 11px 14px;
+  background: rgba(255, 85, 117, .05);
+  color: #ff5575;
+  box-shadow: 0 0 0 1px rgba(255, 85, 117, .08), 0 12px 28px rgba(255, 85, 117, .22);
+  font-weight: 950;
+  text-align: left;
+  transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.approveJobs span {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 85, 117, .16);
+  color: #ff6f8b;
+  box-shadow: 0 0 18px rgba(255, 85, 117, .28);
+  font-size: 15px;
+}
+
+.approveJobs b {
+  color: #ff5575;
+  font-size: 13px;
+}
+
+.approveJobs small {
+  display: block;
+  margin-top: 2px;
+  color: rgba(255, 140, 162, .72);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.approveJobs:hover,
+.active {
+  transform: translateY(-1px);
+  background: rgba(255, 85, 117, .11);
+  color: #ff6f8b;
+  box-shadow: 0 0 24px rgba(255, 85, 117, .34), 0 16px 34px rgba(255, 85, 117, .22);
+}

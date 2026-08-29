@@ -1,0 +1,1 @@
+One shared daily fetch of up to 100 fresh jobs for all users.
