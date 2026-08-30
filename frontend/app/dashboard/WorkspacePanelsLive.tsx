@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   ArrowUpDown,
@@ -12,7 +12,9 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
+  ClipboardList,
   FileText,
+  Flame,
   LayoutGrid,
   MapPin,
   Search,
@@ -25,9 +27,10 @@ import { savePendingIntent, type PendingIntentV1 } from "../../lib/pendingIntent
 import BuildResumePanel from "./BuildResumePanel";
 import GmailPanel from "./GmailPanel";
 import OverviewDashboard from "./OverviewDashboard";
+import ProfilePanel, { type ProfileResumeSignals, type ProfileRow } from "./ProfilePanel";
 import ResumePreviewPanel from "./ResumePreviewPanel";
 import WorkspacePanels from "./WorkspacePanels";
-import { isCampaignRunning, templateCategoryAccent, templateCategoryIcon, type CampaignTemplate } from "./workspace-data";
+import { isCampaignRunning, templateCategoryAccent, templateCategoryIcon, type CampaignTemplate, type WorkspaceTab } from "./workspace-data";
 
 const SAVED_TEMPLATES_KEY = "calsie:saved-templates";
 
@@ -39,6 +42,16 @@ type Props = BaseProps & {
   pendingIntent: PendingIntentV1 | null;
   userHint: string;
   greetingName: string;
+  /* Profile panel. `userHint` is already the signed-in user's id, so it is
+     reused rather than passing the same value under a second name. */
+  accountEmail: string;
+  memberSince?: string | null;
+  emailConfirmed: boolean;
+  profile: ProfileRow | null;
+  profileResumeSignals: ProfileResumeSignals;
+  profileLoading: boolean;
+  googleAvatarUrl: string | null;
+  uploadedAvatarUrl: string;
   onPendingIntentChange: (intent: PendingIntentV1 | null) => void;
   onPendingIntentRestored: (intentId: string) => void;
   onOpenTracker: () => void;
@@ -46,6 +59,9 @@ type Props = BaseProps & {
   onOpenResumePanel: () => void;
   onOpenGmailPanel: () => void;
   onOpenCampaignPanel: () => void;
+  onNavigatePanel: (panel: WorkspaceTab) => void;
+  onLogout: () => void;
+  onProfileChange: (patch: Partial<ProfileRow>) => void;
 };
 
 type Row = {
@@ -252,6 +268,21 @@ export default function WorkspacePanelsLive(props: Props) {
     setCheckoutError("");
   }, [props.active, props.pendingIntent]);
 
+  // ?template=<slug> deep link, used by the topbar search. dashboardPanelPath
+  // already retains and validates this param; until now nothing consumed it.
+  // Runs after the reset effect above so it is not immediately cleared.
+  const searchParams = useSearchParams();
+  const templateParam = searchParams.get("template");
+  useEffect(() => {
+    if (props.active !== "templates" || !templateParam || templates.length === 0) return;
+    const match = templates.find((item) => item.slug === templateParam || item.id === templateParam);
+    if (!match || selected?.id === match.id) return;
+    openTemplate(match);
+    // openTemplate is stable for this purpose; re-running on every render
+    // would fight the user closing the detail view.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.active, templateParam, templates]);
+
   useEffect(() => {
     setDescriptionExpanded(false);
   }, [selected?.id]);
@@ -392,6 +423,33 @@ export default function WorkspacePanelsLive(props: Props) {
   if (props.active === "resume") return <ResumePreviewPanel resumeReady={props.resumeReady} resumeName={props.resumeName} uploadState={props.actionStates.uploadResume} onResumeUpload={props.onResumeUpload} />;
   if (props.active === "buildResume") return <BuildResumePanel uploadState={props.actionStates.uploadResume} onResumeUpload={props.onResumeUpload} />;
   if (props.active === "gmail") return <GmailPanel gmailReady={props.gmailReady} actionStates={props.actionStates} onConnectGmail={props.onConnectGmail} onRevokeGmail={props.onRevokeGmail} />;
+  if (props.active === "profile") return (
+    <ProfilePanel
+      userId={props.userHint}
+      email={props.accountEmail}
+      memberSince={props.memberSince}
+      emailConfirmed={props.emailConfirmed}
+      profile={props.profile}
+      profileResumeSignals={props.profileResumeSignals}
+      profileLoading={props.profileLoading}
+      googleAvatarUrl={props.googleAvatarUrl}
+      uploadedAvatarUrl={props.uploadedAvatarUrl}
+      campaign={props.campaign}
+      purchasedTemplate={props.purchasedTemplate}
+      resumeReady={props.resumeReady}
+      resumeName={props.resumeName}
+      gmailReady={props.gmailReady}
+      approvedCount={props.approvedCount}
+      passedCount={props.passedCount}
+      actionStates={props.actionStates}
+      onNavigate={props.onNavigatePanel}
+      onToggleCampaign={props.onToggleCampaign}
+      onConnectGmail={props.onConnectGmail}
+      onRevokeGmail={props.onRevokeGmail}
+      onLogout={props.onLogout}
+      onProfileChange={props.onProfileChange}
+    />
+  );
   if (props.active === "approve" || props.active === "tracker") {
     const approvalMode = props.active === "approve";
     const status = props.campaign?.status || "Not configured";
@@ -399,7 +457,32 @@ export default function WorkspacePanelsLive(props: Props) {
     const paused = status === "paused";
     const statusClass = running ? "is-running" : paused ? "is-paused" : "is-idle";
     const statusText = running ? "Campaign running" : paused ? "Paused" : status;
-    return <section className="workspace-tracker-section"><header className="workspace-tracker-heading"><div><p>{approvalMode ? "Approval queue" : "Calsie tracker"}</p>{approvalMode ? <h1><span style={{ color: "#ff5f78" }}>SMASH</span> <span style={{ color: "#111" }}>OR PASS</span></h1> : <h1>Application tracker</h1>}<span>{approvalMode ? "Review matched jobs and choose Pass or Smash." : "Only jobs you Smash are added to this tracker."}</span></div><span className={`workspace-status-pill ${statusClass}`}><i /> {statusText}</span></header><div className="workspace-tracker-frame-wrap"><iframe className="workspace-tracker-frame" src={`/tracker?embedded=1&view=${approvalMode ? "review" : "tracker"}`} title={approvalMode ? "Applix job approval queue" : "Applix application tracker"} /></div></section>;
+    return (
+      <div className="ws-panel ws-tracker-panel">
+        <header className="ws-panel-head ws-tracker-head">
+          <div>
+            <p className="ws-panel-eyebrow ws-panel-eyebrow-icon">
+              {approvalMode ? <Flame size={13} strokeWidth={2.4} /> : <ClipboardList size={13} strokeWidth={2.4} />}
+              {approvalMode ? "Approval queue" : "Calsie tracker"}
+            </p>
+            {approvalMode ? (
+              <h1 className="ws-panel-title"><span className="ws-smash-accent">SMASH</span> OR PASS</h1>
+            ) : (
+              <h1 className="ws-panel-title">Application tracker</h1>
+            )}
+            <p className="ws-panel-sub">{approvalMode ? "Review matched jobs and choose Pass or Smash." : "Only jobs you Smash are added to this tracker."}</p>
+          </div>
+          <span className={`ws-status-pill ${statusClass}`}><i />{statusText}</span>
+        </header>
+        <div className="ws-tracker-frame-wrap">
+          <iframe
+            className="ws-tracker-frame"
+            src={`/tracker?embedded=1&view=${approvalMode ? "review" : "tracker"}`}
+            title={approvalMode ? "Applix job approval queue" : "Applix application tracker"}
+          />
+        </div>
+      </div>
+    );
   }
   if (props.active !== "templates") return <WorkspacePanels {...props} />;
 

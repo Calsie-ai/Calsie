@@ -2,7 +2,7 @@
 
 import {
   BarChart3,
-  ChevronDown,
+  ChevronRight,
   FileEdit,
   Flame,
   HelpCircle,
@@ -41,6 +41,9 @@ type Props = {
   displayName: string;
   email: string;
   initial: string;
+  avatarUrl?: string;
+  profileActive: boolean;
+  onOpenProfile: () => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
 };
@@ -59,6 +62,9 @@ export default function WorkspaceSidebar({
   displayName,
   email,
   initial,
+  avatarUrl,
+  profileActive,
+  onOpenProfile,
   collapsed,
   onToggleCollapsed,
 }: Props) {
@@ -159,14 +165,25 @@ export default function WorkspaceSidebar({
             </nav>
           </div>
 
-          <div className="ws-profile" title={collapsed ? `${displayName} — ${email}` : email}>
-            <span className="ws-profile-avatar" aria-hidden="true">{initial}</span>
+          {/* Was a static <div> with a chevron that suggested it opened
+              something. It now actually does — this is the account entry
+              point, matching the topbar avatar. */}
+          <button
+            type="button"
+            className={`ws-profile${profileActive ? " is-active" : ""}`}
+            aria-current={profileActive ? "page" : undefined}
+            title={collapsed ? `${displayName} — ${email}` : email}
+            onClick={onOpenProfile}
+          >
+            <span className="ws-profile-avatar" aria-hidden="true">
+              {avatarUrl ? <img src={avatarUrl} alt="" /> : initial}
+            </span>
             <span className="ws-profile-text">
               <strong>{displayName}</strong>
               <small>{email}</small>
             </span>
-            <ChevronDown size={18} strokeWidth={2} aria-hidden="true" />
-          </div>
+            <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
         </div>
       </div>
     </aside>

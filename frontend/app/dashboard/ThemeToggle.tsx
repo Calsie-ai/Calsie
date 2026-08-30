@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
-import { applyTheme, readStoredTheme, systemTheme, THEME_STORAGE_KEY, type Theme } from "../../lib/theme";
+import {
+  applyTheme,
+  readStoredTheme,
+  systemTheme,
+  THEME_CHANGE_EVENT,
+  THEME_STORAGE_KEY,
+  type Theme,
+} from "../../lib/theme";
 
 export default function ThemeToggle() {
   // Starts null so the server render and the first client render agree; the
@@ -22,7 +29,8 @@ export default function ThemeToggle() {
     return () => query.removeEventListener("change", onChange);
   }, []);
 
-  // Mirror the choice across other open tabs.
+  // Mirror the choice across other open tabs, including a switch back to
+  // "System" — which clears the key, arriving here as a null newValue.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== THEME_STORAGE_KEY) return;
@@ -30,10 +38,21 @@ export default function ThemeToggle() {
       if (next === "dark" || next === "light") {
         setTheme(next);
         document.documentElement.setAttribute("data-theme", next);
+      } else {
+        document.documentElement.removeAttribute("data-theme");
+        setTheme(systemTheme());
       }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // Same-document changes (the profile screen's appearance picker) — a
+  // `storage` event never fires in the document that made the change.
+  useEffect(() => {
+    const onThemeChange = () => setTheme(readStoredTheme() ?? systemTheme());
+    window.addEventListener(THEME_CHANGE_EVENT, onThemeChange);
+    return () => window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange);
   }, []);
 
   const isDark = theme === "dark";

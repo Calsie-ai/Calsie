@@ -50,8 +50,15 @@ import WorkspaceSidebar from "./WorkspaceSidebar";
 import WorkspaceTopbar from "./WorkspaceTopbar";
 import WorkspacePanelsLive, { mapTemplate } from "./WorkspacePanelsLive";
 import { CAMPAIGN_PLAN, isCampaignRunning, type CampaignRecord, type CampaignTemplate, type WorkspaceTab } from "./workspace-data";
+import { googleAvatarFromMetadata, readHideGoogleAvatar, resolveAvatar } from "../../lib/googleAvatar";
+import type { ProfileResumeSignals, ProfileRow } from "./ProfilePanel";
 
 type AuthUserLike = { email?: string | null; user_metadata?: Record<string, unknown> | null } | null;
+
+/** jsonb columns arrive as unknown; count only real, non-empty entries. */
+function countJsonArray(value: unknown): number {
+  return Array.isArray(value) ? value.filter(Boolean).length : 0;
+}
 
 function metaStringField(user: AuthUserLike, keys: string[]) {
   const meta = user?.user_metadata;
@@ -98,6 +105,14 @@ export default function DashboardWorkspace() {
   const [gmailRetryNonce, setGmailRetryNonce] = useState(0);
   const [externalReturnState, setExternalReturnState] = useState<ExternalReturnState>(IDLE_EXTERNAL_RETURN);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Saved profile row values. These override the auth user_metadata fallback
+  // so an edit on the profile panel shows in the sidebar/topbar immediately,
+  // without a reload.
+  // Loaded as part of the single dashboard load below, not by the profile
+  // panel on mount — so opening Profile costs no round trip and renders
+  // immediately with data that is already in memory.
+  const [profileRow, setProfileRow] = useState<ProfileRow | null>(null);
+  const [resumeSignals, setResumeSignals] = useState<ProfileResumeSignals>({});
   const paymentCheckRef = useRef("");
   const gmailCheckRef = useRef("");
   const { abortAction, runAction, states: actionStates } = useActionStates(DASHBOARD_ACTION_KEYS);
@@ -114,6 +129,21 @@ export default function DashboardWorkspace() {
 
   const navigateToPanel = useCallback((panel: WorkspaceTab) => {
     router.push(dashboardPanelPath(panel, new URLSearchParams(query)));
+  }, [query, router]);
+
+  // Selecting a template in search deep-links via the ?template= param that
+  // dashboardPanelPath already retains and validates; WorkspacePanelsLive
+  // reads it and opens that template's detail view.
+  // Keeps the sidebar/topbar and the cached row in step after an edit, so
+  // leaving Profile and coming back shows the saved values without refetching.
+  const handleProfileChange = useCallback((patch: Partial<ProfileRow>) => {
+    setProfileRow((current) => ({ ...(current || {}), ...patch }));
+  }, []);
+
+  const openTemplateFromSearch = useCallback((slug: string) => {
+    const params = new URLSearchParams(query);
+    params.set("template", slug);
+    router.push(dashboardPanelPath("templates", params));
   }, [query, router]);
 
   useEffect(() => {
@@ -420,14 +450,19 @@ export default function DashboardWorkspace() {
     setNotice(null);
     const outcome = await runAction("loadDashboard", async ({ signal }) => {
       const supabase = getSupabaseClient();
-      const [campaignResult, resumeResult, gmailResult] = await Promise.all([
+      const [campaignResult, resumeResult, gmailResult, profileResult] = await Promise.all([
         supabase.from("campaigns").select("id,name,location,target_business_type,search,outreach,status,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).abortSignal(signal),
-        supabase.from("resume_profiles").select("id,resume_file_path,resume_file_name").eq("profile_id", userId).order("updated_at", { ascending: false }).limit(1).abortSignal(signal).maybeSingle(),
+        // The extra columns here are what the profile panel needs. They ride
+        // along on queries this load already makes, so Profile opens with no
+        // fetch of its own instead of blocking on a second round trip.
+        supabase.from("resume_profiles").select("id,resume_file_path,resume_file_name,target_role,profile_summary,skills,work_experience").eq("profile_id", userId).order("updated_at", { ascending: false }).limit(1).abortSignal(signal).maybeSingle(),
         supabase.from("user_email_authorizations").select("status").eq("user_identifier", email || userId).eq("provider", "google").abortSignal(signal).maybeSingle(),
+        supabase.from("profiles").select("full_name,email,phone,location,avatar_url,preferences,created_at").eq("id", userId).abortSignal(signal).maybeSingle(),
       ]);
       if (campaignResult.error) throw campaignResult.error;
       if (resumeResult.error) throw resumeResult.error;
       if (gmailResult.error) throw gmailResult.error;
+      if (profileResult.error) throw profileResult.error;
       const latestCampaign = (((campaignResult.data || [])[0] as CampaignRecord) || null);
 
       const templateId = latestCampaign?.search?.template_id;
@@ -455,10 +490,19 @@ export default function DashboardWorkspace() {
         resumeReady: Boolean(resumeResult.data?.id),
         approvedCount: nextApprovedCount,
         passedCount: nextPassedCount,
+        profile: (profileResult.data as ProfileRow | null) || null,
+        resumeSignals: {
+          targetRole: resumeResult.data?.target_role || "",
+          profileSummary: resumeResult.data?.profile_summary || "",
+          skillsCount: countJsonArray(resumeResult.data?.skills),
+          experienceCount: countJsonArray(resumeResult.data?.work_experience),
+        } satisfies ProfileResumeSignals,
       };
     }, { replace: true, errorMessage: "Could not load your dashboard." });
 
     if (outcome.outcome === "success") {
+      setProfileRow(outcome.value.profile);
+      setResumeSignals(outcome.value.resumeSignals);
       setCampaign(outcome.value.campaign);
       setResumeReady(outcome.value.resumeReady);
       setResumeName(outcome.value.resumeName);
@@ -774,9 +818,27 @@ export default function DashboardWorkspace() {
     isActionLoading(actionStates, "startCampaign")
     || isActionLoading(actionStates, "pauseCampaign")
   );
-  const fullName = fullNameFor(user);
-  const greetingName = greetingNameFor(user);
+  // A saved profile row wins over auth user_metadata, which is only ever a
+  // fallback for accounts that have never opened the profile screen.
+  const savedName = (profileRow?.full_name || "").trim();
+  const fullName = savedName || fullNameFor(user);
+  const greetingName = savedName.split(/[\s._-]+/)[0] || greetingNameFor(user);
   const initial = (fullName.trim().charAt(0) || "?").toUpperCase();
+
+  // "avatars" is a public bucket, so this needs no signed-URL round trip.
+  const uploadedAvatarUrl = profileRow?.avatar_url
+    ? getSupabaseClient().storage.from("avatars").getPublicUrl(profileRow.avatar_url).data.publicUrl
+    : "";
+  // Supabase Auth already carries the Google picture for anyone who signed in
+  // with, or linked, Google — so this default costs nothing to fetch.
+  const googleAvatarUrl = googleAvatarFromMetadata(user.user_metadata as Record<string, unknown> | null);
+  const avatar = resolveAvatar({
+    uploadedUrl: uploadedAvatarUrl,
+    googleUrl: googleAvatarUrl,
+    hideGoogle: readHideGoogleAvatar(profileRow?.preferences),
+  });
+  const avatarUrl = avatar.src;
+  const profileLoading = isActionLoading(actionStates, "loadDashboard") && !profileRow;
   const campaignPrerequisitesMissing = Boolean(campaign) && !isCampaignRunning(campaign?.status) && (!resumeReady || !gmailReady);
   const campaignActionDisabled = !campaign || campaignActionBlocked || campaignPrerequisitesMissing;
   // A disabled control that never says why is a dead end — name the one
@@ -803,12 +865,22 @@ export default function DashboardWorkspace() {
         displayName={fullName}
         email={user.email ?? ""}
         initial={initial}
+        avatarUrl={avatarUrl}
+        profileActive={active === "profile"}
+        onOpenProfile={() => navigateToPanel("profile")}
         collapsed={!sidebarOpen}
         onToggleCollapsed={() => setSidebarOpen((value) => !value)}
       />
       <div className={`workspace-main${active === "templates" ? " is-templates" : ""}`}>
         <div className="ws-topbar-zone">
-          <WorkspaceTopbar displayName={fullName} initial={initial} hideSearch={active === "templates"} />
+          <WorkspaceTopbar
+            displayName={fullName}
+            initial={initial}
+            avatarUrl={avatarUrl}
+            onOpenProfile={() => navigateToPanel("profile")}
+            onNavigate={navigateToPanel}
+            onOpenTemplate={openTemplateFromSearch}
+          />
           {unclaimedIntent ? (
             <div className="ws-notice ws-notice-draft" role="status" aria-live="polite">
               <span className="ws-notice-icon"><CloudUpload size={18} strokeWidth={2} /></span>
@@ -903,6 +975,17 @@ export default function DashboardWorkspace() {
           pendingIntent={pendingIntent}
           userHint={user.id}
           greetingName={greetingName}
+          accountEmail={user.email ?? ""}
+          memberSince={user.created_at}
+          emailConfirmed={Boolean(user.email_confirmed_at)}
+          profile={profileRow}
+          profileResumeSignals={resumeSignals}
+          profileLoading={profileLoading}
+          googleAvatarUrl={googleAvatarUrl}
+          uploadedAvatarUrl={uploadedAvatarUrl}
+          onNavigatePanel={navigateToPanel}
+          onLogout={() => void logout()}
+          onProfileChange={handleProfileChange}
           onPendingIntentChange={setPendingIntent}
           onPendingIntentRestored={handlePendingIntentRestored}
           onOpenTracker={() => navigateToPanel("tracker")}

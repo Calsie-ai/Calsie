@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, Search, Wand2 } from "lucide-react";
+import { ArrowRight, CalendarDays, Mail, Megaphone, Search, Send, Target, Wand2 } from "lucide-react";
 import { isActionLoading, type ActionStateMap, type DashboardActionKey } from "../../lib/actionState";
 import {
   CAMPAIGN_PLAN,
@@ -201,21 +201,69 @@ export default function WorkspacePanels({
   }
 
   if (active === "campaign") {
+    // Blockers are surfaced explicitly: the start button's disabled rule
+    // already required a resume + Gmail, but never said so — leaving the
+    // button dead with no explanation. Logic below is unchanged.
+    const startBlockers = [
+      !resumeReady ? "upload a resume" : null,
+      !gmailReady ? "connect Gmail" : null,
+    ].filter(Boolean) as string[];
+
     return (
-      <section>
-        <header><p>Campaign</p><h1>Set up campaign</h1><span>Pause controls scheduling. Find New Jobs Now runs a separate AI search while the campaign is active.</span></header>
-        <div className="workspace-plan"><div><b>24</b><span>jobs per day</span></div><div><b>1</b><span>approved email per hour</span></div><div><b>30</b><span>campaign days</span></div><div><b>720</b><span>maximum applications</span></div></div>
-        <div className="workspace-card">
-          <h3>{campaign?.name || "No campaign selected"}</h3>
-          <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Choose and review a campaign from Browse Templates first."}</p>
-          <div className="workspace-actions">
-            {running && <button type="button" className="workspace-secondary" onClick={onFindJobsNow} disabled={findJobsLoading || !campaign}>{findJobsLoading ? "Finding jobs…" : "Find New Jobs Now"}</button>}
-            <button type="button" className="workspace-primary" onClick={onToggleCampaign} disabled={campaignActionLoading || !campaign || (!running && (!resumeReady || !gmailReady))}>
-              {pauseLoading ? "Pausing campaign…" : startLoading ? "Starting campaign…" : running ? "Pause Campaign" : paused ? "Resume Campaign" : "Start Campaign"}
-            </button>
+      <div className="ws-panel">
+        <header className="ws-panel-head">
+          <p className="ws-panel-eyebrow ws-panel-eyebrow-icon"><Megaphone size={13} strokeWidth={2.4} /> Campaign</p>
+          <h1 className="ws-panel-title">Set up campaign</h1>
+          <p className="ws-panel-sub">Pause controls scheduling. Find New Jobs Now runs a separate AI search while the campaign is active.</p>
+        </header>
+
+        <div className="ws-campaign-plan">
+          <div className="ws-campaign-plan-item">
+            <span className="ws-campaign-plan-icon"><Target size={17} strokeWidth={2.1} /></span>
+            <div><strong>{CAMPAIGN_PLAN.daily_job_limit}</strong><span>jobs per day</span></div>
+          </div>
+          <div className="ws-campaign-plan-item">
+            <span className="ws-campaign-plan-icon"><Mail size={17} strokeWidth={2.1} /></span>
+            <div><strong>{CAMPAIGN_PLAN.hourly_email_limit}</strong><span>approved email per hour</span></div>
+          </div>
+          <div className="ws-campaign-plan-item">
+            <span className="ws-campaign-plan-icon"><CalendarDays size={17} strokeWidth={2.1} /></span>
+            <div><strong>{CAMPAIGN_PLAN.campaign_days}</strong><span>campaign days</span></div>
+          </div>
+          <div className="ws-campaign-plan-item">
+            <span className="ws-campaign-plan-icon"><Send size={17} strokeWidth={2.1} /></span>
+            <div><strong>{CAMPAIGN_PLAN.total_cap}</strong><span>maximum applications</span></div>
           </div>
         </div>
-      </section>
+
+        <div className="ws-campaign-card">
+          <div className="ws-campaign-card-head">
+            <div>
+              <small>Selected campaign</small>
+              <h3>{campaign?.name || "No campaign selected"}</h3>
+              <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Choose and review a campaign from Browse Templates first."}</p>
+            </div>
+            <span className={`ws-status-pill ${statusClass}`}><i />{statusText}</span>
+          </div>
+
+          <div className="ws-campaign-actions">
+            <button type="button" className="ws-btn-primary" onClick={onToggleCampaign} disabled={campaignActionLoading || !campaign || (!running && (!resumeReady || !gmailReady))}>
+              {pauseLoading ? "Pausing campaign…" : startLoading ? "Starting campaign…" : running ? "Pause Campaign" : paused ? "Resume Campaign" : "Start Campaign"}
+            </button>
+            {running && (
+              <button type="button" className="ws-btn-outline" onClick={onFindJobsNow} disabled={findJobsLoading || !campaign}>
+                <Search size={16} strokeWidth={2.2} />{findJobsLoading ? "Finding jobs…" : "Find New Jobs Now"}
+              </button>
+            )}
+          </div>
+
+          {!campaign ? (
+            <p className="ws-campaign-hint">Pick a template in Browse Templates to create a campaign first.</p>
+          ) : !running && startBlockers.length > 0 ? (
+            <p className="ws-campaign-hint">To start this campaign you still need to {startBlockers.join(" and ")}.</p>
+          ) : null}
+        </div>
+      </div>
     );
   }
 

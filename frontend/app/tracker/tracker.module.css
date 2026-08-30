@@ -1,15 +1,86 @@
+/* This page renders inside a same-origin <iframe> on the dashboard's
+   Smash-or-Pass and Application Tracker panels, and also stands alone at
+   /tracker. An iframe is a separate document, so it cannot inherit the
+   custom properties workspace-macos-theme.css defines on .applix-workspace
+   — the palette has to be declared here as well. Values are kept in step
+   with that file's tokens so both documents render the same colours.
+
+   Dark mode needs no plumbing: THEME_INIT_SCRIPT runs in the ROOT layout
+   head (app/layout.tsx), which this document also uses, so <html> already
+   carries data-theme from the shared localStorage before first paint. */
 .shell {
+  --tr-page: #F7F7F8;
+  --tr-card: #FFFFFF;
+  --tr-card-alt: #FDFDFE;
+  --tr-tint: #FEF0E7;
+  --tr-line: #F0F0F3;
+  --tr-line-2: #E9E9ED;
+  --tr-ink: #14161A;
+  --tr-ink-2: #3F454E;
+  --tr-muted: #6B7280;
+  --tr-accent: #F97316;
+  --tr-accent-ink: #C2530B;
+  --tr-accent-soft: #FDE6D5;
+  --tr-green-ink: #1B9E4B;
+  --tr-green-soft: #E7F6EC;
+  --tr-green-line: #A8DFBF;
+  --tr-link: #C2530B;
+
   min-height: 100vh;
   padding: 16px;
-  background: #fbfaf8;
-  color: #111;
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--tr-page);
+  color: var(--tr-ink);
+  font-family: var(--sf, "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif);
+}
+
+/* Explicit toggle choice. :global() is required because data-theme sits on
+   <html>, outside this CSS module's scope. */
+:global([data-theme="dark"]) .shell {
+  --tr-page: #131519;
+  --tr-card: #1B1E24;
+  --tr-card-alt: #202329;
+  --tr-tint: #2A1C12;
+  --tr-line: #24272D;
+  --tr-line-2: #2E323A;
+  --tr-ink: #F3F4F6;
+  --tr-ink-2: #C8CCD3;
+  --tr-muted: #949AA4;
+  --tr-accent: #FB8B3C;
+  --tr-accent-ink: #FDA868;
+  --tr-accent-soft: #33210F;
+  --tr-green-ink: #35C46E;
+  --tr-green-soft: #14301F;
+  --tr-green-line: #2C6B45;
+  --tr-link: #FDA868;
+}
+
+/* No stored choice — follow the OS, matching how the workspace theme
+   behaves when data-theme is unset. */
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-theme="light"])) .shell {
+    --tr-page: #131519;
+    --tr-card: #1B1E24;
+    --tr-card-alt: #202329;
+    --tr-tint: #2A1C12;
+    --tr-line: #24272D;
+    --tr-line-2: #2E323A;
+    --tr-ink: #F3F4F6;
+    --tr-ink-2: #C8CCD3;
+    --tr-muted: #949AA4;
+    --tr-accent: #FB8B3C;
+    --tr-accent-ink: #FDA868;
+    --tr-accent-soft: #33210F;
+    --tr-green-ink: #35C46E;
+    --tr-green-soft: #14301F;
+    --tr-green-line: #2C6B45;
+    --tr-link: #FDA868;
+  }
 }
 
 .embedded {
   min-height: 100vh;
   padding: 0;
-  background: #fffafc;
+  background: var(--tr-page);
 }
 
 .page {
@@ -52,7 +123,7 @@
 }
 
 .eyebrow {
-  color: #e64364;
+  color: var(--tr-accent-ink);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: .18em;
@@ -60,7 +131,7 @@
 }
 
 .subtitle {
-  color: #5f5f5f;
+  color: var(--tr-ink-2);
   font-size: 13px;
   font-weight: 600;
 }
@@ -68,7 +139,7 @@
 .backLink {
   display: inline-block;
   margin-bottom: 8px;
-  color: #111;
+  color: var(--tr-ink);
   font-size: 12px;
   font-weight: 800;
 }
@@ -86,10 +157,10 @@
 
 .reload {
   min-height: 38px;
-  border: 1px solid #bdbdb8;
+  border: 1px solid var(--tr-line-2);
   border-radius: 7px;
   padding: 0 14px;
-  background: #fff;
+  background: var(--tr-card);
   font-weight: 800;
 }
 
@@ -102,11 +173,11 @@
 
 .summaryCard {
   min-height: 86px;
-  border: 1px solid #d7d2d3;
-  border-top: 3px solid #fb6c7e;
+  border: 1px solid var(--tr-line-2);
+  border-top: 3px solid var(--tr-accent);
   border-radius: 7px;
   padding: 13px 15px;
-  background: #fff;
+  background: var(--tr-card);
 }
 
 .summaryCard span,
@@ -116,7 +187,7 @@
 }
 
 .summaryCard span {
-  color: #555;
+  color: var(--tr-ink-2);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .05em;
@@ -130,16 +201,16 @@
 
 .summaryCard small {
   margin-top: 6px;
-  color: #777;
+  color: var(--tr-muted);
   font-size: 10px;
   font-weight: 700;
 }
 
 .trackerNav {
   min-height: 44px;
-  border: 1px solid #d8d2d4;
-  border-bottom: 2px solid #fb6c7e;
-  background: #fff;
+  border: 1px solid var(--tr-line-2);
+  border-bottom: 2px solid var(--tr-accent);
+  background: var(--tr-card);
 }
 
 .tabs,
@@ -157,18 +228,18 @@
 .tab {
   min-height: 42px;
   border: 0;
-  border-right: 1px solid #e4dfe0;
+  border-right: 1px solid var(--tr-line);
   padding: 0 16px;
-  background: #fff;
-  color: #666;
+  background: var(--tr-card);
+  color: var(--tr-muted);
   font-size: 11px;
   font-weight: 900;
 }
 
 .activeTab {
-  background: #fff0f4;
-  color: #c82f50;
-  box-shadow: inset 0 3px #fb6c7e;
+  background: var(--tr-tint);
+  color: var(--tr-accent-ink);
+  box-shadow: inset 0 3px var(--tr-accent);
 }
 
 .zoomControls {
@@ -179,17 +250,17 @@
 .zoomControls button {
   min-width: 32px;
   height: 30px;
-  border: 1px solid #d3cbcd;
+  border: 1px solid var(--tr-line-2);
   border-radius: 5px;
-  background: #fff;
+  background: var(--tr-card);
   font-weight: 900;
 }
 
 .zoomValue {
   min-width: 56px !important;
-  border-color: #f7a7b2 !important;
-  background: #fff5f7 !important;
-  color: #c72c52;
+  border-color: var(--tr-accent-soft) !important;
+  background: var(--tr-tint) !important;
+  color: var(--tr-accent-ink);
 }
 
 .notice,
@@ -202,22 +273,22 @@
 }
 
 .notice {
-  border: 1px solid #a8dfbf;
-  background: #eaf8ef;
-  color: #176438;
+  border: 1px solid var(--tr-green-line);
+  background: var(--tr-green-soft);
+  color: var(--tr-green-ink);
 }
 
 .error {
-  border: 1px solid #f0a4ae;
-  background: #fff0f2;
-  color: #9e2334;
+  border: 1px solid var(--tr-accent-soft);
+  background: var(--tr-tint);
+  color: var(--tr-accent-ink);
 }
 
 .toolbar {
   padding: 9px 11px;
-  border: 1px solid #ddd6d8;
+  border: 1px solid var(--tr-line);
   border-top: 0;
-  background: #fff;
+  background: var(--tr-card);
 }
 
 .toolbarRight,
@@ -226,7 +297,7 @@
 }
 
 .toolbarLabel {
-  color: #4f4f4f;
+  color: var(--tr-ink-2);
   font-size: 11px;
   font-weight: 800;
 }
@@ -244,16 +315,16 @@
 
 .approveSelected,
 .approve {
-  border: 1px solid #e94f6d;
-  background: #fb6c7e;
-  color: #111;
+  border: 1px solid var(--tr-accent);
+  background: var(--tr-accent);
+  color: var(--tr-ink);
 }
 
 .skipSelected,
 .skip {
-  border: 1px solid #cfc9ca;
-  background: #f8f6f6;
-  color: #333;
+  border: 1px solid var(--tr-line-2);
+  background: var(--tr-card-alt);
+  color: var(--tr-ink-2);
 }
 
 .approveSelected:disabled,
@@ -271,9 +342,9 @@
   max-width: 100%;
   overflow: auto;
   max-height: min(66vh, 720px);
-  border: 1px solid #ddd6d8;
+  border: 1px solid var(--tr-line);
   border-top: 0;
-  background: #fff;
+  background: var(--tr-card);
 }
 
 .sheetCanvas {
@@ -289,25 +360,25 @@
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
-  background: #fff;
+  background: var(--tr-card);
   font-size: 12px;
 }
 
 .sheet th,
 .sheet td {
-  border-right: 1px solid #eadfe2;
-  border-bottom: 1px solid #eadfe2;
+  border-right: 1px solid var(--tr-line);
+  border-bottom: 1px solid var(--tr-line);
   padding: 8px 9px;
   vertical-align: middle;
-  color: #222;
+  color: var(--tr-ink);
 }
 
 .sheet th {
   position: sticky;
   top: 0;
   z-index: 3;
-  background: #fb6c7e;
-  color: #151515;
+  background: var(--tr-accent);
+  color: var(--tr-ink);
   text-align: left;
   font-size: 10px;
   font-weight: 900;
@@ -316,12 +387,12 @@
 }
 
 .sheet tbody tr:nth-child(even) td {
-  background: #fff8fb;
+  background: var(--tr-tint);
 }
 
 .sheet tbody tr:hover td,
 .selectedRow td {
-  background: #fff0f4 !important;
+  background: var(--tr-tint) !important;
 }
 
 .rowNumber { width: 42px; text-align: center; }
@@ -351,18 +422,18 @@
 .companyCell small,
 .descriptionCell small {
   margin-top: 4px;
-  color: #737373;
+  color: var(--tr-muted);
 }
 
 .score {
   display: inline-flex;
   min-width: 42px;
   justify-content: center;
-  border: 1px solid #9bc7a8;
+  border: 1px solid var(--tr-green-line);
   border-radius: 999px;
   padding: 4px 7px;
-  background: #e7f3ea;
-  color: #176438;
+  background: var(--tr-green-soft);
+  color: var(--tr-green-ink);
   font-weight: 900;
 }
 
@@ -373,19 +444,19 @@
   justify-content: center;
   min-height: 28px;
   padding: 0 9px;
-  color: #a92548;
+  color: var(--tr-accent-ink);
   font-weight: 900;
   text-decoration: none;
 }
 
 .openLink {
-  border: 1px solid #e7a4af;
+  border: 1px solid var(--tr-accent-soft);
   border-radius: 5px;
 }
 
 .cleanLink {
   padding: 0;
-  color: #3a86d7;
+  color: var(--tr-link);
 }
 
 .actions {
@@ -400,14 +471,14 @@
 }
 
 .trackerSheetSection {
-  border: 1px solid #2c292a;
-  background: #fff8fb;
+  border: 1px solid var(--tr-ink);
+  background: var(--tr-tint);
 }
 
 .trackerTitleRow {
   min-height: 52px;
   padding: 0 16px;
-  border-bottom: 1px solid #e3d8db;
+  border-bottom: 1px solid var(--tr-line);
 }
 
 .trackerTitleRow strong {
@@ -416,7 +487,7 @@
 }
 
 .trackerTitleRow span {
-  color: #666;
+  color: var(--tr-muted);
   font-size: 11px;
   font-weight: 800;
 }
@@ -434,10 +505,10 @@
   min-height: 230px;
   display: grid;
   place-content: center;
-  border: 1px solid #ddd6d8;
+  border: 1px solid var(--tr-line);
   border-top: 0;
   padding: 34px 20px;
-  background: #fffafc;
+  background: var(--tr-page);
   text-align: center;
 }
 
@@ -448,7 +519,7 @@
 
 .empty p {
   margin: 0;
-  color: #666;
+  color: var(--tr-muted);
   font-size: 12px;
 }
 
@@ -463,7 +534,7 @@
 }
 
 .embedded .toolbar {
-  border-top: 1px solid #ddd6d8;
+  border-top: 1px solid var(--tr-line);
 }
 
 @media (max-width: 760px) {
@@ -475,7 +546,7 @@
   .trackerTitleRow { align-items: stretch; flex-direction: column; }
   .summary { grid-template-columns: 1fr; }
   .tabs { overflow-x: auto; }
-  .zoomControls { justify-content: flex-end; border-top: 1px solid #e4dfe0; }
+  .zoomControls { justify-content: flex-end; border-top: 1px solid var(--tr-line); }
   .toolbarRight { width: 100%; }
   .approveSelected,
   .skipSelected { flex: 1; }

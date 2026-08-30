@@ -11,6 +11,7 @@ export const DASHBOARD_PANELS = [
   "campaign",
   "approve",
   "tracker",
+  "profile",
 ] as const satisfies readonly WorkspaceTab[];
 
 export const DASHBOARD_ONE_TIME_PARAMS = [

@@ -16,7 +16,8 @@ export type WorkspaceTab =
   | "gmail"
   | "campaign"
   | "approve"
-  | "tracker";
+  | "tracker"
+  | "profile";
 
 export type CampaignRecord = {
   id: string;

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import OverviewDashboard from "../dashboard/OverviewDashboard";
+import ProfilePanel from "../dashboard/ProfilePanel";
 import WorkspaceSidebar from "../dashboard/WorkspaceSidebar";
 import WorkspaceTopbar from "../dashboard/WorkspaceTopbar";
 import WorkspacePanels from "../dashboard/WorkspacePanels";
@@ -29,6 +30,26 @@ const MOCK_ROWS = [
 ];
 const MOCK_ACTION_STATES = createActionStateMap(DASHBOARD_ACTION_KEYS);
 
+const MOCK_PROFILE = {
+  full_name: "Sanjaya Rajbhandari",
+  email: "design-preview@calsie.jobs",
+  phone: "0400 123 456",
+  location: "Sydney NSW",
+  avatar_url: null,
+  preferences: {},
+  created_at: "2026-02-11T00:00:00.000Z",
+};
+
+// A real Google avatar URL shape, for previewing the default-photo state.
+const MOCK_GOOGLE_AVATAR = "https://lh3.googleusercontent.com/a/ACg8ocL6YS1Byl1Q3K6AxL3UJ3h9L61n2vcV_g2bb_Mz9QbBoxIYqQ=s96-c";
+
+const MOCK_RESUME_SIGNALS = {
+  targetRole: "Disability Support Worker",
+  profileSummary: "Experienced support worker.",
+  skillsCount: 6,
+  experienceCount: 2,
+};
+
 function DesignTracker() {
   const [rows, setRows] = useState(MOCK_ROWS);
   const approved = rows.filter((row) => row[4] === "Smashed").length;
@@ -49,11 +70,24 @@ export default function DashboardDesignPage() {
   const passedCount = 93;
   const actionStates = MOCK_ACTION_STATES;
 
+  // Lets the profile panel's loading and Google-photo states be previewed:
+  // /dashboard-design?profile=loading and ?profile=google. Read from
+  // location rather than useSearchParams so this page stays statically
+  // prerendered (useSearchParams would force it dynamic).
+  const [profileVariant, setProfileVariant] = useState("");
+  useEffect(() => {
+    setProfileVariant(new URLSearchParams(window.location.search).get("profile") || "");
+  }, []);
+
   const panel = useMemo(() => {
     if (active === "overview") return <OverviewDashboard campaign={campaign} resumeReady resumeName="User Resume Name Here" gmailReady approvedCount={approvedCount} passedCount={passedCount} greetingName="Sanjaya" onOpenTracker={() => setPreviewPanel("tracker")} onBrowseTemplates={() => setPreviewPanel("templates")} onUpdateResume={() => setPreviewPanel("resume")} onConnectGmail={() => setPreviewPanel("gmail")} onSetUpCampaign={() => setPreviewPanel("campaign")} />;
     if (active === "tracker") return <DesignTracker />;
+    // The panel reads no data itself — everything below is passed in, so this
+    // preview makes no network calls. The uuid is only used for write paths
+    // (photo upload, preference saves), which RLS rejects in design mode.
+    if (active === "profile") return <ProfilePanel userId="00000000-0000-4000-8000-000000000000" email="design-preview@calsie.jobs" memberSince="2026-02-11T00:00:00.000Z" emailConfirmed profile={MOCK_PROFILE} profileResumeSignals={MOCK_RESUME_SIGNALS} profileLoading={profileVariant === "loading"} googleAvatarUrl={profileVariant === "google" ? MOCK_GOOGLE_AVATAR : null} uploadedAvatarUrl="" campaign={campaign} purchasedTemplate={null} resumeReady resumeName="Sajan-Giri-Resume.pdf" gmailReady approvedCount={approvedCount} passedCount={passedCount} actionStates={actionStates} onNavigate={setPreviewPanel} onToggleCampaign={() => setCampaign((current) => ({ ...current, status: current.status === "active" ? "paused" : "active" }))} onConnectGmail={() => setMessage("Mock Gmail connection clicked.")} onRevokeGmail={() => setMessage("Mock Gmail connection revoked.")} onLogout={() => setMessage("Mock logout clicked.")} onProfileChange={() => {}} />;
     return <WorkspacePanels active={active} campaign={campaign} resumeReady resumeName="Sajan-Giri-Resume.pdf" gmailReady actionStates={actionStates} selectedTemplateActionId="" onUseTemplate={(template: CampaignTemplate) => { setCampaign({ ...MOCK_CAMPAIGN, name: `${template.title} Campaign`, location: template.location, target_business_type: template.role }); setMessage("Mock campaign updated for design preview."); setPreviewPanel("campaign"); }} onResumeUpload={async () => { setMessage("Mock resume upload clicked."); }} onConnectGmail={() => setMessage("Mock Gmail connection clicked.")} onRevokeGmail={() => setMessage("Mock Gmail connection revoked.")} onToggleCampaign={() => setCampaign((current) => ({ ...current, status: current.status === "active" ? "paused" : "active" }))} onFindJobsNow={() => setMessage("Mock job search completed.")} />;
-  }, [active, campaign, message]);
+  }, [active, campaign, message, profileVariant]);
 
-  return <main className={`applix-workspace${sidebarCollapsed ? " is-sidebar-collapsed" : ""}`}><WorkspaceSidebar active={active} onNavigate={setPreviewPanel} running={campaign.status === "active"} approvedCount={approvedCount} actionLoading={false} actionDisabled={false} onToggleCampaign={() => setCampaign((current) => ({ ...current, status: current.status === "active" ? "paused" : "active" }))} logoutLoading={false} onLogout={() => setMessage("Mock logout clicked.")} displayName="Sanjaya Rajbhandari" email="design-preview@calsie.jobs" initial="S" collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((value) => !value)} /><div className="workspace-main"><WorkspaceTopbar displayName="Sanjaya Rajbhandari" initial="S" />{panel}</div></main>;
+  return <main className={`applix-workspace${sidebarCollapsed ? " is-sidebar-collapsed" : ""}`}><WorkspaceSidebar active={active} onNavigate={setPreviewPanel} running={campaign.status === "active"} approvedCount={approvedCount} actionLoading={false} actionDisabled={false} onToggleCampaign={() => setCampaign((current) => ({ ...current, status: current.status === "active" ? "paused" : "active" }))} logoutLoading={false} onLogout={() => setMessage("Mock logout clicked.")} displayName="Sanjaya Rajbhandari" email="design-preview@calsie.jobs" initial="S" profileActive={active === "profile"} onOpenProfile={() => setPreviewPanel("profile")} collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((value) => !value)} /><div className="workspace-main"><WorkspaceTopbar displayName="Sanjaya Rajbhandari" initial="S" onOpenProfile={() => setPreviewPanel("profile")} onNavigate={setPreviewPanel} onOpenTemplate={() => {}} />{panel}</div></main>;
 }

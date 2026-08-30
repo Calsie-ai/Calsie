@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import { ACTION_TIMEOUTS, isAbortError, normaliseAppError, readJsonResponse, withActionTimeout } from "../../lib/actionState";
+import { isTheme, THEME_STORAGE_KEY } from "../../lib/theme";
 import styles from "./tracker.module.css";
 
 type Campaign = {
@@ -282,6 +283,26 @@ export default function TrackerPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  // This page is embedded in a same-origin iframe on the dashboard. The
+  // root layout's theme script already applies the stored theme on first
+  // paint, but it runs once — so when the user flips the dashboard's
+  // toggle while the frame is open, mirror that here too. `storage` only
+  // fires in *other* documents sharing the origin, which is exactly this
+  // case. Only the attribute is set: writing back to localStorage would
+  // bounce the change between the two documents.
+  useEffect(() => {
+    function syncTheme(event: StorageEvent) {
+      if (event.key !== THEME_STORAGE_KEY) return;
+      if (isTheme(event.newValue)) {
+        document.documentElement.setAttribute("data-theme", event.newValue);
+      } else {
+        document.documentElement.removeAttribute("data-theme");
+      }
+    }
+    window.addEventListener("storage", syncTheme);
+    return () => window.removeEventListener("storage", syncTheme);
+  }, []);
 
   async function prepareApprovedApplications(campaignId: string, accessToken: string) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

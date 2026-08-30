@@ -1,193 +1,156 @@
-.workspace-tracker-section {
+/* Chrome for the Smash-or-Pass and Application Tracker panels: the panel
+   header, the campaign status pill, and the wrapper around the embedded
+   /tracker iframe.
+
+   Everything here uses the shared workspace tokens (defined on
+   .applix-workspace in workspace-macos-theme.css) rather than the literal
+   pink/red hex values this file used to carry, so these panels follow
+   light/dark like the rest of the dashboard. */
+
+.ws-tracker-panel {
   width: 100%;
-  max-width: none !important;
   min-width: 0;
 }
 
-.workspace-tracker-heading {
+/* The status pill sits opposite the title block rather than under it. */
+.applix-workspace .ws-tracker-head {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 16px !important;
+  flex-wrap: wrap;
 }
 
-.workspace-tracker-heading > div {
+.applix-workspace .ws-tracker-head > div {
   min-width: 0;
   flex: 1 1 auto;
 }
 
-.workspace-tracker-heading > div > p {
-  margin: 0 0 8px;
-  color: #e64364;
-  font-size: 12px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: .15em;
+/* "SMASH" is the only word that takes the accent — the rest of the title
+   stays --ink so the heading still reads as a heading, not as two
+   competing colours. */
+.ws-smash-accent {
+  color: var(--orange);
 }
 
-.workspace-tracker-heading h1 {
-  margin: 0 0 9px;
-  font-size: clamp(44px, 5vw, 66px);
-  line-height: .96;
-  letter-spacing: -.05em;
-}
-
-.workspace-tracker-heading > div > span {
-  display: block;
-  max-width: 720px;
-  color: #5b5b5b;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.45;
-  opacity: 1;
-  text-shadow: none;
-}
-
-.workspace-status-pill {
+/* ---------- Campaign status pill ----------
+   Shared by the tracker panels and the Set Up Campaign card. The three
+   states reuse the same colour meanings as the Overview stat dots
+   (.ws-bullet-*): green = running, orange = needs attention, grey =
+   nothing configured. */
+.ws-status-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 34px;
-  padding: 0 13px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  white-space: nowrap;
   flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.workspace-status-pill i {
+.ws-status-pill i {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
   flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--grey-dot, var(--muted-2));
 }
 
-.workspace-status-pill.is-running {
-  border: 1px solid #e97b8d;
-  background: #fff0f2;
-  color: #111;
+.ws-status-pill.is-running {
+  border-color: color-mix(in srgb, var(--green) 35%, transparent);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  color: var(--green);
 }
 
-.workspace-status-pill.is-running i {
-  background: #e64364;
+.ws-status-pill.is-running i {
+  background: var(--green);
 }
 
-.workspace-status-pill.is-paused {
-  border: 1px solid #111;
-  background: #111;
-  color: #fff;
+.ws-status-pill.is-paused {
+  border-color: var(--orange-soft-2);
+  background: var(--orange-soft);
+  color: var(--orange-ink);
 }
 
-.workspace-status-pill.is-paused i {
-  background: #fe818d;
+.ws-status-pill.is-paused i {
+  background: var(--orange);
 }
 
-.workspace-status-pill.is-idle {
-  border: 1px solid #999;
-  background: #fff;
-  color: #333;
+.ws-status-pill.is-idle {
+  border-color: var(--line);
+  background: var(--card-alt);
+  color: var(--muted);
 }
 
-.workspace-status-pill.is-idle i {
-  background: #999;
+.ws-status-pill.is-idle i {
+  background: var(--muted-2);
 }
 
-.workspace-tracker-frame-wrap {
+/* ---------- Embedded tracker frame ---------- */
+.ws-tracker-frame-wrap {
   position: relative;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  height: clamp(560px, calc(100vh - 220px), 780px);
+  height: clamp(560px, calc(100vh - 260px), 780px);
   overflow: hidden;
-  border: 1px solid #cfcfca;
-  border-radius: 8px;
-  background: #f2f2ee;
-  box-shadow: 0 12px 32px rgba(30, 30, 30, .08);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
 }
 
-.workspace-tracker-frame-wrap::before {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: #e85b76;
-  pointer-events: none;
-}
-
-.workspace-tracker-frame {
+.ws-tracker-frame {
   display: block;
   width: 100%;
   height: 100%;
   margin: 0;
   border: 0;
-  background: #f2f2ee;
+  background: var(--card);
 }
 
+/* workspace.css constrains `.workspace-main section` — these panels are
+   divs now, but keep the overflow guard so a wide table inside the frame
+   can never push the page sideways. */
 .workspace-main,
-.workspace-main section,
-.workspace-tracker-section {
+.ws-tracker-panel {
   min-width: 0;
   overflow-x: hidden;
 }
 
 @media (max-width: 1024px) {
-  .workspace-tracker-heading {
+  .applix-workspace .ws-tracker-head {
     align-items: flex-start;
     flex-direction: column;
     gap: 12px;
   }
 
-  .workspace-tracker-heading h1 {
-    font-size: clamp(42px, 7vw, 60px);
-  }
-
-  .workspace-status-pill {
-    align-self: flex-start;
-  }
-
-  .workspace-tracker-frame-wrap {
+  .ws-tracker-frame-wrap {
     height: 720px;
   }
 }
 
 @media (max-width: 850px) {
-  .workspace-tracker-heading h1 {
-    font-size: clamp(39px, 8vw, 54px);
-  }
-
-  .workspace-tracker-heading > div > span {
-    font-size: 14px;
-  }
-
-  .workspace-tracker-frame-wrap {
+  .ws-tracker-frame-wrap {
     height: 700px;
   }
 
-  .workspace-status-pill {
+  .ws-status-pill {
     white-space: normal;
   }
 }
 
 @media (max-width: 520px) {
-  .workspace-tracker-heading {
-    gap: 10px;
-    margin-bottom: 12px !important;
-  }
-
-  .workspace-tracker-heading h1 {
-    font-size: 40px;
-    line-height: .98;
-  }
-
-  .workspace-tracker-frame-wrap {
+  .ws-tracker-frame-wrap {
     height: 680px;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
   }
 }

@@ -13,7 +13,10 @@
     "test:payment-status-refund": "node --experimental-strip-types --test tests/paymentStatusRefund.test.mts",
     "test:stripe-webhook": "node --experimental-strip-types --test tests/stripeWebhookHardening.test.mts",
     "test:zero-cost-checkout": "node --experimental-strip-types --test tests/zeroCostCheckoutActivation.test.mts",
-    "test:resumable-job-fetch": "node --experimental-strip-types --test tests/resumableGlobalJobFetch.test.mts"
+    "test:resumable-job-fetch": "node --experimental-strip-types --test tests/resumableGlobalJobFetch.test.mts",
+    "test:dashboard-search": "node --experimental-strip-types --test tests/dashboardSearch.test.mts",
+    "test:profile-completion": "node --experimental-strip-types --test tests/profileCompletion.test.mts",
+    "test:google-avatar": "node --experimental-strip-types --test tests/googleAvatar.test.mts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.6.1",
