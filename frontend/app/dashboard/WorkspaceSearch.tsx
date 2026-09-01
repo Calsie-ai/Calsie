@@ -122,7 +122,9 @@ export default function WorkspaceSearch({ onNavigate, onOpenTemplate }: Props) {
           type="text"
           value={query}
           placeholder="Search anything..."
+          title="Search pages, sections and templates (Ctrl+K)"
           aria-label="Search pages, sections and templates"
+          aria-keyshortcuts="Control+K Meta+K"
           role="combobox"
           aria-expanded={showPanel}
           aria-controls="ws-search-results"
@@ -133,7 +135,10 @@ export default function WorkspaceSearch({ onNavigate, onOpenTemplate }: Props) {
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
         />
-        <span className="ws-kbd">⌘K</span>
+        {/* The ⌘K badge is replaced by the Calsie mark. The shortcut still
+            works, so its hint moves to the input's title rather than being
+            lost entirely. */}
+        <img className="ws-search-mark" src="/applix-logo.svg" alt="" aria-hidden="true" />
       </label>
 
       {showPanel ? (

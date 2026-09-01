@@ -60,6 +60,8 @@ type Props = BaseProps & {
   onOpenGmailPanel: () => void;
   onOpenCampaignPanel: () => void;
   onNavigatePanel: (panel: WorkspaceTab) => void;
+  /** Opens Browse Templates with that template's detail view already open. */
+  onOpenTemplateDeepLink: (slug: string) => void;
   onLogout: () => void;
   onProfileChange: (patch: Partial<ProfileRow>) => void;
 };
@@ -171,6 +173,7 @@ function descriptionParagraphs(text: string, sentencesPerParagraph = 2): string[
 export default function WorkspacePanelsLive(props: Props) {
   const router = useRouter();
   const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
+  const [topTemplateIds, setTopTemplateIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("");
   const [sortAlpha, setSortAlpha] = useState(false);
@@ -190,8 +193,15 @@ export default function WorkspacePanelsLive(props: Props) {
   const intentIdRef = useRef("");
   const restoredIntentIdRef = useRef("");
 
+  // Templates are now needed by three panels: Browse Templates, the Overview
+  // preview carousel, and the Campaign picker. Loaded once and reused —
+  // WorkspacePanelsLive stays mounted across panel switches, so re-fetching
+  // per panel would just repeat the same request.
+  const templatesLoadedRef = useRef(false);
   useEffect(() => {
-    if (props.active !== "templates") return;
+    const needsTemplates = props.active === "templates" || props.active === "overview" || props.active === "campaign";
+    if (!needsTemplates || templatesLoadedRef.current) return;
+    templatesLoadedRef.current = true;
     const controller = new AbortController();
     setLoading(true);
     setError("");
@@ -207,7 +217,20 @@ export default function WorkspacePanelsLive(props: Props) {
           .abortSignal(controller.signal);
         if (error) throw error;
         if (!controller.signal.aborted) setTemplates(((data || []) as Row[]).map(mapTemplate));
+
+        // Real "top picks" ordering, from how often each template has
+        // actually been used. Best effort: if it fails the picker simply
+        // shows every template without a highlighted group, rather than
+        // inventing a ranking.
+        const { data: ranked, error: rankError } = await supabase
+          .rpc("get_top_campaign_templates", { p_limit: 3 })
+          .abortSignal(controller.signal);
+        if (!rankError && !controller.signal.aborted) {
+          setTopTemplateIds(((ranked || []) as Array<{ template_id: string }>).map((row) => row.template_id));
+        }
       } catch (error) {
+        // Allow a later visit to retry rather than being stuck empty.
+        templatesLoadedRef.current = false;
         if (!controller.signal.aborted) setError(normaliseAppError(error, "Could not load templates.") || "");
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -419,7 +442,7 @@ export default function WorkspacePanelsLive(props: Props) {
     router.push("/payment?restoreIntent=1");
   }
 
-  if (props.active === "overview") return <OverviewDashboard campaign={props.campaign} purchasedTemplate={props.purchasedTemplate} resumeReady={props.resumeReady} resumeName={props.resumeName} gmailReady={props.gmailReady} approvedCount={props.approvedCount} passedCount={props.passedCount} greetingName={props.greetingName} onOpenTracker={props.onOpenTracker} onBrowseTemplates={props.onBrowseTemplates} onUpdateResume={props.onOpenResumePanel} onConnectGmail={props.onOpenGmailPanel} onSetUpCampaign={props.onOpenCampaignPanel} />;
+  if (props.active === "overview") return <OverviewDashboard campaign={props.campaign} purchasedTemplate={props.purchasedTemplate} resumeReady={props.resumeReady} resumeName={props.resumeName} gmailReady={props.gmailReady} approvedCount={props.approvedCount} passedCount={props.passedCount} greetingName={props.greetingName} templates={templates} templatesLoading={loading && templates.length === 0} onOpenTemplate={(template) => props.onOpenTemplateDeepLink(template.slug || template.id)} onOpenTracker={props.onOpenTracker} onBrowseTemplates={props.onBrowseTemplates} onUpdateResume={props.onOpenResumePanel} onConnectGmail={props.onOpenGmailPanel} onSetUpCampaign={props.onOpenCampaignPanel} />;
   if (props.active === "resume") return <ResumePreviewPanel resumeReady={props.resumeReady} resumeName={props.resumeName} uploadState={props.actionStates.uploadResume} onResumeUpload={props.onResumeUpload} />;
   if (props.active === "buildResume") return <BuildResumePanel uploadState={props.actionStates.uploadResume} onResumeUpload={props.onResumeUpload} />;
   if (props.active === "gmail") return <GmailPanel gmailReady={props.gmailReady} actionStates={props.actionStates} onConnectGmail={props.onConnectGmail} onRevokeGmail={props.onRevokeGmail} />;
@@ -484,7 +507,17 @@ export default function WorkspacePanelsLive(props: Props) {
       </div>
     );
   }
-  if (props.active !== "templates") return <WorkspacePanels {...props} />;
+  // The campaign panel gets the live list so it can offer a template picker
+  // instead of only telling the user to go to Browse Templates.
+  if (props.active !== "templates") return (
+    <WorkspacePanels
+      {...props}
+      templates={templates}
+      topTemplateIds={topTemplateIds}
+      templatesLoading={loading && templates.length === 0}
+      onOpenTemplate={(template) => props.onOpenTemplateDeepLink(template.slug || template.id)}
+    />
+  );
 
   const purchased = purchaseState === "purchased_campaign_missing" || purchaseState === "purchased_campaign_ready";
   const buttonLabel = purchaseLoading ? "Checking purchase…" : purchaseState === "processing" ? "Retry verification" : purchaseState === "purchased_campaign_missing" ? "Create campaign" : purchaseState === "purchased_campaign_ready" ? "Open campaign" : checkoutNavigating ? "Opening checkout…" : selected?.paymentRequired === false ? "Use free template" : "Continue to checkout";

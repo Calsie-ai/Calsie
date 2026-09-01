@@ -984,6 +984,7 @@ export default function DashboardWorkspace() {
           googleAvatarUrl={googleAvatarUrl}
           uploadedAvatarUrl={uploadedAvatarUrl}
           onNavigatePanel={navigateToPanel}
+          onOpenTemplateDeepLink={openTemplateFromSearch}
           onLogout={() => void logout()}
           onProfileChange={handleProfileChange}
           onPendingIntentChange={setPendingIntent}

@@ -5061,3 +5061,423 @@ body:has(.applix-workspace) {
     text-align: left;
   }
 }
+
+/* =====================================================
+   Search mark, overview template carousel, campaign
+   template picker.
+   ===================================================== */
+
+/* ---------- Calsie mark in the search field ---------- */
+/* Only the mark grows. .ws-search has a fixed 48px height, so a larger
+   glyph cannot change the field's size. */
+.ws-search-mark {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  opacity: .9;
+}
+
+/* ---------- Overview: template carousel ---------- */
+
+/* The card is a dashed empty-state box by default; as a carousel it becomes
+   a solid framed surface with the slides filling it edge to edge. */
+/* This card is a grid item beside the taller "My order" card, so by default
+   it stretched to that row height and the photo grew with it — a small
+   preview turning into a full-height picture. Sit at the top at the card's
+   natural height instead, close to the 250px the old placeholder used. */
+.ws-preview-card.is-carousel {
+  padding: 0;
+  border-style: solid;
+  border-color: var(--line);
+  overflow: hidden;
+  align-items: stretch;
+  justify-content: flex-start;
+  align-self: start;
+  min-height: 0;
+}
+
+.ws-carousel {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  overflow: hidden;
+}
+
+.ws-carousel:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: -2px;
+}
+
+.ws-carousel.is-empty,
+.ws-carousel.is-loading {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.ws-carousel-skel {
+  width: 100%;
+  height: 200px;
+  border-radius: var(--radius-md);
+}
+
+.ws-carousel-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: var(--page);
+  color: var(--muted);
+}
+
+.ws-carousel-viewport {
+  position: relative;
+  flex: none;
+  display: grid;
+}
+
+/* Every slide is stacked in the same grid cell; only the active one is
+   painted. Cross-fading rather than translating keeps the markup simple
+   and avoids a horizontal scroll container fighting the panel layout. */
+.ws-carousel-slide {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--sf);
+  text-align: left;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .45s ease;
+}
+
+.ws-carousel-slide.is-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Fixed media height: the preview is a thumbnail of the template, not a
+   hero image, and letting it flex made it swallow the whole card. */
+.ws-carousel-img,
+.ws-carousel-fallback {
+  width: 100%;
+  flex: none;
+  height: 190px;
+  object-fit: cover;
+  display: block;
+}
+
+/* A template with no artwork previously rendered as a large blank panel.
+   A soft tint plus the category glyph makes it read as a deliberate
+   placeholder rather than a failed image. */
+.ws-carousel-fallback {
+  display: grid;
+  place-items: center;
+  background: radial-gradient(120% 90% at 50% 0%, var(--orange-soft) 0%, var(--card-alt) 70%);
+  color: var(--orange-ink);
+}
+
+.ws-carousel-body {
+  display: block;
+  padding: 14px 16px 44px;
+  background: var(--card);
+}
+
+.ws-carousel-body small {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--orange-ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.ws-carousel-body strong {
+  display: block;
+  color: var(--ink);
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+
+.ws-carousel-body > span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.ws-carousel-slide:hover .ws-carousel-body strong {
+  color: var(--orange-ink);
+}
+
+.ws-carousel-nav {
+  position: absolute;
+  /* Centred on the 190px media strip, not on the whole card. */
+  top: 95px;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink-2);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  transition: opacity .18s ease, color .18s ease;
+}
+
+.ws-carousel:hover .ws-carousel-nav,
+.ws-carousel:focus-within .ws-carousel-nav {
+  opacity: 1;
+}
+
+/* Keyboard users never trigger :hover, so the focused control must show
+   itself regardless. */
+.ws-carousel-nav:focus-visible {
+  opacity: 1;
+}
+
+.ws-carousel-nav:hover {
+  color: var(--orange);
+}
+
+.ws-carousel-nav.is-prev { left: 10px; }
+.ws-carousel-nav.is-next { right: 10px; }
+
+.ws-carousel-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.ws-carousel-dots button {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--grey-dot);
+  cursor: pointer;
+  transition: width .2s ease, background .2s ease;
+}
+
+.ws-carousel-dots button.is-active {
+  width: 18px;
+  border-radius: 999px;
+  background: var(--orange);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-carousel-slide,
+  .ws-carousel-dots button {
+    transition: none;
+  }
+}
+
+/* ---------- Campaign panel: template picker ---------- */
+
+.ws-campaign-picker {
+  margin-top: 18px;
+  padding: 22px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+
+.ws-campaign-picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.ws-campaign-picker-head small {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.ws-campaign-picker-head h3 {
+  margin: 0 0 5px;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+
+.ws-campaign-picker-head p {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.ws-campaign-picker-group {
+  margin: 20px 0 10px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.ws-campaign-picker-group:first-of-type {
+  margin-top: 0;
+}
+
+.ws-campaign-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.ws-campaign-picker-skel {
+  height: 84px;
+  border-radius: var(--radius-md);
+}
+
+.ws-campaign-pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-md);
+  background: var(--card-alt);
+  font-family: var(--sf);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+
+.ws-campaign-pick:hover {
+  border-color: var(--focus-ring-line);
+  background: var(--orange-soft);
+  transform: translateY(-1px);
+}
+
+.ws-campaign-pick.is-featured {
+  border-color: var(--focus-ring-line);
+}
+
+.ws-campaign-pick-media {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  border-radius: 11px;
+  overflow: hidden;
+  background: var(--page);
+}
+
+.ws-campaign-pick-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ws-campaign-pick-icon {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.ws-campaign-pick-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A long category ("Community Services & Social Care") wrapped to two lines
+   and made that one card taller than the rest of its row. */
+.ws-campaign-pick-body small {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-campaign-pick-body strong {
+  display: block;
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-campaign-pick-meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-campaign-pick-go {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.ws-campaign-pick:hover .ws-campaign-pick-go {
+  color: var(--orange);
+}
+
+@media (max-width: 680px) {
+  .ws-campaign-picker-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ws-campaign-picker-head .ws-btn-outline {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ws-carousel-nav {
+    opacity: 1;
+  }
+}

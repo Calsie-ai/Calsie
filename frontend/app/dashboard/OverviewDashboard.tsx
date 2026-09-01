@@ -2,6 +2,7 @@
 
 import { ArrowRight, ClipboardList, Crown, FileText, FolderOpen, Mail, Megaphone } from "lucide-react";
 import { campaignLocation, campaignRole, type CampaignRecord, type CampaignTemplate } from "./workspace-data";
+import TemplateCarousel from "./TemplateCarousel";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -14,6 +15,10 @@ type Props = {
   approvedCount: number;
   passedCount: number;
   greetingName: string;
+  /** Live templates for the preview carousel. */
+  templates?: CampaignTemplate[];
+  templatesLoading?: boolean;
+  onOpenTemplate?: (template: CampaignTemplate) => void;
   onOpenTracker: () => void;
   onBrowseTemplates: () => void;
   onConnectGmail: () => void;
@@ -124,6 +129,9 @@ export default function OverviewDashboard({
   passedCount,
   greetingName,
   onOpenTracker,
+  templates,
+  templatesLoading,
+  onOpenTemplate,
   onBrowseTemplates,
   onConnectGmail,
   onUpdateResume,
@@ -259,9 +267,19 @@ export default function OverviewDashboard({
           </div>
         </article>
 
-        <article className={`ws-preview-card${purchasedTemplate?.imageUrl ? " has-media" : ""}`}>
+        {/* With a campaign already running this stays a preview of that
+            template. Otherwise the old "Select a template to see preview"
+            dead end becomes a browsable carousel of what is available. */}
+        <article className={`ws-preview-card${purchasedTemplate?.imageUrl ? " has-media" : ""}${!purchasedTemplate?.imageUrl ? " is-carousel" : ""}`}>
           {purchasedTemplate?.imageUrl ? (
             <img src={purchasedTemplate.imageUrl} alt={title} />
+          ) : onOpenTemplate ? (
+            <TemplateCarousel
+              templates={templates || []}
+              loading={templatesLoading}
+              onOpenTemplate={onOpenTemplate}
+              onBrowseTemplates={onBrowseTemplates}
+            />
           ) : (
             <>
               <PreviewArt />

@@ -15,6 +15,37 @@ import {
   type WorkspaceTab,
 } from "./workspace-data";
 
+function TemplatePickCard({
+  template,
+  featured,
+  onOpen,
+}: {
+  template: CampaignTemplate;
+  featured?: boolean;
+  onOpen: (template: CampaignTemplate) => void;
+}) {
+  const Icon = templateCategoryIcon(template.category);
+  return (
+    <button
+      type="button"
+      className={`ws-campaign-pick${featured ? " is-featured" : ""}`}
+      onClick={() => onOpen(template)}
+    >
+      <span className="ws-campaign-pick-media">
+        {template.imageUrl
+          ? <img src={template.imageUrl} alt="" loading="lazy" />
+          : <span className="ws-campaign-pick-icon"><Icon size={22} strokeWidth={1.7} /></span>}
+      </span>
+      <span className="ws-campaign-pick-body">
+        <small>{template.category}</small>
+        <strong>{template.title}</strong>
+        <span className="ws-campaign-pick-meta">{template.role} · {template.location}</span>
+      </span>
+      <span className="ws-campaign-pick-go" aria-hidden="true"><ArrowRight size={15} strokeWidth={2.3} /></span>
+    </button>
+  );
+}
+
 export default function WorkspacePanels({
   active,
   campaign,
@@ -23,6 +54,11 @@ export default function WorkspacePanels({
   gmailReady,
   actionStates,
   selectedTemplateActionId,
+  templates: liveTemplates,
+  topTemplateIds,
+  templatesLoading,
+  onOpenTemplate,
+  onBrowseTemplates,
   onUseTemplate,
   onResumeUpload,
   onConnectGmail,
@@ -37,6 +73,14 @@ export default function WorkspacePanels({
   gmailReady: boolean;
   actionStates: ActionStateMap<DashboardActionKey>;
   selectedTemplateActionId: string;
+  /** Live templates from the database; falls back to the static list. */
+  templates?: CampaignTemplate[];
+  /** Template ids ordered by real pick count, most-picked first. */
+  topTemplateIds?: string[];
+  templatesLoading?: boolean;
+  onOpenTemplate?: (template: CampaignTemplate) => void;
+  /** Navigates to the Browse Templates panel. */
+  onBrowseTemplates?: () => void;
   onUseTemplate: (template: CampaignTemplate) => void;
   onResumeUpload: (file: File) => Promise<void>;
   onConnectGmail: () => void;
@@ -200,6 +244,19 @@ export default function WorkspacePanels({
     );
   }
 
+  // Live DB templates when available, else the static list (design preview).
+  const pickerTemplates = liveTemplates && liveTemplates.length > 0 ? liveTemplates : CAMPAIGN_TEMPLATES;
+  // Ordered by real usage via get_top_campaign_templates; empty when that
+  // ranking is unavailable, in which case no "Top picks" group is shown
+  // rather than presenting an arbitrary order as if it were popularity.
+  const topPicks = (topTemplateIds || [])
+    .map((id) => pickerTemplates.find((item) => item.id === id))
+    .filter((item): item is CampaignTemplate => Boolean(item));
+
+  function openTemplate(template: CampaignTemplate) {
+    if (onOpenTemplate) onOpenTemplate(template);
+  }
+
   if (active === "campaign") {
     // Blockers are surfaced explicitly: the start button's disabled rule
     // already required a resume + Gmail, but never said so — leaving the
@@ -258,11 +315,56 @@ export default function WorkspacePanels({
           </div>
 
           {!campaign ? (
-            <p className="ws-campaign-hint">Pick a template in Browse Templates to create a campaign first.</p>
+            <p className="ws-campaign-hint">Choose a template below to create a campaign.</p>
           ) : !running && startBlockers.length > 0 ? (
             <p className="ws-campaign-hint">To start this campaign you still need to {startBlockers.join(" and ")}.</p>
           ) : null}
         </div>
+
+        {/* Picking a template here opens that template's review + checkout
+            screen on Browse Templates. It deliberately does NOT create the
+            campaign directly: every template goes through the postcode and
+            checkout steps, and short-circuiting that would skip payment. */}
+        <section className="ws-campaign-picker" aria-labelledby="campaign-picker-heading">
+          <div className="ws-campaign-picker-head">
+            <div>
+              <small>Templates</small>
+              <h3 id="campaign-picker-heading">
+                {campaign ? "Start another campaign" : "Choose a campaign template"}
+              </h3>
+              <p>A template sets the roles, locations and search terms Calsie uses on your behalf.</p>
+            </div>
+            {onBrowseTemplates ? (
+              <button type="button" className="ws-btn-outline" onClick={onBrowseTemplates}>
+                Open Browse Templates
+              </button>
+            ) : null}
+          </div>
+
+          {templatesLoading && pickerTemplates.length === 0 ? (
+            <div className="ws-campaign-picker-grid">
+              {[0, 1, 2].map((key) => <span key={key} className="ws-skeleton ws-campaign-picker-skel" />)}
+            </div>
+          ) : pickerTemplates.length === 0 ? (
+            <p className="ws-campaign-hint">No templates are available right now.</p>
+          ) : (
+            <>
+              {topPicks.length > 0 ? (
+                <>
+                  <h4 className="ws-campaign-picker-group">Top picks</h4>
+                  <div className="ws-campaign-picker-grid">
+                    {topPicks.map((item) => <TemplatePickCard key={item.id} template={item} featured onOpen={openTemplate} />)}
+                  </div>
+                </>
+              ) : null}
+
+              <h4 className="ws-campaign-picker-group">{topPicks.length > 0 ? "All templates" : "Available templates"}</h4>
+              <div className="ws-campaign-picker-grid">
+                {pickerTemplates.map((item) => <TemplatePickCard key={item.id} template={item} onOpen={openTemplate} />)}
+              </div>
+            </>
+          )}
+        </section>
       </div>
     );
   }
