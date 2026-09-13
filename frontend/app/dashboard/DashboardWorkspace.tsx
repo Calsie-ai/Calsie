@@ -840,7 +840,7 @@ export default function DashboardWorkspace() {
   const avatarUrl = avatar.src;
   const profileLoading = isActionLoading(actionStates, "loadDashboard") && !profileRow;
   const campaignPrerequisitesMissing = Boolean(campaign) && !isCampaignRunning(campaign?.status) && (!resumeReady || !gmailReady);
-  const campaignActionDisabled = !campaign || campaignActionBlocked || campaignPrerequisitesMissing;
+  const campaignActionDisabled = Boolean(campaign) && (campaignActionBlocked || campaignPrerequisitesMissing);
   // A disabled control that never says why is a dead end — name the one
   // thing still standing in the way.
   const campaignDisabledReason = !campaign
@@ -859,7 +859,7 @@ export default function DashboardWorkspace() {
         actionLoading={campaignActionLoading}
         actionDisabled={campaignActionDisabled}
         disabledReason={campaignDisabledReason}
-        onToggleCampaign={() => void toggleCampaign()}
+        onToggleCampaign={() => campaign ? void toggleCampaign() : navigateToPanel("campaign")}
         logoutLoading={isActionLoading(actionStates, "logout")}
         onLogout={() => void logout()}
         displayName={fullName}
