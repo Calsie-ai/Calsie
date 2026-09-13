@@ -284,6 +284,13 @@ function MatchCardCarousel({ matches }: { matches: PrepareMatch[] }) {
                 <span className="match-summary-label">Summary</span>
                 <p>{match.summary}</p>
               </div>
+              <a
+                className="btn btn-accent match-apply"
+                href="/login"
+                aria-label={`Apply now for ${match.role} at ${match.company}`}
+              >
+                Apply now <span aria-hidden="true">→</span>
+              </a>
             </div>
             <div className="match-card-right">
               <div className="match-fit-head">Why this is a good fit</div>
