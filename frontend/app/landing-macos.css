@@ -489,7 +489,7 @@ body:has(.clm-landing){
 .clm-landing .match-pills{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;}
 .clm-landing .match-pill{display:inline-flex; align-items:center; font-size:12px; font-weight:500; border-radius:var(--clm-pill); padding:5px 12px; background:var(--clm-surface-alt); color:var(--clm-ink-soft); border:1px solid var(--clm-border-soft);}
 
-.clm-landing .match-summary-box{background:var(--clm-surface-alt); border-radius:var(--clm-radius-sm); padding:14px 15px; margin-top:14px; flex:1; display:flex; flex-direction:column; justify-content:center;}
+.clm-landing .match-summary-box{background:var(--clm-surface-alt); border-radius:var(--clm-radius-sm); padding:14px 15px; margin-top:14px;}
 .clm-landing .match-summary-label{display:block; font-family:var(--clm-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--clm-muted); font-weight:600; margin-bottom:6px;}
 .clm-landing .match-summary-box p{font-size:13px; color:var(--clm-ink-soft); line-height:1.55;}
 
