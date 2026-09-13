@@ -399,6 +399,9 @@ body:has(.applix-workspace) {
 
 /* ---------- Start Campaign CTA ---------- */
 .applix-workspace .workspace-campaign-toggle {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -416,7 +419,22 @@ body:has(.applix-workspace) {
   font-weight: 700 !important;
   letter-spacing: -.01em;
   box-shadow: 0 8px 18px rgba(249, 115, 22, .28);
-  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+  transition: transform .22s cubic-bezier(.2, .8, .2, 1), box-shadow .22s ease, background .22s ease;
+}
+
+.applix-workspace .workspace-campaign-toggle::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 20%, rgba(255, 255, 255, .28) 48%, transparent 76%);
+  transform: translateX(-115%);
+  transition: transform .55s cubic-bezier(.2, .8, .2, 1);
+  pointer-events: none;
+}
+
+.applix-workspace .workspace-campaign-toggle svg {
+  transition: transform .3s cubic-bezier(.2, .8, .2, 1);
 }
 
 .applix-workspace .workspace-campaign-toggle b {
@@ -425,13 +443,38 @@ body:has(.applix-workspace) {
 
 .applix-workspace .workspace-campaign-toggle:hover:not(:disabled) {
   background: var(--orange-btn-hover) !important;
-  box-shadow: 0 10px 22px rgba(249, 115, 22, .34);
-  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(249, 115, 22, .38);
+  transform: translateY(-2px) scale(1.015);
+}
+
+.applix-workspace .workspace-campaign-toggle:hover:not(:disabled)::before {
+  transform: translateX(115%);
+}
+
+.applix-workspace .workspace-campaign-toggle:hover:not(:disabled) svg {
+  transform: rotate(90deg) scale(1.08);
+}
+
+.applix-workspace .workspace-campaign-toggle:focus-visible {
+  outline: 3px solid rgba(249, 115, 22, .28);
+  outline-offset: 3px;
 }
 
 .applix-workspace .workspace-campaign-toggle:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(0) scale(.985);
   box-shadow: 0 8px 18px rgba(249, 115, 22, .28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .applix-workspace .workspace-campaign-toggle,
+  .applix-workspace .workspace-campaign-toggle::before,
+  .applix-workspace .workspace-campaign-toggle svg {
+    transition-duration: .01ms;
+  }
+
+  .applix-workspace .workspace-campaign-toggle:hover:not(:disabled) {
+    transform: none;
+  }
 }
 
 /* Keeps the full-strength orange fill and white label when prerequisites
