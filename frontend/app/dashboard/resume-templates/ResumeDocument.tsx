@@ -4,11 +4,14 @@
 
 import AcademicTemplate from "./AcademicTemplate";
 import CleanTemplate from "./CleanTemplate";
+import CareerPivotTemplate from "./CareerPivotTemplate";
 import EntryLevelTemplate from "./EntryLevelTemplate";
+import ExecutiveTemplate from "./ExecutiveTemplate";
 import ProfessionalTemplate from "./ProfessionalTemplate";
 import PureAtsTemplate from "./PureAtsTemplate";
 import SpecialistTemplate from "./SpecialistTemplate";
 import TraditionalTemplate from "./TraditionalTemplate";
+import TechnicalTemplate from "./TechnicalTemplate";
 import type { ResumePdfData, ResumeTemplateId } from "./types";
 
 export type { ResumePdfData, ResumeTemplateId } from "./types";
@@ -22,6 +25,9 @@ export default function ResumeDocument({ templateId, data }: { templateId: Resum
     case "specialist": return <SpecialistTemplate data={data} />;
     case "entryLevel": return <EntryLevelTemplate data={data} />;
     case "academic": return <AcademicTemplate data={data} />;
+    case "executive": return <ExecutiveTemplate data={data} />;
+    case "careerPivot": return <CareerPivotTemplate data={data} />;
+    case "technical": return <TechnicalTemplate data={data} />;
     case "clean":
     default:
       return <CleanTemplate data={data} />;

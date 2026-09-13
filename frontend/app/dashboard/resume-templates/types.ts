@@ -1,5 +1,5 @@
 // Shared contract for every resume PDF template. Moved here (out of the
-// old single-template resume-pdf-document.tsx) since all 7 templates in
+// old single-template resume-pdf-document.tsx) since all 10 templates in
 // this folder consume the exact same data — they only differ in how they
 // lay it out.
 
@@ -35,7 +35,10 @@ export type ResumeTemplateId =
   | "traditional"
   | "specialist"
   | "entryLevel"
-  | "academic";
+  | "academic"
+  | "executive"
+  | "careerPivot"
+  | "technical";
 
 export type ResumeTemplateMeta = {
   id: ResumeTemplateId;
@@ -131,6 +134,36 @@ export const RESUME_TEMPLATES: ResumeTemplateMeta[] = [
     accentColor: "#2A2A40",
     headerAlign: "center",
     sections: ["Summary", "Education", "Certifications", "Skills", "Experience", "References"],
+  },
+  {
+    id: "executive",
+    name: "Executive",
+    description: "An achievement-led profile with leadership capabilities and career impact given first priority.",
+    bestFor: "Senior leaders, managers, and candidates accountable for teams, budgets, or change.",
+    font: "Helvetica",
+    accentColor: "#7A5B20",
+    headerAlign: "left",
+    sections: ["Executive Profile", "Leadership Capabilities", "Career Impact", "Education", "Credentials"],
+  },
+  {
+    id: "careerPivot",
+    name: "Career Pivot",
+    description: "Transferable capabilities lead, while a complete dated career history keeps the story credible and ATS-safe.",
+    bestFor: "Career changers translating established strengths into a new field.",
+    font: "Helvetica",
+    accentColor: "#6B365C",
+    headerAlign: "left",
+    sections: ["Career Profile", "Transferable Skills", "Relevant Experience", "Training", "Credentials"],
+  },
+  {
+    id: "technical",
+    name: "Technical",
+    description: "Hard skills, portfolio evidence, and technical experience appear early in a compact engineering-style layout.",
+    bestFor: "Technology, engineering, data, digital, and other tool-intensive roles.",
+    font: "Helvetica",
+    accentColor: "#155E75",
+    headerAlign: "left",
+    sections: ["Technical Profile", "Technical Skills", "Technical Experience", "Certifications", "Education"],
   },
 ];
 
