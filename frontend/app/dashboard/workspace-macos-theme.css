@@ -418,8 +418,8 @@ body:has(.applix-workspace) {
   font-size: 15px;
   font-weight: 700 !important;
   letter-spacing: -.01em;
-  box-shadow: 0 8px 18px rgba(249, 115, 22, .28);
-  transition: transform .22s cubic-bezier(.2, .8, .2, 1), box-shadow .22s ease, background .22s ease;
+  box-shadow: none !important;
+  transition: transform .22s cubic-bezier(.2, .8, .2, 1), background .22s ease;
 }
 
 .applix-workspace .workspace-campaign-toggle::before {
@@ -434,16 +434,19 @@ body:has(.applix-workspace) {
 }
 
 .applix-workspace .workspace-campaign-toggle svg {
+  color: #FFFFFF !important;
+  stroke: currentColor;
   transition: transform .3s cubic-bezier(.2, .8, .2, 1);
 }
 
 .applix-workspace .workspace-campaign-toggle b {
+  color: #FFFFFF !important;
   font-weight: 700 !important;
 }
 
 .applix-workspace .workspace-campaign-toggle:hover:not(:disabled) {
   background: var(--orange-btn-hover) !important;
-  box-shadow: 0 12px 26px rgba(249, 115, 22, .38);
+  box-shadow: none !important;
   transform: translateY(-2px) scale(1.015);
 }
 
@@ -462,7 +465,7 @@ body:has(.applix-workspace) {
 
 .applix-workspace .workspace-campaign-toggle:active:not(:disabled) {
   transform: translateY(0) scale(.985);
-  box-shadow: 0 8px 18px rgba(249, 115, 22, .28);
+  box-shadow: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -478,7 +481,7 @@ body:has(.applix-workspace) {
 }
 
 /* Keeps the full-strength orange fill and white label when prerequisites
-   are unmet — only the lift and shadow drop away, so the primary action
+   are unmet — only the interactive motion drops away, so the primary action
    never fades out. The cursor and tooltip carry the unavailable state. */
 .applix-workspace .workspace-campaign-toggle:disabled {
   background: var(--orange-btn) !important;
