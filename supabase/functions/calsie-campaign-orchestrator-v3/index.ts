@@ -451,6 +451,35 @@ Deno.serve(async (req) => {
       last_error: selectedCount > 0 ? null : `No review opportunities were selected; ${stopReason}`,
     });
 
+    const notification = selectedCount > 0 ? {
+      type: "jobs_ready_for_review",
+      category: "applications",
+      priority: "action_required",
+      title: `${selectedCount} ${selectedCount === 1 ? "job is" : "jobs are"} ready for review`,
+      message: "Your campaign found new matches. Smash the opportunities worth pursuing or pass on the rest.",
+      action_url: "/dashboard?panel=approve",
+      action_label: "Review jobs",
+      dedupe_key: `jobs-ready:${runId}`,
+    } : {
+      type: "campaign_search_needs_attention",
+      category: "campaigns",
+      priority: "update",
+      title: "Today’s search needs attention",
+      message: "Calsie completed the search but did not find a suitable opportunity. Your campaign remains available for the next run.",
+      action_url: "/dashboard?panel=campaign",
+      action_label: "View campaign",
+      dedupe_key: `search-empty:${runId}`,
+    };
+    await supabase.from("user_notifications").insert({
+      user_id: campaignResult.data.user_id,
+      campaign_id: campaignId,
+      ...notification,
+      entity_type: "campaign_run",
+      entity_id: runId,
+      trace_id: runId,
+      metadata: { selected_count: selectedCount, stop_reason: stopReason },
+    });
+
     return reply({
       ok: selectedCount > 0,
       function: "calsie-campaign-orchestrator-v3",

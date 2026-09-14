@@ -382,6 +382,38 @@ async function loadQueueContext(supabase: ReturnType<typeof createClient>, queue
     .maybeSingle();
 }
 
+async function resolveNotificationUserId(supabase: ReturnType<typeof createClient>, candidate: string, campaignId: string) {
+  if (isUuid(candidate)) return candidate;
+  if (!isUuid(campaignId)) return "";
+  const owner = await supabase.from("campaigns").select("user_id").eq("id", campaignId).maybeSingle();
+  return isUuid(owner.data?.user_id) ? owner.data.user_id : "";
+}
+
+async function notifyCampaignBlocked(supabase: ReturnType<typeof createClient>, identity: string, campaignId: string, reason: string) {
+  const userId = await resolveNotificationUserId(supabase, identity, campaignId);
+  if (!userId) return;
+  await supabase.from("user_notifications").upsert({
+    user_id: userId,
+    campaign_id: isUuid(campaignId) ? campaignId : null,
+    type: "campaign_blocked",
+    category: "attention",
+    priority: "action_required",
+    title: "Campaign needs Gmail attention",
+    message: "Calsie could not send an approved application. Reconnect Gmail to continue.",
+    action_url: "/dashboard?panel=gmail",
+    action_label: "Reconnect Gmail",
+    entity_type: "campaign",
+    entity_id: isUuid(campaignId) ? campaignId : null,
+    dedupe_key: `campaign-blocked:gmail:${campaignId || "unknown"}`,
+    status: "unread",
+    read_at: null,
+    archived_at: null,
+    resolved_at: null,
+    updated_at: new Date().toISOString(),
+    metadata: { reason },
+  }, { onConflict: "user_id,dedupe_key" });
+}
+
 Deno.serve(async (req) => {
   try {
     if (req.method === "OPTIONS") {
@@ -463,6 +495,7 @@ Deno.serve(async (req) => {
 
     const auth = authResult.data as Row | null;
     if (!auth) {
+      await notifyCampaignBlocked(supabase, senderIdentifier, campaignId, "gmail_not_connected");
       return json({
         ok: false,
         error: "No connected Gmail authorization found for this user_identifier.",
@@ -477,6 +510,7 @@ Deno.serve(async (req) => {
 
     if (expiresSoon) {
       if (!refreshToken) {
+        await notifyCampaignBlocked(supabase, senderIdentifier, campaignId, "missing_refresh_token");
         return json({ ok: false, error: "Missing Gmail refresh token. Reconnect Gmail." }, 401);
       }
 
@@ -487,6 +521,8 @@ Deno.serve(async (req) => {
           .update({ status: "error", last_error: JSON.stringify(refreshed.data).slice(0, 500) })
           .eq("user_identifier", senderIdentifier)
           .eq("provider", "google");
+
+        await notifyCampaignBlocked(supabase, senderIdentifier, campaignId, "token_refresh_failed");
 
         return json({
           ok: false,
@@ -572,6 +608,25 @@ Deno.serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq("id", queueId);
+    }
+
+    const notificationUserId = await resolveNotificationUserId(supabase, resumeProfileId || senderIdentifier, campaignId);
+    if (notificationUserId) {
+      await supabase.from("user_notifications").insert({
+        user_id: notificationUserId,
+        campaign_id: isUuid(campaignId) ? campaignId : null,
+        type: "application_sent",
+        category: "applications",
+        priority: "update",
+        title: "Application sent",
+        message: `Gmail confirmed your approved application was sent to ${to}.`,
+        action_url: "/dashboard?panel=tracker",
+        action_label: "View application",
+        entity_type: "outreach_queue",
+        entity_id: isUuid(queueId) ? queueId : null,
+        dedupe_key: `application-sent:${queueId || sendData.id}`,
+        metadata: { queue_id: queueId || null, provider_message_id: sendData.id || null },
+      });
     }
 
     return json({

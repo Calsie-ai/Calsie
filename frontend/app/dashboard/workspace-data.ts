@@ -17,6 +17,7 @@ export type WorkspaceTab =
   | "campaign"
   | "approve"
   | "tracker"
+  | "notifications"
   | "profile";
 
 export type CampaignRecord = {

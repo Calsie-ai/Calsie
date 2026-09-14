@@ -298,10 +298,17 @@ async function createNotification(supabase: ReturnType<typeof createClient>, use
     user_id: userId,
     campaign_id: campaignId,
     type: "approved_applications_preparing",
+    category: "applications",
+    priority: queuedCompanies > 0 ? "info" : "action_required",
     title: queuedCompanies > 0 ? "Applications are being prepared" : "Applications ready for review",
     message: queuedCompanies > 0
       ? `Applix is preparing ${queuedCompanies} company contacts. Drafts will appear as soon as emails are found.`
       : `Applix prepared ${draftsReady} applications. Please review and approve before sending.`,
+    action_url: "/dashboard?panel=tracker",
+    action_label: draftsReady > 0 ? "Review applications" : "View progress",
+    entity_type: "campaign",
+    entity_id: campaignId,
+    dedupe_key: `application-preparation:${campaignId}:${queuedCompanies}:${draftsReady}`,
     metadata: { queued_companies: queuedCompanies, drafts_ready: draftsReady },
   });
 }

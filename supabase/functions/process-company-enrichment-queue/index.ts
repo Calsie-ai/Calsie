@@ -307,9 +307,16 @@ async function createNotification(
     user_id: userId,
     campaign_id: campaignId,
     type: "company_enrichment_completed",
+    category: "applications",
+    priority: "action_required",
     title: "Applications ready for review",
     message:
       `Applix prepared ${draftsReady} applications. Please review and approve before sending.`,
+    action_url: "/dashboard?panel=tracker",
+    action_label: "Review applications",
+    entity_type: "campaign",
+    entity_id: campaignId,
+    dedupe_key: `applications-ready:${campaignId}:${draftsReady}`,
     metadata: { drafts_ready: draftsReady },
   });
 }

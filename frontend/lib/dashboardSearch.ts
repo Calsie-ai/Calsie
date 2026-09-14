@@ -66,6 +66,11 @@ const PANEL_META: Record<WorkspaceTab, { label: string; sublabel: string; keywor
     sublabel: "Jobs you have smashed",
     keywords: ["applications", "history", "sent", "applied", "progress", "tracking"],
   },
+  notifications: {
+    label: "Notifications",
+    sublabel: "Campaign and application updates",
+    keywords: ["alerts", "inbox", "unread", "attention", "updates"],
+  },
   profile: {
     label: "Profile",
     sublabel: "Your account, preferences and support",

@@ -1,8 +1,9 @@
 "use client";
 
-import { Bell } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import WorkspaceSearch from "./WorkspaceSearch";
+import NotificationBell from "./NotificationBell";
+import type { UserNotification } from "../../lib/notifications";
 import type { WorkspaceTab } from "./workspace-data";
 
 type Props = {
@@ -12,9 +13,15 @@ type Props = {
   onOpenProfile: () => void;
   onNavigate: (panel: WorkspaceTab) => void;
   onOpenTemplate: (slug: string) => void;
+  notifications?: UserNotification[];
+  unreadNotificationCount?: number;
+  notificationsLoading?: boolean;
+  onOpenNotification?: (notification: UserNotification) => void;
+  onOpenNotifications?: () => void;
+  onMarkAllNotificationsRead?: () => void;
 };
 
-export default function WorkspaceTopbar({ displayName, initial, avatarUrl, onOpenProfile, onNavigate, onOpenTemplate }: Props) {
+export default function WorkspaceTopbar({ displayName, initial, avatarUrl, onOpenProfile, onNavigate, onOpenTemplate, notifications = [], unreadNotificationCount = 0, notificationsLoading = false, onOpenNotification = () => {}, onOpenNotifications = () => {}, onMarkAllNotificationsRead = () => {} }: Props) {
   return (
     <header className="ws-topbar">
       {/* Search renders on every panel, including Templates. The previous
@@ -24,9 +31,7 @@ export default function WorkspaceTopbar({ displayName, initial, avatarUrl, onOpe
 
       <div className="ws-topbar-right">
         <ThemeToggle />
-        <button type="button" className="ws-icon-btn" aria-label="Notifications">
-          <Bell size={19} strokeWidth={1.9} />
-        </button>
+        <NotificationBell items={notifications} unreadCount={unreadNotificationCount} loading={notificationsLoading} onOpen={onOpenNotification} onViewAll={onOpenNotifications} onMarkAllRead={onMarkAllNotificationsRead} />
         {/* The avatar was a decorative <span>. It is the conventional way
             into an account screen, so it is now a real button. */}
         <button

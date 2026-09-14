@@ -52,6 +52,9 @@ import WorkspacePanelsLive, { mapTemplate } from "./WorkspacePanelsLive";
 import { CAMPAIGN_PLAN, isCampaignRunning, type CampaignRecord, type CampaignTemplate, type WorkspaceTab } from "./workspace-data";
 import { googleAvatarFromMetadata, readHideGoogleAvatar, resolveAvatar } from "../../lib/googleAvatar";
 import type { ProfileResumeSignals, ProfileRow } from "./ProfilePanel";
+import NotificationsPanel from "./NotificationsPanel";
+import { useNotifications } from "./useNotifications";
+import { safeNotificationUrl, type UserNotification } from "../../lib/notifications";
 
 type AuthUserLike = { email?: string | null; user_metadata?: Record<string, unknown> | null } | null;
 
@@ -116,6 +119,7 @@ export default function DashboardWorkspace() {
   const paymentCheckRef = useRef("");
   const gmailCheckRef = useRef("");
   const { abortAction, runAction, states: actionStates } = useActionStates(DASHBOARD_ACTION_KEYS);
+  const notifications = useNotifications(user?.id);
 
   const reportError = useCallback((actionKey: DashboardActionKey, error: unknown, fallback: string) => {
     if (isSessionExpiryError(error)) router.replace(loginPathFor(returnPath));
@@ -145,6 +149,13 @@ export default function DashboardWorkspace() {
     params.set("template", slug);
     router.push(dashboardPanelPath("templates", params));
   }, [query, router]);
+
+  const openNotification = useCallback((notification: UserNotification) => {
+    if (notification.status === "unread") void notifications.markRead(notification.id);
+    const destination = safeNotificationUrl(notification.action_url);
+    if (destination) router.push(destination);
+    else navigateToPanel("notifications");
+  }, [navigateToPanel, notifications, router]);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace(loginPathFor(returnPath));
@@ -880,6 +891,12 @@ export default function DashboardWorkspace() {
             onOpenProfile={() => navigateToPanel("profile")}
             onNavigate={navigateToPanel}
             onOpenTemplate={openTemplateFromSearch}
+            notifications={notifications.items}
+            unreadNotificationCount={notifications.unreadCount}
+            notificationsLoading={notifications.loading}
+            onOpenNotification={openNotification}
+            onOpenNotifications={() => navigateToPanel("notifications")}
+            onMarkAllNotificationsRead={() => void notifications.markAllRead()}
           />
           {unclaimedIntent ? (
             <div className="ws-notice ws-notice-draft" role="status" aria-live="polite">
@@ -961,7 +978,20 @@ export default function DashboardWorkspace() {
             </span>
           </div>
         ) : null}
-        <WorkspacePanelsLive
+        {active === "notifications" ? (
+          <NotificationsPanel
+            items={notifications.items}
+            unreadCount={notifications.unreadCount}
+            loading={notifications.loading}
+            error={notifications.error}
+            onRefresh={() => void notifications.refresh()}
+            onOpen={openNotification}
+            onMarkRead={(id) => void notifications.markRead(id)}
+            onMarkUnread={(id) => void notifications.markUnread(id)}
+            onMarkAllRead={() => void notifications.markAllRead()}
+            onArchive={(id) => void notifications.archive(id)}
+          />
+        ) : <WorkspacePanelsLive
           active={active}
           campaign={campaign}
           purchasedTemplate={purchasedTemplate}
@@ -1000,7 +1030,7 @@ export default function DashboardWorkspace() {
           onRevokeGmail={() => void revokeGmail()}
           onToggleCampaign={() => void toggleCampaign()}
           onFindJobsNow={() => void findJobsNow()}
-        />
+        />}
       </div>
       <button
         type="button"

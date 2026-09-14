@@ -17,7 +17,8 @@
     "test:dashboard-search": "node --experimental-strip-types --test tests/dashboardSearch.test.mts",
     "test:profile-completion": "node --experimental-strip-types --test tests/profileCompletion.test.mts",
     "test:google-avatar": "node --experimental-strip-types --test tests/googleAvatar.test.mts",
-    "test:carousel": "node --experimental-strip-types --test tests/carousel.test.mts"
+    "test:carousel": "node --experimental-strip-types --test tests/carousel.test.mts",
+    "test:notifications": "node --experimental-strip-types --test tests/notifications.test.mts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.6.1",

@@ -282,6 +282,13 @@ Deno.serve(async (req) => {
       || html("Gmail authorization could not be saved.", 500);
   }
 
+  await admin
+    .from("user_notifications")
+    .update({ resolved_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("user_id", state.user_id)
+    .eq("type", "campaign_blocked")
+    .is("resolved_at", null);
+
   return redirectResult(state.return_to, { gmail: "connected" })
     || html("Gmail is connected.");
 });
