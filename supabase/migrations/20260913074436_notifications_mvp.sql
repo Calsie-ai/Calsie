@@ -48,6 +48,7 @@ create policy "Users can read own notifications"
   using ((select auth.uid()) = user_id);
 
 drop policy if exists "Users can update own notifications" on public.user_notifications;
+drop policy if exists "Users can update own notification state" on public.user_notifications;
 create policy "Users can update own notification state"
   on public.user_notifications for update to authenticated
   using ((select auth.uid()) = user_id)
