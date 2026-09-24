@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, ArrowRight, Check, LockKeyhole, MapPin } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, LockKeyhole, MapPin, BriefcaseBusiness, ChevronDown, Layers } from "lucide-react";
 import ThemeToggle from "../dashboard/ThemeToggle";
 import { useAuth } from "../providers/AuthProvider";
 import { getSupabaseClient } from "../../lib/supabaseClient";
@@ -212,77 +212,77 @@ function CheckoutContent() {
   return (
     <main className={styles.page} id="top">
       <header className={styles.header}>
-        <div className={styles.headerInner}>
-          <Link className={styles.brand} href="/" aria-label="Calsie Jobs home">
-            <Image src="/applix-logo.svg" alt="" width={36} height={36} />
-            <span>Calsie <span className={styles.brandDivider}>/</span> Jobs</span>
-          </Link>
-          <nav className={styles.navigation} aria-label="Checkout navigation">
-            <Link href="/support">Support</Link>
-            <ThemeToggle />
-          </nav>
-        </div>
+        <Link className={styles.backLink} aria-label="Back to templates" href="/dashboard?panel=templates&restoreIntent=1">
+          <ArrowLeft size={18} aria-hidden="true" /><span>Templates</span>
+        </Link>
+        <Link className={styles.brand} href="/" aria-label="Calsie Jobs home">
+          <Image src="/applix-logo.svg" alt="" width={32} height={32} />
+          <span>Calsie <span className={styles.brandDivider}>/</span> Jobs</span>
+        </Link>
+        <div className={styles.appearance}><ThemeToggle /></div>
       </header>
       <section className={styles.shell} aria-labelledby="payment-title">
-        <Link className={styles.backLink} href="/dashboard?panel=templates&restoreIntent=1">
-          <ArrowLeft size={16} aria-hidden="true" /> Back to templates
-        </Link>
+        <ol className={styles.steps} aria-label="Checkout progress">
+          <li aria-current="step"><span>1</span> Review</li>
+          <li><span>2</span> Payment</li>
+        </ol>
         <div className={styles.intro}>
-          <p className={styles.eyebrow}>Checkout</p>
           <h1 id="payment-title">Review your campaign</h1>
-          <p>Check your details, then continue to payment.</p>
+          <p>Your template, your location. Ready when you are.</p>
         </div>
         {loading ? <div className={styles.loading} role="status" aria-live="polite">Loading your campaign...</div> : null}
         {message ? <div className={styles.alert} role="alert">{message}</div> : null}
         {!loading && !template ? <div className={styles.emptyState}>
-          <h2>Your campaign starts with a template</h2>
-          <p>Choose a template and add your postcode to continue.</p>
-          <Link className={styles.backLink} href="/dashboard?panel=templates">Browse templates <ArrowRight size={16} aria-hidden="true" /></Link>
+          <Layers size={28} aria-hidden="true" />
+          <h2>Choose your campaign</h2>
+          <p>Select a template and add your postcode to continue.</p>
+          <Link className={styles.editLink} href="/dashboard?panel=templates">Browse templates <ArrowRight size={16} aria-hidden="true" /></Link>
         </div> : null}
-        {template ? <div className={styles.checkoutGrid}>
-          <article className={styles.summaryCard}>
-            <p className={styles.templateTag}>Your campaign</p>
-            <h2>{templateName}</h2>
-            <p className={styles.description}>{template.description}</p>
-            <dl className={styles.metaGrid}>
-              <div className={styles.metaItem}><dt>Target role</dt><dd>{template.role}</dd></div>
-              <div className={styles.metaItem}><dt>Location</dt><dd>{postcodeInfo.label}</dd></div>
-            </dl>
-            <div className={styles.matchingCard}>
-              <MapPin size={20} aria-hidden="true" />
-              <div><strong>Matched to your area</strong><p>We use postcode {postcodeInfo.postcode} to find nearby jobs and providers that cover your area.</p></div>
-            </div>
-            {template.pricing_features?.length ? <div className={styles.featuresSection}>
-              <h3>Included features</h3>
-              <ul className={styles.featuresGrid}>{template.pricing_features.map((feature, index) =>
-                <li className={styles.feature} key={`${index}-${feature}`}><Check size={17} aria-hidden="true" /><span>{feature}</span></li>
-              )}</ul>
-            </div> : null}
-          </article>
-          <aside className={styles.priceCard} aria-labelledby="order-title">
-            <div className={styles.priceTop}>
-              <h2 id="order-title">Order summary</h2>
-              <p className={styles.priceLabel}>Template price</p>
-              <div className={styles.priceRow}>
-                <strong className={styles.currentPrice}>{money(template.price_amount, template.currency)}</strong>
-                <span className={styles.currency}>{template.currency.toUpperCase()}</span>
-                {template.compare_at_price_amount && template.compare_at_price_amount > template.price_amount ? <span className={styles.comparePrice}><span className={styles.srOnly}>Previously </span>{money(template.compare_at_price_amount, template.currency)}</span> : null}
+        {template ? <>
+          <article className={styles.reviewSheet} aria-label="Campaign review">
+            <div className={styles.campaignPreview}>
+              <div className={styles.campaignIcon}><Layers size={28} strokeWidth={1.5} aria-hidden="true" /></div>
+              <div className={styles.campaignHeading}>
+                <p className={styles.eyebrow}>Your campaign</p>
+                <h2>{templateName}</h2>
+                <p className={styles.description}>{template.description}</p>
               </div>
-              <p className={styles.priceTerm}>{template.price_label}</p>
             </div>
-            <div className={styles.priceBody}>
-              <div className={styles.orderLine}><span>Campaign</span><strong>{templateName}</strong></div>
-              <p className={styles.checkoutCopy}>Your campaign is created once checkout is confirmed.</p>
-              <button type="button" className={styles.checkoutButton} onClick={() => void openSecureCheckout()} disabled={checkoutLoading || !postcodeInfo.valid} aria-busy={checkoutLoading}>
-                <span>{checkoutLoading ? "Opening checkout..." : template.payment_required === false ? "Use free template" : "Continue to payment"}</span>
-                {!checkoutLoading ? <ArrowRight size={18} aria-hidden="true" /> : null}
-              </button>
-              <p className={styles.secureNote}><LockKeyhole size={14} aria-hidden="true" /><span>Secure checkout with Stripe</span></p>
-            </div>
-          </aside>
-        </div> : null}
-        <footer className={styles.footer}>Need a hand? <Link href="/support">Contact support</Link></footer>
+            <section className={styles.detailsSection} aria-labelledby="details-title">
+              <div className={styles.sectionHeading}><h3 id="details-title">Campaign details</h3><Link className={styles.editLink} href="/dashboard?panel=templates&restoreIntent=1">Edit details <ArrowRight size={14} aria-hidden="true" /></Link></div>
+              <dl className={styles.detailList}>
+                <div className={styles.detailRow}><dt><BriefcaseBusiness size={18} aria-hidden="true" />Target role</dt><dd>{template.role}</dd></div>
+                <div className={styles.detailRow}><dt><MapPin size={18} aria-hidden="true" />Location</dt><dd>{postcodeInfo.label}</dd></div>
+              </dl>
+              <p className={styles.locationNote}>Jobs and providers are matched to postcode {postcodeInfo.postcode}.</p>
+            </section>
+            {template.pricing_features?.length ? <details className={styles.featuresSection}>
+              <summary><span>Included features <span className={styles.featureCount}>{template.pricing_features.length}</span></span><ChevronDown size={18} aria-hidden="true" /></summary>
+              <ul className={styles.featuresList}>{template.pricing_features.map((feature, index) =>
+                <li key={`${index}-${feature}`}><Check size={17} aria-hidden="true" /><span>{feature}</span></li>
+              )}</ul>
+            </details> : null}
+            <section className={styles.priceSection} aria-label="Price summary">
+              <div><h3>Template price</h3><p>{template.price_label}</p></div>
+              <div className={styles.priceValue}>
+                {template.compare_at_price_amount && template.compare_at_price_amount > template.price_amount ? <span className={styles.comparePrice}><span className={styles.srOnly}>Previously </span>{money(template.compare_at_price_amount, template.currency)}</span> : null}
+                <strong>{money(template.price_amount, template.currency)}</strong><span className={styles.currency}>{template.currency.toUpperCase()}</span>
+              </div>
+            </section>
+          </article>
+          <div className={styles.nextStep}><LockKeyhole size={18} aria-hidden="true" /><div><strong>Next, secure checkout</strong><p>Continue to Stripe. Your campaign is created once checkout is confirmed.</p></div></div>
+        </> : null}
+        <footer className={styles.footer}>Need help? <Link href="/support">Contact support</Link></footer>
       </section>
+      {template ? <div className={styles.paymentBar}>
+        <div className={styles.paymentBarInner}>
+          <div className={styles.barPrice}><span>Template price</span><div><strong>{money(template.price_amount, template.currency)}</strong><span>{template.currency.toUpperCase()}</span></div></div>
+          <button type="button" className={styles.checkoutButton} onClick={() => void openSecureCheckout()} disabled={checkoutLoading || !postcodeInfo.valid} aria-busy={checkoutLoading}>
+            <span>{checkoutLoading ? "Opening checkout..." : template.payment_required === false ? "Use free template" : "Continue to payment"}</span>
+            {!checkoutLoading ? <ArrowRight size={18} aria-hidden="true" /> : null}
+          </button>
+        </div>
+      </div> : null}
     </main>
   );
 }
