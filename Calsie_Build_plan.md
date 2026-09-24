@@ -1,4 +1,4 @@
-# APPLIX BUILD PLAN
+# Calsie AI Build Plan
 
 Last updated: 2026-07-24
 
