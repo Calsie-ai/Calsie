@@ -232,7 +232,7 @@ function CheckoutContent() {
           <h1 id="payment-title">Review your campaign</h1>
           <p>Check your details, then continue to payment.</p>
         </div>
-        {loading ? <div className={styles.loading} role="status" aria-live="polite">Loading your campaign?</div> : null}
+        {loading ? <div className={styles.loading} role="status" aria-live="polite">Loading your campaign...</div> : null}
         {message ? <div className={styles.alert} role="alert">{message}</div> : null}
         {!loading && !template ? <div className={styles.emptyState}>
           <h2>Your campaign starts with a template</h2>
@@ -253,7 +253,7 @@ function CheckoutContent() {
               <div><strong>Matched to your area</strong><p>We use postcode {postcodeInfo.postcode} to find nearby jobs and providers that cover your area.</p></div>
             </div>
             {template.pricing_features?.length ? <div className={styles.featuresSection}>
-              <h3>What?s included</h3>
+              <h3>Included features</h3>
               <ul className={styles.featuresGrid}>{template.pricing_features.map((feature, index) =>
                 <li className={styles.feature} key={`${index}-${feature}`}><Check size={17} aria-hidden="true" /><span>{feature}</span></li>
               )}</ul>
@@ -274,7 +274,7 @@ function CheckoutContent() {
               <div className={styles.orderLine}><span>Campaign</span><strong>{templateName}</strong></div>
               <p className={styles.checkoutCopy}>Your campaign is created once checkout is confirmed.</p>
               <button type="button" className={styles.checkoutButton} onClick={() => void openSecureCheckout()} disabled={checkoutLoading || !postcodeInfo.valid} aria-busy={checkoutLoading}>
-                <span>{checkoutLoading ? "Opening checkout?" : template.payment_required === false ? "Use free template" : "Continue to payment"}</span>
+                <span>{checkoutLoading ? "Opening checkout..." : template.payment_required === false ? "Use free template" : "Continue to payment"}</span>
                 {!checkoutLoading ? <ArrowRight size={18} aria-hidden="true" /> : null}
               </button>
               <p className={styles.secureNote}><LockKeyhole size={14} aria-hidden="true" /><span>Secure checkout with Stripe</span></p>
@@ -288,5 +288,5 @@ function CheckoutContent() {
 }
 
 export default function PaymentPage() {
-  return <Suspense fallback={<main style={{ padding: 40 }}>Loading checkout…</main>}><CheckoutContent /></Suspense>;
+  return <Suspense fallback={<main className={styles.page}><div className={styles.shell}><p className={styles.loading} role="status">Loading checkout...</p></div></main>}><CheckoutContent /></Suspense>;
 }
