@@ -3,6 +3,9 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
+import { ArrowLeft, ArrowRight, Check, LockKeyhole, MapPin } from "lucide-react";
+import ThemeToggle from "../dashboard/ThemeToggle";
 import { useAuth } from "../providers/AuthProvider";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import { inferAustralianPostcode } from "../../lib/australianPostcode";
@@ -207,16 +210,78 @@ function CheckoutContent() {
   const templateName = template?.campaign_name || template?.title || "Campaign checkout";
 
   return (
-    <main className={`${styles.page} applix-landing`} id="top">
-      <header className="applix-header"><div className="applix-container applix-header-inner"><a className="applix-brand" href="/" aria-label="Calsie Jobs home"><img src="/applix-logo.svg" alt="" /><span>Calsie | Jobs</span></a><nav className="applix-nav" aria-label="Checkout navigation"><Link href="/dashboard?panel=overview">Dashboard</Link><a href="/support">Support</a></nav><div className="applix-actions"><Link className="applix-button applix-button--subtle" href="/dashboard?panel=templates">Back to templates</Link></div></div></header>
+    <main className={styles.page} id="top">
+      <header className={styles.header}>
+        <div className={styles.headerInner}>
+          <Link className={styles.brand} href="/" aria-label="Calsie Jobs home">
+            <Image src="/applix-logo.svg" alt="" width={36} height={36} />
+            <span>Calsie <span className={styles.brandDivider}>/</span> Jobs</span>
+          </Link>
+          <nav className={styles.navigation} aria-label="Checkout navigation">
+            <Link href="/support">Support</Link>
+            <ThemeToggle />
+          </nav>
+        </div>
+      </header>
       <section className={styles.shell} aria-labelledby="payment-title">
-        <div className={styles.intro}><div><p className={styles.eyebrow}>Secure campaign checkout</p><h1 id="payment-title">Review your campaign before payment.</h1></div><p>Your template, location and campaign features are confirmed before Stripe opens.</p></div>
-        {loading ? <div className={styles.loading} role="status" aria-live="polite">Loading template checkout…</div> : null}
+        <Link className={styles.backLink} href="/dashboard?panel=templates&restoreIntent=1">
+          <ArrowLeft size={16} aria-hidden="true" /> Back to templates
+        </Link>
+        <div className={styles.intro}>
+          <p className={styles.eyebrow}>Checkout</p>
+          <h1 id="payment-title">Review your campaign</h1>
+          <p>Check your details, then continue to payment.</p>
+        </div>
+        {loading ? <div className={styles.loading} role="status" aria-live="polite">Loading your campaign?</div> : null}
         {message ? <div className={styles.alert} role="alert">{message}</div> : null}
-        {template ? <div className={styles.checkoutGrid}>
-          <article className={styles.summaryCard}><div className={styles.templateTag}>Selected campaign template</div><h2>{templateName}</h2><p className={styles.description}>{template.description}</p><div className={styles.metaGrid}><div className={styles.metaItem}><span>Target role</span><strong>{template.role}</strong></div><div className={styles.metaItem}><span>Campaign location</span><strong>{postcodeInfo.label}</strong></div></div><div className={styles.matchingCard}><div className={styles.matchingIcon}>✓</div><div><strong>Smart local matching enabled</strong><p>Calsie will use postcode {postcodeInfo.postcode} to rank nearby jobs and providers whose service coverage includes your area.</p></div></div><div className={styles.featuresHeader}><h3>Included features</h3><span>{template.pricing_features?.length || 0} campaign benefits</span></div><div className={styles.featuresGrid}>{(template.pricing_features || []).map((feature) => <div className={styles.feature} key={feature}><span className={styles.featureMark}>✓</span><span>{feature}</span></div>)}</div></article>
-          <aside className={styles.priceCard} aria-label="Order summary"><div className={styles.priceTop}><p className={styles.priceLabel}>Template price</p><div className={styles.priceRow}>{template.compare_at_price_amount ? <span className={styles.comparePrice}>{money(template.compare_at_price_amount, template.currency)}</span> : null}<strong className={styles.currentPrice}>{money(template.price_amount, template.currency)}</strong></div><p className={styles.priceTerm}>{template.price_label}</p></div><div className={styles.priceBody}><div className={styles.orderLine}><span>Campaign</span><strong>{templateName}</strong></div><p className={styles.checkoutCopy}>Your campaign is created after Stripe confirms the payment or an approved promotion code.</p><button type="button" className={styles.checkoutButton} onClick={() => void openSecureCheckout()} disabled={checkoutLoading || !postcodeInfo.valid}>{checkoutLoading ? "Opening secure checkout…" : template.payment_required === false ? "Use free template" : "Continue to secure checkout"}</button><div className={styles.secureNote}><b>↗</b><span>You will be redirected to Stripe. Duplicate checkout requests are blocked while loading.</span></div></div></aside>
+        {!loading && !template ? <div className={styles.emptyState}>
+          <h2>Your campaign starts with a template</h2>
+          <p>Choose a template and add your postcode to continue.</p>
+          <Link className={styles.backLink} href="/dashboard?panel=templates">Browse templates <ArrowRight size={16} aria-hidden="true" /></Link>
         </div> : null}
+        {template ? <div className={styles.checkoutGrid}>
+          <article className={styles.summaryCard}>
+            <p className={styles.templateTag}>Your campaign</p>
+            <h2>{templateName}</h2>
+            <p className={styles.description}>{template.description}</p>
+            <dl className={styles.metaGrid}>
+              <div className={styles.metaItem}><dt>Target role</dt><dd>{template.role}</dd></div>
+              <div className={styles.metaItem}><dt>Location</dt><dd>{postcodeInfo.label}</dd></div>
+            </dl>
+            <div className={styles.matchingCard}>
+              <MapPin size={20} aria-hidden="true" />
+              <div><strong>Matched to your area</strong><p>We use postcode {postcodeInfo.postcode} to find nearby jobs and providers that cover your area.</p></div>
+            </div>
+            {template.pricing_features?.length ? <div className={styles.featuresSection}>
+              <h3>What?s included</h3>
+              <ul className={styles.featuresGrid}>{template.pricing_features.map((feature, index) =>
+                <li className={styles.feature} key={`${index}-${feature}`}><Check size={17} aria-hidden="true" /><span>{feature}</span></li>
+              )}</ul>
+            </div> : null}
+          </article>
+          <aside className={styles.priceCard} aria-labelledby="order-title">
+            <div className={styles.priceTop}>
+              <h2 id="order-title">Order summary</h2>
+              <p className={styles.priceLabel}>Template price</p>
+              <div className={styles.priceRow}>
+                <strong className={styles.currentPrice}>{money(template.price_amount, template.currency)}</strong>
+                <span className={styles.currency}>{template.currency.toUpperCase()}</span>
+                {template.compare_at_price_amount && template.compare_at_price_amount > template.price_amount ? <span className={styles.comparePrice}><span className={styles.srOnly}>Previously </span>{money(template.compare_at_price_amount, template.currency)}</span> : null}
+              </div>
+              <p className={styles.priceTerm}>{template.price_label}</p>
+            </div>
+            <div className={styles.priceBody}>
+              <div className={styles.orderLine}><span>Campaign</span><strong>{templateName}</strong></div>
+              <p className={styles.checkoutCopy}>Your campaign is created once checkout is confirmed.</p>
+              <button type="button" className={styles.checkoutButton} onClick={() => void openSecureCheckout()} disabled={checkoutLoading || !postcodeInfo.valid} aria-busy={checkoutLoading}>
+                <span>{checkoutLoading ? "Opening checkout?" : template.payment_required === false ? "Use free template" : "Continue to payment"}</span>
+                {!checkoutLoading ? <ArrowRight size={18} aria-hidden="true" /> : null}
+              </button>
+              <p className={styles.secureNote}><LockKeyhole size={14} aria-hidden="true" /><span>Secure checkout with Stripe</span></p>
+            </div>
+          </aside>
+        </div> : null}
+        <footer className={styles.footer}>Need a hand? <Link href="/support">Contact support</Link></footer>
       </section>
     </main>
   );
