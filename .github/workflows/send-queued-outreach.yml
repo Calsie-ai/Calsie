@@ -2,7 +2,7 @@ name: Send queued outreach
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/1444 * * * *"
   workflow_dispatch:
 
 jobs:
