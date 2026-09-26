@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../providers/AuthProvider";
-import { getSupabaseClient } from "../../../lib/supabaseClient";
+import { getSupabaseClient, initialOAuthReturn } from "../../../lib/supabaseClient";
+import { consumeOAuthDestination, oauthSessionStorage } from "../../../lib/oauthReturn";
 import { loginPathFor, safeInternalPath } from "../../../lib/navigation";
 import "./callback-theme.css";
 
@@ -21,9 +22,11 @@ function AuthCallbackContent() {
     let redirectTimer: number | undefined;
 
     async function finishLogin() {
-      const nextPath = safeInternalPath(searchParams.get("next"));
+      const savedNext = consumeOAuthDestination(oauthSessionStorage());
+      const nextPath = safeInternalPath(searchParams.get("next") || savedNext);
 
       try {
+        if (initialOAuthReturn?.result.kind === "error") throw new Error("Google sign-in could not be completed. Please try again.");
         const code = searchParams.get("code");
         if (code) {
           const { error } = await getSupabaseClient().auth.exchangeCodeForSession(code);
@@ -34,7 +37,7 @@ function AuthCallbackContent() {
         if (!session) {
           setIsError(true);
           setMessage("Login session was not created. Returning you to login…");
-          redirectTimer = window.setTimeout(() => router.replace(loginPathFor(nextPath)), 1500);
+          redirectTimer = window.setTimeout(() => router.replace(`${loginPathFor(nextPath)}&oauthError=1`), 1500);
           return;
         }
 
@@ -43,7 +46,7 @@ function AuthCallbackContent() {
       } catch (error) {
         setIsError(true);
         setMessage(error instanceof Error ? error.message : "Sign-in failed.");
-        redirectTimer = window.setTimeout(() => router.replace(loginPathFor(nextPath)), 2000);
+        redirectTimer = window.setTimeout(() => router.replace(`${loginPathFor(nextPath)}&oauthError=1`), 2000);
       }
     }
 
