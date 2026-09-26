@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../providers/AuthProvider";
+import { rememberOAuthDestination, consumeOAuthDestination, oauthSessionStorage } from "../../lib/oauthReturn";
 import { safeInternalPath } from "../../lib/navigation";
 import { supabase } from "../../lib/supabaseClient";
 import { normaliseAppError, withActionTimeout } from "../../lib/actionState";
@@ -81,13 +82,14 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const { refresh, status } = useAuth();
   const nextPath = safeInternalPath(searchParams.get("next"));
+  const oauthFailed = searchParams.get("oauthError") === "1";
   const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<"success" | "error" | "info">("info");
+  const [message, setMessage] = useState(searchParams.get("oauthError") ? "Google sign-in could not be completed. Please try again." : "");
+  const [messageType, setMessageType] = useState<"success" | "error" | "info">(searchParams.get("oauthError") ? "error" : "info");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -98,9 +100,10 @@ function LoginContent() {
 
   useEffect(() => {
     if (status !== "authenticated" || (!redirectWhenAuthenticated && mode !== "login")) return;
+    if (oauthFailed && !redirectWhenAuthenticated) return;
     router.replace(nextPath);
     router.refresh();
-  }, [mode, nextPath, redirectWhenAuthenticated, router, status]);
+  }, [mode, nextPath, oauthFailed, redirectWhenAuthenticated, router, status]);
 
   /* The OAuth handoff navigates the tab away, so the success path never runs
      its own cleanup. If the user cancels at Google, hits Back, or the redirect
@@ -142,6 +145,7 @@ function LoginContent() {
 
     try {
       const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+      rememberOAuthDestination(nextPath, oauthSessionStorage());
       const { error } = await withActionTimeout(supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } }));
       if (error) throw error;
     } catch (error) {
@@ -149,6 +153,7 @@ function LoginContent() {
         clearTimeout(oauthTimer.current);
         oauthTimer.current = null;
       }
+      consumeOAuthDestination(oauthSessionStorage());
       setMessageType("error");
       setMessage(friendlyAuthError(error));
       setGoogleLoading(false);

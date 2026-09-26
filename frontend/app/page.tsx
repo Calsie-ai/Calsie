@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { rememberOAuthDestination, consumeOAuthDestination, oauthSessionStorage } from "../lib/oauthReturn";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { CALSIE_CONTACT_EMAIL } from "../lib/contact";
 import "./landing-macos.css";
@@ -505,9 +506,11 @@ export default function HomePage() {
     try {
       const supabase = getSupabaseClient();
       const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/dashboard?panel=overview")}`;
+      rememberOAuthDestination("/dashboard?panel=overview", oauthSessionStorage());
       const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
       if (error) throw error;
     } catch (error) {
+      consumeOAuthDestination(oauthSessionStorage());
       if (oauthTimer.current) {
         clearTimeout(oauthTimer.current);
         oauthTimer.current = null;
