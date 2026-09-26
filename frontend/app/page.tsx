@@ -5,6 +5,7 @@ import { rememberOAuthDestination, consumeOAuthDestination, oauthSessionStorage 
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { CALSIE_CONTACT_EMAIL } from "../lib/contact";
 import "./landing-macos.css";
+import Testimonials from "./components/Testimonials";
 
 /* Hero background grid. Coordinates are in the SVG viewBox (1200x800), which
    stretches to the hero via preserveAspectRatio="none", so a straight linear
@@ -1776,6 +1777,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <Testimonials />
 
       <section className="cta-banner">
         <div className="wrap">
