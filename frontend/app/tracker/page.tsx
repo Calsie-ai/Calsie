@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
 import { ACTION_TIMEOUTS, isAbortError, normaliseAppError, readJsonResponse, withActionTimeout } from "../../lib/actionState";
 import { isTheme, THEME_STORAGE_KEY } from "../../lib/theme";
+import JobSwipeDeck from "./JobSwipeDeck";
 import styles from "./tracker.module.css";
 
 type Campaign = {
@@ -38,6 +39,10 @@ type ReviewOpportunity = {
   ai_reason?: string | null;
   service_categories?: string[] | null;
   service_postcodes?: string[] | null;
+  salary?: string | null;
+  job_type?: string | null;
+  posted_at?: string | null;
+  company_logo?: string | null;
 };
 
 type LegacyJob = {
@@ -53,21 +58,11 @@ type LegacyJob = {
 type Tab = "review" | "tracker" | "history";
 type Decision = "approved" | "skipped";
 
-type DayGroup = {
-  key: string;
-  batchDate: string | null;
-  campaignDay: number | null;
-  items: ReviewOpportunity[];
-  waiting: number;
-  approved: number;
-  skipped: number;
-};
-
+const PAGE_SIZE = 500;
+const MAX_HISTORY_ROWS = 5000;
 const MIN_SHEET_ZOOM = 70;
 const MAX_SHEET_ZOOM = 130;
 const SHEET_ZOOM_STEP = 10;
-const PAGE_SIZE = 500;
-const MAX_HISTORY_ROWS = 5000;
 
 function messageFrom(error: unknown, fallback: string) {
   return normaliseAppError(error, fallback) || fallback;
@@ -76,17 +71,13 @@ function messageFrom(error: unknown, fallback: string) {
 function formatDate(value: string | null) {
   if (!value) return "Not recorded";
   const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function formatBatchDate(value: string | null) {
   if (!value) return "DATE NOT RECORDED";
   const date = new Date(`${value}T12:00:00`);
-  return Number.isNaN(date.getTime())
-    ? value.toUpperCase()
-    : date.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
+  return Number.isNaN(date.getTime()) ? value.toUpperCase() : date.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
 }
 
 function shortDescription(value: string | null) {
@@ -111,42 +102,6 @@ function isPending(opportunity: ReviewOpportunity) {
   return !opportunity.status || opportunity.status === "pending_review";
 }
 
-function statusLabel(opportunity: ReviewOpportunity) {
-  if (opportunity.status === "approved") return "Smashed";
-  if (opportunity.status === "skipped") return "Passed";
-  return "Awaiting review";
-}
-
-function statusClass(opportunity: ReviewOpportunity) {
-  if (opportunity.status === "approved") return styles.statusSmashed;
-  if (opportunity.status === "skipped") return styles.statusPassed;
-  return styles.statusPending;
-}
-
-function groupOpportunities(items: ReviewOpportunity[]): DayGroup[] {
-  const groups = new Map<string, ReviewOpportunity[]>();
-  for (const item of items) {
-    const key = `${item.batch_date || "unknown"}:${item.campaign_day ?? "unknown"}`;
-    const group = groups.get(key) || [];
-    group.push(item);
-    groups.set(key, group);
-  }
-
-  return [...groups.entries()].map(([key, groupItems]) => ({
-    key,
-    batchDate: groupItems[0]?.batch_date || null,
-    campaignDay: groupItems[0]?.campaign_day ?? null,
-    items: groupItems,
-    waiting: groupItems.filter(isPending).length,
-    approved: groupItems.filter((item) => item.status === "approved").length,
-    skipped: groupItems.filter((item) => item.status === "skipped").length,
-  })).sort((a, b) => {
-    const dateCompare = (b.batchDate || "").localeCompare(a.batchDate || "");
-    if (dateCompare !== 0) return dateCompare;
-    return (b.campaignDay || 0) - (a.campaignDay || 0);
-  });
-}
-
 export default function TrackerPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -156,45 +111,23 @@ export default function TrackerPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [opportunities, setOpportunities] = useState<ReviewOpportunity[]>([]);
   const [legacyJobs, setLegacyJobs] = useState<LegacyJob[]>([]);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [bulkBusy, setBulkBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [sheetZoom, setSheetZoom] = useState(100);
   const decisionGuardsRef = useRef(new Set<string>());
-  const bulkGuardRef = useRef(false);
   const loadAbortRef = useRef<AbortController | null>(null);
 
   const pendingOpportunities = useMemo(() => opportunities.filter(isPending), [opportunities]);
   const approvedOpportunities = useMemo(() => opportunities.filter((item) => item.status === "approved"), [opportunities]);
   const skippedOpportunities = useMemo(() => opportunities.filter((item) => item.status === "skipped"), [opportunities]);
-  const dayGroups = useMemo(() => groupOpportunities(opportunities), [opportunities]);
-  const summary = useMemo(() => ({
-    waiting: pendingOpportunities.length,
-    approved: approvedOpportunities.length,
-    skipped: skippedOpportunities.length,
-    legacy: legacyJobs.length,
-  }), [approvedOpportunities.length, legacyJobs.length, pendingOpportunities.length, skippedOpportunities.length]);
-  const allSelected = pendingOpportunities.length > 0 && selectedIds.length === pendingOpportunities.length;
+  const currentOpportunity = pendingOpportunities[0] || null;
+  const summary = useMemo(() => ({ waiting: pendingOpportunities.length, approved: approvedOpportunities.length, skipped: skippedOpportunities.length }), [approvedOpportunities.length, pendingOpportunities.length, skippedOpportunities.length]);
   const sheetStyle = { "--sheet-zoom": sheetZoom / 100 } as CSSProperties;
 
   function publishCounts(approvedCount: number) {
-    if (window.parent !== window) {
-      window.parent.postMessage({ type: "applix-tracker-counts", approvedCount }, window.location.origin);
-    }
-  }
-
-  function initialiseExpandedGroups(groups: DayGroup[]) {
-    setExpandedGroups((current) => {
-      const next = { ...current };
-      groups.forEach((group, index) => {
-        if (!(group.key in next)) next[group.key] = index === 0 || group.waiting > 0;
-      });
-      return next;
-    });
+    if (window.parent !== window) window.parent.postMessage({ type: "applix-tracker-counts", approvedCount }, window.location.origin);
   }
 
   async function load(options: { quiet?: boolean } = {}) {
@@ -243,7 +176,6 @@ export default function TrackerPage() {
       }
 
       setOpportunities(loadedOpportunities);
-      initialiseExpandedGroups(groupOpportunities(loadedOpportunities));
       publishCounts(loadedOpportunities.filter((item) => item.status === "approved").length);
 
       if (!options.quiet) {
@@ -257,8 +189,6 @@ export default function TrackerPage() {
         if (legacyResult.error) throw legacyResult.error;
         setLegacyJobs((legacyResult.data || []) as LegacyJob[]);
       }
-
-      setSelectedIds((current) => current.filter((key) => loadedOpportunities.some((item) => isPending(item) && opportunityKey(item) === key)));
     } catch (loadError) {
       if (isAbortError(loadError)) return;
       setError(messageFrom(loadError, "Could not load the review history."));
@@ -284,21 +214,11 @@ export default function TrackerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  // This page is embedded in a same-origin iframe on the dashboard. The
-  // root layout's theme script already applies the stored theme on first
-  // paint, but it runs once — so when the user flips the dashboard's
-  // toggle while the frame is open, mirror that here too. `storage` only
-  // fires in *other* documents sharing the origin, which is exactly this
-  // case. Only the attribute is set: writing back to localStorage would
-  // bounce the change between the two documents.
   useEffect(() => {
     function syncTheme(event: StorageEvent) {
       if (event.key !== THEME_STORAGE_KEY) return;
-      if (isTheme(event.newValue)) {
-        document.documentElement.setAttribute("data-theme", event.newValue);
-      } else {
-        document.documentElement.removeAttribute("data-theme");
-      }
+      if (isTheme(event.newValue)) document.documentElement.setAttribute("data-theme", event.newValue);
+      else document.documentElement.removeAttribute("data-theme");
     }
     window.addEventListener("storage", syncTheme);
     return () => window.removeEventListener("storage", syncTheme);
@@ -308,7 +228,6 @@ export default function TrackerPage() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !anonKey) throw new Error("Missing Supabase environment variables.");
-
     const controller = new AbortController();
     const response = await withActionTimeout(fetch(`${supabaseUrl}/functions/v1/prepare-approved-applications`, {
       method: "POST",
@@ -343,7 +262,7 @@ export default function TrackerPage() {
 
   async function decide(opportunity: ReviewOpportunity, decision: Decision) {
     const key = opportunityKey(opportunity);
-    if (decisionGuardsRef.current.has(key) || bulkGuardRef.current || !isPending(opportunity)) return;
+    if (decisionGuardsRef.current.has(key) || !isPending(opportunity)) return;
     decisionGuardsRef.current.add(key);
     setBusyId(key);
     setMessage("");
@@ -351,17 +270,15 @@ export default function TrackerPage() {
 
     try {
       await recordDecision(opportunity, decision);
-      setSelectedIds((current) => current.filter((id) => id !== key));
       const reviewedAt = new Date().toISOString();
       const nextItems = opportunities.map((item) => opportunityKey(item) === key ? { ...item, status: decision, reviewed_at: reviewedAt } : item);
       setOpportunities(nextItems);
       publishCounts(nextItems.filter((item) => item.status === "approved").length);
-
       if (decision === "approved") {
         await prepareLiveJobs([opportunity]);
-        setMessage(`Smashed. ${opportunityLabel(opportunity)} remains in Day ${opportunity.campaign_day || "?"} history.`);
+        setMessage("Smashed. This job has been approved and moved into your application flow.");
       } else {
-        setMessage(`Passed. ${opportunityLabel(opportunity)} remains in Day ${opportunity.campaign_day || "?"} history.`);
+        setMessage("Passed. This job remains in your review history.");
       }
     } catch (decisionError) {
       setError(messageFrom(decisionError, "Could not save the decision."));
@@ -370,41 +287,6 @@ export default function TrackerPage() {
       decisionGuardsRef.current.delete(key);
       setBusyId(null);
     }
-  }
-
-  async function decideSelected(decision: Decision) {
-    const items = pendingOpportunities.filter((item) => selectedIds.includes(opportunityKey(item)));
-    if (!items.length || bulkGuardRef.current || decisionGuardsRef.current.size > 0) return;
-    bulkGuardRef.current = true;
-    setBulkBusy(true);
-    setMessage("");
-    setError("");
-
-    try {
-      for (const item of items) await recordDecision(item, decision);
-      const decidedKeys = new Set(items.map(opportunityKey));
-      const reviewedAt = new Date().toISOString();
-      const nextItems = opportunities.map((item) => decidedKeys.has(opportunityKey(item)) ? { ...item, status: decision, reviewed_at: reviewedAt } : item);
-      setSelectedIds([]);
-      setOpportunities(nextItems);
-      publishCounts(nextItems.filter((item) => item.status === "approved").length);
-      if (decision === "approved") await prepareLiveJobs(items);
-      setMessage(`${items.length} opportunities ${decision === "approved" ? "smashed" : "passed"}. They remain visible in their original day groups.`);
-    } catch (bulkError) {
-      setError(messageFrom(bulkError, "Could not complete the bulk decision."));
-      await load();
-    } finally {
-      bulkGuardRef.current = false;
-      setBulkBusy(false);
-    }
-  }
-
-  function toggleSelected(key: string) {
-    setSelectedIds((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
-  }
-
-  function toggleAll() {
-    setSelectedIds(allSelected ? [] : pendingOpportunities.map(opportunityKey));
   }
 
   function zoomSheet(direction: "in" | "out") {
@@ -426,112 +308,42 @@ export default function TrackerPage() {
           </header>
         )}
 
-        <section className={styles.summary}>
-          <div className={styles.summaryCard}><span>Awaiting approval</span><strong>{summary.waiting}</strong><small>Across all campaign days</small></div>
-          <div className={styles.summaryCard}><span>Smashed</span><strong>{summary.approved}</strong><small>Kept in daily history</small></div>
-          <div className={styles.summaryCard}><span>Passed</span><strong>{summary.skipped}</strong><small>Kept in daily history</small></div>
-        </section>
+        {tab !== "review" && (
+          <section className={styles.summary}>
+            <div className={styles.summaryCard}><span>Awaiting approval</span><strong>{summary.waiting}</strong><small>Across all campaign days</small></div>
+            <div className={styles.summaryCard}><span>Smashed</span><strong>{summary.approved}</strong><small>Kept in daily history</small></div>
+            <div className={styles.summaryCard}><span>Passed</span><strong>{summary.skipped}</strong><small>Kept in daily history</small></div>
+          </section>
+        )}
 
-        <div className={styles.trackerNav}>
-          <div className={styles.tabs}>
-            <button type="button" onClick={() => setTab("review")} className={`${styles.tab} ${tab === "review" ? styles.activeTab : ""}`}>Smash or Pass</button>
-            <button type="button" onClick={() => setTab("tracker")} className={`${styles.tab} ${tab === "tracker" ? styles.activeTab : ""}`}>Tracker</button>
-            <button type="button" onClick={() => setTab("history")} className={`${styles.tab} ${tab === "history" ? styles.activeTab : ""}`}>Application History</button>
+        {!embedded && (
+          <div className={styles.trackerNav}>
+            <div className={styles.tabs}>
+              <button type="button" onClick={() => setTab("review")} className={`${styles.tab} ${tab === "review" ? styles.activeTab : ""}`}>Smash or Pass</button>
+              <button type="button" onClick={() => setTab("tracker")} className={`${styles.tab} ${tab === "tracker" ? styles.activeTab : ""}`}>Tracker</button>
+              <button type="button" onClick={() => setTab("history")} className={`${styles.tab} ${tab === "history" ? styles.activeTab : ""}`}>Application History</button>
+            </div>
+            {tab !== "review" ? (
+              <div className={styles.zoomControls} aria-label="Tracker sheet zoom controls">
+                <button type="button" onClick={() => zoomSheet("out")} disabled={sheetZoom <= MIN_SHEET_ZOOM} aria-label="Zoom tracker sheet out">−</button>
+                <button type="button" className={styles.zoomValue} onClick={() => setSheetZoom(100)} aria-label="Reset tracker sheet zoom to 100 percent">{sheetZoom}%</button>
+                <button type="button" onClick={() => zoomSheet("in")} disabled={sheetZoom >= MAX_SHEET_ZOOM} aria-label="Zoom tracker sheet in">+</button>
+              </div>
+            ) : null}
           </div>
-          <div className={styles.zoomControls} aria-label="Tracker sheet zoom controls">
-            <button type="button" onClick={() => zoomSheet("out")} disabled={sheetZoom <= MIN_SHEET_ZOOM} aria-label="Zoom tracker sheet out">−</button>
-            <button type="button" className={styles.zoomValue} onClick={() => setSheetZoom(100)} aria-label="Reset tracker sheet zoom to 100 percent">{sheetZoom}%</button>
-            <button type="button" onClick={() => zoomSheet("in")} disabled={sheetZoom >= MAX_SHEET_ZOOM} aria-label="Zoom tracker sheet in">+</button>
-          </div>
-        </div>
+        )}
 
         {message && <p className={styles.notice} role="status" aria-live="polite">{message}</p>}
         {error && <p className={styles.error} role="alert">{error}</p>}
 
         {tab === "review" && (
-          <section>
-            <div className={styles.toolbar}>
-              <span className={styles.toolbarLabel}>{pendingOpportunities.length} awaiting approval · {selectedIds.length} selected · {opportunities.length} total history</span>
-              <div className={styles.toolbarRight}>
-                <button type="button" className={styles.skipSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("skipped")}>Pass selected</button>
-                <button type="button" className={styles.approveSelected} disabled={!selectedIds.length || bulkBusy} onClick={() => void decideSelected("approved")}>{bulkBusy ? "Working..." : "Smash selected"}</button>
-              </div>
-            </div>
-
-            {dayGroups.length > 0 ? (
-              <div className={styles.dayGroups}>
-                {dayGroups.map((group, groupIndex) => {
-                  const expanded = expandedGroups[group.key] ?? (groupIndex === 0 || group.waiting > 0);
-                  const pendingInGroup = group.items.filter(isPending);
-                  const allGroupSelected = pendingInGroup.length > 0 && pendingInGroup.every((item) => selectedIds.includes(opportunityKey(item)));
-                  return (
-                    <section key={group.key} className={styles.dayGroup}>
-                      <button type="button" className={styles.dayHeader} onClick={() => setExpandedGroups((current) => ({ ...current, [group.key]: !expanded }))} aria-expanded={expanded}>
-                        <span>
-                          <strong>DAY {group.campaignDay || "?"} — {formatBatchDate(group.batchDate)}</strong>
-                          <small>{group.items.length} total · {group.waiting} awaiting · {group.approved} smashed · {group.skipped} passed</small>
-                        </span>
-                        <b>{expanded ? "−" : "+"}</b>
-                      </button>
-
-                      {expanded && (
-                        <div className={styles.sheetWrap}>
-                          <div className={styles.sheetCanvas} style={sheetStyle}>
-                            <table className={styles.sheet}>
-                              <thead>
-                                <tr>
-                                  <th className={styles.rowNumber}>#</th>
-                                  <th className={styles.checkColumn}><input aria-label={`Select all waiting opportunities for Day ${group.campaignDay || "unknown"}`} type="checkbox" disabled={!pendingInGroup.length} checked={allGroupSelected} onChange={() => {
-                                    const groupKeys = pendingInGroup.map(opportunityKey);
-                                    setSelectedIds((current) => allGroupSelected ? current.filter((key) => !groupKeys.includes(key)) : [...new Set([...current, ...groupKeys])]);
-                                  }} /></th>
-                                  <th className={styles.scoreColumn}>AI score</th>
-                                  <th className={styles.titleColumn}>Opportunity</th>
-                                  <th className={styles.companyColumn}>Company</th>
-                                  <th className={styles.locationColumn}>Location</th>
-                                  <th className={styles.linkColumn}>Contact</th>
-                                  <th className={styles.actionColumn}>Status / decision</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {group.items.map((item, index) => {
-                                  const key = opportunityKey(item);
-                                  const selected = selectedIds.includes(key);
-                                  const pending = isPending(item);
-                                  return (
-                                    <tr key={key} className={selected ? styles.selectedRow : ""}>
-                                      <td className={styles.rowNumber}>{index + 1}</td>
-                                      <td className={styles.checkColumn}><input aria-label={`Select ${item.company || item.title || "opportunity"}`} type="checkbox" disabled={!pending} checked={selected} onChange={() => toggleSelected(key)} /></td>
-                                      <td><span className={styles.score}>{item.ai_role_relevance_score ?? "Fit"}</span></td>
-                                      <td className={styles.titleCell} title={item.ai_reason || item.description || ""}>
-                                        <strong>{item.title || opportunityLabel(item)}</strong>
-                                        <small>{groupIndex === 0 && pending ? "New · " : ""}{opportunityLabel(item)} · {shortDescription(item.ai_reason || item.description)}</small>
-                                      </td>
-                                      <td className={styles.companyCell}><strong>{item.company || "Unknown company"}</strong><small>{item.source || "Source not saved"}</small></td>
-                                      <td>{item.location || "—"}</td>
-                                      <td>{item.apply_url ? <a className={styles.openLink} href={item.apply_url} target="_blank" rel="noreferrer">Open</a> : "Private"}</td>
-                                      <td>
-                                        {pending ? (
-                                          <div className={styles.actions}>
-                                            <button type="button" className={styles.skip} disabled={busyId === key || bulkBusy} onClick={() => void decide(item, "skipped")}>Pass</button>
-                                            <button type="button" className={styles.approve} disabled={busyId === key || bulkBusy} onClick={() => void decide(item, "approved")}>{busyId === key ? "..." : "Smash"}</button>
-                                          </div>
-                                        ) : <span className={`${styles.statusBadge} ${statusClass(item)}`}>{statusLabel(item)}</span>}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-                    </section>
-                  );
-                })}
-              </div>
-            ) : <div className={styles.empty}><h2>{loading ? "Loading review history..." : "No campaign opportunities yet"}</h2><p>Each successful daily batch will appear here by campaign day.</p></div>}
-          </section>
+          <JobSwipeDeck
+            job={currentOpportunity}
+            waitingCount={pendingOpportunities.length}
+            busy={currentOpportunity ? busyId === opportunityKey(currentOpportunity) : false}
+            onSmash={(job) => void decide(job, "approved")}
+            onPass={(job) => void decide(job, "skipped")}
+          />
         )}
 
         {tab === "tracker" && (
