@@ -46,21 +46,12 @@ type ReviewOpportunity = {
   company_logo?: string | null;
 };
 
-type LegacyJob = {
-  id: string;
-  title: string | null;
-  company: string | null;
-  location: string | null;
-  status: string | null;
-  apply_url: string | null;
-  created_at: string | null;
-};
-
 type CategoryFeedResponse = {
   ok?: boolean;
   error?: string;
   message?: string;
-  campaign?: Campaign | null;
+  agent?: { id: string; name: string; status: string; category: "disability" | "childcare" | "aged_care" } | null;
+  agents?: Array<{ id: string; name: string; status: string; category: "disability" | "childcare" | "aged_care" }>;
   pool?: "disability" | "childcare" | "aged_care" | null;
   source_table?: string | null;
   campaigns?: Array<{ id: string; name: string | null; pool: "disability" | "childcare" | "aged_care"; template_slug: string }>;
@@ -70,7 +61,7 @@ type CategoryFeedResponse = {
 type Tab = "review" | "tracker" | "history";
 type Decision = "approved" | "skipped";
 
-const CATEGORY_JOB_FEED_URL = "https://ibgmpamvkvjzdxirzxzr.supabase.co/functions/v1/calsie-category-job-feed";
+const CATEGORY_JOB_FEED_URL = "https://ibgmpamvkvjzdxirzxzr.supabase.co/functions/v1/calsie-agent-feed";
 const MIN_SHEET_ZOOM = 70;
 const MAX_SHEET_ZOOM = 130;
 const SHEET_ZOOM_STEP = 10;
@@ -140,7 +131,6 @@ export default function TrackerPage() {
   const [agentCampaigns, setAgentCampaigns] = useState<NonNullable<CategoryFeedResponse["campaigns"]>>([]);
   const [feedMessage, setFeedMessage] = useState("");
   const [opportunities, setOpportunities] = useState<ReviewOpportunity[]>([]);
-  const [legacyJobs, setLegacyJobs] = useState<LegacyJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -189,42 +179,24 @@ export default function TrackerPage() {
       if (!selectedId) selectedId = window.localStorage.getItem(storageKey) || "";
       let feed: CategoryFeedResponse;
       try {
-        feed = await categoryFeed(session.access_token, { action: "feed", limit: 500, ...(selectedId ? { campaign_id: selectedId } : {}) }, controller.signal);
+        feed = await categoryFeed(session.access_token, { action: "feed", ...(selectedId ? { agent_id: selectedId } : {}) }, controller.signal);
       } catch (feedError) {
-        if (!selectedId || !(feedError instanceof Error) || !feedError.message.includes("unavailable to this user")) throw feedError;
+        if (!selectedId || !(feedError instanceof Error) || !feedError.message.includes("unavailable to your account")) throw feedError;
         window.localStorage.removeItem(storageKey);
-        feed = await categoryFeed(session.access_token, { action: "feed", limit: 500 }, controller.signal);
+        feed = await categoryFeed(session.access_token, { action: "feed" }, controller.signal);
       }
       const loadedOpportunities = feed.opportunities || [];
-      selectedCampaignRef.current = feed.campaign?.id || "";
-      setAgentCampaigns(feed.campaigns || []);
+      selectedCampaignRef.current = feed.agent?.id || "";
+      setAgentCampaigns((feed.agents || []).map((item) => ({ ...item, pool: item.category, template_slug: item.category })));
       setFeedMessage(feed.message || "");
-      setCampaign(feed.campaign || null);
+      setCampaign(feed.agent ? { id: feed.agent.id, name: feed.agent.name, status: feed.agent.status, location: null, target_business_type: feed.agent.category } : null);
       setOpportunities(loadedOpportunities);
-      publishCounts(loadedOpportunities, feed.campaign?.id || null);
-
-      if (!options.quiet) {
-        // Keep the old application-history screen intact. It is separate from
-        // the new category catalogue and can be migrated independently later.
-        const legacyResult = await supabase
-          .from("jobs")
-          .select("id,title,company,location,status,apply_url,created_at")
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false })
-          .limit(500)
-          .abortSignal(controller.signal);
-        if (legacyResult.error) {
-          setLegacyJobs([]);
-        } else {
-          setLegacyJobs((legacyResult.data || []) as LegacyJob[]);
-        }
-      }
+      publishCounts(loadedOpportunities, feed.agent?.id || null);
     } catch (loadError) {
       if (isAbortError(loadError)) return;
       setError(messageFrom(loadError, "Could not load your category job feed."));
       if (!options.quiet) {
         setOpportunities([]);
-        setLegacyJobs([]);
       }
     } finally {
       if (loadAbortRef.current === controller) {
@@ -263,13 +235,7 @@ export default function TrackerPage() {
     const token = sessionResult.data.session?.access_token;
     if (!token) throw new Error("Please sign in again.");
 
-    const response = await fetch("/api/agents/decision", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-      body: JSON.stringify({ campaign_id: opportunity.campaign_id, source_job_id: sourceJobId, decision }),
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || result.ok !== true) throw new Error(result.error || "Could not save the decision.");
+    await categoryFeed(token, { action: "decide", agent_id: opportunity.campaign_id, source_job_id: sourceJobId, decision });
   }
 
   async function decide(opportunity: ReviewOpportunity, decision: Decision) {
@@ -331,12 +297,12 @@ export default function TrackerPage() {
             {agentCampaigns.length === 0 && <option value="">No active care agent</option>}
             {agentCampaigns.map((item) => <option key={item.id} value={item.id}>{item.pool === "disability" ? "Disability Agent" : item.pool === "childcare" ? "Childcare Agent" : "Aged Care Agent"} · {item.name || "Campaign"}</option>)}
           </select>
-          {!campaign && <Link href="/dashboard?panel=templates">Choose an agent</Link>}
+          {!campaign && <Link href="/dashboard">Choose an agent</Link>}
         </div>
         {feedMessage && <p className={styles.notice} role="status">{feedMessage}</p>}
         {tab !== "review" && (
           <section className={styles.summary}>
-            <div className={styles.summaryCard}><span>Awaiting approval</span><strong>{summary.waiting}</strong><small>In your selected category</small></div>
+            <div className={styles.summaryCard}><span>Loaded for review</span><strong>{summary.waiting}</strong><small>More jobs load as you review</small></div>
             <div className={styles.summaryCard}><span>Smashed</span><strong>{summary.approved}</strong><small>Saved review decisions</small></div>
             <div className={styles.summaryCard}><span>Passed</span><strong>{summary.skipped}</strong><small>Saved review decisions</small></div>
           </section>
@@ -392,14 +358,6 @@ export default function TrackerPage() {
               <thead><tr><th>Company</th><th>Job title</th><th>Decision</th><th>Reviewed</th><th>Link</th></tr></thead>
               <tbody>{[...approvedOpportunities, ...skippedOpportunities].sort((a, b) => (b.reviewed_at || "").localeCompare(a.reviewed_at || "")).map((item) => <tr key={opportunityKey(item)}><td>{item.company || "Unknown"}</td><td>{item.title || "Untitled"}</td><td>{item.status === "approved" ? "Smashed" : "Passed"}</td><td>{formatDate(item.reviewed_at)}</td><td>{item.apply_url ? <a className={styles.cleanLink} href={item.apply_url} target="_blank" rel="noreferrer">Open job</a> : "—"}</td></tr>)}</tbody>
             </table></div></div>
-          </section>
-          <section className={styles.historyWrap}>
-            <div className={styles.trackerTitleRow}><strong>OLDER APPLICATION HISTORY</strong></div>
-            <div className={styles.sheetCanvas} style={sheetStyle}><table className={styles.sheet}>
-              <thead><tr><th className={styles.rowNumber}>#</th><th className={styles.companyColumn}>Company</th><th className={styles.titleColumn}>Job title</th><th className={styles.locationColumn}>Location</th><th>Status</th><th className={styles.dateColumn}>Added</th><th className={styles.linkColumn}>Link</th></tr></thead>
-              <tbody>{legacyJobs.map((job, index) => <tr key={job.id}><td className={styles.rowNumber}>{index + 1}</td><td className={styles.companyCell}><strong>{job.company || "Unknown"}</strong></td><td className={styles.titleCell}><strong>{job.title || "Untitled"}</strong></td><td>{job.location || "—"}</td><td>{job.status || "new"}</td><td>{formatDate(job.created_at)}</td><td>{job.apply_url ? <a className={styles.cleanLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td></tr>)}</tbody>
-            </table></div>
-            {!loading && legacyJobs.length === 0 && <div className={styles.empty}><h2>No application history yet</h2></div>}
           </section>
           </>
         )}

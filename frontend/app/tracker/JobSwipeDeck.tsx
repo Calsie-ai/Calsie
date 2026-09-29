@@ -128,7 +128,7 @@ export default function JobSwipeDeck({ job, waitingCount, busy, onSmash, onPass 
         </div>
       </div>
 
-      <p style={{ margin: "22px 0 0", textAlign: "center", fontSize: 12, color: "rgba(255,255,255,.38)" }}>{waitingCount} job{waitingCount === 1 ? "" : "s"} waiting in this review queue</p>
+      <p style={{ margin: "22px 0 0", textAlign: "center", fontSize: 12, color: "rgba(255,255,255,.38)" }}>{waitingCount} job{waitingCount === 1 ? "" : "s"} loaded for review</p>
     </section>
   );
 }

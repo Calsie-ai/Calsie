@@ -1,9 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Calsie identity, templates, campaigns and dashboard state live in the main
-// project. The public key is safe for browsers; RLS controls data access.
-const supabaseUrl = "https://bnshgtrqbfuphhhdgccs.supabase.co";
-const supabaseAnonKey = "sb_publishable_HLFwtpqvm2UVxVgzR9WhBQ_KL_B1Tfo";
+// Independent Calsie identity and agent state live with the Jobs catalogue.
+const supabaseUrl = "https://ibgmpamvkvjzdxirzxzr.supabase.co";
+const supabaseAnonKey = "sb_publishable_tcLwrdaARcGb1aDhTLJohA_U5XT1jIS";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
