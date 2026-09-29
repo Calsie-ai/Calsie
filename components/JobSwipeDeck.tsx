@@ -1,8 +1,5 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-
 type JobCard = {
   match_id?: string;
   id: string;
@@ -22,163 +19,88 @@ type Props = {
   initialJobs: JobCard[];
 };
 
+function postedLabel(createdAt: string | null) {
+  if (!createdAt) return "Recently";
+  const created = new Date(createdAt).getTime();
+  const days = Math.max(0, Math.floor((Date.now() - created) / 86400000));
+  if (days === 0) return "Today";
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
+}
+
 export default function JobSwipeDeck({ initialJobs }: Props) {
-  const supabase = createClientComponentClient();
-  const [jobs, setJobs] = useState<JobCard[]>(initialJobs || []);
-  const [dragStartX, setDragStartX] = useState<number | null>(null);
-  const [dragX, setDragX] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [lastAction, setLastAction] = useState<string | null>(null);
-
-  const current = jobs[0];
-  const remaining = Math.max(jobs.length - 1, 0);
-
-  const emailLabel = useMemo(() => {
-    if (!current) return "";
-    return current.extracted_email ? "Email found" : "No email yet";
-  }, [current]);
-
-  const swipeHint = dragX > 40 ? "Approve" : dragX < -40 ? "Skip" : "Review";
-  const rotate = Math.max(-8, Math.min(8, dragX / 18));
-
-  async function decide(job: JobCard, decision: "approved" | "skipped") {
-    if (!job || busy) return;
-    setBusy(true);
-
-    if (!job.campaign_id) {
-      setBusy(false);
-      alert("Campaign information is missing for this job.");
-      return;
-    }
-
-    const { data: updated, error } = await supabase.rpc(
-      "decide_campaign_job",
-      {
-        p_campaign_id: job.campaign_id,
-        p_job_id: job.id,
-        p_decision: decision,
-      }
-    );
-
-    if (!error && updated !== true) {
-      setBusy(false);
-      alert("This job could not be updated or is no longer available.");
-      return;
-    }
-
-    setBusy(false);
-    setDragX(0);
-    setDragStartX(null);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setLastAction(decision === "approved" ? "Approved for apply queue" : "Skipped");
-    setJobs((previous) => previous.filter((item) => item.id !== job.id));
-  }
-
-  function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (busy) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setDragStartX(event.clientX);
-  }
-
-  function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (busy || dragStartX === null) return;
-    setDragX(event.clientX - dragStartX);
-  }
-
-  function onPointerUp(event: React.PointerEvent<HTMLDivElement>) {
-    if (!current || dragStartX === null) return;
-    const distance = event.clientX - dragStartX;
-    setDragStartX(null);
-
-    if (distance > 90) return decide(current, "approved");
-    if (distance < -90) return decide(current, "skipped");
-    setDragX(0);
-  }
+  // UI mock only: intentionally no swipe decisions, RPC calls, or persistence yet.
+  const current = initialJobs?.[0];
 
   if (!current) {
     return (
-      <div className="rounded-[2rem] border border-white/10 bg-white/[0.06] p-8 text-center text-white shadow-2xl">
-        <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-emerald-400/15 text-2xl">✓</div>
-        <h2 className="text-2xl font-black">No jobs left to review</h2>
-        <p className="mt-2 text-sm text-white/70">Applix will add more cards when the agent finds new Indeed jobs.</p>
-        {lastAction && <p className="mt-4 text-xs uppercase tracking-[0.25em] text-pink-300">Last action: {lastAction}</p>}
-      </div>
+      <section className="rounded-[2rem] bg-white p-8 text-center text-slate-900 shadow-2xl">
+        <h2 className="text-2xl font-black">No job card available</h2>
+        <p className="mt-2 text-sm text-slate-500">A fetched job will appear here when one is available.</p>
+      </section>
     );
   }
 
+  const summary = current.description || "Job description will appear here from the existing fetched job data.";
+
   return (
-    <section className="mx-auto flex w-full max-w-xl flex-col gap-4">
-      <div className="flex items-center justify-between rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-white/60">
-        <span>{remaining} more waiting</span>
-        <span className={dragX > 40 ? "text-emerald-300" : dragX < -40 ? "text-rose-300" : "text-white/60"}>{swipeHint}</span>
-      </div>
-
-      <div
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        style={{ transform: `translateX(${dragX}px) rotate(${rotate}deg)` }}
-        className="touch-pan-y select-none rounded-[2rem] border border-white/10 bg-gradient-to-b from-slate-950 to-slate-900 p-6 text-white shadow-2xl transition-transform duration-150"
-      >
-        <div className="mb-4 flex items-center justify-between gap-3 text-xs uppercase tracking-[0.25em] text-white/50">
-          <span>{current.source || "Indeed"}</span>
-          <span className={current.extracted_email ? "text-emerald-300" : "text-amber-300"}>{emailLabel}</span>
-        </div>
-
-        <h1 className="text-3xl font-black leading-tight">{current.title || "Untitled job"}</h1>
-        <p className="mt-3 text-xl font-semibold text-pink-300">{current.company || "Unknown company"}</p>
-        <p className="mt-1 text-white/70">{current.location || "Location not listed"}</p>
-
-        <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-            <p className="text-white/40">Decision</p>
-            <p className="font-bold">Needs review</p>
+    <section className="mx-auto w-full max-w-2xl pb-10">
+      <article className="rounded-[2rem] bg-[#fbfbfc] p-5 text-slate-900 shadow-[0_22px_60px_rgba(0,0,0,0.28)] sm:p-7">
+        <div className="flex items-start gap-4">
+          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-slate-100 text-center text-[10px] font-black leading-tight text-slate-600">
+            {current.company ? current.company.slice(0, 2).toUpperCase() : "CO"}
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-            <p className="text-white/40">Apply route</p>
-            <p className="font-bold">{current.extracted_email ? "Email" : "Job URL"}</p>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-black leading-tight sm:text-3xl">{current.title || "Untitled job"}</h1>
+            <p className="mt-1 truncate text-lg text-slate-500 sm:text-xl">{current.company || "Company not listed"}</p>
           </div>
         </div>
 
-        <p className="mt-5 line-clamp-6 text-sm leading-6 text-white/70">
-          {current.description || "No description was saved for this job."}
-        </p>
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="rounded-full bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-700">$ Salary</div>
+          <div className="rounded-full bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-700">⌖ {current.location || "Location"}</div>
+          <div className="col-span-2 rounded-full bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-700 sm:col-span-1">▣ Job type</div>
+        </div>
 
-        {current.apply_url && (
-          <a
-            href={current.apply_url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-5 block rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm font-semibold text-white"
-          >
-            Open Indeed job post
-          </a>
-        )}
+        <div className="mt-5 rounded-3xl bg-slate-100/90 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Summary</p>
+          <p className="mt-3 line-clamp-4 text-base leading-7 text-slate-700 sm:text-lg">{summary}</p>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="rounded-2xl bg-slate-100 p-3 text-center">
+            <p className="text-xs text-slate-400">Posted at</p>
+            <p className="mt-1 text-sm font-black text-slate-800">{postedLabel(current.created_at)}</p>
+          </div>
+          <div className="rounded-2xl bg-slate-100 p-3 text-center">
+            <p className="text-xs text-slate-400">From</p>
+            <p className="mt-1 truncate text-sm font-black capitalize text-slate-800">{current.source || "Job source"}</p>
+          </div>
+          <div className="rounded-2xl bg-slate-100 p-3 text-center">
+            <p className="text-xs text-slate-400">Compatibility</p>
+            <p className="mt-1 rounded-full bg-emerald-100 px-2 py-1 text-sm font-black text-emerald-900">9/10</p>
+          </div>
+        </div>
+      </article>
+
+      <div className="mt-5 text-center">
+        <div className="text-2xl font-bold text-white">⌃</div>
+        <div className="mx-auto mt-1 h-1.5 w-16 rounded-full bg-white/25" />
+        <p className="mt-3 text-sm text-white/70">Swipe up for more job details</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          disabled={busy}
-          onClick={() => decide(current, "skipped")}
-          className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-lg font-black text-white disabled:opacity-50"
-        >
-          ← Skip
-        </button>
-        <button
-          disabled={busy}
-          onClick={() => decide(current, "approved")}
-          className="rounded-2xl bg-pink-500 px-5 py-4 text-lg font-black text-white shadow-lg shadow-pink-500/20 disabled:opacity-50"
-        >
-          Approve →
-        </button>
+      <div className="mt-8 grid grid-cols-2 gap-8 px-5 sm:px-16">
+        <div className="text-center">
+          <button aria-label="Smash" className="mx-auto grid h-28 w-28 place-items-center rounded-full border border-[#ff5a1f] bg-[#ff5a1f]/5 text-5xl text-[#ff5a1f] shadow-[0_0_32px_rgba(255,90,31,0.16)]">♥</button>
+          <p className="mt-4 text-xl font-black">Smash</p>
+          <p className="mt-1 text-sm text-white/45">Swipe left</p>
+        </div>
+        <div className="text-center">
+          <button aria-label="Pass" className="mx-auto grid h-28 w-28 place-items-center rounded-full border border-white/25 bg-white/[0.02] text-5xl font-light text-white/75">×</button>
+          <p className="mt-4 text-xl font-black">Pass</p>
+          <p className="mt-1 text-sm text-white/45">Swipe right</p>
+        </div>
       </div>
-
-      <p className="text-center text-xs text-white/50">Swipe right to approve for apply queue. Swipe left to skip.</p>
     </section>
   );
 }
