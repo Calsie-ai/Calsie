@@ -1,0 +1,5 @@
+# One reviewed application function slug per line.
+# Intentionally empty: legacy application functions have not yet been approved
+# for the new project's schema, secrets, JWT settings and user access policies.
+# Apify scraping, collection, filtering and storage belong to a separate unit.
+# See docs/deployment-workflow.md before adding a function.

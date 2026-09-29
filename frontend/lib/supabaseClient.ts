@@ -1,8 +1,17 @@
+import { oauthReturnFromUrl } from "./oauthReturn";
 import { createClient } from "@supabase/supabase-js";
 
 // Independent Calsie identity and agent state live with the Jobs catalogue.
 const supabaseUrl = "https://ibgmpamvkvjzdxirzxzr.supabase.co";
 const supabaseAnonKey = "sb_publishable_tcLwrdaARcGb1aDhTLJohA_U5XT1jIS";
+
+// Capture only return metadata before Supabase consumes the token fragment.
+// Access/refresh tokens are never copied into this record.
+export const initialOAuthReturn = typeof window === "undefined" ? null : {
+  pathname: window.location.pathname,
+  next: new URLSearchParams(window.location.search).get("next"),
+  result: oauthReturnFromUrl(window.location.href),
+};
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
