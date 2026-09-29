@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
+// Calsie identity, templates, campaigns and dashboard state live in the main
+// project. The public key is safe for browsers; RLS controls data access.
+const supabaseUrl = "https://bnshgtrqbfuphhhdgccs.supabase.co";
+const supabaseAnonKey = "sb_publishable_HLFwtpqvm2UVxVgzR9WhBQ_KL_B1Tfo";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -25,9 +27,5 @@ supabase.auth.signInWithOAuth = ((credentials) => {
 }) as typeof supabase.auth.signInWithOAuth;
 
 export function getSupabaseClient() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    throw new Error("Missing Supabase environment variables. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.");
-  }
-
   return supabase;
 }
