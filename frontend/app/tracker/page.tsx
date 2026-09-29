@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseClient } from "../../lib/supabaseClient";
-import { ACTION_TIMEOUTS, isAbortError, normaliseAppError, readJsonResponse, withActionTimeout } from "../../lib/actionState";
+import { isAbortError, normaliseAppError } from "../../lib/actionState";
 import { isTheme, THEME_STORAGE_KEY } from "../../lib/theme";
 import JobSwipeDeck from "./JobSwipeDeck";
 import styles from "./tracker.module.css";
@@ -21,6 +21,7 @@ type ReviewOpportunity = {
   opportunity_type: "live_job" | "direct_company";
   review_id: string;
   id: string | null;
+  source_job_id?: number | null;
   campaign_id: string;
   title: string | null;
   company: string | null;
@@ -55,11 +56,20 @@ type LegacyJob = {
   created_at: string | null;
 };
 
+type CategoryFeedResponse = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  campaign?: Campaign | null;
+  pool?: "disability" | "childcare" | "aged_care" | null;
+  source_table?: string | null;
+  opportunities?: ReviewOpportunity[];
+};
+
 type Tab = "review" | "tracker" | "history";
 type Decision = "approved" | "skipped";
 
-const PAGE_SIZE = 500;
-const MAX_HISTORY_ROWS = 5000;
+const CATEGORY_JOB_FEED_URL = "https://ibgmpamvkvjzdxirzxzr.supabase.co/functions/v1/calsie-category-job-feed";
 const MIN_SHEET_ZOOM = 70;
 const MAX_SHEET_ZOOM = 130;
 const SHEET_ZOOM_STEP = 10;
@@ -102,6 +112,23 @@ function isPending(opportunity: ReviewOpportunity) {
   return !opportunity.status || opportunity.status === "pending_review";
 }
 
+async function categoryFeed(token: string, body: Record<string, unknown>, signal?: AbortSignal) {
+  const response = await fetch(CATEGORY_JOB_FEED_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+  const payload = await response.json().catch(() => ({})) as CategoryFeedResponse;
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error || `Could not load the category job feed (${response.status}).`);
+  }
+  return payload;
+}
+
 export default function TrackerPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -139,59 +166,42 @@ export default function TrackerPage() {
 
     try {
       const supabase = getSupabaseClient();
-      const auth = await supabase.auth.getUser();
-      if (auth.error || !auth.data.user) {
+      const sessionResult = await supabase.auth.getSession();
+      const session = sessionResult.data.session;
+      if (sessionResult.error || !session?.user || !session.access_token) {
         router.replace("/");
         return;
       }
 
-      const campaignResult = await supabase
-        .from("campaigns")
-        .select("id,name,target_business_type,location,status")
-        .eq("user_id", auth.data.user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .abortSignal(controller.signal)
-        .maybeSingle();
-      if (campaignResult.error) throw campaignResult.error;
-
-      const latestCampaign = campaignResult.data as Campaign | null;
-      setCampaign(latestCampaign);
-
-      const loadedOpportunities: ReviewOpportunity[] = [];
-      if (latestCampaign?.id) {
-        for (let offset = 0; offset < MAX_HISTORY_ROWS; offset += PAGE_SIZE) {
-          const reviewResult = await supabase.rpc("get_review_opportunities_v2", {
-            p_campaign_id: latestCampaign.id,
-            p_limit: PAGE_SIZE,
-            p_offset: offset,
-            p_decision_status: null,
-            p_campaign_day: null,
-          }).abortSignal(controller.signal);
-          if (reviewResult.error) throw reviewResult.error;
-          const rows = (reviewResult.data || []) as ReviewOpportunity[];
-          loadedOpportunities.push(...rows);
-          if (rows.length < PAGE_SIZE) break;
-        }
-      }
-
+      // Smash or Pass now uses the category-specific Apify catalogue selected by
+      // the user's campaign template. The jobs database verifies this MAIN Calsie
+      // access token before resolving support-worker -> disability, childcare ->
+      // childcare, or agecare -> aged-care jobs.
+      const feed = await categoryFeed(session.access_token, { action: "feed", limit: 500 }, controller.signal);
+      const loadedOpportunities = feed.opportunities || [];
+      setCampaign(feed.campaign || null);
       setOpportunities(loadedOpportunities);
       publishCounts(loadedOpportunities.filter((item) => item.status === "approved").length);
 
       if (!options.quiet) {
+        // Keep the old application-history screen intact. It is separate from
+        // the new category catalogue and can be migrated independently later.
         const legacyResult = await supabase
           .from("jobs")
           .select("id,title,company,location,status,apply_url,created_at")
-          .eq("user_id", auth.data.user.id)
+          .eq("user_id", session.user.id)
           .order("created_at", { ascending: false })
           .limit(500)
           .abortSignal(controller.signal);
-        if (legacyResult.error) throw legacyResult.error;
-        setLegacyJobs((legacyResult.data || []) as LegacyJob[]);
+        if (legacyResult.error) {
+          setLegacyJobs([]);
+        } else {
+          setLegacyJobs((legacyResult.data || []) as LegacyJob[]);
+        }
       }
     } catch (loadError) {
       if (isAbortError(loadError)) return;
-      setError(messageFrom(loadError, "Could not load the review history."));
+      setError(messageFrom(loadError, "Could not load your category job feed."));
       if (!options.quiet) {
         setOpportunities([]);
         setLegacyJobs([]);
@@ -224,40 +234,20 @@ export default function TrackerPage() {
     return () => window.removeEventListener("storage", syncTheme);
   }, []);
 
-  async function prepareApprovedApplications(campaignId: string, accessToken: string) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !anonKey) throw new Error("Missing Supabase environment variables.");
-    const controller = new AbortController();
-    const response = await withActionTimeout(fetch(`${supabaseUrl}/functions/v1/prepare-approved-applications`, {
-      method: "POST",
-      headers: { "content-type": "application/json", apikey: anonKey, authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ campaign_id: campaignId, limit: 25 }),
-      signal: controller.signal,
-    }), ACTION_TIMEOUTS.ordinary, () => controller.abort());
-    const payload = await readJsonResponse<{ ok?: boolean }>(response, "Application preparation failed.");
-    if (payload.ok === false) throw new Error("Application preparation failed");
-    return payload;
-  }
-
   async function recordDecision(opportunity: ReviewOpportunity, decision: Decision) {
-    const supabase = getSupabaseClient();
-    const result = await supabase.rpc("decide_campaign_opportunity", {
-      p_opportunity_type: opportunity.opportunity_type,
-      p_review_id: opportunity.review_id,
-      p_decision: decision,
-    });
-    if (result.error) throw result.error;
-    if (result.data !== true) throw new Error(`${opportunity.company || opportunity.title || "Opportunity"} is no longer available for review.`);
-  }
+    const sourceJobId = Number(opportunity.source_job_id ?? opportunity.id);
+    if (!Number.isSafeInteger(sourceJobId) || sourceJobId <= 0) throw new Error("This Apify job does not have a valid source id.");
 
-  async function prepareLiveJobs(items: ReviewOpportunity[]) {
-    if (!items.some((item) => item.opportunity_type === "live_job")) return null;
     const supabase = getSupabaseClient();
-    const session = await supabase.auth.getSession();
-    const token = session.data.session?.access_token;
+    const sessionResult = await supabase.auth.getSession();
+    const token = sessionResult.data.session?.access_token;
     if (!token) throw new Error("Please sign in again.");
-    return prepareApprovedApplications(items[0].campaign_id, token);
+
+    await categoryFeed(token, {
+      action: "decide",
+      source_job_id: sourceJobId,
+      decision,
+    });
   }
 
   async function decide(opportunity: ReviewOpportunity, decision: Decision) {
@@ -274,12 +264,7 @@ export default function TrackerPage() {
       const nextItems = opportunities.map((item) => opportunityKey(item) === key ? { ...item, status: decision, reviewed_at: reviewedAt } : item);
       setOpportunities(nextItems);
       publishCounts(nextItems.filter((item) => item.status === "approved").length);
-      if (decision === "approved") {
-        await prepareLiveJobs([opportunity]);
-        setMessage("Smashed. This job has been approved and moved into your application flow.");
-      } else {
-        setMessage("Passed. This job remains in your review history.");
-      }
+      setMessage(decision === "approved" ? "Smashed. This job has been saved to your Calsie review decisions." : "Passed. This job has been removed from your waiting feed.");
     } catch (decisionError) {
       setError(messageFrom(decisionError, "Could not save the decision."));
       await load();
@@ -310,9 +295,9 @@ export default function TrackerPage() {
 
         {tab !== "review" && (
           <section className={styles.summary}>
-            <div className={styles.summaryCard}><span>Awaiting approval</span><strong>{summary.waiting}</strong><small>Across all campaign days</small></div>
-            <div className={styles.summaryCard}><span>Smashed</span><strong>{summary.approved}</strong><small>Kept in daily history</small></div>
-            <div className={styles.summaryCard}><span>Passed</span><strong>{summary.skipped}</strong><small>Kept in daily history</small></div>
+            <div className={styles.summaryCard}><span>Awaiting approval</span><strong>{summary.waiting}</strong><small>In your selected category</small></div>
+            <div className={styles.summaryCard}><span>Smashed</span><strong>{summary.approved}</strong><small>Saved review decisions</small></div>
+            <div className={styles.summaryCard}><span>Passed</span><strong>{summary.skipped}</strong><small>Saved review decisions</small></div>
           </section>
         )}
 
@@ -351,8 +336,8 @@ export default function TrackerPage() {
             <div className={styles.trackerTitleRow}><strong>CALSIE TRACKER</strong><span>{approvedOpportunities.length} smashed opportunit{approvedOpportunities.length === 1 ? "y" : "ies"}</span></div>
             {approvedOpportunities.length > 0 ? (
               <div className={styles.historyWrap}><div className={styles.sheetCanvas} style={sheetStyle}><table className={`${styles.sheet} ${styles.trackerSheet}`}>
-                <thead><tr><th className={styles.companyColumn}>Company</th><th className={styles.linkColumn}>Type / URL</th><th className={styles.descriptionColumn}>Description</th><th className={styles.dateColumn}>Campaign day</th><th className={styles.dateColumn}>Smashed at</th></tr></thead>
-                <tbody>{approvedOpportunities.map((item) => <tr key={opportunityKey(item)}><td className={styles.companyCell}><strong>{item.company || "Unknown company"}</strong></td><td>{item.apply_url ? <a className={styles.cleanLink} href={item.apply_url} target="_blank" rel="noreferrer">{item.opportunity_type === "live_job" ? "Open job" : "Open website"}</a> : opportunityLabel(item)}</td><td className={styles.descriptionCell}><strong>{item.title || opportunityLabel(item)}</strong><small>{shortDescription(item.ai_reason || item.description)}</small></td><td>Day {item.campaign_day || "?"}<br />{formatBatchDate(item.batch_date)}</td><td>{formatDate(item.reviewed_at)}</td></tr>)}</tbody>
+                <thead><tr><th className={styles.companyColumn}>Company</th><th className={styles.linkColumn}>Type / URL</th><th className={styles.descriptionColumn}>Description</th><th className={styles.dateColumn}>Posted</th><th className={styles.dateColumn}>Smashed at</th></tr></thead>
+                <tbody>{approvedOpportunities.map((item) => <tr key={opportunityKey(item)}><td className={styles.companyCell}><strong>{item.company || "Unknown company"}</strong></td><td>{item.apply_url ? <a className={styles.cleanLink} href={item.apply_url} target="_blank" rel="noreferrer">Open job</a> : opportunityLabel(item)}</td><td className={styles.descriptionCell}><strong>{item.title || opportunityLabel(item)}</strong><small>{shortDescription(item.ai_reason || item.description)}</small></td><td>{formatBatchDate(item.batch_date)}</td><td>{formatDate(item.reviewed_at)}</td></tr>)}</tbody>
               </table></div></div>
             ) : <div className={styles.empty}><h2>{loading ? "Loading tracker..." : "No smashed opportunities yet"}</h2><p>Items appear here after you press Smash.</p></div>}
           </section>
