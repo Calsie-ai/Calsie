@@ -63,6 +63,7 @@ type CategoryFeedResponse = {
   campaign?: Campaign | null;
   pool?: "disability" | "childcare" | "aged_care" | null;
   source_table?: string | null;
+  campaigns?: Array<{ id: string; name: string | null; pool: "disability" | "childcare" | "aged_care"; template_slug: string }>;
   opportunities?: ReviewOpportunity[];
 };
 
@@ -136,6 +137,8 @@ export default function TrackerPage() {
   const requestedView = searchParams.get("view");
   const [tab, setTab] = useState<Tab>(initialTab(requestedView));
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [agentCampaigns, setAgentCampaigns] = useState<NonNullable<CategoryFeedResponse["campaigns"]>>([]);
+  const [feedMessage, setFeedMessage] = useState("");
   const [opportunities, setOpportunities] = useState<ReviewOpportunity[]>([]);
   const [legacyJobs, setLegacyJobs] = useState<LegacyJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,6 +148,8 @@ export default function TrackerPage() {
   const [sheetZoom, setSheetZoom] = useState(100);
   const decisionGuardsRef = useRef(new Set<string>());
   const loadAbortRef = useRef<AbortController | null>(null);
+  const selectedCampaignRef = useRef("");
+  const userIdRef = useRef("");
 
   const pendingOpportunities = useMemo(() => opportunities.filter(isPending), [opportunities]);
   const approvedOpportunities = useMemo(() => opportunities.filter((item) => item.status === "approved"), [opportunities]);
@@ -153,11 +158,16 @@ export default function TrackerPage() {
   const summary = useMemo(() => ({ waiting: pendingOpportunities.length, approved: approvedOpportunities.length, skipped: skippedOpportunities.length }), [approvedOpportunities.length, pendingOpportunities.length, skippedOpportunities.length]);
   const sheetStyle = { "--sheet-zoom": sheetZoom / 100 } as CSSProperties;
 
-  function publishCounts(approvedCount: number) {
-    if (window.parent !== window) window.parent.postMessage({ type: "applix-tracker-counts", approvedCount }, window.location.origin);
+  function publishCounts(items: ReviewOpportunity[], campaignId: string | null) {
+    if (window.parent !== window) window.parent.postMessage({
+      type: "applix-tracker-counts",
+      campaignId,
+      approvedCount: items.filter((item) => item.status === "approved").length,
+      passedCount: items.filter((item) => item.status === "skipped").length,
+    }, window.location.origin);
   }
 
-  async function load(options: { quiet?: boolean } = {}) {
+  async function load(options: { quiet?: boolean; campaignId?: string } = {}) {
     loadAbortRef.current?.abort();
     const controller = new AbortController();
     loadAbortRef.current = controller;
@@ -172,16 +182,26 @@ export default function TrackerPage() {
         router.replace("/");
         return;
       }
+      userIdRef.current = session.user.id;
 
-      // Smash or Pass now uses the category-specific Apify catalogue selected by
-      // the user's campaign template. The jobs database verifies this MAIN Calsie
-      // access token before resolving support-worker -> disability, childcare ->
-      // childcare, or agecare -> aged-care jobs.
-      const feed = await categoryFeed(session.access_token, { action: "feed", limit: 500 }, controller.signal);
+      const storageKey = `calsie:agent-campaign:${session.user.id}`;
+      let selectedId = options.campaignId ?? selectedCampaignRef.current;
+      if (!selectedId) selectedId = window.localStorage.getItem(storageKey) || "";
+      let feed: CategoryFeedResponse;
+      try {
+        feed = await categoryFeed(session.access_token, { action: "feed", limit: 500, ...(selectedId ? { campaign_id: selectedId } : {}) }, controller.signal);
+      } catch (feedError) {
+        if (!selectedId || !(feedError instanceof Error) || !feedError.message.includes("unavailable to this user")) throw feedError;
+        window.localStorage.removeItem(storageKey);
+        feed = await categoryFeed(session.access_token, { action: "feed", limit: 500 }, controller.signal);
+      }
       const loadedOpportunities = feed.opportunities || [];
+      selectedCampaignRef.current = feed.campaign?.id || "";
+      setAgentCampaigns(feed.campaigns || []);
+      setFeedMessage(feed.message || "");
       setCampaign(feed.campaign || null);
       setOpportunities(loadedOpportunities);
-      publishCounts(loadedOpportunities.filter((item) => item.status === "approved").length);
+      publishCounts(loadedOpportunities, feed.campaign?.id || null);
 
       if (!options.quiet) {
         // Keep the old application-history screen intact. It is separate from
@@ -216,7 +236,7 @@ export default function TrackerPage() {
 
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => void load({ quiet: true }), 8000);
+    const timer = window.setInterval(() => void load({ quiet: true }), 30000);
     return () => {
       window.clearInterval(timer);
       loadAbortRef.current?.abort();
@@ -243,11 +263,13 @@ export default function TrackerPage() {
     const token = sessionResult.data.session?.access_token;
     if (!token) throw new Error("Please sign in again.");
 
-    await categoryFeed(token, {
-      action: "decide",
-      source_job_id: sourceJobId,
-      decision,
+    const response = await fetch("/api/agents/decision", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ campaign_id: opportunity.campaign_id, source_job_id: sourceJobId, decision }),
     });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.ok !== true) throw new Error(result.error || "Could not save the decision.");
   }
 
   async function decide(opportunity: ReviewOpportunity, decision: Decision) {
@@ -263,7 +285,7 @@ export default function TrackerPage() {
       const reviewedAt = new Date().toISOString();
       const nextItems = opportunities.map((item) => opportunityKey(item) === key ? { ...item, status: decision, reviewed_at: reviewedAt } : item);
       setOpportunities(nextItems);
-      publishCounts(nextItems.filter((item) => item.status === "approved").length);
+      publishCounts(nextItems, campaign?.id || null);
       setMessage(decision === "approved" ? "Smashed. This job has been saved to your Calsie review decisions." : "Passed. This job has been removed from your waiting feed.");
     } catch (decisionError) {
       setError(messageFrom(decisionError, "Could not save the decision."));
@@ -293,6 +315,25 @@ export default function TrackerPage() {
           </header>
         )}
 
+        <div className={styles.agentPicker}>
+          <label htmlFor="active-care-agent">Active care agent</label>
+          <select
+            id="active-care-agent"
+            value={campaign?.id || ""}
+            disabled={loading || agentCampaigns.length === 0}
+            onChange={(event) => {
+              const id = event.target.value;
+              selectedCampaignRef.current = id;
+              if (userIdRef.current) window.localStorage.setItem(`calsie:agent-campaign:${userIdRef.current}`, id);
+              void load({ campaignId: id });
+            }}
+          >
+            {agentCampaigns.length === 0 && <option value="">No active care agent</option>}
+            {agentCampaigns.map((item) => <option key={item.id} value={item.id}>{item.pool === "disability" ? "Disability Agent" : item.pool === "childcare" ? "Childcare Agent" : "Aged Care Agent"} · {item.name || "Campaign"}</option>)}
+          </select>
+          {!campaign && <Link href="/dashboard?panel=templates">Choose an agent</Link>}
+        </div>
+        {feedMessage && <p className={styles.notice} role="status">{feedMessage}</p>}
         {tab !== "review" && (
           <section className={styles.summary}>
             <div className={styles.summaryCard}><span>Awaiting approval</span><strong>{summary.waiting}</strong><small>In your selected category</small></div>
@@ -344,13 +385,23 @@ export default function TrackerPage() {
         )}
 
         {tab === "history" && (
+          <>
+          <section className={styles.trackerSheetSection}>
+            <div className={styles.trackerTitleRow}><strong>REVIEW HISTORY</strong><span>{approvedOpportunities.length + skippedOpportunities.length} decisions</span></div>
+            <div className={styles.historyWrap}><div className={styles.sheetCanvas} style={sheetStyle}><table className={styles.sheet}>
+              <thead><tr><th>Company</th><th>Job title</th><th>Decision</th><th>Reviewed</th><th>Link</th></tr></thead>
+              <tbody>{[...approvedOpportunities, ...skippedOpportunities].sort((a, b) => (b.reviewed_at || "").localeCompare(a.reviewed_at || "")).map((item) => <tr key={opportunityKey(item)}><td>{item.company || "Unknown"}</td><td>{item.title || "Untitled"}</td><td>{item.status === "approved" ? "Smashed" : "Passed"}</td><td>{formatDate(item.reviewed_at)}</td><td>{item.apply_url ? <a className={styles.cleanLink} href={item.apply_url} target="_blank" rel="noreferrer">Open job</a> : "—"}</td></tr>)}</tbody>
+            </table></div></div>
+          </section>
           <section className={styles.historyWrap}>
+            <div className={styles.trackerTitleRow}><strong>OLDER APPLICATION HISTORY</strong></div>
             <div className={styles.sheetCanvas} style={sheetStyle}><table className={styles.sheet}>
               <thead><tr><th className={styles.rowNumber}>#</th><th className={styles.companyColumn}>Company</th><th className={styles.titleColumn}>Job title</th><th className={styles.locationColumn}>Location</th><th>Status</th><th className={styles.dateColumn}>Added</th><th className={styles.linkColumn}>Link</th></tr></thead>
               <tbody>{legacyJobs.map((job, index) => <tr key={job.id}><td className={styles.rowNumber}>{index + 1}</td><td className={styles.companyCell}><strong>{job.company || "Unknown"}</strong></td><td className={styles.titleCell}><strong>{job.title || "Untitled"}</strong></td><td>{job.location || "—"}</td><td>{job.status || "new"}</td><td>{formatDate(job.created_at)}</td><td>{job.apply_url ? <a className={styles.cleanLink} href={job.apply_url} target="_blank" rel="noreferrer">Open</a> : "—"}</td></tr>)}</tbody>
             </table></div>
             {!loading && legacyJobs.length === 0 && <div className={styles.empty}><h2>No application history yet</h2></div>}
           </section>
+          </>
         )}
       </div>
     </main>

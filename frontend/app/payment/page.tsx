@@ -9,6 +9,7 @@ import { inferAustralianPostcode } from "../../lib/australianPostcode";
 import { loginPathFor } from "../../lib/navigation";
 import { readPendingIntent, savePendingIntent, type PendingIntentV1 } from "../../lib/pendingIntent";
 import { ACTION_TIMEOUTS, isAbortError, normaliseAppError, readJsonResponse, withActionTimeout } from "../../lib/actionState";
+import { careAgentForSlug } from "../../lib/careAgents";
 import styles from "./payment.module.css";
 
 type TemplateCheckout = {
@@ -204,7 +205,7 @@ function CheckoutContent() {
     }
   }
 
-  const templateName = template?.campaign_name || template?.title || "Campaign checkout";
+  const templateName = careAgentForSlug(template?.slug)?.title || template?.campaign_name || template?.title || "Campaign checkout";
 
   return (
     <main className={`${styles.page} applix-landing`} id="top">

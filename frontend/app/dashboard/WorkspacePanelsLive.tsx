@@ -24,6 +24,7 @@ import { getSupabaseClient } from "../../lib/supabaseClient";
 import { normaliseAppError } from "../../lib/actionState";
 import { inferAustralianPostcode, normaliseAustralianPostcode } from "../../lib/australianPostcode";
 import { savePendingIntent, type PendingIntentV1 } from "../../lib/pendingIntent";
+import { CARE_AGENTS, careAgentForSlug } from "../../lib/careAgents";
 import BuildResumePanel from "./BuildResumePanel";
 import GmailPanel from "./GmailPanel";
 import OverviewDashboard from "./OverviewDashboard";
@@ -100,16 +101,17 @@ type PurchaseStateResponse = {
 };
 
 export function mapTemplate(row: Row): CampaignTemplate {
+  const agent = careAgentForSlug(row.slug);
   return {
     id: row.id,
     slug: row.slug || undefined,
-    title: row.title,
-    campaignName: row.campaign_name || `${row.title} Campaign`,
+    title: agent?.title || row.title,
+    campaignName: agent?.title || row.campaign_name || `${row.title} Campaign`,
     imageUrl: row.image_url,
     role: row.role,
     location: row.location,
     description: row.description,
-    category: row.category,
+    category: agent?.category || row.category,
     queryTerms: row.query_terms || [],
     includeTitleTerms: row.include_title_terms || [],
     excludeTitleTerms: row.exclude_title_terms || [],
@@ -216,7 +218,7 @@ export default function WorkspacePanelsLive(props: Props) {
           .order("updated_at", { ascending: false })
           .abortSignal(controller.signal);
         if (error) throw error;
-        if (!controller.signal.aborted) setTemplates(((data || []) as Row[]).map(mapTemplate));
+        if (!controller.signal.aborted) setTemplates(((data || []) as Row[]).filter((row) => Boolean(CARE_AGENTS[row.slug])).map(mapTemplate));
 
         // Real "top picks" ordering, from how often each template has
         // actually been used. Best effort: if it fails the picker simply
