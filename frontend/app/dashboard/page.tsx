@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import DashboardWorkspace from "./DashboardWorkspace";
+import IndependentDashboard from "./IndependentDashboard";
 
 function DashboardLoading() {
   return (
@@ -12,7 +12,7 @@ function DashboardLoading() {
 export default function DashboardPage() {
   return (
     <Suspense fallback={<DashboardLoading />}>
-      <DashboardWorkspace />
+      <IndependentDashboard />
     </Suspense>
   );
 }

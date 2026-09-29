@@ -93,6 +93,7 @@ export default function DashboardWorkspace() {
   const returnPath = safeInternalPath(`${pathname}${query ? `?${query}` : ""}`);
   const active = parseDashboardPanel(searchParams.get("panel"));
   const [campaign, setCampaign] = useState<CampaignRecord | null>(null);
+  const campaignIdRef = useRef("");
   const [purchasedTemplate, setPurchasedTemplate] = useState<CampaignTemplate | null>(null);
   const [approvedCount, setApprovedCount] = useState(0);
   const [passedCount, setPassedCount] = useState(0);
@@ -439,11 +440,18 @@ export default function DashboardWorkspace() {
   useEffect(() => {
     const receiveTrackerCounts = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      if (event.data?.type === "applix-tracker-counts") setApprovedCount(Number(event.data.approvedCount || 0));
+      if (event.data?.type === "applix-tracker-counts") {
+        if (event.data.campaignId === campaignIdRef.current) {
+          setApprovedCount(Number(event.data.approvedCount || 0));
+          setPassedCount(Number(event.data.passedCount || 0));
+        } else if (event.data.campaignId && user?.id) {
+          void load(user.id, user.email || undefined);
+        }
+      }
     };
     window.addEventListener("message", receiveTrackerCounts);
     return () => window.removeEventListener("message", receiveTrackerCounts);
-  }, []);
+  }, [user?.id, user?.email]);
 
   function requireUser() {
     if (user) return user;
@@ -462,7 +470,7 @@ export default function DashboardWorkspace() {
     const outcome = await runAction("loadDashboard", async ({ signal }) => {
       const supabase = getSupabaseClient();
       const [campaignResult, resumeResult, gmailResult, profileResult] = await Promise.all([
-        supabase.from("campaigns").select("id,name,location,target_business_type,search,outreach,status,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).abortSignal(signal),
+        supabase.from("campaigns").select("id,name,location,target_business_type,search,outreach,status,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(100).abortSignal(signal),
         // The extra columns here are what the profile panel needs. They ride
         // along on queries this load already makes, so Profile opens with no
         // fetch of its own instead of blocking on a second round trip.
@@ -474,7 +482,9 @@ export default function DashboardWorkspace() {
       if (resumeResult.error) throw resumeResult.error;
       if (gmailResult.error) throw gmailResult.error;
       if (profileResult.error) throw profileResult.error;
-      const latestCampaign = (((campaignResult.data || [])[0] as CampaignRecord) || null);
+      const savedCampaignId = window.localStorage.getItem(`calsie:agent-campaign:${userId}`);
+      const ownedCampaigns = (campaignResult.data || []) as CampaignRecord[];
+      const latestCampaign = ownedCampaigns.find((item) => item.id === savedCampaignId) || ownedCampaigns[0] || null;
 
       const templateId = latestCampaign?.search?.template_id;
       let purchased: CampaignTemplate | null = null;
@@ -487,10 +497,22 @@ export default function DashboardWorkspace() {
       let nextApprovedCount = 0;
       let nextPassedCount = 0;
       if (latestCampaign?.id) {
-        const { data, error } = await supabase.rpc("get_campaign_tracker_counts", { p_campaign_id: latestCampaign.id }).abortSignal(signal);
-        if (error) throw error;
-        nextApprovedCount = Number(data?.[0]?.approved_count || 0);
-        nextPassedCount = Number(data?.[0]?.passed_count || 0);
+        const careAgent = ["support-worker", "childcare", "agecare"].includes(purchased?.slug || "");
+        if (careAgent) {
+          const [approved, skipped] = await Promise.all([
+            supabase.from("calsie_agent_job_decisions").select("id", { count: "exact", head: true }).eq("campaign_id", latestCampaign.id).eq("decision", "approved").abortSignal(signal),
+            supabase.from("calsie_agent_job_decisions").select("id", { count: "exact", head: true }).eq("campaign_id", latestCampaign.id).eq("decision", "skipped").abortSignal(signal),
+          ]);
+          if (approved.error) throw approved.error;
+          if (skipped.error) throw skipped.error;
+          nextApprovedCount = approved.count || 0;
+          nextPassedCount = skipped.count || 0;
+        } else {
+          const { data, error } = await supabase.rpc("get_campaign_tracker_counts", { p_campaign_id: latestCampaign.id }).abortSignal(signal);
+          if (error) throw error;
+          nextApprovedCount = Number(data?.[0]?.approved_count || 0);
+          nextPassedCount = Number(data?.[0]?.passed_count || 0);
+        }
       }
 
       return {
@@ -512,6 +534,7 @@ export default function DashboardWorkspace() {
     }, { replace: true, errorMessage: "Could not load your dashboard." });
 
     if (outcome.outcome === "success") {
+      campaignIdRef.current = outcome.value.campaign?.id || "";
       setProfileRow(outcome.value.profile);
       setResumeSignals(outcome.value.resumeSignals);
       setCampaign(outcome.value.campaign);

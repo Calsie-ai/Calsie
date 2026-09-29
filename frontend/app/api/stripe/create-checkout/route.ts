@@ -5,6 +5,7 @@ import { STRIPE_CANCEL_PATH, STRIPE_SUCCESS_PATH } from "../../../../lib/externa
 import { safeInternalPath } from "../../../../lib/navigation";
 import { registerCheckoutPurchase } from "../../../../lib/server/stripeWebhookStore";
 import { resolveAppOrigin } from "../../../../lib/serverOrigin";
+import { careAgentForSlug } from "../../../../lib/careAgents";
 
 export const runtime = "nodejs";
 
@@ -197,7 +198,7 @@ export async function POST(req: Request) {
       }, { status: 409 });
     }
 
-    const templateName = template.campaign_name || template.title;
+    const templateName = careAgentForSlug(template.slug)?.title || template.campaign_name || template.title;
     const currency = (template.currency || "aud").toLowerCase();
     const metadata: Record<string, string> = {
       user_id: currentUser.id,

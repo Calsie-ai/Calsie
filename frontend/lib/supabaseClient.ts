@@ -1,8 +1,9 @@
 import { oauthReturnFromUrl } from "./oauthReturn";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
+// Independent Calsie identity and agent state live with the Jobs catalogue.
+const supabaseUrl = "https://ibgmpamvkvjzdxirzxzr.supabase.co";
+const supabaseAnonKey = "sb_publishable_tcLwrdaARcGb1aDhTLJohA_U5XT1jIS";
 
 // Capture only return metadata before Supabase consumes the token fragment.
 // Access/refresh tokens are never copied into this record.
@@ -34,9 +35,5 @@ supabase.auth.signInWithOAuth = ((credentials) => {
 }) as typeof supabase.auth.signInWithOAuth;
 
 export function getSupabaseClient() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    throw new Error("Missing Supabase environment variables. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.");
-  }
-
   return supabase;
 }

@@ -136,6 +136,29 @@
   font-weight: 600;
 }
 
+.agentPicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 16px;
+  color: var(--tr-ink-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.agentPicker select {
+  min-width: 210px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--tr-line);
+  border-radius: 9px;
+  background: var(--tr-surface, #fff);
+  color: var(--tr-ink);
+  font: inherit;
+}
+
+.agentPicker a { color: var(--tr-accent-ink); }
+
 .backLink {
   display: inline-block;
   margin-bottom: 8px;

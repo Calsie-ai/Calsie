@@ -19,7 +19,7 @@ function friendlyAuthError(error: unknown) {
   if (raw.includes("invalid login credentials")) return "Wrong email or password. If you forgot it, use Reset password below.";
   if (raw.includes("email not confirmed") || raw.includes("confirm")) return "Your email is not confirmed yet. Check your inbox for the confirmation email before logging in.";
   if (raw.includes("invalid path specified")) return "The login redirect path was invalid. Refresh this page and try again.";
-  if (raw.includes("fetch") || raw.includes("network") || raw.includes("timeout")) return "Applix could not reach the login server. Check internet connection or Supabase environment settings.";
+  if (raw.includes("fetch") || raw.includes("network") || raw.includes("timeout")) return "Calsie could not reach the login server. Check your connection and try again.";
   return normaliseAppError(error, "Login failed. Please check your details and try again.");
 }
 
@@ -165,7 +165,7 @@ function LoginContent() {
     const authEmail = cleanEmail(email);
     if (!authEmail || !authEmail.includes("@")) {
       setMessageType("error");
-      setMessage("Enter your full email address first, then Applix can send a reset link.");
+      setMessage("Enter your full email address first, then Calsie can send a reset link.");
       return;
     }
 
@@ -241,11 +241,11 @@ function LoginContent() {
           setMode("login");
           return;
         }
-        setMessage("Account ready. Opening Applix…");
+        setMessage("Account ready. Opening Calsie…");
       } else {
         const { error } = await withActionTimeout(supabase.auth.signInWithPassword({ email: authEmail, password: authPassword }));
         if (error) throw error;
-        setMessage("Login successful. Opening Applix…");
+        setMessage("Login successful. Opening Calsie…");
       }
 
       setMessageType("success");
@@ -267,8 +267,8 @@ function LoginContent() {
     mode === "reset"
       ? "Enter your email and we'll send you a link to choose a new password."
       : mode === "signup"
-        ? "Free to create, free to browse. You only pay when you choose a campaign template."
-        : "Log in to pick up your resume profile, job matches and prepared applications.";
+        ? "Create an account and choose a Disability, Aged Care or Childcare Agent."
+        : "Log in to review jobs and see your Smash or Pass history.";
   const submitLabel = mode === "login" ? "Log in" : mode === "signup" ? "Create account" : "Send reset link";
 
   return (
