@@ -351,7 +351,7 @@ export default function ProfilePanel({
   const displayName = fullName.trim() || email.split("@")[0] || "Your account";
   const initial = (displayName.trim().charAt(0) || "?").toUpperCase();
   const running = isCampaignRunning(campaign?.status);
-  const campaignBusy = isActionLoading(actionStates, "startCampaign") || isActionLoading(actionStates, "pauseCampaign");
+  const campaignBusy = isActionLoading(actionStates, "loadDashboard") || isActionLoading(actionStates, "startCampaign") || isActionLoading(actionStates, "pauseCampaign");
   const logoutLoading = isActionLoading(actionStates, "logout");
   const revokeLoading = isActionLoading(actionStates, "revokeGmail");
   const connectLoading = isActionLoading(actionStates, "connectGmail");
@@ -691,9 +691,9 @@ export default function ProfilePanel({
             </>
           ) : (
             <>
-              <p className="ws-acct-body">Pick a campaign template to tell Calsie which roles and locations to search for you.</p>
+              <p className="ws-acct-body">Pick an agent to tell Calsie which roles and locations to search for you.</p>
               <div className="ws-acct-actions">
-                <button type="button" className="ws-btn-primary" onClick={() => onNavigate("templates")}>Browse templates</button>
+                <button type="button" className="ws-btn-primary" onClick={() => onNavigate("templates")}>Browse agents</button>
               </div>
             </>
           )}
@@ -702,8 +702,8 @@ export default function ProfilePanel({
         <section className="ws-acct-card" aria-labelledby="acct-template-heading">
           <div className="ws-acct-card-head">
             <div>
-              <small>Template</small>
-              <h3 id="acct-template-heading">{activeTemplateName || "No template selected"}</h3>
+              <small>Agent</small>
+              <h3 id="acct-template-heading">{activeTemplateName || "No agent selected"}</h3>
             </div>
             <span className="ws-acct-card-icon" aria-hidden="true"><LayoutGrid size={17} strokeWidth={2} /></span>
           </div>
@@ -726,13 +726,13 @@ export default function ProfilePanel({
           ) : (
             <p className="ws-acct-body">
               {campaign
-                ? "This campaign was set up without a saved template record."
-                : "Templates bundle the search terms, filters and locations for a role type."}
+                ? "This campaign was set up without a saved agent record."
+                : "Agents bundle the search terms, filters and locations for a role type."}
             </p>
           )}
 
           <div className="ws-acct-actions">
-            <button type="button" className="ws-btn-outline" onClick={() => onNavigate("templates")}>Browse templates</button>
+            <button type="button" className="ws-btn-outline" onClick={() => onNavigate("templates")}>Browse agents</button>
           </div>
         </section>
       </div>

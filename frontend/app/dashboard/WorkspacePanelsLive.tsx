@@ -24,7 +24,7 @@ import { getSupabaseClient } from "../../lib/supabaseClient";
 import { normaliseAppError } from "../../lib/actionState";
 import { inferAustralianPostcode, normaliseAustralianPostcode } from "../../lib/australianPostcode";
 import { savePendingIntent, type PendingIntentV1 } from "../../lib/pendingIntent";
-import { AGENT_TEMPLATES, careAgentForSlug } from "../../lib/careAgents";
+import { AGENT_TEMPLATES, careAgentForSlug, type CalsieAgent } from "../../lib/careAgents";
 import BuildResumePanel from "./BuildResumePanel";
 import GmailPanel from "./GmailPanel";
 import OverviewDashboard from "./OverviewDashboard";
@@ -37,6 +37,8 @@ const SAVED_TEMPLATES_KEY = "calsie:saved-templates";
 
 type BaseProps = ComponentProps<typeof WorkspacePanels>;
 type Props = BaseProps & {
+  ownedAgents: CalsieAgent[];
+  onOpenOwnedAgent: (agent: CalsieAgent) => void;
   approvedCount: number;
   passedCount: number;
   purchasedTemplate?: CampaignTemplate | null;
@@ -181,6 +183,7 @@ export default function WorkspacePanelsLive(props: Props) {
   const [sortAlpha, setSortAlpha] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
   const [selected, setSelected] = useState<CampaignTemplate | null>(null);
+  const [agentView, setAgentView] = useState<"browse" | "owned">("browse");
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [postcode, setPostcode] = useState("");
   const [postcodeTouched, setPostcodeTouched] = useState(false);
@@ -407,8 +410,9 @@ export default function WorkspacePanelsLive(props: Props) {
   );
 
   const selectingAgent = props.actionStates.useTemplate.status === "loading";
-  const buttonLabel = selectingAgent ? "Selecting agent…" : "Use agent";
-  const buttonAction = selectAgent;
+  const ownedAgent = props.ownedAgents.find((agent) => agent.category === selected?.id);
+  const buttonLabel = selectingAgent ? "Activating agent…" : ownedAgent ? "Open campaign" : "Choose agent";
+  const buttonAction = ownedAgent ? () => props.onOpenOwnedAgent(ownedAgent) : selectAgent;
 
   return (
     <div className="ws-panel">
@@ -425,7 +429,7 @@ export default function WorkspacePanelsLive(props: Props) {
               says which section this is, so the label was pure repetition. */}
           <header className="ws-panel-head ws-templates-hero">
             <h1 className="ws-panel-title">Agent details</h1>
-            <p className="ws-panel-sub">Review your agent and choose it to start reviewing jobs. Payments are deferred.</p>
+            <p className="ws-panel-sub">Choose your agent, then set up its campaign. Payment is deferred.</p>
           </header>
 
           <div className="ws-review-card">
@@ -447,7 +451,7 @@ export default function WorkspacePanelsLive(props: Props) {
               <h2>{selected.title}</h2>
               <span className="ws-review-ready">
                 <span className="ws-usage-check"><Check size={12} strokeWidth={3} /></span>
-                Category agent · <strong>{selected.campaignName || selected.title}</strong>
+                {ownedAgent ? "Owned agent" : "Category agent"} · <strong>{selected.campaignName || selected.title}</strong>
               </span>
             </div>
           </div>
@@ -496,7 +500,7 @@ export default function WorkspacePanelsLive(props: Props) {
             ) : null}
           </div>
 
-          <div className="ws-review-section">
+          {ownedAgent ? <div className="ws-review-section"><h3><CheckCircle2 size={16} /> Already in My Agents</h3><p>Your campaign and review history are saved. Payment deferred.</p><p>Saved location: {ownedAgent.preferences?.location || "Australia"}</p></div> : <div className="ws-review-section">
             <h3><MapPin size={16} strokeWidth={2} /> Choose campaign location</h3>
             <label className="ws-field ws-field-postcode" htmlFor="campaign-postcode">
               Australian postcode
@@ -524,7 +528,7 @@ export default function WorkspacePanelsLive(props: Props) {
               {postcodeInfo.valid ? <p className="ws-field-success">Detected location: {postcodeInfo.label}</p> : null}
             </div>
             <p className="ws-review-hint">Location is saved with your agent. The feed currently includes the entire category pool; finer location filtering comes next.</p>
-          </div>
+          </div>}
 
           <div className="ws-review-section">
             <h3><CheckCircle2 size={16} strokeWidth={2} /> Included with this agent</h3>
@@ -549,12 +553,12 @@ export default function WorkspacePanelsLive(props: Props) {
             <div className="ws-checkout-meta">
               <span>Agent</span>
               <strong>{selected.campaignName || selected.title}</strong>
-              <small>{postcodeInfo.valid ? postcodeInfo.label : "Postcode optional"}</small>
+              <small>{ownedAgent ? "Owned · Payment deferred" : postcodeInfo.valid ? postcodeInfo.label : "Postcode optional"}</small>
             </div>
-            <div className="ws-checkout-price" aria-label="Template price">
+            <div className="ws-checkout-price" aria-label="Agent access">
               {selected.compareAtPriceAmount ? <span className="ws-checkout-price-was">{formatMoney(selected.compareAtPriceAmount, selected.currency)}</span> : null}
-              <span className="ws-checkout-price-now">{formatMoney(selected.priceAmount || 0, selected.currency)}</span>
-              <span className="ws-checkout-price-label">{selected.priceLabel}</span>
+              <span className="ws-checkout-price-now">Payment deferred</span>
+              <span className="ws-checkout-price-label">Activation available now</span>
             </div>
             <button type="button" className="ws-btn-primary" onClick={() => void buttonAction()} disabled={selectingAgent}>
               {buttonLabel}<ArrowRight size={15} strokeWidth={2.4} />
@@ -571,12 +575,17 @@ export default function WorkspacePanelsLive(props: Props) {
               <p className="ws-panel-sub">Login and browsing are free. Choose Disability, Aged Care, or Childcare. Payments are deferred.</p>
             </header>
 
-            <div className="ws-template-search">
-              <Search size={18} strokeWidth={1.8} />
-              <input id="template-search" aria-label="Search agents or job roles" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search agents or job roles" />
+            <div className="ws-filter-row" aria-label="Agent views">
+              <button type="button" className={`ws-filter-chip${agentView === "browse" ? " is-active" : ""}`} aria-pressed={agentView === "browse"} onClick={() => setAgentView("browse")}>Browse agents</button>
+              <button type="button" className={`ws-filter-chip${agentView === "owned" ? " is-active" : ""}`} aria-pressed={agentView === "owned"} onClick={() => setAgentView("owned")}>My Agents ({props.ownedAgents.length})</button>
             </div>
 
-            {categories.length > 1 ? (
+            {agentView === "browse" ? <div className="ws-template-search">
+              <Search size={18} strokeWidth={1.8} />
+              <input id="template-search" aria-label="Search agents or job roles" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search agents or job roles" />
+            </div> : null}
+
+            {agentView === "browse" && categories.length > 1 ? (
               <div className="ws-filter-row">
                 <button type="button" className={`ws-filter-chip${activeCategory ? "" : " is-active"}`} onClick={() => setActiveCategory("")}>
                   <LayoutGrid size={14} strokeWidth={2.2} /> All categories
@@ -598,7 +607,22 @@ export default function WorkspacePanelsLive(props: Props) {
 
           {error && <div className="ws-panel-message ws-panel-message-alert" role="alert">{error}</div>}
 
-          {loading ? (
+          {agentView === "owned" ? (
+            props.ownedAgents.length === 0 ? <div className="ws-empty-state"><p className="ws-empty-state-title">No agents yet</p><p>Choose an agent to add it here. Payment is deferred.</p><button type="button" className="ws-btn-primary" onClick={() => setAgentView("browse")}>Browse agents</button></div> :
+            <div className="ws-template-grid">
+              {props.ownedAgents.map((agent) => {
+                const definition = templates.find((item) => item.id === agent.category);
+                return <article className="ws-template-card" key={agent.id}>
+                  {definition?.imageUrl ? <img className="ws-template-card-image" src={definition.imageUrl} alt="" /> : null}
+                  <span className="ws-template-tag">Owned · Payment deferred</span>
+                  <h3>{agent.name}</h3>
+                  <p>{agent.preferences?.location || "Australia"}</p>
+                  <p>{agent.status === "active" ? "Campaign active" : agent.status === "paused" ? "Campaign paused" : "Ready to set up"}</p>
+                  <div className="ws-template-foot"><button type="button" className="ws-template-btn" onClick={() => props.onOpenOwnedAgent(agent)}>Open campaign<ArrowRight size={14} /></button></div>
+                </article>;
+              })}
+            </div>
+          ) : loading ? (
             <div className="ws-template-grid" aria-hidden="true">
               {Array.from({ length: 6 }, (_, index) => (
                 <div className="ws-template-card ws-template-card-skeleton" key={index}>
@@ -647,7 +671,7 @@ export default function WorkspacePanelsLive(props: Props) {
                     <h3>{item.title}</h3>
                     <p>{item.description}</p>
                     <div className="ws-template-foot">
-                      <span className="ws-template-usage">{item.role} · Choose postcode</span>
+                      <span className="ws-template-usage">{props.ownedAgents.some((agent) => agent.category === item.id) ? "Owned · Payment deferred" : `${item.role} · Choose postcode`}</span>
                       {/* Kept as a real button so the card stays reachable by
                           keyboard now that the click target is the whole
                           article; stopPropagation avoids a double open. */}

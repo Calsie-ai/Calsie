@@ -79,7 +79,7 @@ export default function WorkspacePanels({
   topTemplateIds?: string[];
   templatesLoading?: boolean;
   onOpenTemplate?: (template: CampaignTemplate) => void;
-  /** Navigates to the Browse Templates panel. */
+  /** Navigates to the Browse Agents panel. */
   onBrowseTemplates?: () => void;
   onUseTemplate: (template: CampaignTemplate) => void;
   onResumeUpload: (file: File) => Promise<void>;
@@ -132,7 +132,7 @@ export default function WorkspacePanels({
   const resumeLoading = isActionLoading(actionStates, "uploadResume");
   const startLoading = isActionLoading(actionStates, "startCampaign");
   const pauseLoading = isActionLoading(actionStates, "pauseCampaign");
-  const campaignActionLoading = startLoading || pauseLoading;
+  const campaignActionLoading = startLoading || pauseLoading || isActionLoading(actionStates, "loadDashboard");
   const findJobsLoading = isActionLoading(actionStates, "findJobs");
 
   if (active === "templates") {
@@ -140,7 +140,7 @@ export default function WorkspacePanels({
       <div className="ws-panel">
         <header className="ws-panel-head">
           <p className="ws-panel-eyebrow">Templates</p>
-          <h1 className="ws-panel-title">Browse templates</h1>
+          <h1 className="ws-panel-title">Browse agents</h1>
           <p className="ws-panel-sub">Choose a custom campaign or start from a ready-made template.</p>
         </header>
 
@@ -152,7 +152,7 @@ export default function WorkspacePanels({
                 <h2>Review template</h2>
                 <p>Change any detail before adding this campaign to your workspace.</p>
               </div>
-              <button type="button" className="ws-btn-outline" onClick={() => setSelectedTemplate(null)}>Back to templates</button>
+              <button type="button" className="ws-btn-outline" onClick={() => setSelectedTemplate(null)}>Back to agents</button>
             </div>
             <div className="ws-review-grid">
               <label className="ws-field">Campaign name<input value={reviewTitle} onChange={(event) => setReviewTitle(event.target.value)} /></label>
@@ -258,14 +258,7 @@ export default function WorkspacePanels({
   }
 
   if (active === "campaign") {
-    // Blockers are surfaced explicitly: the start button's disabled rule
-    // already required a resume + Gmail, but never said so — leaving the
-    // button dead with no explanation. Logic below is unchanged.
-    const startBlockers = [
-      !resumeReady ? "upload a resume" : null,
-      !gmailReady ? "connect Gmail" : null,
-    ].filter(Boolean) as string[];
-
+    // Starting activates category job review; email automation is separate.
     return (
       <div className="ws-panel">
         <header className="ws-panel-head">
@@ -299,13 +292,13 @@ export default function WorkspacePanels({
             <div>
               <small>Selected campaign</small>
               <h3>{campaign?.name || "No campaign selected"}</h3>
-              <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Choose and review a campaign from Browse Templates first."}</p>
+              <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Choose and review a campaign from Browse Agents first."}</p>
             </div>
             <span className={`ws-status-pill ${statusClass}`}><i />{statusText}</span>
           </div>
 
           <div className="ws-campaign-actions">
-            <button type="button" className="ws-btn-primary" onClick={onToggleCampaign} disabled={campaignActionLoading || !campaign || (!running && (!resumeReady || !gmailReady))}>
+            <button type="button" className="ws-btn-primary" onClick={onToggleCampaign} disabled={campaignActionLoading || !campaign}>
               {pauseLoading ? "Pausing campaign…" : startLoading ? "Starting campaign…" : running ? "Pause Campaign" : paused ? "Resume Campaign" : "Start Campaign"}
             </button>
             {running && (
@@ -316,28 +309,25 @@ export default function WorkspacePanels({
           </div>
 
           {!campaign ? (
-            <p className="ws-campaign-hint">Choose a template below to create a campaign.</p>
-          ) : !running && startBlockers.length > 0 ? (
-            <p className="ws-campaign-hint">Automatic applications are not connected yet. You can review jobs now in Smash / Pass.</p>
-          ) : null}
+            <p className="ws-campaign-hint">Choose an agent below to create a campaign.</p>
+          ) : (
+            <p className="ws-campaign-hint">Starting enables job review. Payment is deferred. Automatic email applications will be connected later.</p>
+          )}
         </div>
 
-        {/* Picking a template here opens that template's review + checkout
-            screen on Browse Templates. It deliberately does NOT create the
-            campaign directly: every template goes through the postcode and
-            checkout steps, and short-circuiting that would skip payment. */}
+        {/* Review the agent and location before activating ownership. */}
         <section className="ws-campaign-picker" aria-labelledby="campaign-picker-heading">
           <div className="ws-campaign-picker-head">
             <div>
-              <small>Templates</small>
+              <small>Agents</small>
               <h3 id="campaign-picker-heading">
-                {campaign ? "Start another campaign" : "Choose a campaign template"}
+                {campaign ? "Start another campaign" : "Choose an agent"}
               </h3>
-              <p>A template sets the roles, locations and search terms Calsie uses on your behalf.</p>
+              <p>An agent selects the job category for your campaign.</p>
             </div>
             {onBrowseTemplates ? (
               <button type="button" className="ws-btn-outline" onClick={onBrowseTemplates}>
-                Open Browse Templates
+                Open Browse Agents
               </button>
             ) : null}
           </div>
@@ -347,7 +337,7 @@ export default function WorkspacePanels({
               {[0, 1, 2].map((key) => <span key={key} className="ws-skeleton ws-campaign-picker-skel" />)}
             </div>
           ) : pickerTemplates.length === 0 ? (
-            <p className="ws-campaign-hint">No templates are available right now.</p>
+            <p className="ws-campaign-hint">No agents are available right now.</p>
           ) : (
             <>
               {topPicks.length > 0 ? (
@@ -359,7 +349,7 @@ export default function WorkspacePanels({
                 </>
               ) : null}
 
-              <h4 className="ws-campaign-picker-group">{topPicks.length > 0 ? "All templates" : "Available templates"}</h4>
+              <h4 className="ws-campaign-picker-group">{topPicks.length > 0 ? "All agents" : "Available agents"}</h4>
               <div className="ws-campaign-picker-grid">
                 {pickerTemplates.map((item) => <TemplatePickCard key={item.id} template={item} onOpen={openTemplate} />)}
               </div>
@@ -385,7 +375,7 @@ export default function WorkspacePanels({
       <div className="workspace-plan"><div><b>{resumeReady ? "Ready" : "Missing"}</b><span>resume</span></div><div><b>{gmailReady ? "Connected" : "Disconnected"}</b><span>Gmail</span></div><div><b>{status}</b><span>campaign</span></div><div><b>{CAMPAIGN_PLAN.hourly_email_limit}/hour</b><span>send limit</span></div></div>
       <div className="workspace-card">
         <h3>{campaign?.name || "Set up your first campaign"}</h3>
-        <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Browse templates, upload your resume, connect Gmail, and start."}</p>
+        <p>{campaign ? `${campaignRole(campaign)} · ${campaignLocation(campaign)}` : "Browse agents, upload your resume, connect Gmail, and start."}</p>
         <div className="workspace-actions">
           {running && <button type="button" className="workspace-secondary" onClick={onFindJobsNow} disabled={findJobsLoading || !campaign}>{findJobsLoading ? "Finding jobs…" : "Find New Jobs Now"}</button>}
           <button type="button" className="workspace-primary" onClick={onToggleCampaign} disabled={campaignActionLoading || !campaign || (!running && (!resumeReady || !gmailReady))}>

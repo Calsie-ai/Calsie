@@ -65,7 +65,7 @@ Deno.serve(async (req: Request) => {
       .select("id,user_id,category,name,status,created_at")
       .eq("user_id", userId).order("created_at", { ascending: false });
     if (agentsResult.error) throw agentsResult.error;
-    const agents = (agentsResult.data || []).filter((agent) => agent.status === "active" && agent.category in POOLS);
+    const agents = (agentsResult.data || []).filter((agent) => ["draft", "active", "paused"].includes(agent.status) && agent.category in POOLS);
     const requestedId = typeof body?.agent_id === "string" ? body.agent_id : "";
     const agent = requestedId ? agents.find((item) => item.id === requestedId) : agents[0];
     if (requestedId && !agent) return reply(req, { ok: false, error: "This agent is unavailable to your account." }, 404);
@@ -74,6 +74,7 @@ Deno.serve(async (req: Request) => {
     const table = POOLS[category];
 
     if (action === "decide") {
+      if (agent.status !== "active") return reply(req, { ok: false, error: "Start or resume this campaign before reviewing jobs." }, 409);
       const jobId = Number(body?.source_job_id);
       if (!Number.isSafeInteger(jobId) || jobId <= 0 || !["approved", "skipped"].includes(body?.decision)) {
         return reply(req, { ok: false, error: "Invalid decision." }, 400);
@@ -89,6 +90,9 @@ Deno.serve(async (req: Request) => {
         job_snapshot: job.data, reviewed_at: new Date().toISOString(),
       });
       if (saved.error) {
+        if (saved.error.code === "23514" && saved.error.message.includes("campaign_not_active")) {
+          return reply(req, { ok: false, error: "Start or resume this campaign before reviewing jobs." }, 409);
+        }
         if (saved.error.code === "23505") return reply(req, { ok: false, error: "This job was already reviewed." }, 409);
         throw saved.error;
       }
@@ -132,9 +136,10 @@ Deno.serve(async (req: Request) => {
     const snapshots = decisions.filter((item) => !found.has(Number(item.source_job_id)))
       .map((item) => ({ id: item.source_job_id, ...item.job_snapshot }));
     let sent = 0;
-    const opportunities = [...jobs.filter((item) => byId.has(Number(item.id)) || sent++ < 100), ...historical, ...snapshots]
+    const opportunities = [...jobs.filter((item) => byId.has(Number(item.id)) || (agent.status === "active" && sent++ < 100)), ...historical, ...snapshots]
       .map((item) => mapJob(item, agent.id, byId.get(Number(item.id))));
-    return reply(req, { ok: true, agent, agents, category, source_table: table, opportunities });
+    return reply(req, { ok: true, agent, agents, category, source_table: table, opportunities,
+      message: agent.status === "active" ? null : "Start or resume this campaign from Set Up Campaign to review new jobs. Your history is saved." });
   } catch (error) {
     return reply(req, { ok: false, error: error instanceof Error ? error.message : "Could not load agent jobs." }, 500);
   }

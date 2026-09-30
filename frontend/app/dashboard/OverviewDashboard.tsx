@@ -139,10 +139,10 @@ export default function OverviewDashboard({
 }: Props) {
   const status = campaign?.status || "Not configured";
   const campaignLabel = ["active", "scheduled", "launched"].includes(status) ? "Active" : status === "paused" ? "Paused" : status === "draft" ? "Agent selected" : "Not set";
-  const title = purchasedTemplate?.title || campaign?.name || "No template selected";
+  const title = purchasedTemplate?.title || campaign?.name || "No agent selected";
   const role = purchasedTemplate?.role || campaignRole(campaign);
   const location = purchasedTemplate?.location || campaignLocation(campaign);
-  const description = purchasedTemplate?.description || "Choose a template to create your job campaign.";
+  const description = purchasedTemplate?.description || "Choose an agent to create your job campaign.";
   const timing = campaignTiming(campaign);
   const dayLabel = timing.hasStarted ? `Day ${timing.currentDay} of ${timing.totalDays}` : "Not started";
   const dayProgress = timing.hasStarted ? Math.min(100, Math.round((timing.currentDay / timing.totalDays) * 100)) : 0;
@@ -210,7 +210,7 @@ export default function OverviewDashboard({
           title="Plan"
           sub={campaign ? "Category job pool" : "Not selected"}
           dot={campaign ? "ready" : "neutral"}
-          footLabel={campaign ? "Configured" : "Choose a template"}
+          footLabel={campaign ? "Configured" : "Choose an agent"}
           onAction={campaign ? undefined : onBrowseTemplates}
         />
       </section>
@@ -250,7 +250,7 @@ export default function OverviewDashboard({
             </button>
           </div>
           <div className="ws-order-body">
-            <p className="ws-eyebrow ws-eyebrow-accent">{purchasedTemplate?.category || "Campaign template"}</p>
+            <p className="ws-eyebrow ws-eyebrow-accent">{purchasedTemplate?.category || "Agent"}</p>
             <h2 className="ws-order-title">{title}</h2>
             <p className="ws-order-text">{description}</p>
             {purchasedTemplate ? (
@@ -262,7 +262,7 @@ export default function OverviewDashboard({
             ) : null}
             <button type="button" className="ws-btn-outline" onClick={purchasedTemplate ? onOpenTracker : onBrowseTemplates}>
               <FolderOpen size={17} strokeWidth={1.9} />
-              {purchasedTemplate ? "Open Tracker" : "Browse Templates"}
+              {purchasedTemplate ? "Open Tracker" : "Browse Agents"}
             </button>
           </div>
         </article>
