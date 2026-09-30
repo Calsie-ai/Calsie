@@ -24,7 +24,7 @@ import { getSupabaseClient } from "../../lib/supabaseClient";
 import { normaliseAppError } from "../../lib/actionState";
 import { inferAustralianPostcode, normaliseAustralianPostcode } from "../../lib/australianPostcode";
 import { savePendingIntent, type PendingIntentV1 } from "../../lib/pendingIntent";
-import { CARE_AGENTS, careAgentForSlug } from "../../lib/careAgents";
+import { AGENT_TEMPLATES, careAgentForSlug } from "../../lib/careAgents";
 import BuildResumePanel from "./BuildResumePanel";
 import GmailPanel from "./GmailPanel";
 import OverviewDashboard from "./OverviewDashboard";
@@ -174,8 +174,8 @@ function descriptionParagraphs(text: string, sentencesPerParagraph = 2): string[
 
 export default function WorkspacePanelsLive(props: Props) {
   const router = useRouter();
-  const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
-  const [topTemplateIds, setTopTemplateIds] = useState<string[]>([]);
+  const templates = AGENT_TEMPLATES;
+  const topTemplateIds: string[] = [];
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("");
   const [sortAlpha, setSortAlpha] = useState(false);
@@ -188,60 +188,8 @@ export default function WorkspacePanelsLive(props: Props) {
   const [checkoutError, setCheckoutError] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [purchaseState, setPurchaseState] = useState<PurchaseState>("not_purchased");
-  const [purchaseId, setPurchaseId] = useState("");
-  const [campaignId, setCampaignId] = useState("");
-  const [purchaseLoading, setPurchaseLoading] = useState(false);
   const intentIdRef = useRef("");
   const restoredIntentIdRef = useRef("");
-
-  // Templates are now needed by three panels: Browse Templates, the Overview
-  // preview carousel, and the Campaign picker. Loaded once and reused —
-  // WorkspacePanelsLive stays mounted across panel switches, so re-fetching
-  // per panel would just repeat the same request.
-  const templatesLoadedRef = useRef(false);
-  useEffect(() => {
-    const needsTemplates = props.active === "templates" || props.active === "overview" || props.active === "campaign";
-    if (!needsTemplates || templatesLoadedRef.current) return;
-    templatesLoadedRef.current = true;
-    const controller = new AbortController();
-    setLoading(true);
-    setError("");
-
-    async function loadTemplates() {
-      try {
-        const supabase = getSupabaseClient();
-        const { data, error } = await supabase
-          .from("campaign_templates")
-          .select("id,slug,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required")
-          .eq("is_active", true)
-          .order("updated_at", { ascending: false })
-          .abortSignal(controller.signal);
-        if (error) throw error;
-        if (!controller.signal.aborted) setTemplates(((data || []) as Row[]).filter((row) => Boolean(CARE_AGENTS[row.slug])).map(mapTemplate));
-
-        // Real "top picks" ordering, from how often each template has
-        // actually been used. Best effort: if it fails the picker simply
-        // shows every template without a highlighted group, rather than
-        // inventing a ranking.
-        const { data: ranked, error: rankError } = await supabase
-          .rpc("get_top_campaign_templates", { p_limit: 3 })
-          .abortSignal(controller.signal);
-        if (!rankError && !controller.signal.aborted) {
-          setTopTemplateIds(((ranked || []) as Array<{ template_id: string }>).map((row) => row.template_id));
-        }
-      } catch (error) {
-        // Allow a later visit to retry rather than being stuck empty.
-        templatesLoadedRef.current = false;
-        if (!controller.signal.aborted) setError(normaliseAppError(error, "Could not load templates.") || "");
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    }
-
-    void loadTemplates();
-    return () => controller.abort();
-  }, [props.active]);
 
   useEffect(() => {
     intentIdRef.current = props.pendingIntent?.type === "purchase_template" ? props.pendingIntent.id : "";
@@ -336,16 +284,6 @@ export default function WorkspacePanelsLive(props: Props) {
     });
   }
 
-  useEffect(() => {
-    if (!selected || props.active !== "templates") {
-      setPurchaseState("not_purchased");
-      setPurchaseId("");
-      setCampaignId("");
-      return;
-    }
-    void refreshPurchaseState(selected.id);
-  }, [props.active, selected?.id]);
-
   const categories = useMemo(() => Array.from(new Set(templates.map((item) => item.category))).sort((a, b) => a.localeCompare(b)), [templates]);
 
   const visible = useMemo(() => {
@@ -358,57 +296,6 @@ export default function WorkspacePanelsLive(props: Props) {
   }, [activeCategory, query, sortAlpha, templates]);
 
   const postcodeInfo = useMemo(() => inferAustralianPostcode(postcode.trim()), [postcode]);
-
-  async function accessToken() {
-    const { data } = await getSupabaseClient().auth.getSession();
-    return data.session?.access_token || "";
-  }
-
-  async function refreshPurchaseState(templateId: string) {
-    setPurchaseLoading(true);
-    try {
-      const token = await accessToken();
-      if (!token) return;
-      const response = await fetch("/api/stripe/purchase-state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: token, template_id: templateId }),
-      });
-      const result = await response.json() as PurchaseStateResponse;
-      if (!response.ok || !result.ok || !result.state) throw new Error(result.error || "Could not load purchase state.");
-      setPurchaseState(result.state);
-      setPurchaseId(result.purchase_id || "");
-      setCampaignId(result.campaign_id || "");
-    } catch (error) {
-      setCheckoutError(normaliseAppError(error, "Could not load purchase state.") || "");
-    } finally {
-      setPurchaseLoading(false);
-    }
-  }
-
-  async function activateCampaign() {
-    if (!selected || !purchaseId || checkoutNavigating) return;
-    setCheckoutNavigating(true);
-    setCheckoutError("");
-    try {
-      const token = await accessToken();
-      if (!token) throw new Error("Your session expired. Sign in again.");
-      const response = await fetch("/api/stripe/activate-campaign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: token, purchase_id: purchaseId }),
-      });
-      const result = await response.json() as { ok?: boolean; campaign_id?: string; error?: string };
-      if (!response.ok || !result.ok || !result.campaign_id) throw new Error(result.error || "Could not create campaign.");
-      setCampaignId(result.campaign_id);
-      setPurchaseState("purchased_campaign_ready");
-      router.push("/dashboard?panel=overview");
-    } catch (error) {
-      setCheckoutError(normaliseAppError(error, "Could not create campaign.") || "");
-    } finally {
-      setCheckoutNavigating(false);
-    }
-  }
 
   function persistTemplateIntent(item: CampaignTemplate, nextPostcode: string) {
     const saved = savePendingIntent({ id: intentIdRef.current || undefined, type: "purchase_template", returnPath: "/dashboard?panel=templates&restoreIntent=1", panel: "templates", templateId: item.id, templateSlug: item.slug, postcode: nextPostcode || undefined, currentStep: "review", intendedAction: "continue_to_checkout", userHint: props.userHint });
@@ -433,15 +320,13 @@ export default function WorkspacePanelsLive(props: Props) {
     persistTemplateIntent(item, "");
   }
 
-  function continueToCheckout() {
+  function selectAgent() {
     setPostcodeTouched(true);
     setCheckoutError("");
-    if (!selected) return setCheckoutError("Choose a campaign template before checkout.");
-    if (!postcodeInfo.valid) return setCheckoutError("Enter a valid 4-digit Australian postcode.");
-    if (checkoutNavigating || purchaseState === "processing" || purchaseState.startsWith("purchased_")) return;
-    if (!persistTemplateIntent(selected, postcodeInfo.postcode)) return setCheckoutError("Could not safely save this campaign draft. Check browser storage permissions and try again.");
-    setCheckoutNavigating(true);
-    router.push("/payment?restoreIntent=1");
+    if (!selected) return;
+    if (postcode && !postcodeInfo.valid) return setCheckoutError("Enter a valid 4-digit Australian postcode, or leave it blank.");
+    if (props.actionStates.useTemplate.status === "loading") return;
+    props.onUseTemplate({ ...selected, location: postcodeInfo.valid ? postcodeInfo.label : "Australia" });
   }
 
   if (props.active === "overview") return <OverviewDashboard campaign={props.campaign} purchasedTemplate={props.purchasedTemplate} resumeReady={props.resumeReady} resumeName={props.resumeName} gmailReady={props.gmailReady} approvedCount={props.approvedCount} passedCount={props.passedCount} greetingName={props.greetingName} templates={templates} templatesLoading={loading && templates.length === 0} onOpenTemplate={(template) => props.onOpenTemplateDeepLink(template.slug || template.id)} onOpenTracker={props.onOpenTracker} onBrowseTemplates={props.onBrowseTemplates} onUpdateResume={props.onOpenResumePanel} onConnectGmail={props.onOpenGmailPanel} onSetUpCampaign={props.onOpenCampaignPanel} />;
@@ -481,7 +366,7 @@ export default function WorkspacePanelsLive(props: Props) {
     const running = isCampaignRunning(status);
     const paused = status === "paused";
     const statusClass = running ? "is-running" : paused ? "is-paused" : "is-idle";
-    const statusText = running ? "Campaign running" : paused ? "Paused" : status;
+    const statusText = running ? "Campaign running" : paused ? "Paused" : props.campaign ? "Agent selected" : status;
     return (
       <div className="ws-panel ws-tracker-panel">
         <header className="ws-panel-head ws-tracker-head">
@@ -521,9 +406,9 @@ export default function WorkspacePanelsLive(props: Props) {
     />
   );
 
-  const purchased = purchaseState === "purchased_campaign_missing" || purchaseState === "purchased_campaign_ready";
-  const buttonLabel = purchaseLoading ? "Checking purchase…" : purchaseState === "processing" ? "Retry verification" : purchaseState === "purchased_campaign_missing" ? "Create campaign" : purchaseState === "purchased_campaign_ready" ? "Open campaign" : checkoutNavigating ? "Opening checkout…" : selected?.paymentRequired === false ? "Use free template" : "Continue to checkout";
-  const buttonAction = purchaseState === "purchased_campaign_missing" ? activateCampaign : purchaseState === "purchased_campaign_ready" ? () => router.push("/dashboard?panel=overview") : purchaseState === "processing" && selected ? () => void refreshPurchaseState(selected.id) : continueToCheckout;
+  const selectingAgent = props.actionStates.useTemplate.status === "loading";
+  const buttonLabel = selectingAgent ? "Selecting agent…" : "Use agent";
+  const buttonAction = selectAgent;
 
   return (
     <div className="ws-panel">
@@ -533,14 +418,14 @@ export default function WorkspacePanelsLive(props: Props) {
               page — not buried inside the card below the header, where it
               read as part of the card's content instead of navigation. */}
           <button type="button" className="ws-review-back" onClick={() => setSelected(null)}>
-            <ChevronLeft size={17} strokeWidth={2.4} /> Back to templates
+            <ChevronLeft size={17} strokeWidth={2.4} /> Back to agents
           </button>
 
-          {/* No "Templates" eyebrow here — "Back to templates" already
+          {/* No "Templates" eyebrow here — "Back to agents" already
               says which section this is, so the label was pure repetition. */}
           <header className="ws-panel-head ws-templates-hero">
-            <h1 className="ws-panel-title">Template details</h1>
-            <p className="ws-panel-sub">Review the campaign, choose your postcode, and confirm the price before checkout.</p>
+            <h1 className="ws-panel-title">Agent details</h1>
+            <p className="ws-panel-sub">Review your agent and choose it to start reviewing jobs. Payments are deferred.</p>
           </header>
 
           <div className="ws-review-card">
@@ -562,7 +447,7 @@ export default function WorkspacePanelsLive(props: Props) {
               <h2>{selected.title}</h2>
               <span className="ws-review-ready">
                 <span className="ws-usage-check"><Check size={12} strokeWidth={3} /></span>
-                Ready-made campaign · <strong>{selected.campaignName || selected.title}</strong>
+                Category agent · <strong>{selected.campaignName || selected.title}</strong>
               </span>
             </div>
           </div>
@@ -573,7 +458,7 @@ export default function WorkspacePanelsLive(props: Props) {
             <div className="ws-recipe-grid">
               <div className="ws-recipe-item">
                 <span className="ws-recipe-icon"><Search size={15} strokeWidth={2} /></span>
-                <span><span>Search recipe</span><strong>Every Day Job Portal Search</strong></span>
+                <span><span>Search recipe</span><strong>Classified category job pool</strong></span>
               </div>
               <div className="ws-recipe-item">
                 <span className="ws-recipe-icon"><Target size={15} strokeWidth={2} /></span>
@@ -581,11 +466,11 @@ export default function WorkspacePanelsLive(props: Props) {
               </div>
               <div className="ws-recipe-item">
                 <span className="ws-recipe-icon"><MapPin size={15} strokeWidth={2} /></span>
-                <span><span>Location</span><strong>{postcodeInfo.valid ? postcodeInfo.label : "Choose postcode below"}</strong></span>
+                <span><span>Location</span><strong>{postcodeInfo.valid ? postcodeInfo.label : "Australia"}</strong></span>
               </div>
               <div className="ws-recipe-item">
                 <span className="ws-recipe-icon"><CalendarDays size={15} strokeWidth={2} /></span>
-                <span><span>Posted within</span><strong>{selected.postedWithinDays} days</strong></span>
+                <span><span>Job source</span><strong>{selected.category} pool</strong></span>
               </div>
               <div className="ws-recipe-item">
                 <span className="ws-recipe-icon"><Briefcase size={15} strokeWidth={2} /></span>
@@ -621,7 +506,7 @@ export default function WorkspacePanelsLive(props: Props) {
                 autoComplete="postal-code"
                 maxLength={4}
                 value={postcode}
-                disabled={purchased}
+                disabled={selectingAgent}
                 onBlur={() => setPostcodeTouched(true)}
                 onChange={(event) => {
                   const nextPostcode = normaliseAustralianPostcode(event.target.value.trim());
@@ -630,19 +515,19 @@ export default function WorkspacePanelsLive(props: Props) {
                   persistTemplateIntent(selected, nextPostcode);
                 }}
                 placeholder="Example: 2141"
-                aria-invalid={postcodeTouched && !postcodeInfo.valid}
+                aria-invalid={postcodeTouched && Boolean(postcode) && !postcodeInfo.valid}
                 aria-describedby="campaign-postcode-message"
               />
             </label>
             <div id="campaign-postcode-message" aria-live="polite">
-              {postcodeTouched && !postcodeInfo.valid ? <p className="ws-field-error">Enter a valid 4-digit Australian postcode.</p> : null}
+              {postcodeTouched && Boolean(postcode) && !postcodeInfo.valid ? <p className="ws-field-error">Enter a valid 4-digit Australian postcode.</p> : null}
               {postcodeInfo.valid ? <p className="ws-field-success">Detected location: {postcodeInfo.label}</p> : null}
             </div>
-            <p className="ws-review-hint">Your postcode will be used to rank nearby jobs and providers that service your area.</p>
+            <p className="ws-review-hint">Location is saved with your agent. The feed currently includes the entire category pool; finer location filtering comes next.</p>
           </div>
 
           <div className="ws-review-section">
-            <h3><CheckCircle2 size={16} strokeWidth={2} /> Included with this template</h3>
+            <h3><CheckCircle2 size={16} strokeWidth={2} /> Included with this agent</h3>
             {(selected.pricingFeatures || []).length > 0 ? (
               <div className="ws-feature-list">
                 {(selected.pricingFeatures || []).map((feature) => (
@@ -658,24 +543,20 @@ export default function WorkspacePanelsLive(props: Props) {
             )}
           </div>
 
-          {purchaseState === "processing" ? <div className="ws-panel-message" role="status">Checkout is still being confirmed.</div> : null}
-          {purchaseState === "purchased_campaign_missing" ? <div className="ws-panel-message" role="status">Checkout completed. No additional payment is required.</div> : null}
-          {purchaseState === "purchased_campaign_ready" ? <div className="ws-panel-message" role="status">This campaign is already in your account.</div> : null}
-          {purchaseState === "failed_or_expired" ? <div className="ws-panel-message ws-panel-message-alert" role="alert">The previous checkout failed or expired. Your draft is safe and you can try again.</div> : null}
           {checkoutError ? <div className="ws-panel-message ws-panel-message-alert" role="alert">{checkoutError}</div> : null}
 
           <div className="ws-checkout-bar">
             <div className="ws-checkout-meta">
-              <span>Campaign template</span>
+              <span>Agent</span>
               <strong>{selected.campaignName || selected.title}</strong>
-              <small>{postcodeInfo.valid ? postcodeInfo.label : "Enter postcode to continue"}</small>
+              <small>{postcodeInfo.valid ? postcodeInfo.label : "Postcode optional"}</small>
             </div>
             <div className="ws-checkout-price" aria-label="Template price">
               {selected.compareAtPriceAmount ? <span className="ws-checkout-price-was">{formatMoney(selected.compareAtPriceAmount, selected.currency)}</span> : null}
               <span className="ws-checkout-price-now">{formatMoney(selected.priceAmount || 0, selected.currency)}</span>
               <span className="ws-checkout-price-label">{selected.priceLabel}</span>
             </div>
-            <button type="button" className="ws-btn-primary" onClick={() => void buttonAction()} disabled={purchaseLoading || checkoutNavigating || (!postcodeInfo.valid && purchaseState === "not_purchased")}>
+            <button type="button" className="ws-btn-primary" onClick={() => void buttonAction()} disabled={selectingAgent}>
               {buttonLabel}<ArrowRight size={15} strokeWidth={2.4} />
             </button>
           </div>
@@ -685,14 +566,14 @@ export default function WorkspacePanelsLive(props: Props) {
         <>
           <div className="ws-templates-top">
             <header className="ws-panel-head ws-templates-hero">
-              <p className="ws-panel-eyebrow">Templates</p>
-              <h1 className="ws-panel-title">Browse templates</h1>
-              <p className="ws-panel-sub">Login and browsing are free. Pricing appears only after you choose a template.</p>
+              <p className="ws-panel-eyebrow">Agents</p>
+              <h1 className="ws-panel-title">Browse agents</h1>
+              <p className="ws-panel-sub">Login and browsing are free. Choose Disability, Aged Care, or Childcare. Payments are deferred.</p>
             </header>
 
             <div className="ws-template-search">
               <Search size={18} strokeWidth={1.8} />
-              <input id="template-search" aria-label="Search templates or job roles" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search templates or job roles" />
+              <input id="template-search" aria-label="Search agents or job roles" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search agents or job roles" />
             </div>
 
             {categories.length > 1 ? (
@@ -731,7 +612,7 @@ export default function WorkspacePanelsLive(props: Props) {
             </div>
           ) : visible.length === 0 ? (
             <div className="ws-empty-state">
-              <p className="ws-empty-state-title">No templates match that search</p>
+              <p className="ws-empty-state-title">No agents match that search</p>
               <p className="ws-empty-state-text">Try a different role or keyword, or use the custom campaign option instead.</p>
             </div>
           ) : (
@@ -770,7 +651,7 @@ export default function WorkspacePanelsLive(props: Props) {
                       {/* Kept as a real button so the card stays reachable by
                           keyboard now that the click target is the whole
                           article; stopPropagation avoids a double open. */}
-                      <button type="button" className="ws-template-btn" onClick={(event) => { event.stopPropagation(); openTemplate(item); }}>Review template<ArrowRight size={14} strokeWidth={2.4} /></button>
+                      <button type="button" className="ws-template-btn" onClick={(event) => { event.stopPropagation(); openTemplate(item); }}>Review agent<ArrowRight size={14} strokeWidth={2.4} /></button>
                     </div>
                   </article>
                 );

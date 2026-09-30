@@ -138,7 +138,7 @@ export default function OverviewDashboard({
   onSetUpCampaign,
 }: Props) {
   const status = campaign?.status || "Not configured";
-  const campaignLabel = ["active", "scheduled", "launched"].includes(status) ? "Active" : status === "paused" ? "Paused" : status === "draft" ? "Draft" : "Not set";
+  const campaignLabel = ["active", "scheduled", "launched"].includes(status) ? "Active" : status === "paused" ? "Paused" : status === "draft" ? "Agent selected" : "Not set";
   const title = purchasedTemplate?.title || campaign?.name || "No template selected";
   const role = purchasedTemplate?.role || campaignRole(campaign);
   const location = purchasedTemplate?.location || campaignLocation(campaign);
@@ -208,7 +208,7 @@ export default function OverviewDashboard({
         <StatCard
           icon={Crown}
           title="Plan"
-          sub={campaign ? `${timing.dailyJobLimit} jobs/day · ${timing.totalDays} days` : "Not selected"}
+          sub={campaign ? "Category job pool" : "Not selected"}
           dot={campaign ? "ready" : "neutral"}
           footLabel={campaign ? "Configured" : "Choose a template"}
           onAction={campaign ? undefined : onBrowseTemplates}

@@ -20,7 +20,7 @@ export function useNotifications(userId?: string) {
     }
     setLoading(true);
     const { data, error: readError } = await getSupabaseClient()
-      .from("user_notifications")
+      .from("calsie_notifications")
       .select(SELECT_FIELDS)
       .eq("user_id", userId)
       .is("archived_at", null)
@@ -56,7 +56,7 @@ export function useNotifications(userId?: string) {
 
   const updateOne = useCallback(async (id: string, patch: Record<string, string | null>) => {
     if (!userId) return false;
-    const { error: updateError } = await getSupabaseClient().from("user_notifications").update(patch).eq("id", id).eq("user_id", userId);
+    const { error: updateError } = await getSupabaseClient().from("calsie_notifications").update(patch).eq("id", id).eq("user_id", userId);
     if (updateError) {
       setError("That notification could not be updated.");
       return false;
@@ -72,7 +72,7 @@ export function useNotifications(userId?: string) {
   const markAllRead = useCallback(async () => {
     if (!userId) return false;
     const now = new Date().toISOString();
-    const { error: updateError } = await getSupabaseClient().from("user_notifications").update({ status: "read", read_at: now }).eq("user_id", userId).eq("status", "unread");
+    const { error: updateError } = await getSupabaseClient().from("calsie_notifications").update({ status: "read", read_at: now }).eq("user_id", userId).eq("status", "unread");
     if (updateError) {
       setError("Notifications could not be marked as read.");
       return false;

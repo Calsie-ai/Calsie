@@ -225,7 +225,7 @@ export default function ProfilePanel({
         phone: draft.phone.trim(),
         location: draft.location.trim(),
       };
-      const { error } = await supabase.from("profiles").upsert({
+      const { error } = await supabase.from("calsie_profiles").upsert({
         id: userId,
         email,
         ...next,
@@ -264,7 +264,7 @@ export default function ProfilePanel({
         .upload(path, file, { contentType: file.type, upsert: false });
       if (uploadError) throw uploadError;
 
-      const { error } = await supabase.from("profiles").upsert({ id: userId, email, avatar_url: path });
+      const { error } = await supabase.from("calsie_profiles").upsert({ id: userId, email, avatar_url: path });
       if (error) throw error;
 
       onProfileChange({ avatar_url: path });
@@ -287,7 +287,7 @@ export default function ProfilePanel({
     const previousPath = avatarPath;
     try {
       const supabase = getSupabaseClient();
-      const { error } = await supabase.from("profiles").upsert({ id: userId, email, avatar_url: null });
+      const { error } = await supabase.from("calsie_profiles").upsert({ id: userId, email, avatar_url: null });
       if (error) throw error;
       onProfileChange({ avatar_url: null });
       // Falls back to the Google picture when there is one, not to initials.
@@ -312,7 +312,7 @@ export default function ProfilePanel({
     const merged = { ...base, ...patch };
     onProfileChange({ preferences: merged });
     try {
-      await getSupabaseClient().from("profiles").upsert({ id: userId, email, preferences: merged });
+      await getSupabaseClient().from("calsie_profiles").upsert({ id: userId, email, preferences: merged });
     } catch {
       /* Already applied locally; a failed preference write is not worth
          interrupting the user for. */
@@ -661,7 +661,7 @@ export default function ProfilePanel({
               <h3 id="acct-campaign-heading">{campaign ? campaign.name : "No campaign yet"}</h3>
             </div>
             <span className={`ws-status-pill ${running ? "is-running" : campaign ? "is-paused" : "is-idle"}`}>
-              <i />{running ? "Running" : campaign ? "Paused" : "Not set up"}
+              <i />{running ? "Running" : campaign ? "Agent selected" : "Not set up"}
             </span>
           </div>
 
@@ -926,7 +926,7 @@ export default function ProfilePanel({
       <section className="ws-acct-card ws-acct-session" aria-labelledby="acct-session-heading">
         <div>
           <h3 id="acct-session-heading">Sign out</h3>
-          <p className="ws-acct-body">Ends this session on this device. Your campaign keeps running on schedule.</p>
+          <p className="ws-acct-body">Ends this session on this device. Your saved profile and reviewed jobs remain in your workspace.</p>
         </div>
         <button type="button" className="ws-btn-outline ws-acct-signout" disabled={logoutLoading} onClick={onLogout}>
           <Power size={15} strokeWidth={2.2} />

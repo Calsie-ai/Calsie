@@ -48,9 +48,10 @@ import {
 import { HelpCircle } from "lucide-react";
 import WorkspaceSidebar from "./WorkspaceSidebar";
 import WorkspaceTopbar from "./WorkspaceTopbar";
-import WorkspacePanelsLive, { mapTemplate } from "./WorkspacePanelsLive";
-import { CAMPAIGN_PLAN, isCampaignRunning, type CampaignRecord, type CampaignTemplate, type WorkspaceTab } from "./workspace-data";
+import WorkspacePanelsLive from "./WorkspacePanelsLive";
+import { isCampaignRunning, type CampaignRecord, type CampaignTemplate, type WorkspaceTab } from "./workspace-data";
 import { googleAvatarFromMetadata, readHideGoogleAvatar, resolveAvatar } from "../../lib/googleAvatar";
+import { AGENT_TEMPLATES, agentCampaign, type CalsieAgent } from "../../lib/careAgents";
 import type { ProfileResumeSignals, ProfileRow } from "./ProfilePanel";
 import NotificationsPanel from "./NotificationsPanel";
 import { useNotifications } from "./useNotifications";
@@ -176,6 +177,7 @@ export default function DashboardWorkspace() {
     const intent = readPendingIntent();
     const eligibleIntent = Boolean(
       intent
+      && (intent.type !== "purchase_template" || AGENT_TEMPLATES.some((item) => item.id === intent.templateId))
       && pendingIntentMatchesWorkflow(intent, pathname)
       && (!intent.userHint || intent.userHint === user.id),
     );
@@ -204,6 +206,14 @@ export default function DashboardWorkspace() {
       return;
     }
 
+    if (paymentReturn || gmailReturn) {
+      setNotice({ type: "info", message: paymentReturn ? "Payments are deferred while your workspace is rebuilt." : "Gmail integration is not connected to this fresh workspace yet." });
+      const clean = new URLSearchParams(currentParams);
+      for (const key of [...PAYMENT_RETURN_PARAMS, ...GMAIL_RETURN_PARAMS]) clean.delete(key);
+      router.replace(dashboardPanelPath(paymentReturn ? "templates" : "gmail", clean));
+      return;
+    }
+
     let activeEffect = true;
     const applyRestoration = () => {
       if (!activeEffect || !intent || !eligibleIntent) return;
@@ -215,209 +225,6 @@ export default function DashboardWorkspace() {
         setPendingIntent(null);
       }
     };
-
-    if (externalReturn?.kind === "stripe_cancelled") {
-      applyRestoration();
-      setExternalReturnState((state) => transitionExternalReturn(
-        transitionExternalReturn(state, { type: "return", kind: "stripe_cancelled" }),
-        { type: "cancel" },
-      ));
-      setNotice({
-        type: "warning",
-        message: "Checkout was cancelled. Your campaign details were kept.",
-        actionKey: "verifyPayment",
-      });
-      const completedPath = dashboardPathAfterProcessing(
-        "templates",
-        currentParams,
-        true,
-        PAYMENT_RETURN_PARAMS,
-      );
-      if (completedPath) router.replace(completedPath);
-      return () => {
-        activeEffect = false;
-      };
-    }
-
-    if (externalReturn?.kind === "stripe_success") {
-      applyRestoration();
-      const validPurchaseIntent = Boolean(
-        intent
-        && eligibleIntent
-        && intent.type === "purchase_template"
-        && intent.templateId
-        && intent.postcode,
-      );
-      if (externalReturn.invalidSession || !externalReturn.sessionId || !validPurchaseIntent || !intent || !session?.access_token) {
-        setExternalReturnState((state) => transitionExternalReturn(
-          transitionExternalReturn(state, { type: "return", kind: "stripe_success" }),
-          { type: "fail" },
-        ));
-        setNotice({
-          type: "error",
-          message: "This payment return could not be verified. Your checkout draft is safe.",
-          actionKey: "verifyPayment",
-        });
-        const completedPath = dashboardPathAfterProcessing(
-          "templates",
-          currentParams,
-          true,
-          PAYMENT_RETURN_PARAMS,
-        );
-        if (completedPath) router.replace(completedPath);
-        return () => {
-          activeEffect = false;
-        };
-      }
-
-      const paymentCheckKey = paymentVerificationKey(externalReturn.sessionId, intent.id);
-      if (paymentCheckRef.current === paymentCheckKey) {
-        return;
-      }
-      paymentCheckRef.current = paymentCheckKey;
-      setExternalReturnState((state) => transitionExternalReturn(
-        transitionExternalReturn(state, { type: "return", kind: "stripe_success", key: paymentCheckKey }),
-        { type: "verify" },
-      ));
-      setNotice({ type: "info", message: "Verifying your payment…", actionKey: "verifyPayment" });
-      void runAction(
-        "verifyPayment",
-        async ({ signal }) => {
-          const response = await fetch("/api/stripe/payment-status", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              access_token: session.access_token,
-              checkout_session_id: externalReturn.sessionId,
-              intent_id: intent.id,
-              template_id: intent.templateId,
-              postcode: intent.postcode,
-            }),
-            signal,
-          });
-          return readJsonResponse<PaymentVerificationResponse>(
-            response,
-            "Could not verify payment.",
-          );
-        },
-        { timeoutMs: ACTION_TIMEOUTS.payment, errorMessage: "Could not verify payment." },
-      ).then((outcome) => {
-        if (!activeEffect) return;
-        if (outcome.outcome === "success") {
-          const result = outcome.value;
-          if (
-            isConfirmedPaymentStatus(result)
-            && result.checkoutSessionId === externalReturn.sessionId
-            && result.templateId === intent.templateId
-            && result.postcode === intent.postcode
-          ) {
-            consumePendingIntentAfterSuccess(intent.id);
-            setPendingIntent(intent);
-            setUnclaimedIntent(null);
-            setRestoredIntentId("");
-            setExternalReturnState((state) => transitionExternalReturn(
-              transitionExternalReturn(state, { type: "confirm" }),
-              { type: "process" },
-            ));
-            reportSuccess("verifyPayment", "Payment confirmed. Your saved checkout draft was completed.");
-            const completedPath = dashboardPathAfterProcessing(
-              intent.panel,
-              currentParams,
-              true,
-              PAYMENT_RETURN_PARAMS,
-            );
-            if (completedPath) router.replace(completedPath);
-            return;
-          }
-          if (result.status === "pending") {
-            setExternalReturnState((state) => transitionExternalReturn(state, { type: "pending" }));
-            setNotice({ type: "warning", message: "Payment is still processing. Your checkout draft is safe; retry verification shortly.", actionKey: "verifyPayment" });
-            return;
-          }
-          setExternalReturnState((state) => transitionExternalReturn(state, { type: "fail" }));
-          setNotice({ type: "error", message: "Payment could not be confirmed. Your checkout draft is safe.", actionKey: "verifyPayment" });
-          return;
-        }
-        if (outcome.outcome === "error") {
-          paymentCheckRef.current = "";
-          setExternalReturnState((state) => transitionExternalReturn(state, { type: "fail" }));
-          reportError("verifyPayment", outcome.error, "Could not verify payment. Your draft is safe; retry when ready.");
-        }
-      });
-      return () => {
-        activeEffect = false;
-        abortAction("verifyPayment");
-      };
-    }
-
-    if (gmailReturn && externalReturn) {
-      const gmailCheckKey = `${externalReturn.kind}:${externalReturn.kind === "gmail_error" ? externalReturn.reason : "connected"}`;
-      if (gmailCheckRef.current === gmailCheckKey) return;
-      gmailCheckRef.current = gmailCheckKey;
-      setExternalReturnState((state) => transitionExternalReturn(
-        transitionExternalReturn(state, { type: "return", kind: externalReturn.kind, key: gmailCheckKey }),
-        { type: "verify" },
-      ));
-      setNotice({ type: "info", message: "Checking your Gmail connection…", actionKey: "verifyGmail" });
-      void runAction(
-        "verifyGmail",
-        async ({ signal }) => {
-          const supabase = getSupabaseClient();
-          const result = await supabase
-            .from("user_email_authorizations")
-            .select("status,provider_email,connected_at")
-            .eq("user_identifier", user.email || user.id)
-            .eq("provider", "google")
-            .abortSignal(signal)
-            .maybeSingle();
-          if (result.error) throw result.error;
-          return { connected: result.data?.status === "connected" };
-        },
-        { timeoutMs: ACTION_TIMEOUTS.gmail, errorMessage: "Could not check Gmail status." },
-      ).then((outcome) => {
-        if (!activeEffect) return;
-        if (outcome.outcome === "success") {
-          const connected = outcome.value.connected;
-          setGmailReady(connected);
-          if (externalReturn.kind === "gmail_connected" && connected) {
-            setExternalReturnState((state) => transitionExternalReturn(
-              transitionExternalReturn(state, { type: "confirm" }),
-              { type: "process" },
-            ));
-            reportSuccess("verifyGmail", "Gmail connected.");
-          } else {
-            setExternalReturnState((state) => transitionExternalReturn(
-              transitionExternalReturn(state, { type: "fail" }),
-              { type: "process" },
-            ));
-            setNotice({
-              type: connected ? "warning" : "error",
-              message: externalReturn.kind === "gmail_error"
-                ? gmailReturnMessage(externalReturn.reason)
-                : "Gmail authorization returned, but no active connection was confirmed. Try connecting again.",
-              actionKey: "verifyGmail",
-            });
-          }
-          const completedPath = dashboardPathAfterProcessing(
-            "gmail",
-            currentParams,
-            true,
-            GMAIL_RETURN_PARAMS,
-          );
-          if (completedPath) router.replace(completedPath);
-          return;
-        }
-        if (outcome.outcome === "error") {
-          gmailCheckRef.current = "";
-          setExternalReturnState((state) => transitionExternalReturn(state, { type: "fail" }));
-          reportError("verifyGmail", outcome.error, "Could not check Gmail status. Your existing connection was left unchanged.");
-        }
-      });
-      return () => {
-        activeEffect = false;
-        abortAction("verifyGmail");
-      };
-    }
 
     if (shouldRestoreIntent && intent && isDashboardPanel(requestedPanel)) applyRestoration();
     return () => {
@@ -469,66 +276,46 @@ export default function DashboardWorkspace() {
     setNotice(null);
     const outcome = await runAction("loadDashboard", async ({ signal }) => {
       const supabase = getSupabaseClient();
-      const [campaignResult, resumeResult, gmailResult, profileResult] = await Promise.all([
-        supabase.from("campaigns").select("id,name,location,target_business_type,search,outreach,status,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(100).abortSignal(signal),
-        // The extra columns here are what the profile panel needs. They ride
-        // along on queries this load already makes, so Profile opens with no
-        // fetch of its own instead of blocking on a second round trip.
-        supabase.from("resume_profiles").select("id,resume_file_path,resume_file_name,target_role,profile_summary,skills,work_experience").eq("profile_id", userId).order("updated_at", { ascending: false }).limit(1).abortSignal(signal).maybeSingle(),
-        supabase.from("user_email_authorizations").select("status").eq("user_identifier", email || userId).eq("provider", "google").abortSignal(signal).maybeSingle(),
-        supabase.from("profiles").select("full_name,email,phone,location,avatar_url,preferences,created_at").eq("id", userId).abortSignal(signal).maybeSingle(),
+      const [agentResult, profileResult] = await Promise.all([
+        supabase.from("calsie_agents").select("id,category,name,status,preferences,created_at").eq("user_id", userId).order("created_at", { ascending: false }).abortSignal(signal),
+        supabase.from("calsie_profiles").select("full_name,email,phone,location,avatar_url,preferences,created_at,resume_file_path,resume_file_name,resume_draft").eq("id", userId).abortSignal(signal).maybeSingle(),
       ]);
-      if (campaignResult.error) throw campaignResult.error;
-      if (resumeResult.error) throw resumeResult.error;
-      if (gmailResult.error) throw gmailResult.error;
+      if (agentResult.error) throw agentResult.error;
       if (profileResult.error) throw profileResult.error;
       const savedCampaignId = window.localStorage.getItem(`calsie:agent-campaign:${userId}`);
-      const ownedCampaigns = (campaignResult.data || []) as CampaignRecord[];
-      const latestCampaign = ownedCampaigns.find((item) => item.id === savedCampaignId) || ownedCampaigns[0] || null;
-
-      const templateId = latestCampaign?.search?.template_id;
-      let purchased: CampaignTemplate | null = null;
-      if (templateId) {
-        const { data: template, error } = await supabase.from("campaign_templates").select("id,slug,title,campaign_name,image_url,role,location,description,category,query_terms,include_title_terms,exclude_title_terms,description_keywords,job_types,posted_within_days,price_amount,compare_at_price_amount,currency,price_label,pricing_features,payment_required").eq("id", templateId).abortSignal(signal).maybeSingle();
-        if (error) throw error;
-        purchased = template ? mapTemplate(template) : null;
-      }
-
+      const agents = (agentResult.data || []) as CalsieAgent[];
+      const selectedAgent = agents.find((item) => item.id === savedCampaignId) || agents[0] || null;
+      const latestCampaign = selectedAgent ? agentCampaign(selectedAgent) : null;
+      const definition = AGENT_TEMPLATES.find((item) => item.id === selectedAgent?.category);
+      const purchased = definition ? { ...definition, location: latestCampaign?.location || definition.location } : null;
+      const resume = (profileResult.data?.resume_draft || {}) as Record<string, unknown>;
       let nextApprovedCount = 0;
       let nextPassedCount = 0;
-      if (latestCampaign?.id) {
-        const careAgent = ["support-worker", "childcare", "agecare"].includes(purchased?.slug || "");
-        if (careAgent) {
-          const [approved, skipped] = await Promise.all([
-            supabase.from("calsie_agent_job_decisions").select("id", { count: "exact", head: true }).eq("campaign_id", latestCampaign.id).eq("decision", "approved").abortSignal(signal),
-            supabase.from("calsie_agent_job_decisions").select("id", { count: "exact", head: true }).eq("campaign_id", latestCampaign.id).eq("decision", "skipped").abortSignal(signal),
-          ]);
-          if (approved.error) throw approved.error;
-          if (skipped.error) throw skipped.error;
-          nextApprovedCount = approved.count || 0;
-          nextPassedCount = skipped.count || 0;
-        } else {
-          const { data, error } = await supabase.rpc("get_campaign_tracker_counts", { p_campaign_id: latestCampaign.id }).abortSignal(signal);
-          if (error) throw error;
-          nextApprovedCount = Number(data?.[0]?.approved_count || 0);
-          nextPassedCount = Number(data?.[0]?.passed_count || 0);
-        }
+      if (latestCampaign) {
+        const [approved, skipped] = await Promise.all([
+          supabase.from("calsie_job_swipe_decisions").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("agent_id", latestCampaign.id).eq("decision", "approved").abortSignal(signal),
+          supabase.from("calsie_job_swipe_decisions").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("agent_id", latestCampaign.id).eq("decision", "skipped").abortSignal(signal),
+        ]);
+        if (approved.error) throw approved.error;
+        if (skipped.error) throw skipped.error;
+        nextApprovedCount = approved.count || 0;
+        nextPassedCount = skipped.count || 0;
       }
 
       return {
         campaign: latestCampaign,
-        gmailReady: gmailResult.data?.status === "connected",
+        gmailReady: false,
         purchased,
-        resumeName: resumeResult.data?.resume_file_name || "",
-        resumeReady: Boolean(resumeResult.data?.id),
+        resumeName: profileResult.data?.resume_file_name || "",
+        resumeReady: Boolean(profileResult.data?.resume_file_path),
         approvedCount: nextApprovedCount,
         passedCount: nextPassedCount,
         profile: (profileResult.data as ProfileRow | null) || null,
         resumeSignals: {
-          targetRole: resumeResult.data?.target_role || "",
-          profileSummary: resumeResult.data?.profile_summary || "",
-          skillsCount: countJsonArray(resumeResult.data?.skills),
-          experienceCount: countJsonArray(resumeResult.data?.work_experience),
+          targetRole: typeof resume.target_role === "string" ? resume.target_role : "",
+          profileSummary: typeof resume.profile_summary === "string" ? resume.profile_summary : "",
+          skillsCount: countJsonArray(resume.skills),
+          experienceCount: countJsonArray(resume.work_experience),
         } satisfies ProfileResumeSignals,
       };
     }, { replace: true, errorMessage: "Could not load your dashboard." });
@@ -555,18 +342,14 @@ export default function DashboardWorkspace() {
     const outcome = await runAction("useTemplate", async ({ signal }) => {
       const currentUser = requireUser();
       const supabase = getSupabaseClient();
-      const { data: created, error } = await supabase.from("campaigns").insert({
-        user_id: currentUser.id,
-        name: template.campaignName || `${template.title} Campaign`,
-        location: template.location,
-        target_business_type: template.role,
-        search: { target_role: template.role, target_location: template.location, query_terms: template.queryTerms, include_title_terms: template.includeTitleTerms, exclude_title_terms: template.excludeTitleTerms, description_keywords: template.descriptionKeywords, job_types: template.jobTypes, posted_within_days: template.postedWithinDays, fetch_frequency: "daily", campaign_days: 30, daily_job_limit: 24, template_id: template.id },
-        filters: { location: template.location, job_types: template.jobTypes, posted_within_days: template.postedWithinDays },
-        outreach: CAMPAIGN_PLAN,
-        status: "draft",
-      }).select("id,name,location,target_business_type,search,outreach,status,created_at").abortSignal(signal).single();
+      if (!AGENT_TEMPLATES.some((item) => item.id === template.id)) throw new Error("Choose an available agent.");
+      const { data: created, error } = await supabase.from("calsie_agents").upsert({
+        user_id: currentUser.id, category: template.id, name: template.title, status: "active",
+        preferences: { location: template.location },
+      }, { onConflict: "user_id,category" }).select("id,category,name,status,preferences,created_at").abortSignal(signal).single();
       if (error) throw error;
-      return created as CampaignRecord;
+      window.localStorage.setItem(`calsie:agent-campaign:${currentUser.id}`, created.id);
+      return agentCampaign(created as CalsieAgent);
     }, { errorMessage: "Could not use this template." });
     setSelectedTemplateActionId("");
 
@@ -579,7 +362,9 @@ export default function DashboardWorkspace() {
         consumePendingIntentAfterSuccess(pendingIntent.id);
         setPendingIntent(null);
       }
-      reportSuccess("useTemplate", `${template.title} campaign added.`);
+      campaignIdRef.current = outcome.value.id;
+      void load(user!.id, user!.email);
+      reportSuccess("useTemplate", `${template.title} selected.`);
       navigateToPanel("overview");
     } else if (outcome.outcome === "error") {
       reportError("useTemplate", outcome.error, "Could not use this template. Your draft was kept.");
@@ -614,12 +399,12 @@ export default function DashboardWorkspace() {
         contentType: file.type || "application/octet-stream",
       });
       if (storageError) throw storageError;
-      const { error } = await supabase.from("resume_profiles").upsert({
-        profile_id: currentUser.id,
+      const { error } = await supabase.from("calsie_profiles").upsert({
+        id: currentUser.id,
         resume_file_path: path,
         resume_file_name: file.name,
         resume_file_type: file.type || extension,
-      }, { onConflict: "profile_id" });
+      }, { onConflict: "id" });
       if (error) throw error;
       return { name: file.name };
     }, { timeoutMs: ACTION_TIMEOUTS.upload, errorMessage: "Could not update your resume." });
@@ -634,133 +419,21 @@ export default function DashboardWorkspace() {
   }
 
   async function connectGmail() {
-    setNotice(null);
-    const outcome = await runAction("connectGmail", async ({ signal }) => {
-      const token = requireAccessToken();
-      const savedIntent = readPendingIntent();
-      setExternalReturnState((state) => transitionExternalReturn(state, {
-        type: "depart",
-        kind: "gmail_connected",
-        key: savedIntent?.id || "",
-      }));
-      const response = await fetch("/api/applix/connect-gmail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          access_token: token,
-          provider: "google",
-          return_path: "/dashboard?panel=gmail",
-          pending_intent_id: savedIntent?.id || null,
-        }),
-        signal,
-      });
-      const result = await readJsonResponse<{ ok?: boolean; authorization_url?: string }>(response, "Could not connect Gmail.");
-      if (!result.authorization_url) throw new Error("Gmail authorization URL missing");
-      return result.authorization_url;
-    }, { timeoutMs: ACTION_TIMEOUTS.gmail, errorMessage: "Could not connect Gmail." });
-
-    if (outcome.outcome === "success") {
-      window.location.assign(outcome.value);
-    } else if (outcome.outcome === "error") {
-      reportError("connectGmail", outcome.error, "Could not connect Gmail.");
-    }
+    setNotice({ type: "info", message: "Gmail connection is the next integration step. Your dashboard and resume are preserved.", actionKey: "connectGmail" });
   }
 
   async function revokeGmail() {
-    const confirmed = window.confirm("Revoke the connected Gmail account? Calsie will no longer be able to send application emails until you connect again.");
-    if (!confirmed) return;
-    setNotice(null);
-    const outcome = await runAction("revokeGmail", async ({ signal }) => {
-      const token = requireAccessToken();
-      const response = await fetch("/api/applix/revoke-gmail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: token }),
-        signal,
-      });
-      const result = await readJsonResponse<{ ok?: boolean }>(response, "Could not revoke Gmail connection.");
-      if (!result.ok) throw new Error("Gmail revoke failed");
-      return true;
-    }, { timeoutMs: ACTION_TIMEOUTS.gmail, errorMessage: "Could not revoke Gmail connection." });
-
-    if (outcome.outcome === "success") {
-      setGmailReady(false);
-      reportSuccess("revokeGmail", "Gmail connection revoked. Calsie can no longer send through this account.");
-    } else if (outcome.outcome === "error") {
-      reportError("revokeGmail", outcome.error, "Could not revoke Gmail. Your existing connection was left unchanged.");
-    }
+    setNotice({ type: "info", message: "No Gmail account is connected to this fresh workspace.", actionKey: "revokeGmail" });
   }
 
   async function toggleCampaign() {
     if (!campaign) { navigateToPanel("templates"); return; }
-    const actionKey: DashboardActionKey = isCampaignRunning(campaign.status) ? "pauseCampaign" : "startCampaign";
-    setNotice(null);
-    const campaignBeforeAction = campaign;
-    const outcome = await runAction(actionKey, async ({ signal }) => {
-      const supabase = getSupabaseClient();
-      if (actionKey === "pauseCampaign") {
-        const { data: updated, error } = await supabase.from("campaigns").update({
-          status: "paused",
-          outreach: { ...(campaignBeforeAction.outreach || {}), active: false, paused_at: new Date().toISOString() },
-        }).eq("id", campaignBeforeAction.id).select("id,name,location,target_business_type,search,outreach,status,created_at").abortSignal(signal).single();
-        if (error) throw error;
-        return updated as CampaignRecord;
-      }
-      if (!resumeReady || !gmailReady) throw new Error("Campaign prerequisites missing");
-      const token = requireAccessToken();
-      const response = await fetch("/api/applix/schedule-campaign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: token, campaign_id: campaignBeforeAction.id, enabled: true }),
-        signal,
-      });
-      const result = await readJsonResponse<{ ok?: boolean; campaign?: CampaignRecord; outreach?: CampaignRecord["outreach"] }>(response, "Could not start campaign.");
-      if (!result.ok) throw new Error("Campaign start failed");
-      return result.campaign || {
-        ...campaignBeforeAction,
-        status: "active",
-        outreach: { ...(campaignBeforeAction.outreach || {}), ...(result.outreach || {}), active: true, scheduled: true },
-      };
-    }, { errorMessage: actionKey === "pauseCampaign" ? "Could not pause campaign." : "Could not start campaign." });
-
-    if (outcome.outcome === "success") {
-      setCampaign(outcome.value);
-      reportSuccess(actionKey, actionKey === "pauseCampaign" ? "Campaign paused." : "Campaign started. AI matching is running; no email was sent.");
-    } else if (outcome.outcome === "error") {
-      const fallback = actionKey === "pauseCampaign"
-        ? "Could not pause campaign. Its previous state was kept."
-        : !resumeReady || !gmailReady
-          ? "Upload your resume and connect Gmail before starting the campaign."
-          : "Could not start campaign. Its previous state was kept.";
-      reportError(actionKey, outcome.error, fallback);
-    }
+    setNotice({ type: "info", message: "Automatic applications need the new Gmail integration. You can review jobs now in Smash / Pass.", actionKey: "startCampaign" });
   }
 
   async function findJobsNow() {
-    if (!campaign || !isCampaignRunning(campaign.status)) {
-      setNotice({ type: "warning", message: "Resume the campaign before finding new jobs.", actionKey: "findJobs" });
-      return;
-    }
-    setNotice(null);
-    const campaignId = campaign.id;
-    const outcome = await runAction("findJobs", async ({ signal }) => {
-      const token = requireAccessToken();
-      const response = await fetch("/api/applix/run-campaign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: token, campaign_id: campaignId }),
-        signal,
-      });
-      const result = await readJsonResponse<{ ok?: boolean }>(response, "Could not find new jobs.");
-      if (!result.ok) throw new Error("Job search failed");
-      return true;
-    }, { timeoutMs: ACTION_TIMEOUTS.campaignSearch, errorMessage: "Could not find new jobs." });
-
-    if (outcome.outcome === "success") {
-      reportSuccess("findJobs", "Job search completed. Open the tracker to review AI-approved jobs. No email was sent.");
-    } else if (outcome.outcome === "error") {
-      reportError("findJobs", outcome.error, "Could not find new jobs. Your campaign state was kept.");
-    }
+    if (!campaign) { navigateToPanel("templates"); return; }
+    navigateToPanel("approve");
   }
 
   async function logout() {

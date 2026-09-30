@@ -173,12 +173,12 @@ export default function BuildResumePanel({ uploadState, onResumeUpload }: Props)
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Please sign in again.");
       const { data, error } = await supabase
-        .from("resume_profiles")
-        .select("full_name,email,phone,location,linkedin,website_or_portfolio,target_role,industry,industry_specialisation,work_rights_locked,work_experience,education_locked,certifications_locked,licences_locked,skills,references_locked,profile_summary")
-        .eq("profile_id", userData.user.id)
+        .from("calsie_profiles")
+        .select("resume_draft")
+        .eq("id", userData.user.id)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data?.resume_draft || null;
     }, { errorMessage: "Could not load your saved draft." }).then((outcome) => {
       if (!alive) return;
       if (outcome.outcome === "success" && outcome.value) {
@@ -290,7 +290,7 @@ export default function BuildResumePanel({ uploadState, onResumeUpload }: Props)
       if (licences.length > 0 || !hasUnrecognisedLegacyData.licences) payload.licences_locked = licences;
       if (references.length > 0 || !hasUnrecognisedLegacyData.references) payload.references_locked = references;
 
-      const { error } = await supabase.from("resume_profiles").upsert(payload, { onConflict: "profile_id" });
+      const { error } = await supabase.from("calsie_profiles").upsert({ id: userData.user.id, resume_draft: payload }, { onConflict: "id" });
       if (error) throw error;
       return true;
     }, { errorMessage: "Could not save your progress. Your answers are still on this screen — try again." });

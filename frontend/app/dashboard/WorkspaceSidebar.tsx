@@ -21,7 +21,7 @@ import type { WorkspaceTab } from "./workspace-data";
 
 const primary: Array<[WorkspaceTab, string, LucideIcon]> = [
   ["overview", "Overview", LayoutGrid],
-  ["templates", "Browse Templates", ImageIcon],
+  ["templates", "Browse Agents", ImageIcon],
   ["resume", "Update Resume", Pencil],
   ["buildResume", "Build Resume", FileEdit],
   ["gmail", "Gmail Connection", Mail],

@@ -6,7 +6,14 @@ export function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "This legacy service is not available in the new Calsie app." }, { status: 410 });
   }
-  return NextResponse.redirect(new URL("/dashboard", request.url));
+  const restoredPanels: Record<string, string> = {
+    "/profile": "profile", "/campaign/templates": "templates",
+    "/campaign/new": "campaign", "/campaign/draft": "campaign",
+    "/resume-canvas": "buildResume", "/dashboard/jobs/tracker": "tracker",
+  };
+  const destination = new URL("/dashboard", request.url);
+  destination.searchParams.set("panel", restoredPanels[request.nextUrl.pathname] || "overview");
+  return NextResponse.redirect(destination);
 }
 
 export const config = {

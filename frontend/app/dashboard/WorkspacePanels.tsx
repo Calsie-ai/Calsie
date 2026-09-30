@@ -271,9 +271,10 @@ export default function WorkspacePanels({
         <header className="ws-panel-head">
           <p className="ws-panel-eyebrow ws-panel-eyebrow-icon"><Megaphone size={13} strokeWidth={2.4} /> Campaign</p>
           <h1 className="ws-panel-title">Set up campaign</h1>
-          <p className="ws-panel-sub">Pause controls scheduling. Find New Jobs Now runs a separate AI search while the campaign is active.</p>
+          <p className="ws-panel-sub">Your selected agent feeds Smash / Pass from its category pool. Gmail and automatic applications are the next integration step.</p>
         </header>
 
+        <p className="ws-campaign-hint">Planned automation limits, available after Gmail integration:</p>
         <div className="ws-campaign-plan">
           <div className="ws-campaign-plan-item">
             <span className="ws-campaign-plan-icon"><Target size={17} strokeWidth={2.1} /></span>
@@ -317,7 +318,7 @@ export default function WorkspacePanels({
           {!campaign ? (
             <p className="ws-campaign-hint">Choose a template below to create a campaign.</p>
           ) : !running && startBlockers.length > 0 ? (
-            <p className="ws-campaign-hint">To start this campaign you still need to {startBlockers.join(" and ")}.</p>
+            <p className="ws-campaign-hint">Automatic applications are not connected yet. You can review jobs now in Smash / Pass.</p>
           ) : null}
         </div>
 

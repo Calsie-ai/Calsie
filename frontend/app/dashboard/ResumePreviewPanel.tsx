@@ -38,9 +38,9 @@ export default function ResumePreviewPanel({ resumeReady, resumeName, uploadStat
         if (!userData.user) throw new Error("Please sign in again.");
 
         const { data: profile, error: profileError } = await supabase
-          .from("resume_profiles")
+          .from("calsie_profiles")
           .select("resume_file_path,resume_file_type,resume_file_name")
-          .eq("profile_id", userData.user.id)
+          .eq("id", userData.user.id)
           .maybeSingle();
 
         if (profileError) throw profileError;
