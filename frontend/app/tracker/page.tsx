@@ -50,7 +50,7 @@ type CategoryFeedResponse = {
   ok?: boolean;
   error?: string;
   message?: string;
-  agent?: { id: string; name: string; status: string; category: "disability" | "childcare" | "aged_care" } | null;
+  agent?: { id: string; name: string; status: string; category: "disability" | "childcare" | "aged_care"; preferences?: { location?: string } } | null;
   agents?: Array<{ id: string; name: string; status: string; category: "disability" | "childcare" | "aged_care" }>;
   pool?: "disability" | "childcare" | "aged_care" | null;
   source_table?: string | null;
@@ -126,6 +126,7 @@ export default function TrackerPage() {
   const searchParams = useSearchParams();
   const embedded = searchParams.get("embedded") === "1";
   const requestedView = searchParams.get("view");
+  const requestedAgent = searchParams.get("agent_id") || "";
   const [tab, setTab] = useState<Tab>(initialTab(requestedView));
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [agentCampaigns, setAgentCampaigns] = useState<NonNullable<CategoryFeedResponse["campaigns"]>>([]);
@@ -138,7 +139,9 @@ export default function TrackerPage() {
   const [sheetZoom, setSheetZoom] = useState(100);
   const decisionGuardsRef = useRef(new Set<string>());
   const loadAbortRef = useRef<AbortController | null>(null);
-  const selectedCampaignRef = useRef("");
+  const selectedCampaignRef = useRef(requestedAgent);
+  const loadVersionRef = useRef(0);
+  const opportunitiesRef = useRef<ReviewOpportunity[]>([]);
   const userIdRef = useRef("");
 
   const pendingOpportunities = useMemo(() => opportunities.filter(isPending), [opportunities]);
@@ -158,6 +161,8 @@ export default function TrackerPage() {
   }
 
   async function load(options: { quiet?: boolean; campaignId?: string } = {}) {
+    if (decisionGuardsRef.current.size) return;
+    const version = ++loadVersionRef.current;
     loadAbortRef.current?.abort();
     const controller = new AbortController();
     loadAbortRef.current = controller;
@@ -172,6 +177,7 @@ export default function TrackerPage() {
         router.replace("/");
         return;
       }
+      if (controller.signal.aborted || version !== loadVersionRef.current) return;
       userIdRef.current = session.user.id;
 
       const storageKey = `calsie:agent-campaign:${session.user.id}`;
@@ -185,17 +191,29 @@ export default function TrackerPage() {
         window.localStorage.removeItem(storageKey);
         feed = await categoryFeed(session.access_token, { action: "feed" }, controller.signal);
       }
-      const loadedOpportunities = feed.opportunities || [];
+      if (controller.signal.aborted || version !== loadVersionRef.current || decisionGuardsRef.current.size) return;
+      let loadedOpportunities = feed.opportunities || [];
+      if (options.quiet && feed.agent?.id === selectedCampaignRef.current) {
+        // Keep the current card stable when new jobs arrive in the background.
+        const byKey = new Map(loadedOpportunities.map((item) => [opportunityKey(item), item]));
+        const existing = opportunitiesRef.current.flatMap((item) => {
+          const fresh = byKey.get(opportunityKey(item));
+          byKey.delete(opportunityKey(item));
+          return fresh ? [fresh] : [];
+        });
+        loadedOpportunities = [...existing, ...byKey.values()];
+      }
       selectedCampaignRef.current = feed.agent?.id || "";
       setAgentCampaigns((feed.agents || []).map((item) => ({ ...item, pool: item.category, template_slug: item.category })));
       setFeedMessage(feed.message || "");
-      setCampaign(feed.agent ? { id: feed.agent.id, name: feed.agent.name, status: feed.agent.status, location: null, target_business_type: feed.agent.category } : null);
+      setCampaign(feed.agent ? { id: feed.agent.id, name: feed.agent.name, status: feed.agent.status, location: feed.agent.preferences?.location || "Australia", target_business_type: feed.agent.category } : null);
+      opportunitiesRef.current = loadedOpportunities;
       setOpportunities(loadedOpportunities);
-      publishCounts(loadedOpportunities, feed.agent?.id || null);
     } catch (loadError) {
-      if (isAbortError(loadError)) return;
+      if (isAbortError(loadError) || controller.signal.aborted || version !== loadVersionRef.current) return;
       setError(messageFrom(loadError, "Could not load your category job feed."));
       if (!options.quiet) {
+        opportunitiesRef.current = [];
         setOpportunities([]);
       }
     } finally {
@@ -207,14 +225,22 @@ export default function TrackerPage() {
   }
 
   useEffect(() => {
-    void load();
+    setTab(initialTab(requestedView));
+    selectedCampaignRef.current = requestedAgent;
+    void load({ campaignId: requestedAgent || undefined });
     const timer = window.setInterval(() => void load({ quiet: true }), 30000);
     return () => {
       window.clearInterval(timer);
+      ++loadVersionRef.current;
       loadAbortRef.current?.abort();
     };
+    // load is guarded by controller + version; URL is authoritative in the frame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [router, requestedAgent, requestedView]);
+
+  useEffect(() => {
+    if (!loading) publishCounts(opportunities, campaign?.id || null);
+  }, [opportunities, campaign?.id, loading]);
 
   useEffect(() => {
     function syncTheme(event: StorageEvent) {
@@ -240,25 +266,31 @@ export default function TrackerPage() {
 
   async function decide(opportunity: ReviewOpportunity, decision: Decision) {
     const key = opportunityKey(opportunity);
-    if (decisionGuardsRef.current.has(key) || !isPending(opportunity)) return;
+    if (decisionGuardsRef.current.size || loading || campaign?.status !== "active" || selectedCampaignRef.current !== opportunity.campaign_id || !isPending(opportunity)) return;
     decisionGuardsRef.current.add(key);
+    ++loadVersionRef.current;
+    loadAbortRef.current?.abort();
     setBusyId(key);
     setMessage("");
     setError("");
-
+    let decisionError: unknown;
     try {
       await recordDecision(opportunity, decision);
+      if (selectedCampaignRef.current !== opportunity.campaign_id) return;
       const reviewedAt = new Date().toISOString();
-      const nextItems = opportunities.map((item) => opportunityKey(item) === key ? { ...item, status: decision, reviewed_at: reviewedAt } : item);
+      const nextItems = opportunitiesRef.current.map((item) => opportunityKey(item) === key ? { ...item, status: decision, reviewed_at: reviewedAt } : item);
+      opportunitiesRef.current = nextItems;
       setOpportunities(nextItems);
-      publishCounts(nextItems, campaign?.id || null);
-      setMessage(decision === "approved" ? "Smashed. This job has been saved to your Calsie review decisions." : "Passed. This job has been removed from your waiting feed.");
-    } catch (decisionError) {
-      setError(messageFrom(decisionError, "Could not save the decision."));
-      await load();
+      setMessage(decision === "approved" ? "Smashed. Saved to your tracker." : "Passed. Removed from your review feed.");
+    } catch (caught) {
+      decisionError = caught;
     } finally {
       decisionGuardsRef.current.delete(key);
       setBusyId(null);
+      if (selectedCampaignRef.current === opportunity.campaign_id) {
+        await load({ quiet: true });
+        if (decisionError) setError(messageFrom(decisionError, "Could not save the decision. Please retry."));
+      }
     }
   }
 
@@ -267,7 +299,7 @@ export default function TrackerPage() {
   }
 
   return (
-    <main className={`${styles.shell} ${embedded ? styles.embedded : ""}`}>
+    <main className={`${styles.shell} ${embedded ? styles.embedded : ""} ${tab === "review" ? styles.reviewShell : ""}`}>
       <div className={styles.page}>
         {!embedded && (
           <header className={styles.header}>
@@ -277,16 +309,16 @@ export default function TrackerPage() {
               <h1>{tab === "review" ? "Smash or Pass" : tab === "tracker" ? "Opportunity tracker" : "Application history"}</h1>
               <p className={styles.subtitle}>{campaign ? `${campaign.name || campaign.target_business_type || "Campaign"} · ${campaign.location || "Location not set"}` : "No campaign selected"}</p>
             </div>
-            <button type="button" onClick={() => void load()} disabled={loading} className={styles.reload}>{loading ? "Loading..." : "Reload"}</button>
+            <button type="button" onClick={() => void load()} disabled={loading || !!busyId} className={styles.reload}>{loading ? "Loading..." : "Reload"}</button>
           </header>
         )}
 
-        <div className={styles.agentPicker}>
-          <label htmlFor="active-care-agent">Active care agent</label>
+        {!embedded && <div className={styles.agentPicker}>
+          <label htmlFor="active-care-agent">Care agent</label>
           <select
             id="active-care-agent"
             value={campaign?.id || ""}
-            disabled={loading || agentCampaigns.length === 0}
+            disabled={loading || !!busyId || agentCampaigns.length === 0}
             onChange={(event) => {
               const id = event.target.value;
               selectedCampaignRef.current = id;
@@ -294,12 +326,12 @@ export default function TrackerPage() {
               void load({ campaignId: id });
             }}
           >
-            {agentCampaigns.length === 0 && <option value="">No active care agent</option>}
+            {agentCampaigns.length === 0 && <option value="">{loading ? "Loading agents…" : "No care agent selected"}</option>}
             {agentCampaigns.map((item) => <option key={item.id} value={item.id}>{item.pool === "disability" ? "Disability Agent" : item.pool === "childcare" ? "Childcare Agent" : "Aged Care Agent"} · {item.name || "Campaign"}</option>)}
           </select>
-          {!campaign && <Link href="/dashboard">Choose an agent</Link>}
-        </div>
-        {feedMessage && <p className={styles.notice} role="status">{feedMessage}</p>}
+          {!campaign && !loading && <Link href="/dashboard?panel=templates">Choose an agent</Link>}
+        </div>}
+        {tab !== "review" && feedMessage && <p className={styles.notice} role="status">{feedMessage}</p>}
         {tab !== "review" && (
           <section className={styles.summary}>
             <div className={styles.summaryCard}><span>Loaded for review</span><strong>{summary.waiting}</strong><small>More jobs load as you review</small></div>
@@ -325,16 +357,22 @@ export default function TrackerPage() {
           </div>
         )}
 
-        {message && <p className={styles.notice} role="status" aria-live="polite">{message}</p>}
-        {error && <p className={styles.error} role="alert">{error}</p>}
+        {tab !== "review" && message && <p className={styles.notice} role="status" aria-live="polite">{message}</p>}
+        {tab !== "review" && error && <p className={styles.error} role="alert">{error}</p>}
 
         {tab === "review" && (
           <JobSwipeDeck
             job={currentOpportunity}
             waitingCount={pendingOpportunities.length}
-            busy={currentOpportunity ? busyId === opportunityKey(currentOpportunity) : false}
-            onSmash={(job) => void decide(job, "approved")}
-            onPass={(job) => void decide(job, "skipped")}
+            busy={!!busyId}
+            loading={loading}
+            error={error}
+            feedback={message}
+            campaignStatus={campaign?.status}
+            hasAgent={!!campaign}
+            onRetry={() => void load()}
+            onSmash={() => currentOpportunity && void decide(currentOpportunity, "approved")}
+            onPass={() => currentOpportunity && void decide(currentOpportunity, "skipped")}
           />
         )}
 

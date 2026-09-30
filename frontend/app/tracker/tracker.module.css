@@ -574,3 +574,20 @@
   .approveSelected,
   .skipSelected { flex: 1; }
 }
+
+/* Review is intentionally the dark canvas from the supplied card design. */
+.shell.reviewShell {
+  --tr-page: #1b1e23;
+  --tr-ink: #f8fafc;
+  --tr-ink-2: #c4c9d2;
+  --tr-line: #414650;
+  --tr-accent-ink: #ff936b;
+  --tr-card: #24282f;
+  --tr-muted: #b5bac4;
+  background: #1b1e23;
+}
+.reviewShell .agentPicker { padding: 16px 24px 0; margin-bottom: 0; flex-wrap: wrap; }
+.reviewShell .agentPicker select { background: #292d33; }
+.reviewShell .header { padding: 12px 24px; }
+.reviewShell .notice { border-radius: 10px; border-color: #3c564b; background: #253b31; color: #d1f0df; }
+.reviewShell .error { border-radius: 10px; background: #442d2d; color: #ffd8d8; }

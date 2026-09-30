@@ -43,3 +43,21 @@ retain their prior status; lifecycle logging begins with this release.
 Rollback: roll back the frontend and feed together; retain owned agents and
 events rather than deleting user history. Payments remain deferred. Never point
 the app back at the old project as a rollback mechanism.
+
+## Smash / Pass review release
+
+No new tables or migration are needed. Deploy both `index.ts` and `feedRules.ts`
+from the `calsie-agent-feed` function folder to the NEW project after merging.
+The frontend alone does not release the function code.
+
+Pending jobs come from the selected owner's active agent category, newest first,
+excluding that user's prior decisions for that agent. Saved location is applied
+both when fetching jobs and when accepting a decision. Postcode-derived labels
+match the detected state because scraped listings do not consistently include
+postcodes or coordinates; this is not a distance/radius filter. City-only labels
+match their normalized city/state words. Australia means the whole category pool.
+History is retained even if a job no longer matches the location. No experience
+ranking, fabricated compatibility score or Day 8 recommendation routing is added.
+
+Deploy rollback: restore the previous function and frontend together. Existing
+agents, decisions, and lifecycle events are retained.

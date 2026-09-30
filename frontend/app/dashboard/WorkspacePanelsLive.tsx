@@ -389,8 +389,9 @@ export default function WorkspacePanelsLive(props: Props) {
         </header>
         <div className="ws-tracker-frame-wrap">
           <iframe
+            key={`${props.campaign?.id || "none"}:${status}:${approvalMode}`}
             className="ws-tracker-frame"
-            src={`/tracker?embedded=1&view=${approvalMode ? "review" : "tracker"}`}
+            src={`/tracker?embedded=1&view=${approvalMode ? "review" : "tracker"}&agent_id=${encodeURIComponent(props.campaign?.id || "")}`}
             title={approvalMode ? "Applix job approval queue" : "Applix application tracker"}
           />
         </div>
@@ -527,7 +528,7 @@ export default function WorkspacePanelsLive(props: Props) {
               {postcodeTouched && Boolean(postcode) && !postcodeInfo.valid ? <p className="ws-field-error">Enter a valid 4-digit Australian postcode.</p> : null}
               {postcodeInfo.valid ? <p className="ws-field-success">Detected location: {postcodeInfo.label}</p> : null}
             </div>
-            <p className="ws-review-hint">Location is saved with your agent. The feed currently includes the entire category pool; finer location filtering comes next.</p>
+            <p className="ws-review-hint">Postcode-based campaigns show jobs in the detected state. Precise postcode and distance matching will come later. Leave this blank to browse Australia.</p>
           </div>}
 
           <div className="ws-review-section">
