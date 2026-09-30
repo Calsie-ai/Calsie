@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { matchesLocation, plainDescription } from "./feedRules.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const URL = Deno.env.get("SUPABASE_URL") || "";
@@ -29,13 +30,13 @@ function reply(req: Request, data: unknown, status = 200) {
 function mapJob(row: Row, agentId: string, decision?: Row) {
   const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
   const string = (value: unknown) => typeof value === "string" && value.trim() ? value.trim() : null;
-  const posted = row.listing_date || row.created_at || null;
+  const posted = row.listing_date || null;
   return {
     opportunity_type: "live_job", review_id: `apify:${row.id}`, id: String(row.id),
     source_job_id: Number(row.id), campaign_id: agentId,
     title: row.title || null, company: row.company || null, location: row.location || null,
     source: row.job_source || null, apply_url: row.canonical_apply_url || null,
-    extracted_email: null, description: string(payload.description) || string(payload.jobDescription) || string(payload.summary),
+    extracted_email: null, description: plainDescription(payload.description) || plainDescription(payload.jobDescription) || plainDescription(payload.summary),
     status: decision?.decision || "pending_review", created_at: row.created_at || null,
     selected_at: row.fetched_at || row.created_at || null, reviewed_at: decision?.reviewed_at || null,
     batch_date: posted ? String(posted).slice(0, 10) : null, campaign_day: null,
@@ -62,12 +63,12 @@ Deno.serve(async (req: Request) => {
     if (action !== "feed" && action !== "decide") return reply(req, { ok: false, error: "Unknown action." }, 400);
 
     const agentsResult = await db.from("calsie_agents")
-      .select("id,user_id,category,name,status,created_at")
+      .select("id,user_id,category,name,status,created_at,preferences")
       .eq("user_id", userId).order("created_at", { ascending: false });
     if (agentsResult.error) throw agentsResult.error;
     const agents = (agentsResult.data || []).filter((agent) => ["draft", "active", "paused"].includes(agent.status) && agent.category in POOLS);
     const requestedId = typeof body?.agent_id === "string" ? body.agent_id : "";
-    const agent = requestedId ? agents.find((item) => item.id === requestedId) : agents[0];
+    const agent = requestedId ? agents.find((item) => item.id === requestedId) : agents.find((item) => item.status === "active") || agents[0];
     if (requestedId && !agent) return reply(req, { ok: false, error: "This agent is unavailable to your account." }, 404);
     if (!agent) return reply(req, { ok: true, agent: null, agents, opportunities: [], message: "Choose an agent to review jobs." });
     const category = agent.category as Category;
@@ -84,6 +85,7 @@ Deno.serve(async (req: Request) => {
         .eq("id", jobId).maybeSingle();
       if (job.error) throw job.error;
       if (!job.data) return reply(req, { ok: false, error: "Job is no longer in this agent's pool." }, 404);
+      if (!matchesLocation(job.data.location, agent.preferences?.location)) return reply(req, { ok: false, error: "This job does not match your campaign location." }, 409);
       const saved = await db.from("calsie_job_swipe_decisions").insert({
         user_id: userId, agent_id: agent.id, category, source_table: table,
         source_job_id: jobId, decision: body.decision,
@@ -119,7 +121,7 @@ Deno.serve(async (req: Request) => {
         .order("id", { ascending: false }).range(offset, offset + 499);
       if (page.error) throw page.error;
       jobs.push(...(page.data || []));
-      pending += (page.data || []).filter((item) => !byId.has(Number(item.id))).length;
+      pending += (page.data || []).filter((item) => !byId.has(Number(item.id)) && matchesLocation(item.location, agent.preferences?.location)).length;
       if ((page.data || []).length < 500) break;
     }
     const visible = new Set(jobs.map((item) => Number(item.id)));
@@ -136,7 +138,7 @@ Deno.serve(async (req: Request) => {
     const snapshots = decisions.filter((item) => !found.has(Number(item.source_job_id)))
       .map((item) => ({ id: item.source_job_id, ...item.job_snapshot }));
     let sent = 0;
-    const opportunities = [...jobs.filter((item) => byId.has(Number(item.id)) || (agent.status === "active" && sent++ < 100)), ...historical, ...snapshots]
+    const opportunities = [...jobs.filter((item) => byId.has(Number(item.id)) || (agent.status === "active" && matchesLocation(item.location, agent.preferences?.location) && sent++ < 100)), ...historical, ...snapshots]
       .map((item) => mapJob(item, agent.id, byId.get(Number(item.id))));
     return reply(req, { ok: true, agent, agents, category, source_table: table, opportunities,
       message: agent.status === "active" ? null : "Start or resume this campaign from Set Up Campaign to review new jobs. Your history is saved." });
