@@ -94,6 +94,7 @@ export default function DashboardWorkspace() {
   const returnPath = safeInternalPath(`${pathname}${query ? `?${query}` : ""}`);
   const active = parseDashboardPanel(searchParams.get("panel"));
   const [campaign, setCampaign] = useState<CampaignRecord | null>(null);
+  const [ownedAgents, setOwnedAgents] = useState<CalsieAgent[]>([]);
   const campaignIdRef = useRef("");
   const [purchasedTemplate, setPurchasedTemplate] = useState<CampaignTemplate | null>(null);
   const [approvedCount, setApprovedCount] = useState(0);
@@ -272,17 +273,17 @@ export default function DashboardWorkspace() {
     throw new Error("Your session expired. Sign in to continue.");
   }
 
-  async function load(userId: string, email: string | undefined) {
+  async function load(userId: string, email: string | undefined, preferredAgentId?: string) {
     setNotice(null);
     const outcome = await runAction("loadDashboard", async ({ signal }) => {
       const supabase = getSupabaseClient();
       const [agentResult, profileResult] = await Promise.all([
-        supabase.from("calsie_agents").select("id,category,name,status,preferences,created_at").eq("user_id", userId).order("created_at", { ascending: false }).abortSignal(signal),
+        supabase.from("calsie_agents").select("id,category,name,status,payment_status,preferences,created_at,started_at").eq("user_id", userId).order("created_at", { ascending: false }).abortSignal(signal),
         supabase.from("calsie_profiles").select("full_name,email,phone,location,avatar_url,preferences,created_at,resume_file_path,resume_file_name,resume_draft").eq("id", userId).abortSignal(signal).maybeSingle(),
       ]);
       if (agentResult.error) throw agentResult.error;
       if (profileResult.error) throw profileResult.error;
-      const savedCampaignId = window.localStorage.getItem(`calsie:agent-campaign:${userId}`);
+      const savedCampaignId = preferredAgentId || window.localStorage.getItem(`calsie:agent-campaign:${userId}`);
       const agents = (agentResult.data || []) as CalsieAgent[];
       const selectedAgent = agents.find((item) => item.id === savedCampaignId) || agents[0] || null;
       const latestCampaign = selectedAgent ? agentCampaign(selectedAgent) : null;
@@ -303,6 +304,7 @@ export default function DashboardWorkspace() {
       }
 
       return {
+        agents,
         campaign: latestCampaign,
         gmailReady: false,
         purchased,
@@ -321,6 +323,7 @@ export default function DashboardWorkspace() {
     }, { replace: true, errorMessage: "Could not load your dashboard." });
 
     if (outcome.outcome === "success") {
+      setOwnedAgents(outcome.value.agents);
       campaignIdRef.current = outcome.value.campaign?.id || "";
       setProfileRow(outcome.value.profile);
       setResumeSignals(outcome.value.resumeSignals);
@@ -343,14 +346,14 @@ export default function DashboardWorkspace() {
       const currentUser = requireUser();
       const supabase = getSupabaseClient();
       if (!AGENT_TEMPLATES.some((item) => item.id === template.id)) throw new Error("Choose an available agent.");
-      const { data: created, error } = await supabase.from("calsie_agents").upsert({
-        user_id: currentUser.id, category: template.id, name: template.title, status: "active",
-        preferences: { location: template.location },
-      }, { onConflict: "user_id,category" }).select("id,category,name,status,preferences,created_at").abortSignal(signal).single();
+      const { data: created, error } = await supabase.rpc("calsie_choose_agent", {
+        p_category: template.id, p_location: template.location || "Australia",
+      }).abortSignal(signal).single();
       if (error) throw error;
-      window.localStorage.setItem(`calsie:agent-campaign:${currentUser.id}`, created.id);
-      return agentCampaign(created as CalsieAgent);
-    }, { errorMessage: "Could not use this template." });
+      const agent = created as CalsieAgent;
+      window.localStorage.setItem(`calsie:agent-campaign:${currentUser.id}`, agent.id);
+      return agentCampaign(agent);
+    }, { errorMessage: "Could not activate this agent." });
     setSelectedTemplateActionId("");
 
     if (outcome.outcome === "success") {
@@ -365,9 +368,9 @@ export default function DashboardWorkspace() {
       campaignIdRef.current = outcome.value.id;
       void load(user!.id, user!.email);
       reportSuccess("useTemplate", `${template.title} selected.`);
-      navigateToPanel("overview");
+      navigateToPanel("campaign");
     } else if (outcome.outcome === "error") {
-      reportError("useTemplate", outcome.error, "Could not use this template. Your draft was kept.");
+      reportError("useTemplate", outcome.error, "Could not activate this agent. Your draft was kept.");
     }
   }
 
@@ -428,7 +431,43 @@ export default function DashboardWorkspace() {
 
   async function toggleCampaign() {
     if (!campaign) { navigateToPanel("templates"); return; }
-    setNotice({ type: "info", message: "Automatic applications need the new Gmail integration. You can review jobs now in Smash / Pass.", actionKey: "startCampaign" });
+    if (isActionLoading(actionStates, "loadDashboard")) return;
+    const currentUser = requireUser();
+    const agentId = campaign.id;
+    const nextStatus = campaign.status === "active" ? "paused" : "active";
+    const actionKey = nextStatus === "paused" ? "pauseCampaign" : "startCampaign";
+    setNotice(null);
+    const outcome = await runAction(actionKey, async ({ signal }) => {
+      const { data, error } = await getSupabaseClient().from("calsie_agents")
+        .update({ status: nextStatus }).eq("id", agentId).eq("user_id", currentUser.id)
+        .eq("status", campaign.status)
+        .select("id,category,name,status,payment_status,preferences,created_at,started_at").abortSignal(signal).single();
+      if (error) throw error;
+      return data as CalsieAgent;
+    }, { errorMessage: "Could not update your campaign. Refresh and try again." });
+    if (outcome.outcome === "success") {
+      setOwnedAgents((items) => items.map((item) => item.id === agentId ? outcome.value : item));
+      if (campaignIdRef.current === agentId) setCampaign(agentCampaign(outcome.value));
+      reportSuccess(actionKey, nextStatus === "paused" ? "Campaign paused. Your history is saved." : "Campaign started. You can review jobs in Smash / Pass.");
+    } else if (outcome.outcome === "error") {
+      reportError(actionKey, outcome.error, "Could not update your campaign. Refresh and try again.");
+    }
+  }
+
+  function openOwnedAgent(agent: CalsieAgent) {
+    const currentUser = requireUser();
+    if (!ownedAgents.some((item) => item.id === agent.id)) return;
+    if (pendingIntent?.templateId === agent.category) {
+      consumePendingIntentAfterSuccess(pendingIntent.id);
+      setPendingIntent(null);
+    }
+    window.localStorage.setItem(`calsie:agent-campaign:${currentUser.id}`, agent.id);
+    setCampaign(agentCampaign(agent));
+    campaignIdRef.current = agent.id;
+    const definition = AGENT_TEMPLATES.find((item) => item.id === agent.category);
+    setPurchasedTemplate(definition ? { ...definition, location: agent.preferences?.location || definition.location } : null);
+    void load(currentUser.id, currentUser.email, agent.id);
+    navigateToPanel("campaign");
   }
 
   async function findJobsNow() {
@@ -522,7 +561,8 @@ export default function DashboardWorkspace() {
   const campaignActionKey: DashboardActionKey = isCampaignRunning(campaign?.status) ? "pauseCampaign" : "startCampaign";
   const campaignActionLoading = isActionLoading(actionStates, campaignActionKey);
   const campaignActionBlocked = (
-    isActionLoading(actionStates, "startCampaign")
+    isActionLoading(actionStates, "loadDashboard")
+    || isActionLoading(actionStates, "startCampaign")
     || isActionLoading(actionStates, "pauseCampaign")
   );
   // A saved profile row wins over auth user_metadata, which is only ever a
@@ -546,15 +586,8 @@ export default function DashboardWorkspace() {
   });
   const avatarUrl = avatar.src;
   const profileLoading = isActionLoading(actionStates, "loadDashboard") && !profileRow;
-  const campaignPrerequisitesMissing = Boolean(campaign) && !isCampaignRunning(campaign?.status) && (!resumeReady || !gmailReady);
-  const campaignActionDisabled = Boolean(campaign) && (campaignActionBlocked || campaignPrerequisitesMissing);
-  // A disabled control that never says why is a dead end — name the one
-  // thing still standing in the way.
-  const campaignDisabledReason = !campaign
-    ? "Choose a campaign template to get started"
-    : campaignPrerequisitesMissing
-      ? (!resumeReady ? "Upload your resume first" : "Connect Gmail first")
-      : "";
+  const campaignActionDisabled = Boolean(campaign) && campaignActionBlocked;
+  const campaignDisabledReason = !campaign ? "Choose an agent to get started" : "";
 
   return (
     <main className={`applix-workspace${sidebarOpen ? "" : " is-sidebar-collapsed"}`}>
@@ -691,6 +724,8 @@ export default function DashboardWorkspace() {
           active={active}
           campaign={campaign}
           purchasedTemplate={purchasedTemplate}
+          ownedAgents={ownedAgents}
+          onOpenOwnedAgent={openOwnedAgent}
           resumeReady={resumeReady}
           resumeName={resumeName}
           gmailReady={gmailReady}
