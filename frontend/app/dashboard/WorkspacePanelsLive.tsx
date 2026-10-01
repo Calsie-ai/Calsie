@@ -1,4 +1,5 @@
 "use client";
+import TrackerWorkspace, { type ReviewCounts } from "../tracker/TrackerWorkspace";
 
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -37,6 +38,7 @@ const SAVED_TEMPLATES_KEY = "calsie:saved-templates";
 
 type BaseProps = ComponentProps<typeof WorkspacePanels>;
 type Props = BaseProps & {
+  onReviewCounts: (counts: ReviewCounts) => void;
   ownedAgents: CalsieAgent[];
   onOpenOwnedAgent: (agent: CalsieAgent) => void;
   approvedCount: number;
@@ -363,8 +365,9 @@ export default function WorkspacePanelsLive(props: Props) {
       onProfileChange={props.onProfileChange}
     />
   );
-  if (props.active === "approve" || props.active === "tracker") {
-    const approvalMode = props.active === "approve";
+  if (props.active === "approve") return <TrackerWorkspace key={`${props.campaign?.id || "none"}:${props.campaign?.status || "none"}`} embedded initialView="review" agentId={props.campaign?.id || ""} onCounts={props.onReviewCounts} />;
+  if (props.active === "tracker") {
+    const approvalMode = false;
     const status = props.campaign?.status || "Not configured";
     const running = isCampaignRunning(status);
     const paused = status === "paused";

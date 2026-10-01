@@ -111,6 +111,18 @@ export default function DashboardWorkspace() {
   const [gmailRetryNonce, setGmailRetryNonce] = useState(0);
   const [externalReturnState, setExternalReturnState] = useState<ExternalReturnState>(IDLE_EXTERNAL_RETURN);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  useEffect(() => {
+    const compact = window.matchMedia("(max-width: 760px)");
+    const close = () => { if (compact.matches) setSidebarOpen(false); };
+    close();
+    compact.addEventListener("change", close);
+    return () => compact.removeEventListener("change", close);
+  }, []);
+  const handleReviewCounts = useCallback((counts: { campaignId: string | null; approvedCount: number; passedCount: number }) => {
+    if (counts.campaignId !== campaignIdRef.current) return;
+    setApprovedCount(counts.approvedCount);
+    setPassedCount(counts.passedCount);
+  }, []);
   // Saved profile row values. These override the auth user_metadata fallback
   // so an edit on the profile panel shows in the sidebar/topbar immediately,
   // without a reload.
@@ -590,7 +602,7 @@ export default function DashboardWorkspace() {
   const campaignDisabledReason = !campaign ? "Choose an agent to get started" : "";
 
   return (
-    <main className={`applix-workspace${sidebarOpen ? "" : " is-sidebar-collapsed"}`}>
+    <main className={`applix-workspace${sidebarOpen ? "" : " is-sidebar-collapsed"}${active === "approve" ? " is-smash-review" : ""}`}>
       <WorkspaceSidebar
         active={active}
         onNavigate={navigateToPanel}
@@ -721,6 +733,7 @@ export default function DashboardWorkspace() {
             onArchive={(id) => void notifications.archive(id)}
           />
         ) : <WorkspacePanelsLive
+          onReviewCounts={handleReviewCounts}
           active={active}
           campaign={campaign}
           purchasedTemplate={purchasedTemplate}

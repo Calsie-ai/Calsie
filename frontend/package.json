@@ -26,6 +26,7 @@
     "googleapis": "^144.0.0",
     "lucide-react": "^1.31.0",
     "mammoth": "latest",
+    "motion": "13.4.6",
     "next": "latest",
     "pdf-parse": "latest",
     "react": "latest",

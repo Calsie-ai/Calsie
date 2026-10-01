@@ -4,6 +4,7 @@ import "./workspace-contrast.css";
 import "./workspace-tracker.css";
 import "./workspace-final.css";
 import "./workspace-macos-theme.css";
+import "./smash-workspace.css";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return children;

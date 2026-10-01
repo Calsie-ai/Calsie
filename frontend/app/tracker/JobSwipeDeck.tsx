@@ -1,88 +1,100 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent } from "react";
-import { BriefcaseBusiness, CalendarDays, ChevronUp, ChevronsLeft, ChevronsRight, CircleDollarSign, ExternalLink, Heart, MapPin, Sparkles, Star, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { motion, useReducedMotion } from "motion/react";
+import { BriefcaseBusiness, Check, ChevronLeft, ChevronRight, CircleCheck, CircleDollarSign, MapPin, X } from "lucide-react";
+import type { ReviewOpportunity } from "./TrackerWorkspace";
+import { isCampaignRunning } from "../dashboard/workspace-data";
 import { postedLabel, swipeAction } from "../../lib/jobSwipe";
-import styles from "./swipe.module.css";
+import styles from "./smash-pass.module.css";
 
-type ReviewOpportunity = {
-  review_id: string; campaign_id: string; title: string | null; company: string | null;
-  location: string | null; source: string | null; apply_url: string | null;
-  description: string | null; salary?: string | null; job_type?: string | null;
-  posted_at?: string | null; company_logo?: string | null;
-};
 type Props = {
-  job: ReviewOpportunity | null; waitingCount: number; busy: boolean; loading?: boolean;
-  error?: string; feedback?: string; campaignStatus?: string | null; hasAgent?: boolean;
-  onSmash: (job: ReviewOpportunity) => void; onPass: (job: ReviewOpportunity) => void;
-  onRetry: () => void;
+  campaign: { status: string | null } | null;
+  opportunities: ReviewOpportunity[];
+  loading: boolean;
+  busy: boolean;
+  error: string;
+  feedback: string;
+  feedMessage: string;
+  onDecide: (item: ReviewOpportunity, decision: "approved" | "skipped") => Promise<void>;
+  onReload: () => void;
 };
+const keyOf = (item: ReviewOpportunity) => `${item.opportunity_type}:${item.review_id}`;
 
-export default function JobSwipeDeck({ job, waitingCount, busy, loading, error, feedback, campaignStatus, hasAgent, onSmash, onPass, onRetry }: Props) {
-  const [view, setView] = useState<"review" | "recommended">("review");
-  const [detailsOpen, setDetailsOpen] = useState(false);
+function JobCard({ item }: { item: ReviewOpportunity }) {
   const [logoFailed, setLogoFailed] = useState(false);
-  const [drag, setDrag] = useState({ x: 0, y: 0 });
-  const start = useRef<{ x: number; y: number; id: number } | null>(null);
-  useEffect(() => { setDetailsOpen(false); setLogoFailed(false); setDrag({ x: 0, y: 0 }); start.current = null; }, [job?.review_id, job?.campaign_id]);
-  const disabled = busy || loading || campaignStatus !== "active";
+  const description = (item.description || item.ai_reason || "No description provided.").replace(/<[^>]*>/g, " ").trim();
+  const paragraphs = description.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const initials = (item.company || "Company").split(/\s+/).slice(0, 3).map((word) => word[0]).join("");
+  return <>
+    <div className={styles.cardHeading}>
+      <div className={styles.companyMark} aria-hidden="true">{item.company_logo && !logoFailed ? <img src={item.company_logo} alt="" onError={() => setLogoFailed(true)} /> : initials}</div>
+      <div><h2>{item.title || "Direct company outreach"}</h2><p>{item.company || "Company not listed"}</p></div>
+      <span className={styles.badge}>New</span>
+    </div>
+    <div className={styles.metadata}>
+      <span><CircleDollarSign />{item.salary || "Salary not listed"}</span>
+      <span><MapPin />{item.location || "Location not listed"}</span>
+      <span><BriefcaseBusiness />{item.job_type || (item.opportunity_type === "direct_company" ? "Direct outreach" : "Type not listed")}</span>
+    </div>
+    <div className={styles.description} tabIndex={0} aria-label="Job description">
+      <h3>Summary</h3>
+      {paragraphs.map((paragraph, index) => /^(key responsibilities|responsibilities|requirements|qualifications|benefits|about the role):?$/i.test(paragraph) ? <h3 key={index}>{paragraph.replace(/:$/, "")}</h3> : <p key={index}>{paragraph.replace(/^[•\-*]\s*/, "")}</p>)}
+      {item.ai_reason && item.description && <><h3>Why this match</h3><p>{item.ai_reason}</p></>}
+      <div className={styles.source}>Posted {postedLabel(item.posted_at)} · {item.source || "Source not listed"}{item.apply_url && /^https?:\/\//i.test(item.apply_url) && <a href={item.apply_url} target="_blank" rel="noreferrer">Open original job</a>}</div>
+    </div>
+  </>;
+}
 
-  function pointerDown(event: PointerEvent<HTMLElement>) {
-    if (disabled || detailsOpen || !job || !event.isPrimary || event.button !== 0 || (event.target as HTMLElement).closest("a,button,input,select")) return;
-    start.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
-    event.currentTarget.setPointerCapture(event.pointerId);
+export default function JobSwipeDeck({ campaign, opportunities, loading, busy, error, feedback, feedMessage, onDecide, onReload }: Props) {
+  const [recommended, setRecommended] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const reducedMotion = useReducedMotion();
+  const pending = useMemo(() => opportunities.filter((item) => !item.status || item.status === "pending_review"), [opportunities]);
+  const queue = useMemo(() => recommended ? pending.filter((item) => Number.isFinite(item.ai_role_relevance_score)).sort((a, b) => b.ai_role_relevance_score! - a.ai_role_relevance_score!) : pending, [pending, recommended]);
+  const selectedIndex = Math.max(0, queue.findIndex((item) => keyOf(item) === selectedKey));
+  const current = queue[selectedIndex];
+  const reviewed = opportunities.filter((item) => item.status === "approved" || item.status === "skipped").length;
+  const total = opportunities.length;
+  const running = isCampaignRunning(campaign?.status);
+  const canDecide = campaign?.status === "active" && !busy && !loading;
+  const status = !campaign ? "No campaign selected" : running ? "Campaign running" : campaign.status === "paused" ? "Campaign paused" : campaign.status === "completed" ? "Campaign completed" : "Campaign ready";
+  const visible = queue.map((item, index) => {
+    let offset = (index - selectedIndex + queue.length) % queue.length;
+    if (offset > queue.length / 2) offset -= queue.length;
+    return { item, offset };
+  }).filter(({ offset }) => Math.abs(offset) <= 2);
+  function move(direction: number) {
+    const next = queue[(selectedIndex + direction + queue.length) % queue.length];
+    if (next && !busy) setSelectedKey(keyOf(next));
   }
-  function pointerMove(event: PointerEvent<HTMLElement>) {
-    if (!start.current || start.current.id !== event.pointerId) return;
-    setDrag({ x: event.clientX - start.current.x, y: event.clientY - start.current.y });
-  }
-  function pointerEnd(event: PointerEvent<HTMLElement>, cancelled = false) {
-    const origin = start.current;
-    start.current = null;
-    setDrag({ x: 0, y: 0 });
-    if (!origin || origin.id !== event.pointerId || cancelled || disabled || !job) return;
-    const action = swipeAction(event.clientX - origin.x, event.clientY - origin.y);
-    if (action === "details") setDetailsOpen(true);
-    else if (action === "approved") onSmash(job);
-    else if (action === "skipped") onPass(job);
-  }
-  const emptyTitle = loading ? "Loading your jobs…" : error ? "Could not load your jobs" : !hasAgent ? "Choose a care agent" : campaignStatus !== "active" ? "Your campaign is paused or not started" : "You’re all caught up";
-  const emptyBody = loading ? "Getting jobs for your selected agent." : error ? error : !hasAgent ? "Choose an agent from Browse Agents, then start its campaign." : campaignStatus !== "active" ? "Start or resume it from Set Up Campaign to review new jobs." : "No unreviewed jobs match this campaign’s location right now. Check again after the next collection.";
-  return (
-    <section className={styles.deck} aria-label="Job review">
-      <div className={styles.brand}>Calsie<Sparkles aria-hidden="true" /></div>
-      <div className={styles.tabs} role="tablist" aria-label="Job feed">
-        <button id="swipe-review-tab" type="button" role="tab" aria-selected={view === "review"} aria-controls="swipe-feed-panel" className={view === "review" ? styles.selected : ""} onClick={() => setView("review")}>Smash or Pass</button>
-        <button id="swipe-recommended-tab" type="button" role="tab" aria-selected={view === "recommended"} aria-controls="swipe-feed-panel" className={view === "recommended" ? styles.selected : ""} onClick={() => setView("recommended")}>Recommended</button>
+  const nav = (direction: number, outer = false) => <button type="button" className={outer ? styles.outerArrow : styles.arrow} aria-label={direction < 0 ? "Previous job" : "Next job"} disabled={busy || queue.length < 2} onClick={() => move(direction)}>{direction < 0 ? <ChevronLeft /> : <ChevronRight />}</button>;
+  return <div className={styles.review}>
+    <div className={styles.banner}>
+      <div className={styles.introduction}><p className={styles.eyebrow}>{status}</p><h1><span>Smash</span> or Pass</h1><p>Review matched jobs and choose Pass or Smash.</p></div>
+      <div className={styles.progress}>
+        <div className={styles.ring} role="img" aria-label={`${reviewed} of ${total} jobs reviewed`}>
+          <svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" /><circle cx="60" cy="60" r="50" strokeDasharray={`${total ? reviewed / total * 314.16 : 0} 314.16`} /></svg>
+          <span><strong>{reviewed}</strong>/{total}</span>
+        </div>
+        <div><h2>Review Progress</h2><p>{reviewed} loaded jobs reviewed</p><div className={styles.campaignNote}><CircleCheck size={21} /><span>{running ? "Campaign started. You can review jobs in Smash / Pass." : campaign ? "Start or resume your campaign to review jobs." : "Set up a campaign to find matched jobs."}</span></div></div>
       </div>
-      <div id="swipe-feed-panel" role="tabpanel" aria-labelledby={view === "review" ? "swipe-review-tab" : "swipe-recommended-tab"}>
-        {view === "recommended" ? <div className={styles.empty}><Star size={32} /><h2>Recommendations start from Day 8</h2><p>Your personalized recommendation feed will be connected in a later update. Keep reviewing jobs in Smash or Pass.</p></div> : !job || loading || error ? <div className={styles.empty} role="status"><h2>{emptyTitle}</h2><p>{emptyBody}</p>{error && <button type="button" onClick={onRetry}>Try again</button>}</div> : <>
-          <article className={`${styles.card} ${detailsOpen ? styles.expanded : ""}`} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={(event) => pointerEnd(event)} onPointerCancel={(event) => pointerEnd(event, true)} style={{ transform: `translate(${Math.max(-100, Math.min(100, drag.x))}px, ${Math.max(-35, Math.min(35, drag.y))}px) rotate(${drag.x / 40}deg)` }}>
-            {Math.abs(drag.x) > 35 && <span className={`${styles.swipeLabel} ${drag.x < 0 ? styles.smashLabel : styles.passLabel}`}>{drag.x < 0 ? "SMASH" : "PASS"}</span>}
-            <header className={styles.cardHeader}>
-              {job.company_logo && !logoFailed ? <img src={job.company_logo} alt={`${job.company || "Company"} logo`} onError={() => setLogoFailed(true)} /> : <div className={styles.initials} aria-hidden="true">{(job.company || "CO").slice(0, 2).toUpperCase()}</div>}
-              <div><h2>{job.title || "Untitled job"}</h2><p>{job.company || "Company not listed"}</p></div>
-            </header>
-            <div className={styles.facts}>
-              <div><CircleDollarSign /><span>{job.salary || "Salary not listed"}</span></div>
-              <div><MapPin /><span>{job.location || "Location not listed"}</span></div>
-              <div><BriefcaseBusiness /><span>{job.job_type || "Type not listed"}</span></div>
-            </div>
-            <div className={styles.summary}><span>Summary</span><p className={detailsOpen ? "" : styles.clamped}>{job.description || "No job description was supplied by the source."}</p>{detailsOpen && job.apply_url && <a href={job.apply_url} target="_blank" rel="noreferrer">Open original job <ExternalLink size={16} /></a>}</div>
-            <div className={styles.metadata}>
-              <div><CalendarDays /><span>Posted at<strong>{postedLabel(job.posted_at)}</strong></span></div>
-              <div><ExternalLink /><span>From<strong>{job.source || "Not listed"}</strong></span></div>
-              <div><Star /><span>Compatibility<strong className={styles.score}>Not scored</strong></span></div>
-            </div>
-          </article>
-          <button type="button" className={styles.details} aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}><ChevronUp className={detailsOpen ? styles.flipped : ""} /><i /><span>{detailsOpen ? "Hide job details" : "Swipe up for more job details"}</span></button>
-          <div className={styles.actions}>
-            <div><button type="button" className={styles.smash} disabled={disabled} aria-label="Smash job" onClick={() => onSmash(job)}><ChevronsLeft className={styles.direction} /><Heart fill="currentColor" /></button><strong>Smash</strong><span>Swipe left</span></div>
-            <div><button type="button" className={styles.pass} disabled={disabled} aria-label="Pass job" onClick={() => onPass(job)}><X /><ChevronsRight className={styles.direction} /></button><strong>Pass</strong><span>Swipe right</span></div>
-          </div>
-          <p className={styles.count} aria-live="polite">{busy ? "Saving your decision…" : feedback || `${waitingCount} jobs loaded for review`}</p>
-        </>}
+    </div>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    {feedMessage && <p className={styles.feedMessage} role="status">{feedMessage}</p>}
+    <div className={styles.controls}>
+      <div className={styles.segmented} aria-label="Review queue"><button type="button" aria-pressed={!recommended} disabled={busy} onClick={() => { setRecommended(false); setSelectedKey(null); }}>Smash or Pass</button><button type="button" aria-pressed={recommended} disabled={busy} onClick={() => { setRecommended(true); setSelectedKey(null); }}>Recommended</button></div>
+      <div className={styles.navigation}><span aria-live="polite">{queue.length ? selectedIndex + 1 : 0} of {queue.length}</span>{nav(-1)}{nav(1)}</div>
+    </div>
+    {current && !loading ? <>
+      <div className={styles.deck} aria-label="Matched jobs" aria-roledescription="carousel">
+        {visible.map(({ item, offset }) => <motion.article key={keyOf(item)} className={styles.card} aria-hidden={offset !== 0} inert={offset !== 0} drag={offset === 0 && canDecide ? "x" : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={.25} onDragEnd={(_, info) => { if (offset !== 0 || !canDecide) return; const action = swipeAction(info.offset.x, info.offset.y); if (action === "approved" || action === "skipped") void onDecide(item, action); }} animate={{ x: `${offset * 20}%`, scale: 1 - Math.abs(offset) * .12, opacity: offset === 0 ? 1 : Math.abs(offset) === 1 ? .65 : .3, filter: offset === 0 ? "blur(0px)" : "blur(1px)" }} transition={{ duration: reducedMotion ? 0 : .3, ease: [.22, 1, .36, 1] }} style={{ zIndex: 5 - Math.abs(offset), pointerEvents: offset === 0 ? "auto" : "none", touchAction: "pan-y" }}><JobCard item={item} /></motion.article>)}
+        <div className={styles.deckPrevious}>{nav(-1, true)}</div><div className={styles.deckNext}>{nav(1, true)}</div>
       </div>
-    </section>
-  );
+      <div className={styles.decisions} aria-busy={busy}><button type="button" disabled={!canDecide} onClick={() => void onDecide(current, "skipped")}><span><X /></span>Pass</button><button type="button" disabled={!canDecide} onClick={() => void onDecide(current, "approved")}><span><Check /></span>Smash</button></div>
+      {busy && <p className={styles.saving} role="status">Saving your decision…</p>}
+      {!busy && feedback && <p className={styles.saving} role="status">{feedback}</p>}
+    </> : <div className={styles.empty} aria-live="polite"><h2>{loading ? "Loading your matches…" : error ? "Could not load your matches" : !campaign ? "Choose a care agent" : campaign.status !== "active" ? "Start or resume your campaign" : recommended && pending.length ? "No scored matches yet" : total ? "You’re all caught up" : "Your matches will appear here"}</h2><p>{recommended && pending.length ? "You can still review every job in Smash or Pass." : "Review each match and decide which opportunities to pursue."}</p>{!loading && !error && (!campaign || campaign.status !== "active") ? <Link href={campaign ? "/dashboard?panel=campaign" : "/dashboard?panel=templates"}>{campaign ? "Set up campaign" : "Browse agents"}</Link> : <button type="button" disabled={loading} onClick={onReload}>Refresh matches</button>}</div>}
+  </div>;
 }

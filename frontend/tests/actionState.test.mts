@@ -234,6 +234,8 @@ test("23. all non-submit buttons declare an explicit type", () => {
     "app/campaign/new/page.tsx",
     "app/campaign/templates/page.tsx",
     "app/tracker/page.tsx",
+    "app/tracker/TrackerWorkspace.tsx",
+    "app/tracker/JobSwipeDeck.tsx",
     "app/resume-canvas/page.tsx",
   ];
   for (const path of sourceFiles) {
