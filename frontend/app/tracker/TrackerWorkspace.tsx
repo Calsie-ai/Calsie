@@ -21,7 +21,7 @@ export type ReviewOpportunity = {
   opportunity_type: "live_job" | "direct_company";
   review_id: string;
   id: string | null;
-  source_job_id?: number | null;
+  source_job_id?: string | number | null;
   campaign_id: string;
   title: string | null;
   company: string | null;
@@ -250,8 +250,8 @@ export default function TrackerWorkspace({ embedded: embeddedOverride, initialVi
   }, []);
 
   async function recordDecision(opportunity: ReviewOpportunity, decision: Decision) {
-    const sourceJobId = Number(opportunity.source_job_id ?? opportunity.id);
-    if (!Number.isSafeInteger(sourceJobId) || sourceJobId <= 0) throw new Error("This Apify job does not have a valid source id.");
+    const sourceJobId = String(opportunity.source_job_id ?? opportunity.id ?? "");
+    if (!sourceJobId) throw new Error("This Apify job does not have a valid source id.");
 
     const supabase = getSupabaseClient();
     const sessionResult = await supabase.auth.getSession();
