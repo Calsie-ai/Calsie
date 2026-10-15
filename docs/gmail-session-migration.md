@@ -55,3 +55,11 @@ Keep the encryption key stable across deployments. Changing it makes existing to
 ## Verification commands
 
 From `frontend`: `npm run typecheck`, `node --experimental-strip-types --test tests/gmailConnection.test.mts`, and `npm run build`. There is no lint script/config in this repository. See the PR for existing-suite results and known baseline failures. Embedded PostgreSQL state-machine tests live in `supabase/jobs/tests/gmail-connection.mjs` and can run with `PGLITE_MODULE=/absolute/path/to/@electric-sql/pglite/dist/index.js node supabase/jobs/tests/gmail-connection.mjs` after installing PGlite outside the repository. These are isolated test fixtures, never production data.
+
+## Explicit migration exclusion: approved/sent email status polling
+
+The user has explicitly excluded the old approved/sent-email status checker and its failed/repeated invocations from migration. Do not copy or activate the legacy email status checker, recurring status scans, scheduler migrations, retry loops, or sender workflows as part of Gmail authorization. Do not bulk-apply the root supabase/migrations history to the NEW project.
+
+The Gmail status endpoint in this PR reads connection metadata only. It is requested when the authenticated dashboard initializes or the login token changes, after the Google return, or by an explicit user status retry. It does not inspect approved/sent applications, schedule a job, invoke a Gmail Edge Function, or retry on a timer. The SQL migration creates no cron job, HTTP dispatcher, or recurring trigger.
+
+Any future sending integration must be designed separately around an actual approved application becoming due, with a persisted provider result and bounded failure handling. This document does not authorize migrating or activating any old background checker. Existing Apify recovery/pipeline schedules are separate and were not altered by this PR.
