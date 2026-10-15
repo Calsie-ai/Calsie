@@ -16,7 +16,7 @@ import {
 type Props = {
   gmailReady: boolean;
   actionStates: ActionStateMap<DashboardActionKey>;
-  onConnectGmail: () => void;
+  onConnectGmail: (consent?: import("./gmail-consent").GmailConsent) => void;
   onRevokeGmail: () => void;
 };
 
@@ -150,7 +150,7 @@ export default function GmailPanel({ gmailReady, actionStates, onConnectGmail, o
         ) : (
           <div>
             <div className="ws-gmail-cta-row">
-              <button type="button" className="ws-btn-primary ws-gmail-connect" onClick={onConnectGmail} disabled={connectLoading || !gmailConsentComplete} aria-describedby="gmail-privacy-permission">
+              <button type="button" className="ws-btn-primary ws-gmail-connect" onClick={() => onConnectGmail({ privacy_accepted: privacyAccepted, dedicated_email_confirmed: dedicatedEmailConfirmed, policy_version: GMAIL_PRIVACY_POLICY_VERSION })} disabled={connectLoading || !gmailConsentComplete} aria-describedby="gmail-privacy-permission">
                 <Mail size={15} strokeWidth={2.4} /> {connectLoading ? "Connecting…" : "Connect Google"}
               </button>
               <div className="ws-gmail-security-note">

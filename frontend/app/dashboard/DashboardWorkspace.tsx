@@ -52,6 +52,7 @@ import WorkspacePanelsLive from "./WorkspacePanelsLive";
 import { isCampaignRunning, type CampaignRecord, type CampaignTemplate, type WorkspaceTab } from "./workspace-data";
 import { googleAvatarFromMetadata, readHideGoogleAvatar, resolveAvatar } from "../../lib/googleAvatar";
 import { AGENT_TEMPLATES, agentCampaign, type CalsieAgent } from "../../lib/careAgents";
+import type { GmailConsent } from "./gmail-consent";
 import type { ProfileResumeSignals, ProfileRow } from "./ProfilePanel";
 import NotificationsPanel from "./NotificationsPanel";
 import { useNotifications } from "./useNotifications";
@@ -220,7 +221,9 @@ export default function DashboardWorkspace() {
     }
 
     if (paymentReturn || gmailReturn) {
-      setNotice({ type: "info", message: paymentReturn ? "Payments are deferred while your workspace is rebuilt." : "Gmail integration is not connected to this fresh workspace yet." });
+      if (paymentReturn) setNotice({ type: "info", message: "Payments are deferred while your workspace is rebuilt." });
+      if (externalReturn?.kind === "gmail_error") setNotice({ type: "error", message: gmailReturnMessage(externalReturn.reason), actionKey: "verifyGmail" });
+      if (externalReturn?.kind === "gmail_connected") setGmailRetryNonce((value) => value + 1);
       const clean = new URLSearchParams(currentParams);
       for (const key of [...PAYMENT_RETURN_PARAMS, ...GMAIL_RETURN_PARAMS]) clean.delete(key);
       router.replace(dashboardPanelPath(paymentReturn ? "templates" : "gmail", clean));
@@ -257,6 +260,25 @@ export default function DashboardWorkspace() {
     status,
     user,
   ]);
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.access_token) { setGmailReady(false); return; }
+    let activeEffect = true;
+    void runAction("verifyGmail", async ({ signal }) => {
+      const response = await fetch("/api/applix/gmail-status", { signal, cache: "no-store", headers: { Authorization: `Bearer ${session.access_token}` } });
+      return readJsonResponse<{ connected: boolean; gmail_email: string | null }>(response, "Could not check Gmail connection.");
+    }, { replace: true, timeoutMs: ACTION_TIMEOUTS.gmail, errorMessage: "Could not check Gmail connection." }).then((outcome) => {
+      if (!activeEffect) return;
+      if (outcome.outcome === "success") {
+        setGmailReady(outcome.value.connected);
+        if (outcome.value.connected && gmailRetryNonce > 0) reportSuccess("verifyGmail", `Gmail connected: ${outcome.value.gmail_email}.`);
+      } else if (outcome.outcome === "error") {
+        setGmailReady(false);
+        reportError("verifyGmail", outcome.error, "Could not check Gmail connection. Try again.");
+      }
+    });
+    return () => { activeEffect = false; abortAction("verifyGmail"); };
+  }, [status, session?.access_token, user?.id, gmailRetryNonce, runAction, abortAction, reportError, reportSuccess]);
+
   useEffect(() => {
     const receiveTrackerCounts = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
@@ -318,7 +340,6 @@ export default function DashboardWorkspace() {
       return {
         agents,
         campaign: latestCampaign,
-        gmailReady: false,
         purchased,
         resumeName: profileResult.data?.resume_file_name || "",
         resumeReady: Boolean(profileResult.data?.resume_file_path),
@@ -342,7 +363,6 @@ export default function DashboardWorkspace() {
       setCampaign(outcome.value.campaign);
       setResumeReady(outcome.value.resumeReady);
       setResumeName(outcome.value.resumeName);
-      setGmailReady(outcome.value.gmailReady);
       setPurchasedTemplate(outcome.value.purchased);
       setApprovedCount(outcome.value.approvedCount);
       setPassedCount(outcome.value.passedCount);
@@ -433,12 +453,34 @@ export default function DashboardWorkspace() {
     }
   }
 
-  async function connectGmail() {
-    setNotice({ type: "info", message: "Gmail connection is the next integration step. Your dashboard and resume are preserved.", actionKey: "connectGmail" });
+  async function connectGmail(consent?: GmailConsent) {
+    if (!consent) { navigateToPanel("gmail"); return; }
+    setNotice(null);
+    const outcome = await runAction("connectGmail", async ({ signal }) => {
+      requireUser();
+      const response = await fetch("/api/applix/connect-gmail", { method: "POST", signal,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${requireAccessToken()}` }, body: JSON.stringify(consent) });
+      const data = await readJsonResponse<{ authorization_url: string }>(response, "Could not start Gmail connection.");
+      const url = new URL(data.authorization_url);
+      if (url.origin !== "https://accounts.google.com") throw new Error("Invalid Google connection response.");
+      window.location.assign(url.toString());
+    }, { timeoutMs: ACTION_TIMEOUTS.gmail, errorMessage: "Could not connect Gmail." });
+    if (outcome.outcome === "error") reportError("connectGmail", outcome.error, "Could not connect Gmail.");
   }
 
   async function revokeGmail() {
-    setNotice({ type: "info", message: "No Gmail account is connected to this fresh workspace.", actionKey: "revokeGmail" });
+    setNotice(null);
+    const outcome = await runAction("revokeGmail", async ({ signal }) => {
+      const response = await fetch("/api/applix/revoke-gmail", { method: "POST", signal, headers: { Authorization: `Bearer ${requireAccessToken()}` } });
+      return readJsonResponse<{ message: string; revocation_confirmed: boolean }>(response, "Could not disconnect Gmail.");
+    }, { timeoutMs: ACTION_TIMEOUTS.gmail, errorMessage: "Could not disconnect Gmail." });
+    if (outcome.outcome === "success") {
+      setGmailReady(false);
+      setNotice({ type: outcome.value.revocation_confirmed ? "success" : "warning", message: outcome.value.message });
+    } else if (outcome.outcome === "error") {
+      setGmailRetryNonce((value) => value + 1);
+      reportError("revokeGmail", outcome.error, "Could not confirm Gmail disconnection. Check connection status.");
+    }
   }
 
   async function toggleCampaign() {
@@ -702,8 +744,7 @@ export default function DashboardWorkspace() {
                 </button>
               ) : null}
               {notice.actionKey === "verifyGmail"
-                && notice.type === "error"
-                && searchParams.has("gmail") ? (
+                && notice.type === "error" ? (
                 <button
                   type="button"
                   className="ws-btn-outline"
@@ -770,7 +811,7 @@ export default function DashboardWorkspace() {
           onOpenCampaignPanel={() => navigateToPanel("campaign")}
           onUseTemplate={(item) => void useTemplate(item)}
           onResumeUpload={uploadResume}
-          onConnectGmail={() => void connectGmail()}
+          onConnectGmail={(consent) => void connectGmail(consent)}
           onRevokeGmail={() => void revokeGmail()}
           onToggleCampaign={() => void toggleCampaign()}
           onFindJobsNow={() => void findJobsNow()}

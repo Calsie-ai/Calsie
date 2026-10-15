@@ -33,6 +33,7 @@ const createCheckoutSource = source("../app/api/stripe/create-checkout/route.ts"
 const paymentStatusSource = source("../app/api/stripe/payment-status/route.ts");
 const webhookSource = source("../app/api/stripe/webhook/route.ts");
 const connectRouteSource = source("../app/api/applix/connect-gmail/route.ts");
+const gmailCallbackRouteSource = source("../app/api/google/callback/route.ts");
 const connectFunctionSource = source("../../supabase/functions/connect-gmail/index.ts");
 const callbackFunctionSource = source("../../supabase/functions/gmail-oauth-callback/index.ts");
 
@@ -289,8 +290,9 @@ test("cancellation and failed payment expose a deliberate checkout continuation"
 });
 
 test("Gmail initiation accepts only the exact safe return panel", () => {
-  assert.match(connectRouteSource, /returnPath !== "\/dashboard\?panel=gmail"/);
+  assert.match(gmailCallbackRouteSource, /new URL\("\/dashboard\?panel=gmail", config\.origin\)/);
   assert.doesNotMatch(connectRouteSource, /body\.return_to/);
+  assert.doesNotMatch(gmailCallbackRouteSource, /searchParams\.get\("(?:next|return_to|return_path)"/);
 });
 
 test("Gmail OAuth state is random, signed, expiring, and user-bound", () => {
@@ -329,13 +331,13 @@ test("Gmail callback refresh is idempotent after a completed exchange", () => {
 });
 
 test("dashboard verifies Gmail database state instead of trusting the query", () => {
-  assert.match(dashboardSource, /from\("user_email_authorizations"\)/);
-  assert.match(dashboardSource, /result\.data\?\.status === "connected"/);
-  assert.match(dashboardSource, /externalReturn\.kind === "gmail_connected" && connected/);
+  assert.match(dashboardSource, /fetch\("\/api\/applix\/gmail-status"/);
+  assert.match(dashboardSource, /setGmailReady\(outcome\.value\.connected\)/);
+  assert.doesNotMatch(dashboardSource, /setGmailReady\(true\)/);
 });
 
-test("Gmail departure carries pending intent continuity without exposing it in the callback URL", () => {
-  assert.match(dashboardSource, /pending_intent_id: savedIntent\?\.id \|\| null/);
-  assert.match(connectRouteSource, /pending_intent_id: pendingIntentId \|\| null/);
-  assert.doesNotMatch(callbackFunctionSource, /searchParams\.set\("pending_intent_id"/);
+test("Gmail departure sends consent to the server and keeps session credentials out of callback URLs", () => {
+  assert.match(dashboardSource, /body: JSON\.stringify\(consent\)/);
+  assert.match(connectRouteSource, /response\.cookies\.set\(config\.cookieName, binding/);
+  assert.doesNotMatch(gmailCallbackRouteSource, /searchParams\.set\("(?:access_token|refresh_token|pending_intent_id)"/);
 });
