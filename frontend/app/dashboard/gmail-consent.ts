@@ -34,3 +34,5 @@ export const GMAIL_CONNECTION_CONSENT_TEXT =
 
 export const GMAIL_DEDICATED_EMAIL_CONFIRMATION_TEXT =
   "I confirm I have created a separate or dedicated email account for my Calsie campaign.";
+
+export type GmailConsent = { privacy_accepted: boolean; dedicated_email_confirmed: boolean; policy_version: string };

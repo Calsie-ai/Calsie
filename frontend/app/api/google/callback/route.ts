@@ -1,88 +1,64 @@
-import { createClient } from "@supabase/supabase-js";
-import { google } from "googleapis";
 import { NextRequest, NextResponse } from "next/server";
+import { gmailConfig, gmailUser, transition } from "../../../../lib/gmailServer";
+import { hasSendScope, matchesState, nonceHash, seal, unseal } from "../../../../lib/gmailSecurity";
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
-
-const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY || process.env.APPLIX_SERVICE_ROLE_KEY;
-
-function html(message: string, detail: string, status = 200) {
-  return new NextResponse(
-    `<!doctype html><html><body style="font-family: system-ui; padding: 32px;"><h2>${message}</h2><p>${detail}</p></body></html>`,
-    { status, headers: { "content-type": "text/html; charset=utf-8" } }
-  );
-}
-
+export const runtime = "nodejs";
+type BrowserBinding = { attemptId: string; nonce: string; userId: string; accessToken: string; expiresAt: number };
 export async function GET(req: NextRequest) {
-  const code = req.nextUrl.searchParams.get("code");
-  const state = req.nextUrl.searchParams.get("state");
-
-  if (!code) {
-    return NextResponse.json({ error: "No code received from Google" }, { status: 400 });
+  let config: ReturnType<typeof gmailConfig>;
+  try { config = gmailConfig(); } catch {
+    return NextResponse.json({ error: "Gmail connection is unavailable." }, { status: 503 });
   }
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json({ error: "Missing Supabase server configuration" }, { status: 500 });
-  }
-
+  const finish = (reason?: string) => {
+    const url = new URL("/dashboard?panel=gmail", config.origin);
+    url.searchParams.set("gmail", reason ? "error" : "connected");
+    if (reason) url.searchParams.set("reason", reason);
+    const response = NextResponse.redirect(url, 303);
+    response.headers.set("Cache-Control", "no-store");
+    response.headers.set("Referrer-Policy", "no-referrer");
+    response.cookies.set(config.cookieName, "", { httpOnly: true, secure: config.secure, sameSite: "lax", path: "/", maxAge: 0 });
+    return response;
+  };
+  let binding: BrowserBinding | undefined;
+  let claimed = false;
+  let failureCode = "GMAIL_INVALID_STATE";
   try {
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
-
-    const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
-    const profile = await oauth2.userinfo.get();
-    const gmailEmail = profile.data.email;
-    const userId = state || gmailEmail;
-
-    if (!gmailEmail || !userId) {
-      return NextResponse.json({ error: "Could not identify Gmail user" }, { status: 400 });
+    binding = unseal<BrowserBinding>(req.cookies.get(config.cookieName)?.value || "", config.key, "oauth-browser");
+    if (!matchesState(req.nextUrl.searchParams.get("state"), binding.nonce)) return finish("invalid_state");
+    if (binding.expiresAt <= Date.now()) return finish("expired_state");
+    const user = await gmailUser(binding.accessToken);
+    if (user.id !== binding.userId) return finish("account_mismatch");
+    const attempt = await transition("claim", user.id, { attempt_id: binding.attemptId, nonce_hash: nonceHash(binding.nonce) });
+    if (!attempt.ok) return finish("invalid_state");
+    claimed = true;
+    if (req.nextUrl.searchParams.has("error")) {
+      await transition("fail", user.id, { attempt_id: binding.attemptId, error_code: "GMAIL_ACCESS_DENIED" });
+      return finish("access_denied");
     }
-
-    if (!tokens.refresh_token) {
-      return NextResponse.json(
-        {
-          error: "No refresh token received. Reconnect Gmail with prompt=consent and access_type=offline.",
-          gmail_email: gmailEmail,
-          has_access_token: Boolean(tokens.access_token),
-          has_refresh_token: false,
-        },
-        { status: 400 }
-      );
+    const code = req.nextUrl.searchParams.get("code");
+    if (!code || code.length > 4096) throw new Error("GMAIL_CODE_MISSING");
+    failureCode = "GMAIL_EXCHANGE_FAILED";
+    const exchange = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ code, client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: config.redirectUri, grant_type: "authorization_code" }),
+      signal: AbortSignal.timeout(15000), cache: "no-store" });
+    const tokens = await exchange.json();
+    if (!exchange.ok || !tokens.access_token || !tokens.refresh_token || !hasSendScope(tokens.scope) || tokens.token_type?.toLowerCase() !== "bearer") throw new Error(failureCode);
+    const profileResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${tokens.access_token}` }, signal: AbortSignal.timeout(10000), cache: "no-store" });
+    const profile = await profileResponse.json();
+    if (!profileResponse.ok || typeof profile.email !== "string" || profile.email_verified !== true || typeof profile.sub !== "string") throw new Error(failureCode);
+    failureCode = "GMAIL_STORAGE_FAILED";
+    // Tokens are bound to the local user; Google email may be a dedicated account different from login.
+    const saved = await transition("complete", user.id, { attempt_id: binding.attemptId, gmail_email: profile.email, google_subject: profile.sub,
+      scope: tokens.scope, token_ciphertext: seal({ access_token: tokens.access_token, refresh_token: tokens.refresh_token,
+        expires_at: Date.now() + Number(tokens.expires_in || 3600) * 1000 }, config.key, `gmail-tokens:${user.id}`) });
+    if (!saved.ok) throw new Error(failureCode);
+    return finish();
+  } catch {
+    if (claimed && binding) {
+      await transition("fail", binding.userId, { attempt_id: binding.attemptId, error_code: failureCode }).catch(() => {});
+      // Discard failed/abandoned credentials locally. Google revokes a whole grant,
+      // so revoking this token here could break a newer successful authorization.
     }
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
-
-    const { error } = await supabase.from("gmail_connections").upsert(
-      {
-        user_id: userId,
-        user_identifier: userId,
-        gmail_email: gmailEmail,
-        google_email: gmailEmail,
-        access_token: tokens.access_token || null,
-        refresh_token: tokens.refresh_token,
-        expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
-        expiry_date: tokens.expiry_date || null,
-        scope: tokens.scope || null,
-        token_type: tokens.token_type || null,
-        status: "connected",
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" }
-    );
-
-    if (error) {
-      console.error("Failed to save Gmail connection:", error);
-      return NextResponse.json({ error: "Gmail connected but save failed", details: error.message }, { status: 500 });
-    }
-
-    return html("Gmail connected successfully.", "You can close this tab and return to Applix.");
-  } catch (error) {
-    console.error("Google callback error:", error);
-    return NextResponse.json({ error: "Failed to connect Gmail" }, { status: 500 });
+    return finish(claimed ? (failureCode === "GMAIL_STORAGE_FAILED" ? "storage_failed" : "exchange_failed") : "invalid_state");
   }
 }

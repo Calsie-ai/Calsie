@@ -83,7 +83,7 @@ export default function WorkspacePanels({
   onBrowseTemplates?: () => void;
   onUseTemplate: (template: CampaignTemplate) => void;
   onResumeUpload: (file: File) => Promise<void>;
-  onConnectGmail: () => void;
+  onConnectGmail: (consent?: import("./gmail-consent").GmailConsent) => void;
   onRevokeGmail: () => void;
   onToggleCampaign: () => void;
   onFindJobsNow: () => void;
